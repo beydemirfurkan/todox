@@ -198,11 +198,11 @@ export async function linkFileAction(fd: FormData) {
   revalidatePath("/", "layout");
 }
 
-export async function refreshRefAction(fd: FormData) {
+export async function acceptRefAction(fd: FormData) {
   const user = await requireUser();
   const id = num(fd, "ref_id");
   await assertRef(user.id, id);
-  await refs.refresh(id);
+  await refs.acceptSeen(id);
   revalidatePath("/", "layout");
 }
 

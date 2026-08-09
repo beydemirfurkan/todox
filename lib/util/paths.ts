@@ -1,19 +1,20 @@
-import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { randomBytes } from "node:crypto";
 
-const ROOT_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod"];
-
-export function hashFile(path: string): string | null {
-  try {
-    return createHash("sha256").update(readFileSync(path)).digest("hex");
-  } catch {
-    return null;
-  }
-}
+/**
+ * Path handling for the server, which has no filesystem worth reading.
+ *
+ * Hashing files and locating a repository root used to live here and were
+ * called from request handlers. That only made sense when the MCP server was
+ * the same process as the database; on a web host there is no checkout, so
+ * both silently returned nonsense -- and both turned a caller-supplied path
+ * into a real `readFileSync`/`existsSync`. They now live in `mcp/workspace.ts`,
+ * on the machine that actually holds the code. Nothing here touches disk.
+ */
 
 export function shareToken() {
-  return randomBytes(12).toString("base64url");
+  // Matches the 32 bytes used for sessions and API tokens; there is no reason
+  // for the share link to be the weakest secret in the app.
+  return randomBytes(32).toString("base64url");
 }
 
 export function slugify(s: string) {
@@ -22,26 +23,6 @@ export function slugify(s: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 48);
-}
-
-function asDirectory(p: string) {
-  return existsSync(p) && statSync(p).isDirectory() ? p : dirname(p);
-}
-
-/**
- * Walk up from a path looking for a project root marker. Lets an agent hand us
- * any file it happens to be editing and still get the repo, not the folder the
- * file lives in.
- */
-export function findProjectRoot(start: string): string {
-  let dir = asDirectory(start);
-  for (let i = 0; i < 40; i++) {
-    if (ROOT_MARKERS.some((m) => existsSync(join(dir, m)))) return dir;
-    const up = dirname(dir);
-    if (up === dir) break;
-    dir = up;
-  }
-  return asDirectory(start);
 }
 
 /**

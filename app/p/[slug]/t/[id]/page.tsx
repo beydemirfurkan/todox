@@ -13,7 +13,7 @@ import {
   addEntryAction,
   deleteEntryAction,
   linkFileAction,
-  refreshRefAction,
+  acceptRefAction,
   setStatusAction,
   unlinkRefAction,
   updateTaskAction,
@@ -216,12 +216,17 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                     <RefBadge status={r.state} t={t} />
                     <span className="mono text-[11px] text-faint">
                       {t("linkedAt")} {ago(r.linked_at, t)}
+                      {/* Whose answer this is, and how old. The server cannot
+                          read the file; an agent looked and told us. */}
+                      {r.checked_at
+                        ? ` · ${t("checkedAt")} ${ago(r.checked_at, t)}`
+                        : ` · ${t("neverChecked")}`}
                     </span>
                     <span className="row-action ml-auto flex gap-2">
                       {r.state === "changed" && (
-                        <form action={refreshRefAction}>
+                        <form action={acceptRefAction}>
                           <input type="hidden" name="ref_id" value={r.id} />
-                          <button className="link-more !text-[12px]">{t("rehash")}</button>
+                          <button className="link-more !text-[12px]">{t("acceptRef")}</button>
                         </form>
                       )}
                       <form action={unlinkRefAction}>

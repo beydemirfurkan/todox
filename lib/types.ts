@@ -101,8 +101,12 @@ export type Ref = {
   context_id: number | null;
   path: string;
   note: string | null;
+  /** The file as it was when the note was written. */
   hash: string | null;
   linked_at: string;
+  /** What the agent last found on disk; null once checked means it is gone. */
+  hash_seen: string | null;
+  checked_at: string | null;
 };
 
 /** One status transition. This is what makes "how long did it take" answerable. */

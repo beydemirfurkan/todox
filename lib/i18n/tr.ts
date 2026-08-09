@@ -96,7 +96,9 @@ export const tr: Record<Key, string> = {
   delete: "sil",
   link: "bağla",
   unlink: "bağı kaldır",
-  rehash: "yeniden özetle",
+  acceptRef: "güncel kabul et",
+  checkedAt: "kontrol",
+  neverChecked: "henüz bir ajan bakmadı",
   append: "ekle",
   apply: "uygula",
   title: "başlık",
@@ -190,9 +192,9 @@ export const tr: Record<Key, string> = {
     "Boş. Asıl önemli kısım burası: kararlar, çıkmazlar, açık sorular ve sonraki oturumun ilk okuyacağı devir notu.",
   filesInPlay: "İşin içindeki dosyalar",
   filesHint:
-    "Dosyalar bağlandıkları anda parmak izleri alınır. Biri sonradan değişirse bu görevdeki her not işaretlenir — böylece ajan, değişmiş koda ait bir açıklamaya asla güvenmez.",
+    "Dosyaların parmak izini ajan alır, çünkü onları gerçekten görebilen taraf o. Biri değiştiğinde bu görevdeki her not işaretlenir — böylece kimse değişmiş koda ait bir açıklamaya güvenmez.",
   filesEmpty:
-    "Bu görevin dokunduğu dosyaları bağla. todox onları şimdi özetler, bir not bayatladığında sana söyler.",
+    "Bu görevin dokunduğu dosyaları bağla. Bu görevi okuyan bir sonraki ajan onları kontrol eder ve bir not bayatladıysa söyler.",
   filePathPh: "/mutlak/yol/...",
   fileNotePh: "bu dosya neden önemli (isteğe bağlı)",
   whatAgentSees: "Ajanın gördüğü",
@@ -262,7 +264,7 @@ export const tr: Record<Key, string> = {
   ref_fresh: "taze",
   ref_changed: "değişmiş!",
   ref_missing: "kayıp!",
-  ref_unknown: "okunamıyor",
+  ref_unknown: "bakılmadı",
 
   k_note: "not",
   k_decision: "karar",

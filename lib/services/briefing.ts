@@ -26,10 +26,16 @@ export async function briefing(userId: number, project: Project) {
 
   const openTasks = open.map((t) => {
     const log = logs.get(t.id) ?? [];
+    // `hash` and `id` go out so the agent can check the file itself and report
+    // back — this process has no copy of the repository, so the status here is
+    // only ever as fresh as the last thing an agent told us.
     const linked = (files.get(t.id) ?? []).map((r) => ({
+      id: r.id,
       path: r.path,
       note: r.note,
+      hash: r.hash,
       status: refs.freshness(r),
+      checked_at: r.checked_at,
     }));
     // A cold agent needs the shape of the work, not every keystroke: the last
     // handoff, every decision, and every dead end (the expensive ones).

@@ -142,6 +142,10 @@ CREATE INDEX IF NOT EXISTS idx_contexts_user ON contexts (user_id);
 
 -- Files in play, hashed at link time so we can tell the agent when a note it
 -- is about to trust describes code that has since moved on.
+-- Files in play. \`hash\` is what the file looked like when it was linked;
+-- \`hash_seen\` is what the agent last found on disk. Both are computed where
+-- the code actually lives -- this server has no copy of the repository, so it
+-- stores them and compares them, and never reads a file itself.
 CREATE TABLE IF NOT EXISTS refs (
   id         SERIAL PRIMARY KEY,
   task_id    INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
@@ -149,9 +153,17 @@ CREATE TABLE IF NOT EXISTS refs (
   path       TEXT NOT NULL,
   note       TEXT,
   hash       TEXT,
-  linked_at  TEXT NOT NULL
+  linked_at  TEXT NOT NULL,
+  hash_seen  TEXT,
+  checked_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_refs_task ON refs (task_id);
+CREATE INDEX IF NOT EXISTS idx_refs_context ON refs (context_id);
+
+-- Existing installs predate the two columns above. Postgres makes this
+-- idempotent, so it belongs inline rather than in a migration history.
+ALTER TABLE refs ADD COLUMN IF NOT EXISTS hash_seen  TEXT;
+ALTER TABLE refs ADD COLUMN IF NOT EXISTS checked_at TEXT;
 `;
 
 /**

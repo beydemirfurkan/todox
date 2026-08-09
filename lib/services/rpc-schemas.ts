@@ -25,6 +25,15 @@ const model = z
 
 const projectRef = z.string().describe("Slug, name, or a path inside the project");
 
+/**
+ * Filled in by the MCP server, not by the model. The web host has no checkout,
+ * so it cannot find a repository root on its own.
+ */
+const repoRoot = z
+  .string()
+  .optional()
+  .describe("Absolute path of the repository root containing `cwd`.");
+
 /** Accepts anything `new Date()` understands, which is what `resolvePeriod` uses. */
 const datetime = z
   .string()
@@ -63,6 +72,7 @@ export const SHAPES = {
       .describe(
         "When `project` is an absolute path that matches nothing, register a project for that repo instead of erroring. Default false.",
       ),
+    repo_root: repoRoot,
   },
 
   listTasks: {
@@ -101,9 +111,18 @@ export const SHAPES = {
       .optional()
       .describe("1 high, 2 normal (default), 3 low. This is what reports call importance."),
     files: z
-      .array(z.string())
+      .array(
+        z.object({
+          path: z.string().min(1),
+          hash: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .nullish(),
+        }),
+      )
       .optional()
-      .describe("Absolute paths of files in play; hashed for staleness"),
+      .describe("Absolute paths of files in play, with their sha256"),
+    repo_root: repoRoot,
     model,
   },
 
@@ -127,8 +146,38 @@ export const SHAPES = {
   linkFiles: {
     task_id: z.number().int(),
     paths: z
-      .array(z.object({ path: z.string().min(1), note: z.string().optional() }))
+      .array(
+        z.object({
+          path: z.string().min(1),
+          note: z.string().optional(),
+          hash: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .nullish()
+            .describe("sha256 of the file, computed by you. The server has no copy."),
+        }),
+      )
       .min(1),
+  },
+
+  /**
+   * Reports what the agent found on disk. The web UI has no filesystem, so
+   * this is the only way it can ever show that a note has gone stale.
+   */
+  reportRefs: {
+    refs: z
+      .array(
+        z.object({
+          id: z.number().int(),
+          hash: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .nullable()
+            .describe("null when the file is gone"),
+        }),
+      )
+      .min(1)
+      .max(500),
   },
 
   addContext: {

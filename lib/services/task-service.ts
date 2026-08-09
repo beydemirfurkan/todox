@@ -12,7 +12,12 @@ import { now } from "../util/time";
  */
 
 export async function create(
-  input: tasks.NewTask & { actor?: string; model?: string | null; files?: string[] },
+  input: tasks.NewTask & {
+    actor?: string;
+    model?: string | null;
+    /** Hashes come from the caller: this process cannot see the files. */
+    files?: { path: string; hash?: string | null }[];
+  },
 ): Promise<Task> {
   const { actor, model, files, ...row } = input;
   const task = await tasks.create(row);
@@ -25,8 +30,7 @@ export async function create(
     model,
   });
 
-  if (files?.length)
-    await refs.link({ task_id: task.id, paths: files.map((path) => ({ path })) });
+  if (files?.length) await refs.link({ task_id: task.id, paths: files });
 
   return task;
 }

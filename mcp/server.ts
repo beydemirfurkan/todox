@@ -19,6 +19,7 @@ import { renderMarkdown } from "../lib/services/report-markdown";
 import type { ActivityReport } from "../lib/services/reports";
 import { SHAPES, type MethodName } from "../lib/services/rpc-schemas";
 import { createClient, readConfig, type RpcClient } from "./rpc-client";
+import { checkRefs, findProjectRoot, hashFile } from "./workspace";
 
 const INSTRUCTIONS = [
   "todox is the persistent working memory for this developer's projects.",
@@ -83,6 +84,9 @@ type RegisterTool = (
 
 const register = server.registerTool.bind(server) as unknown as RegisterTool;
 
+/** Parameters this process supplies from its own environment, never the model. */
+const INTERNAL: string[] = ["repo_root", "tz"];
+
 /**
  * Every tool is the same shape: forward to the server, or report why not.
  *
@@ -98,36 +102,116 @@ function tool(
   opts: {
     /** Arguments this side consumes itself; added to the schema, never sent. */
     presentation?: z.ZodRawShape;
+    /**
+     * Fields advertised to the model instead of the server's version, for the
+     * few the model should not have to fill in itself. `create_task` takes
+     * plain paths here and this process attaches the hashes.
+     */
+    overrides?: z.ZodRawShape;
+    /** Last chance to add what only this side knows, before the call goes out. */
+    prepare?: (params: Record<string, unknown>) => Record<string, unknown>;
+    /** Runs on the result, and may call back to the server. */
+    after?: (result: unknown, call: RpcClient) => Promise<unknown>;
     transform?: (result: unknown, args: Record<string, unknown>) => unknown;
   } = {},
 ) {
   const shape = SHAPES[method];
   const accepted = Object.keys(shape);
 
+  // Advertised to the model minus the fields this process fills in itself.
+  // `repo_root` is not something a model should be inventing; leaving it in the
+  // schema is an invitation to guess at a path it cannot see.
+  const advertised = Object.fromEntries(
+    Object.entries({ ...shape, ...opts.overrides, ...opts.presentation }).filter(
+      ([k]) => !INTERNAL.includes(k),
+    ),
+  ) as z.ZodRawShape;
+
   register(
     name,
-    { ...config, inputSchema: { ...shape, ...opts.presentation } },
+    { ...config, inputSchema: advertised },
     async (raw) => {
       const args = raw ?? {};
       // Forward only what the server's schema declares. It rejects unknown
       // keys, and it should: presentation options and any metadata the SDK
       // adds are ours to deal with, not something to make the server tolerate.
-      const params = Object.fromEntries(
+      let params = Object.fromEntries(
         Object.entries(args).filter(([k]) => accepted.includes(k)),
       );
       // This process runs where the developer is, so it is the only side that
       // knows their timezone. Without it the server measures "today" in UTC.
       if (accepted.includes("tz") && params.tz === undefined)
         params.tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      // Same reasoning for the repository root: the web host has no checkout,
+      // so it cannot walk up looking for a .git.
+      if (accepted.includes("repo_root") && params.repo_root === undefined) {
+        const ref = (params.cwd ?? params.project) as string | undefined;
+        if (typeof ref === "string" && ref.startsWith("/"))
+          params.repo_root = findProjectRoot(ref);
+      }
+      if (opts.prepare) params = opts.prepare(params);
+
       try {
         const result = await call(method, params);
-        const shaped = opts.transform ? opts.transform(result, args) : result;
+        const settled = opts.after ? await opts.after(result, call) : result;
+        const shaped = opts.transform ? opts.transform(settled, args) : settled;
         return typeof shaped === "string" ? plain(shaped) : ok(shaped);
       } catch (e) {
         return fail((e as Error).message);
       }
     },
   );
+}
+
+/**
+ * Hashes every linked file the payload mentions, rewrites its `status`, and
+ * tells the server what it found.
+ *
+ * The server stores hashes and compares them; it never opens a file, because
+ * it does not have one. So the answer to "has this note gone stale" can only
+ * come from here, and the web UI only knows what we last reported.
+ */
+async function checkLinkedFiles(result: unknown, call: RpcClient) {
+  if (!result || typeof result !== "object") return result;
+
+  const buckets: { path?: unknown; id?: unknown; hash?: unknown; status?: unknown }[] = [];
+  const collect = (files: unknown) => {
+    if (Array.isArray(files))
+      for (const f of files) if (f && typeof f === "object") buckets.push(f);
+  };
+
+  const r = result as { files?: unknown; open_tasks?: unknown };
+  collect(r.files);
+  if (Array.isArray(r.open_tasks))
+    for (const t of r.open_tasks) collect((t as { files?: unknown })?.files);
+
+  const refs = buckets
+    .filter((f) => typeof f.id === "number" && typeof f.path === "string")
+    .map((f) => ({ id: f.id as number, path: f.path as string, hash: (f.hash ?? null) as string | null }));
+  if (!refs.length) return result;
+
+  const { checked, seen } = checkRefs(refs);
+  const byId = new Map(checked.map((c) => [c.id, c]));
+  for (const f of buckets) {
+    const hit = byId.get(f.id as number);
+    if (hit) f.status = hit.status;
+  }
+
+  // Best effort: a failed write-back must not cost the agent its briefing.
+  try {
+    await call("reportRefs", { refs: seen });
+  } catch {
+    /* the status above is still correct for this call */
+  }
+
+  // The briefing's own summary was built from what the server had on file.
+  const stale = checked.filter((c) => c.status === "changed" || c.status === "missing");
+  if (Array.isArray((result as { stale_refs?: unknown }).stale_refs))
+    (result as { stale_refs: string[] }).stale_refs = stale.map(
+      (c) => `${c.path} (${c.status})`,
+    );
+
+  return result;
 }
 
 /**
@@ -162,11 +246,17 @@ async function main() {
 
   /* ------------------------------------------------------- the briefing */
 
-  tool(call, "get_context", "getContext", {
-    title: "Get project context (call this first)",
-    description:
-      "The session-start briefing: global rules, project decisions/conventions/gotchas, every open task with its decisions, dead ends, open questions, linked files and last handoff note. Also flags notes whose linked files have changed since they were written. Pass your working directory as `project`.",
-  });
+  tool(
+    call,
+    "get_context",
+    "getContext",
+    {
+      title: "Get project context (call this first)",
+      description:
+        "The session-start briefing: global rules, project decisions/conventions/gotchas, every open task with its decisions, dead ends, open questions, linked files and last handoff note. Also flags notes whose linked files have changed since they were written. Pass your working directory as `project`.",
+    },
+    { after: checkLinkedFiles },
+  );
 
   /* --------------------------------------------------------------- tasks */
 
@@ -175,17 +265,44 @@ async function main() {
     description: "Tasks in a project, filtered by status.",
   });
 
-  tool(call, "get_task", "getTask", {
-    title: "Get task with full log",
-    description:
-      "One task with its complete entry log and linked files (each marked fresh/changed/missing).",
-  });
+  tool(
+    call,
+    "get_task",
+    "getTask",
+    {
+      title: "Get task with full log",
+      description:
+        "One task with its complete entry log and linked files (each marked fresh/changed/missing).",
+    },
+    { after: checkLinkedFiles },
+  );
 
-  tool(call, "create_task", "createTask", {
-    title: "Create task",
-    description:
-      "Capture work that will not finish in this session. Pass `cwd` (your absolute working directory) and todox picks the right project — registering one for that repo if it has never seen it. Put the goal and the definition of done in `body`, not just a title.",
-  });
+  tool(
+    call,
+    "create_task",
+    "createTask",
+    {
+      title: "Create task",
+      description:
+        "Capture work that will not finish in this session. Pass `cwd` (your absolute working directory) and todox picks the right project — registering one for that repo if it has never seen it. Put the goal and the definition of done in `body`, not just a title.",
+    },
+    {
+      // The model names files; this side hashes them. Asking a model for a
+      // sha256 would be asking it to invent one.
+      overrides: {
+        files: z
+          .array(z.string())
+          .optional()
+          .describe("Absolute paths of files in play; hashed here for staleness"),
+      },
+      prepare: (p) => ({
+        ...p,
+        files: Array.isArray(p.files)
+          ? (p.files as string[]).map((path) => ({ path, hash: hashFile(path) }))
+          : undefined,
+      }),
+    },
+  );
 
   tool(call, "update_task", "updateTask", {
     title: "Update task",
@@ -201,11 +318,32 @@ async function main() {
       "Append one entry. kinds: 'decision' (what was chosen and why), 'dead_end' (approach tried that did NOT work -- highest value, prevents repeats), 'question' (needs the human), 'note', 'handoff' (state at end of session: what is done, what is next, what to watch out for).",
   });
 
-  tool(call, "link_files", "linkFiles", {
-    title: "Link files to a task",
-    description:
-      "Attach file paths to a task and hash them now, so todox can later warn that a note describes code that has since changed.",
-  });
+  tool(
+    call,
+    "link_files",
+    "linkFiles",
+    {
+      title: "Link files to a task",
+      description:
+        "Attach file paths to a task and hash them now, so todox can later warn that a note describes code that has since changed.",
+    },
+    {
+      overrides: {
+        paths: z
+          .array(z.object({ path: z.string().min(1), note: z.string().optional() }))
+          .min(1),
+      },
+      prepare: (p) => ({
+        ...p,
+        paths: Array.isArray(p.paths)
+          ? (p.paths as { path: string; note?: string }[]).map((x) => ({
+              ...x,
+              hash: hashFile(x.path),
+            }))
+          : p.paths,
+      }),
+    },
+  );
 
   /* -------------------------------------------------- durable knowledge */
 

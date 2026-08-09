@@ -101,7 +101,9 @@ export const en = {
   delete: "delete",
   link: "link",
   unlink: "unlink",
-  rehash: "re-hash",
+  acceptRef: "accept as current",
+  checkedAt: "checked",
+  neverChecked: "not checked by an agent yet",
   append: "append",
   apply: "apply",
   title: "title",
@@ -199,9 +201,9 @@ export const en = {
     "Empty. This is the part that matters: decisions, dead ends, open questions, and the handoff the next session reads first.",
   filesInPlay: "Files in play",
   filesHint:
-    "Files are fingerprinted when you link them. If one changes later, every note on this task gets flagged — so the agent never trusts a description of code that has moved on.",
+    "Files are fingerprinted by the agent, which is the side that can actually see them. When one changes, every note on this task gets flagged — so nobody trusts a description of code that has moved on.",
   filesEmpty:
-    "Link the files this task touches. todox hashes them now and tells you later when a note has gone stale.",
+    "Link the files this task touches. The next agent to read this task checks them and says whether a note has gone stale.",
   filePathPh: "/absolute/path/...",
   fileNotePh: "why this file matters (optional)",
   whatAgentSees: "What the agent sees",
@@ -275,7 +277,7 @@ export const en = {
   ref_fresh: "fresh",
   ref_changed: "moved on!",
   ref_missing: "gone!",
-  ref_unknown: "unreadable",
+  ref_unknown: "unchecked",
 
   /* entry kinds */
   k_note: "note",

@@ -6,7 +6,7 @@ import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
 import { BadRequest } from "./errors";
-import { assertProject, assertTask } from "./ownership";
+import { assertProject, assertRef, assertTask } from "./ownership";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
@@ -72,9 +72,12 @@ export const methods = {
     return projectsRepo.byId(userId, found.id);
   },
 
-  getContext: async ({ userId }, p: { project: string; create_if_missing?: boolean }) => {
+  getContext: async (
+    { userId },
+    p: { project: string; create_if_missing?: boolean; repo_root?: string },
+  ) => {
     if (p.create_if_missing) {
-      const { project, created } = await resolveOrCreate(userId, p.project);
+      const { project, created } = await resolveOrCreate(userId, p.project, p.repo_root);
       return { project_created: created, ...(await briefing(userId, project)) };
     }
     return briefing(userId, await mustResolve(userId, p.project));
@@ -100,7 +103,9 @@ export const methods = {
         id: r.id,
         path: r.path,
         note: r.note,
+        hash: r.hash,
         status: refsRepo.freshness(r),
+        checked_at: r.checked_at,
       })),
     };
   },
@@ -114,7 +119,8 @@ export const methods = {
       body?: string;
       status?: Status;
       priority?: number;
-      files?: string[];
+      files?: { path: string; hash?: string | null }[];
+      repo_root?: string;
       model?: string;
     },
   ) => {
@@ -122,7 +128,7 @@ export const methods = {
     // asymmetry stops a typo'd slug from silently spawning a junk project.
     const { project, created } = p.project
       ? { project: await mustResolve(userId, p.project), created: false }
-      : await resolveOrCreate(userId, pickRef({ cwd: p.cwd }));
+      : await resolveOrCreate(userId, pickRef({ cwd: p.cwd }), p.repo_root);
 
     const task = await taskService.create({
       project_id: project.id,
@@ -172,10 +178,19 @@ export const methods = {
 
   linkFiles: async (
     { userId },
-    p: { task_id: number; paths: { path: string; note?: string }[] },
+    p: { task_id: number; paths: { path: string; note?: string; hash?: string | null }[] },
   ) => {
     await assertTask(userId, p.task_id);
     return refsRepo.link({ task_id: p.task_id, paths: p.paths });
+  },
+
+  reportRefs: async ({ userId }, p: { refs: { id: number; hash: string | null }[] }) => {
+    // Each row is proved to be the caller's before anything is written; the
+    // ids come off a payload we handed out, but that is not a reason to trust
+    // them coming back.
+    await Promise.all(p.refs.map((r) => assertRef(userId, r.id)));
+    await refsRepo.recordCheck(p.refs);
+    return { recorded: p.refs.length };
   },
 
   addContext: async (

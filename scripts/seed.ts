@@ -16,6 +16,7 @@ import * as tasksRepo from "../lib/repositories/tasks";
 import * as usersRepo from "../lib/repositories/users";
 import * as taskService from "../lib/services/task-service";
 import { hashPassword } from "../lib/util/password";
+import { hashFile } from "../mcp/workspace";
 
 const DEMO = {
   username: "demo",
@@ -125,6 +126,8 @@ async function main() {
       kind: "handoff",
       body: "Settled: own task model, no GitHub. Next up is proving the loop end to end — an agent calls get_context, works, and writes a handoff that a fresh session can actually resume from.",
     });
+    // This script runs beside the checkout, so it can do what the web server
+    // cannot: hash the files it links.
     await refsRepo.link({
       task_id: t1.id,
       paths: [
@@ -136,7 +139,7 @@ async function main() {
           path: resolve(REPO, "mcp/server.ts"),
           note: "tool surface the agent sees",
         },
-      ],
+      ].map((p) => ({ ...p, hash: hashFile(p.path) })),
     });
 
     const t2 = await taskService.create({

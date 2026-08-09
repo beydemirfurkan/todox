@@ -2,7 +2,7 @@ import { basename } from "node:path";
 
 import * as projects from "../repositories/projects";
 import type { Project } from "../types";
-import { findProjectRoot, isInside, slugify } from "../util/paths";
+import { isInside, slugify } from "../util/paths";
 import { BadRequest } from "./errors";
 
 /** Resolve a project by slug, by name, or by a filesystem path inside it. */
@@ -39,10 +39,17 @@ export async function mustResolve(userId: number, ref: string): Promise<Project>
  * Resolve, creating one when the reference is a real filesystem path we don't
  * know yet. This is what lets an agent capture a task on its first try instead
  * of erroring out and asking the human to register a project.
+ *
+ * `repoRoot` comes from the caller because only the caller can see the disk.
+ * This used to call `findProjectRoot(ref)` here, which walks up looking for a
+ * `.git` — on a web host with no checkout every probe missed, so it fell back
+ * to `dirname(ref)` and registered the *parent* of the repository under the
+ * parent's name. An agent in `/Users/me/code` got a project called "code".
  */
 export async function resolveOrCreate(
   userId: number,
   ref: string,
+  repoRoot?: string,
 ): Promise<{ project: Project; created: boolean }> {
   const found = await resolve(userId, ref);
   if (found) return { project: found, created: false };
@@ -50,7 +57,7 @@ export async function resolveOrCreate(
   if (!ref.startsWith("/"))
     return { project: await mustResolve(userId, ref), created: false };
 
-  const root = findProjectRoot(ref);
+  const root = repoRoot?.startsWith("/") ? repoRoot.replace(/\/+$/, "") : ref;
   const name = basename(root) || "untitled";
   return {
     project: await projects.create(userId, {
