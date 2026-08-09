@@ -1,26 +1,477 @@
 @import "tailwindcss";
 
+/*
+  todox — "lab notebook, drawn by hand", at night.
+  Cut-paper stickers on dark stock: 2px light outlines, hard offset shadows,
+  flat marker colours, nothing blurred. Dark-only on purpose — this is a tool
+  developers stare at all day.
+
+  Two text colours exist for a reason: --ink sits on dark surfaces, --on-fill
+  sits on the bright marker colours. Never mix them up; that is where dark
+  cartoon UIs usually fall apart.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #191b22;
+  --card: #22252e;
+  --inset: #1c1f27;
+
+  --ink: #f1eee5;
+  --on-fill: #17181d;
+  --line: #3e4451;
+  --line-strong: #565d6d;
+  /* bright marker fills get a dark hairline, not a glowing white one */
+  --edge-dark: rgba(0, 0, 0, 0.42);
+  --muted: #a9a394;
+  --faint: #9b9587;
+  --rule: #333844;
+  --shadow-col: #0e1016;
+
+  --accent: #ffd84d;
+  --k-decision: #6cb7f5;
+  --k-dead_end: #ff6f5e;
+  --k-question: #ffd84d;
+  --k-handoff: #bda2ff;
+  --k-note: #b8b2a4;
+  --ok: #74d18f;
+
+  --shadow: 4px 4px 0 var(--shadow-col);
+  --shadow-sm: 3px 3px 0 var(--shadow-col);
+  --shadow-lg: 7px 7px 0 var(--shadow-col);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-inset: var(--inset);
+  --color-ink: var(--ink);
+  --color-onFill: var(--on-fill);
+  --color-line: var(--line);
+  --color-lineStrong: var(--line-strong);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-ok: var(--ok);
+  --font-display: var(--font-shantell);
+  --font-sans: var(--font-instrument);
+  --font-mono: var(--font-dm-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html {
+  color-scheme: dark;
+  /* Firefox scrollbars, which ignore ::-webkit-scrollbar entirely */
+  scrollbar-color: var(--rule) var(--paper);
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
   }
 }
 
+/* ------------------------------------------------------------- selection */
+
+/* Marker-pen highlight: the same yellow the app uses for "in flight". */
+::selection {
+  background: var(--accent);
+  color: var(--on-fill);
+  text-shadow: none;
+}
+::-moz-selection {
+  background: var(--accent);
+  color: var(--on-fill);
+  text-shadow: none;
+}
+/* On a surface that is already accent-yellow, that highlight would vanish --
+   invert it instead. */
+.on-fill ::selection,
+.on-fill::selection {
+  background: var(--on-fill);
+  color: var(--accent);
+}
+
+/* -------------------------------------------------------------- pointers */
+
+:root {
+  --cursor-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M4 2.5 4 18.2 8.3 14.1 11.1 20.6 14.2 19.1 11.4 12.9 17.3 12.7Z' fill='%23f1eee5' stroke='%2317181d' stroke-width='1.7' stroke-linejoin='round'/%3E%3C/svg%3E")
+    4 2;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  cursor: var(--cursor-arrow), default;
+}
+
+/* Semantics beat decoration: every control says what it is under the mouse. */
+a,
+button,
+summary,
+label:has(input[type="radio"]),
+label:has(input[type="checkbox"]),
+select,
+[role="button"] {
+  cursor: pointer;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+textarea {
+  cursor: text;
+}
+
+:disabled,
+[aria-disabled="true"] {
+  cursor: default;
+}
+
+::placeholder {
+  cursor: text;
+}
+
+body {
+  position: relative;
+  background-color: var(--paper);
+  /* faint grain over a pencil dot grid, both as plain background layers --
+     a fixed blend-mode overlay here caused repaint tearing while scrolling */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+    radial-gradient(var(--rule) 1.2px, transparent 1.2px);
+  background-size:
+    160px 160px,
+    22px 22px;
+  color: var(--ink);
+  font-family: var(--font-instrument), ui-sans-serif, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Body copy caps out at a comfortable measure. */
+.prose {
+  max-width: 68ch;
+}
+
+.display {
+  font-family: var(--font-shantell), cursive;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mono {
+  font-family: var(--font-dm-mono), ui-monospace, monospace;
+}
+
+/* ------------------------------------------------------------ a11y basics */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 50;
+}
+.skip-link:focus {
+  left: 12px;
+  top: 12px;
+  background: var(--accent);
+  color: var(--on-fill);
+  border: 1.5px solid var(--edge-dark);
+  border-radius: 999px;
+  padding: 8px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Row actions are revealed on hover, which leaves keyboard users with no way
+   to reach them -- so focus inside the row reveals them too. */
+.row-action {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.group:hover .row-action,
+.group:focus-within .row-action,
+.row-action:focus-visible {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------- stickers */
+
+.sticker {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.sticker-flat {
+  background: var(--inset);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+}
+
+.lift {
+  transition:
+    transform 0.13s cubic-bezier(0.34, 1.4, 0.64, 1),
+    box-shadow 0.13s ease;
+}
+.lift:hover {
+  transform: translate(-2px, -2px) rotate(-0.35deg);
+  box-shadow: var(--shadow-lg);
+}
+.lift:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--shadow-col);
+}
+
+/* ------------------------------------------------------------- controls */
+
+.btn {
+  font-family: var(--font-shantell), cursive;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1.5px solid var(--edge-dark);
+  border-radius: 999px;
+  padding: 5px 16px 6px;
+  background: var(--accent);
+  color: var(--on-fill);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+.btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--shadow-col);
+}
+.btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--shadow-col);
+}
+.btn-quiet {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.link-more {
+  font-family: var(--font-shantell), cursive;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+.link-more:hover {
+  color: var(--ink);
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+summary {
+  list-style: none;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: 15px;
+  background: var(--inset);
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 11px;
+  color: var(--ink);
+  caret-color: var(--accent);
+  width: 100%;
+  outline: none;
+  transition: box-shadow 0.1s ease;
+}
+
+/* the native search affordances fight the drawn ones */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  appearance: none;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-sm);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--faint);
+}
+textarea {
+  resize: vertical;
+  min-height: 74px;
+  line-height: 1.55;
+}
+select {
+  appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' stroke='%23f1eee5' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+/* native controls follow the dark scheme rather than rendering white */
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Anything sitting on a bright marker fill needs the dark text colour. */
+.on-fill {
+  color: var(--on-fill);
+}
+
+/* ---------------------------------------------------------------- search */
+
+/* The wrapper owns the frame so the icon, field and shortcut hint move as one
+   piece, and focus lights up the whole thing rather than a bare input. */
+.searchbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  background: var(--inset);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  transition:
+    border-color 0.14s ease,
+    box-shadow 0.14s ease,
+    width 0.18s cubic-bezier(0.3, 1.1, 0.5, 1);
+}
+.searchbox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.searchbox input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  font-size: 14px;
+  color: var(--ink);
+  caret-color: var(--accent);
+  cursor: text;
+}
+.searchbox input::placeholder {
+  color: var(--faint);
+}
+.searchbox .icon {
+  color: var(--faint);
+  flex-shrink: 0;
+  transition: color 0.14s ease;
+}
+.searchbox:focus-within .icon {
+  color: var(--accent);
+}
+.searchbox kbd {
+  font-family: var(--font-dm-mono), ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 14px;
+  padding: 0 5px;
+  color: var(--muted);
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.searchbox:focus-within kbd {
+  opacity: 0;
+}
+.searchbox .clear {
+  color: var(--faint);
+  flex-shrink: 0;
+  line-height: 0;
+}
+.searchbox .clear:hover {
+  color: var(--k-dead_end);
+}
+
+/* Headings read better when the line breaks are balanced rather than ragged. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+pre {
+  tab-size: 2;
+}
+
+/* --------------------------------------------------------------- motion */
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px) rotate(-1deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pop {
+  animation: pop-in 0.42s cubic-bezier(0.24, 1.2, 0.4, 1) both;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(3deg);
+  }
+}
+.bob {
+  animation: bob 3.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop,
+  .bob {
+    animation: none;
+  }
+  .lift:hover {
+    transform: none;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border: 3px solid var(--paper);
+  border-radius: 999px;
 }

@@ -6,12 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "mcp": "tsx mcp/server.ts",
+    "seed": "tsx scripts/seed.ts",
+    "smoke:mcp": "tsx scripts/mcp-smoke.ts",
+    "smoke:report": "tsx scripts/report-smoke.ts",
+    "smoke:auth": "tsx scripts/auth-smoke.ts",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:import-sqlite": "tsx scripts/import-sqlite.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@neondatabase/serverless": "^1.1.0",
     "next": "16.3.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -21,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.11",
     "typescript": "^5"
   },
   "packageManager": "pnpm@10.33.0"

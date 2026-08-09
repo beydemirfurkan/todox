@@ -1,0 +1,215 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+import type { ContextKind, EntryKind, Status } from "@/lib/constants";
+import { isLang } from "@/lib/i18n";
+import { LANG_COOKIE } from "@/lib/lang";
+import * as contexts from "@/lib/repositories/contexts";
+import * as entries from "@/lib/repositories/entries";
+import * as projects from "@/lib/repositories/projects";
+import * as refs from "@/lib/repositories/refs";
+import {
+  assertContext,
+  assertEntry,
+  assertProject,
+  assertRef,
+  assertTask,
+} from "@/lib/services/ownership";
+import * as sharing from "@/lib/services/sharing";
+import * as taskService from "@/lib/services/task-service";
+import { requireUser } from "@/lib/session";
+
+const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() || "";
+const num = (fd: FormData, k: string) => Number(fd.get(k));
+
+/* -------------------------------------------------------------- language */
+
+/** The only action that does not need an account: it just sets a cookie. */
+export async function setLangAction(fd: FormData) {
+  const lang = fd.get("lang");
+  if (!isLang(lang)) return;
+  (await cookies()).set(LANG_COOKIE, lang, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+  revalidatePath("/", "layout");
+}
+
+/* --------------------------------------------------------------- sharing */
+
+export async function setSharingAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "project_id");
+  await assertProject(user.id, id);
+  // Publishing is the one outward-facing action, so it is the one gated on a
+  // verified address. Turning sharing off is always allowed.
+  const enabling = fd.get("enabled") === "1";
+  if (enabling && !user.email_verified_at) return;
+  await sharing.setSharing(user.id, id, {
+    enabled: fd.get("enabled") === "1",
+    includeLog: fd.get("include_log") === "on",
+  });
+  revalidatePath("/", "layout");
+}
+
+export async function rotateShareAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "project_id");
+  await assertProject(user.id, id);
+  await sharing.rotate(user.id, id);
+  revalidatePath("/", "layout");
+}
+
+/* -------------------------------------------------------------- projects */
+
+export async function createProjectAction(fd: FormData) {
+  const user = await requireUser();
+  const name = str(fd, "name");
+  if (!name) return;
+  const p = await projects.create(user.id, {
+    name,
+    slug: await projects.nextFreeSlug(user.id, str(fd, "name")),
+    root_path: str(fd, "root_path") || null,
+    summary: str(fd, "summary") || null,
+  });
+  redirect(`/p/${p.slug}`);
+}
+
+export async function updateProjectAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "id");
+  await assertProject(user.id, id);
+  await projects.update(user.id, id, {
+    name: str(fd, "name") || undefined,
+    root_path: str(fd, "root_path") || null,
+    summary: str(fd, "summary") || null,
+  });
+  revalidatePath("/", "layout");
+}
+
+/* ----------------------------------------------------------------- tasks */
+
+export async function createTaskAction(fd: FormData) {
+  const user = await requireUser();
+  const slug = str(fd, "slug");
+  const project = await projects.bySlug(user.id, slug);
+  const title = str(fd, "title");
+  if (!project || !title) return;
+  await taskService.create({
+    project_id: project.id,
+    title,
+    body: str(fd, "body") || null,
+    priority: num(fd, "priority") || 2,
+    actor: "human",
+  });
+  revalidatePath(`/p/${slug}`);
+}
+
+export async function setStatusAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "task_id");
+  await assertTask(user.id, id);
+  await taskService.update(id, { status: str(fd, "status") as Status }, { actor: "human" });
+  revalidatePath("/", "layout");
+}
+
+export async function updateTaskAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "task_id");
+  await assertTask(user.id, id);
+  await taskService.update(
+    id,
+    {
+      title: str(fd, "title") || undefined,
+      body: str(fd, "body") || null,
+      priority: num(fd, "priority") || 2,
+    },
+    { actor: "human" },
+  );
+  revalidatePath("/", "layout");
+}
+
+/* --------------------------------------------------------------- entries */
+
+export async function addEntryAction(fd: FormData) {
+  const user = await requireUser();
+  const taskId = num(fd, "task_id");
+  await assertTask(user.id, taskId);
+  const body = str(fd, "body");
+  if (!body) return;
+  await taskService.addEntry({
+    task_id: taskId,
+    kind: str(fd, "kind") as EntryKind,
+    body,
+    author: "human",
+  });
+  revalidatePath("/", "layout");
+}
+
+export async function deleteEntryAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "entry_id");
+  await assertEntry(user.id, id);
+  await entries.remove(id);
+  revalidatePath("/", "layout");
+}
+
+/* -------------------------------------------------------------- contexts */
+
+export async function addContextAction(fd: FormData) {
+  const user = await requireUser();
+  const slug = str(fd, "slug");
+  const project = slug ? await projects.bySlug(user.id, slug) : null;
+  if (slug && !project) return;
+  const title = str(fd, "title");
+  const body = str(fd, "body");
+  if (!title || !body) return;
+  await contexts.create({
+    user_id: user.id,
+    project_id: project?.id ?? null,
+    kind: str(fd, "kind") as ContextKind,
+    title,
+    body,
+  });
+  revalidatePath("/", "layout");
+}
+
+export async function deleteContextAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "context_id");
+  await assertContext(user.id, id);
+  await contexts.remove(id);
+  revalidatePath("/", "layout");
+}
+
+/* ------------------------------------------------------------------ refs */
+
+export async function linkFileAction(fd: FormData) {
+  const user = await requireUser();
+  const taskId = num(fd, "task_id");
+  await assertTask(user.id, taskId);
+  const path = str(fd, "path");
+  if (!path) return;
+  await refs.link({ task_id: taskId, paths: [{ path, note: str(fd, "note") || null }] });
+  revalidatePath("/", "layout");
+}
+
+export async function refreshRefAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "ref_id");
+  await assertRef(user.id, id);
+  await refs.refresh(id);
+  revalidatePath("/", "layout");
+}
+
+export async function unlinkRefAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "ref_id");
+  await assertRef(user.id, id);
+  await refs.unlink(id);
+  revalidatePath("/", "layout");
+}
