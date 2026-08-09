@@ -115,6 +115,57 @@ export async function changePassword(
   return { ok: true, value: true };
 }
 
+/**
+ * Changing the address is a credential change, so it costs the password.
+ *
+ * It used to need only a session cookie, which made the current-password gate
+ * on `changePassword` worthless: point the account at an address you control,
+ * run the forgot-password flow, and `completePasswordReset` sets a new password
+ * without the old one and kills the real owner's sessions. A stolen cookie
+ * became permanent ownership. The gate has to be here too, or it is nowhere.
+ *
+ * Returns the previous address so the caller can warn it.
+ */
+export async function changeEmail(
+  userId: number,
+  currentPassword: string,
+  next: string,
+): Promise<Result<{ user: PublicUser; previousEmail: string }>> {
+  const user = await users.byId(userId);
+  if (!user) return { ok: false, errors: [{ field: "form", code: "badCredentials" }] };
+
+  if (!(await verifyPassword(currentPassword, user.password_hash)))
+    return { ok: false, errors: [{ field: "current", code: "badCredentials" }] };
+
+  const email = next.trim();
+  if (!EMAIL_RE.test(email))
+    return { ok: false, errors: [{ field: "email", code: "emailFormat" }] };
+
+  if (email.toLowerCase() === user.email.toLowerCase())
+    return { ok: true, value: { user: publicUser(user), previousEmail: user.email } };
+
+  const clash = await users.byEmail(email);
+  if (clash && clash.id !== userId)
+    return { ok: false, errors: [{ field: "email", code: "emailTaken" }] };
+
+  await users.updateEmail(userId, email);
+  return {
+    ok: true,
+    value: {
+      user: { ...publicUser(user), email, email_verified_at: null },
+      previousEmail: user.email,
+    },
+  };
+}
+
+export async function changeName(userId: number, name: string): Promise<Result<true>> {
+  const trimmed = name.trim();
+  if (trimmed.length < 2)
+    return { ok: false, errors: [{ field: "name", code: "nameRequired" }] };
+  await users.updateProfile(userId, { name: trimmed });
+  return { ok: true, value: true };
+}
+
 /* ------------------------------------------------------------ api tokens */
 
 export async function createApiToken(userId: number, name: string) {
@@ -129,6 +180,13 @@ export const listApiTokens = (userId: number): Promise<ApiToken[]> =>
 
 export const revokeApiToken = (id: number, userId: number) =>
   apiTokens.remove(id, userId);
+
+/**
+ * Agent tokens carry the full permissions of the account and never expire, so
+ * there has to be one action that ends all of them at once. The recovery flow
+ * calls it; the account page offers it as a button.
+ */
+export const revokeAllApiTokens = (userId: number) => apiTokens.destroyAllFor(userId);
 
 export async function userForApiToken(token: string): Promise<PublicUser | undefined> {
   const u = await apiTokens.userForToken(token);

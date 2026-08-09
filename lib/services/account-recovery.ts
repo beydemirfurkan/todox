@@ -1,3 +1,4 @@
+import * as apiTokens from "../repositories/api-tokens";
 import * as authTokens from "../repositories/auth-tokens";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
@@ -78,6 +79,11 @@ export async function completePasswordReset(
   await authTokens.consume(hit.row.id);
   // Whoever knew the old password loses their grip on the account.
   await sessions.destroyAllFor(hit.user.id);
+  // Agent tokens too. This is the recovery path -- you are here because you
+  // lost control of the account, and a token that never expires and carries
+  // full permissions is exactly what an intruder would keep. Killing sessions
+  // while leaving those alive would have been security theatre.
+  await apiTokens.destroyAllFor(hit.user.id);
 
   // Reaching the inbox proves the address, so verification comes for free.
   if (!hit.user.email_verified_at) await users.markEmailVerified(hit.user.id);
@@ -125,6 +131,47 @@ export async function sendVerification(user: PublicUser, lang: "tr" | "en") {
             link,
             "",
             `The link is valid for ${VERIFY_TTL_DAYS} days.`,
+          ].join("\n"),
+  });
+}
+
+/**
+ * Warns the address that just stopped being the account's.
+ *
+ * The new address gets a verification link and can prove itself; the old one
+ * gets nothing unless we send it. That is the only channel left to somebody
+ * whose account was taken over, so it is the one that matters.
+ */
+export async function sendEmailChanged(
+  previousEmail: string,
+  user: PublicUser,
+  lang: "tr" | "en",
+) {
+  await send({
+    to: previousEmail,
+    subject:
+      lang === "tr" ? "todox e-posta adresin değişti" : "Your todox email was changed",
+    text:
+      lang === "tr"
+        ? [
+            `Merhaba ${user.name},`,
+            "",
+            `@${user.username} hesabının e-posta adresi ${previousEmail} yerine`,
+            `${user.email} olarak değiştirildi.`,
+            "",
+            "Bunu sen yaptıysan yapman gereken bir şey yok.",
+            "Yapmadıysan hesabına başkası erişiyor demektir: hemen şifreni",
+            `sıfırla (${baseUrl()}/forgot) ve ajan tokenlarını iptal et.`,
+          ].join("\n")
+        : [
+            `Hi ${user.name},`,
+            "",
+            `The email address on @${user.username} was changed from ${previousEmail}`,
+            `to ${user.email}.`,
+            "",
+            "If that was you, there is nothing to do.",
+            "If it was not, somebody else has access: reset your password now",
+            `(${baseUrl()}/forgot) and revoke your agent tokens.`,
           ].join("\n"),
   });
 }

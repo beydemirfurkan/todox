@@ -39,3 +39,7 @@ export async function userForToken(token: string): Promise<User | undefined> {
 
 export const remove = (id: number, userId: number) =>
   run("DELETE FROM api_tokens WHERE id = ? AND user_id = ?", [id, userId]);
+
+/** Every agent token for one account. Used when the account itself is in doubt. */
+export const destroyAllFor = (userId: number) =>
+  run("DELETE FROM api_tokens WHERE user_id = ?", [userId]);
