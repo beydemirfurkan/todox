@@ -9,7 +9,7 @@ import { activityReport, type TaskReport } from "@/lib/services/reports";
 import { resolvePeriod, type PeriodName } from "@/lib/util/time";
 import { Blob, Chip, Counter, Empty, Panel } from "../components";
 import { CopyMarkdown } from "../features/copy-markdown";
-import { KIND_COLOR, statusLabel } from "../kinds";
+import { IMPORTANCE_COLOR, KIND_COLOR, statusLabel } from "../kinds";
 
 export const dynamic = "force-dynamic";
 
@@ -239,15 +239,9 @@ function TaskRow({ task, t }: { task: TaskReport; t: T }) {
           {task.title}
         </Link>
         <Chip>{task.project_slug}</Chip>
-        <Chip
-          color={
-            task.importance === "high"
-              ? "var(--accent)"
-              : task.importance === "low"
-                ? "var(--k-note)"
-                : "var(--card)"
-          }
-        >
+        {/* "normal" used to pass var(--card) here, which paints --on-fill on
+            the card colour: 1.16:1, i.e. an invisible word. */}
+        <Chip color={IMPORTANCE_COLOR[task.importance]}>
           {t(`imp_${task.importance}` as Key)}
         </Chip>
         <Chip>{statusLabel(t, task.status)}</Chip>

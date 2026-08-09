@@ -5,6 +5,14 @@ export function Chip({
   tilt = 0,
 }: {
   children: React.ReactNode;
+  /**
+   * One of the bright marker fills, or nothing.
+   *
+   * Text colour is chosen from whether a fill was given, not from how light it
+   * is — a `var(--…)` string cannot be measured here. So a dark value paints
+   * dark on dark and the label disappears. If you want a neutral chip, pass
+   * nothing: ink on the card is 13:1.
+   */
   color?: string;
   title?: string;
   tilt?: number;
