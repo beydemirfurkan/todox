@@ -16,7 +16,13 @@ const PUBLIC = [
   "/verify",
   "/s/",
   "/api/rpc",
+  // Metadata files. Redirecting these to /login silently breaks the favicon
+  // and every social link preview, which is the sort of thing nobody notices
+  // until somebody pastes the URL into Slack.
   "/icon.svg",
+  "/opengraph-image.png",
+  "/robots.txt",
+  "/sitemap.xml",
 ];
 
 export default function proxy(req: NextRequest) {
