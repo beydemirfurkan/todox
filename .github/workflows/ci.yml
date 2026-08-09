@@ -24,10 +24,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
-      - run: pnpm exec tsc --noEmit
-      # Every page is force-dynamic, so nothing queries the database at build
-      # time. That is what keeps this job free of secrets.
+
+      # Build first: PageProps and LayoutProps are globals Next generates into
+      # .next/types, so a bare tsc run before it cannot resolve them.
+      # Nothing queries the database at build time -- every page is
+      # force-dynamic -- which is what keeps this job free of secrets.
       - run: pnpm build
+
+      # Covers what the build does not: scripts/ and mcp/.
+      - run: pnpm exec tsc --noEmit
 
   smoke:
     runs-on: ubuntu-latest
