@@ -5,10 +5,10 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getLang } from "@/lib/lang";
-import * as users from "@/lib/repositories/users";
 import {
   completePasswordReset,
   requestPasswordReset,
+  sendEmailChanged,
   sendVerification,
   sessionAfterReset,
 } from "@/lib/services/account-recovery";
@@ -171,20 +171,49 @@ export async function changePasswordAction(
   redirect("/login");
 }
 
-export async function updateProfileAction(fd: FormData) {
+export async function updateNameAction(
+  _prev: AuthState,
+  fd: FormData,
+): Promise<AuthState> {
   const user = await requireUser();
-  const email = str(fd, "email");
-  const name = str(fd, "name");
-
-  if (name) await users.updateProfile(user.id, { name });
-
-  if (email && email.toLowerCase() !== user.email.toLowerCase()) {
-    const clash = await users.byEmail(email);
-    if (clash && clash.id !== user.id) return;
-    await users.updateEmail(user.id, email);
-    await sendVerification({ ...user, email, email_verified_at: null }, await getLang());
-  }
+  const result = await auth.changeName(user.id, str(fd, "name"));
+  if (!result.ok) return { errors: result.errors };
   revalidatePath("/account");
+  return { errors: [] };
+}
+
+/**
+ * Deliberately its own action, and it costs the password.
+ *
+ * Changing the address is the first half of an account takeover: point it at
+ * an address you control, then run the forgot-password flow. Sharing a submit
+ * button with the display name made that a side effect of "save profile".
+ */
+export async function changeEmailAction(
+  _prev: AuthState,
+  fd: FormData,
+): Promise<AuthState> {
+  const user = await requireUser();
+
+  // Unmetered, this was "send mail from your domain to any address I name",
+  // routing around the limit on resendVerificationAction.
+  const gate = await limit.consume("emailChangePerUser", String(user.id));
+  if (!gate.allowed) return tooMany(gate.retryAfterSec);
+
+  const result = await auth.changeEmail(user.id, raw(fd, "current"), str(fd, "email"));
+  if (!result.ok) return { errors: result.errors };
+
+  const { user: updated, previousEmail } = result.value;
+  if (updated.email.toLowerCase() !== previousEmail.toLowerCase()) {
+    const lang = await getLang();
+    await sendVerification(updated, lang);
+    // The old address is the only channel left to someone who has been locked
+    // out, so it hears about this even though it is no longer the account's.
+    await sendEmailChanged(previousEmail, updated, lang);
+  }
+
+  revalidatePath("/account");
+  return { errors: [] };
 }
 
 /* ------------------------------------------------------------ api tokens */
@@ -199,6 +228,19 @@ export async function createTokenAction(fd: FormData) {
 
 export async function revokeTokenAction(fd: FormData) {
   const user = await requireUser();
-  await auth.revokeApiToken(Number(fd.get("token_id")), user.id);
+  const id = Number(fd.get("token_id"));
+  // NaN would reach an integer column and come back as a 500.
+  if (!Number.isInteger(id)) return;
+  await auth.revokeApiToken(id, user.id);
+  revalidatePath("/account");
+}
+
+/**
+ * Tokens never expire and carry the whole account, so "I think one of these
+ * leaked" needs an answer that does not depend on knowing which.
+ */
+export async function revokeAllTokensAction() {
+  const user = await requireUser();
+  await auth.revokeAllApiTokens(user.id);
   revalidatePath("/account");
 }

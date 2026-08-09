@@ -3,11 +3,13 @@ import { getT } from "@/lib/lang";
 import { listApiTokens } from "@/lib/services/auth";
 import { requireUser } from "@/lib/session";
 import {
+  changeEmailAction,
   changePasswordAction,
   createTokenAction,
   resendVerificationAction,
+  revokeAllTokensAction,
   revokeTokenAction,
-  updateProfileAction,
+  updateNameAction,
 } from "../auth-actions";
 import { Blob, Chip, Counter, Empty, Field, Panel } from "../components";
 import { authMessages } from "../auth-messages";
@@ -63,20 +65,45 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel delay={40} title={t("profile")}>
-          <form action={updateProfileAction} className="space-y-3">
-            <Field label={t("displayName")} hidden={false}>
-              <input name="name" defaultValue={user.name} autoComplete="name" />
-            </Field>
-            <Field label={t("email")} hidden={false}>
-              <input
-                name="email"
-                type="email"
-                defaultValue={user.email}
-                autoComplete="email"
-              />
-            </Field>
-            <button className="btn btn-quiet">{t("save")}</button>
-          </form>
+          <AuthForm
+            action={updateNameAction}
+            submitLabel={t("save")}
+            successLabel={t("profileSaved")}
+            messages={authMessages(t)}
+            fields={[
+              {
+                name: "name",
+                label: t("displayName"),
+                autoComplete: "name",
+                defaultValue: user.name,
+              },
+            ]}
+          />
+        </Panel>
+
+        <Panel delay={60} title={t("changeEmail")}>
+          <p className="mb-3 text-[13.5px] text-muted">{t("changeEmailNote")}</p>
+          <AuthForm
+            action={changeEmailAction}
+            submitLabel={t("changeEmail")}
+            successLabel={t("changeEmailSent")}
+            messages={authMessages(t)}
+            fields={[
+              {
+                name: "email",
+                label: t("email"),
+                type: "email",
+                autoComplete: "email",
+                defaultValue: user.email,
+              },
+              {
+                name: "current",
+                label: t("currentPassword"),
+                type: "password",
+                autoComplete: "current-password",
+              },
+            ]}
+          />
         </Panel>
 
         <Panel delay={80} title={t("changePassword")}>
@@ -160,6 +187,15 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           </Field>
           <button className="btn">{t("createToken")}</button>
         </form>
+
+        {tokens.length > 0 && (
+          <div className="mt-4 border-t border-dashed border-rule pt-3">
+            <p className="mb-2 text-[13.5px] text-muted">{t("revokeAllNote")}</p>
+            <form action={revokeAllTokensAction}>
+              <button className="link-more !text-[13px]">{t("revokeAll")}</button>
+            </form>
+          </div>
+        )}
       </Panel>
     </div>
   );

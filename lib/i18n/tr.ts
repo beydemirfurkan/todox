@@ -68,14 +68,23 @@ export const tr: Record<Key, string> = {
 
   accountTitle: "Hesap",
   profile: "Profil",
+  profileSaved: "Kaydedildi.",
+  changeEmail: "E-postayı değiştir",
+  changeEmailNote:
+    "Şifren gerekiyor, çünkü hesaplar tam olarak buradan ele geçiriliyor. Yeni adres kendini doğrulamak zorunda, eskisine de ne olduğu bildiriliyor.",
+  changeEmailSent: "Değişti. Doğrulama bağlantısı için yeni adrese bak.",
   changePassword: "Şifre değiştir",
-  changePasswordNote: "Değiştirince her yerden çıkış yapılır.",
+  changePasswordNote:
+    "Her yerden çıkış yapılır. Ajan token'ları çalışmaya devam eder — sorun onlardan biriyse aşağıdan iptal et.",
   apiTokens: "Ajan token'ları",
   apiTokensIntro:
     "MCP sunucusu bunlardan biriyle giriş yapar. Bir tane oluştur, aşağıdaki komuta yapıştır; ajan yalnızca senin hesabına erişir.",
   tokenName: "ne için",
   createToken: "token oluştur",
   revoke: "iptal et",
+  revokeAll: "bütün token'ları iptal et",
+  revokeAllNote:
+    "Token'ların son kullanma tarihi yok ve her biri hesabın tamamını taşıyor. Biri sızdıysa ve hangisi olduğunu bilmiyorsan hepsini birden bitir.",
   tokenOnce: "Şimdi kopyala — bir daha gösterilmeyecek.",
   neverUsed: "hiç kullanılmadı",
   lastUsed: "son kullanım",

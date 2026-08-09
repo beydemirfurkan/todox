@@ -72,14 +72,23 @@ export const en = {
   /* account */
   accountTitle: "Account",
   profile: "Profile",
+  profileSaved: "Saved.",
+  changeEmail: "Change email",
+  changeEmailNote:
+    "Your password, because this is how an account gets taken over. The new address has to confirm itself, and the old one is told what happened.",
+  changeEmailSent: "Changed. Check the new address for the confirmation link.",
   changePassword: "Change password",
-  changePasswordNote: "Changing it signs you out everywhere.",
+  changePasswordNote:
+    "Signs you out everywhere. Agent tokens keep working — revoke them below if one of those is the problem.",
   apiTokens: "Agent tokens",
   apiTokensIntro:
     "The MCP server signs in with one of these. Create one, paste it into the command below, and the agent reaches your account and nothing else.",
   tokenName: "what is it for",
   createToken: "create token",
   revoke: "revoke",
+  revokeAll: "revoke every token",
+  revokeAllNote:
+    "Tokens do not expire and each one carries the whole account. If you think one has leaked and cannot tell which, end all of them.",
   tokenOnce: "Copy it now — it is never shown again.",
   neverUsed: "never used",
   lastUsed: "last used",

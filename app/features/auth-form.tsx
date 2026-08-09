@@ -11,6 +11,8 @@ export type AuthFieldSpec = {
   type?: string;
   autoComplete?: string;
   autoFocus?: boolean;
+  /** Prefill, for forms that edit something that already has a value. */
+  defaultValue?: string;
 };
 
 /**
@@ -26,6 +28,7 @@ export function AuthForm({
   submitLabel,
   messages,
   hidden,
+  successLabel,
 }: {
   action: (prev: AuthState, fd: FormData) => Promise<AuthState>;
   fields: AuthFieldSpec[];
@@ -33,11 +36,16 @@ export function AuthForm({
   messages: Record<string, string>;
   /** Values the form must carry but nobody should type, e.g. a reset token. */
   hidden?: Record<string, string>;
+  /** Shown when the action returns without errors. Omit for forms that redirect. */
+  successLabel?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   const errors = state?.errors ?? [];
   const formError = errors.find((e) => e.field === "form");
   const errorFor = (name: string) => errors.find((e) => e.field === name);
+  // null means "not submitted yet"; an empty list means it worked. Forms that
+  // redirect never reach either.
+  const succeeded = Boolean(successLabel) && state !== null && errors.length === 0;
 
   // The template is translated on the server; only the number is filled here.
   const message = (e: { code: string; retryAfterSec?: number }) =>
@@ -58,6 +66,16 @@ export function AuthForm({
         </p>
       )}
 
+      {succeeded && (
+        <p
+          role="status"
+          className="sticker-flat px-3 py-2 text-[14px]"
+          style={{ borderColor: "var(--ok)" }}
+        >
+          {successLabel}
+        </p>
+      )}
+
       {fields.map((f) => {
         const err = errorFor(f.name);
         const errId = `${f.name}-error`;
@@ -67,6 +85,7 @@ export function AuthForm({
               <input
                 name={f.name}
                 type={f.type ?? "text"}
+                defaultValue={f.defaultValue}
                 autoComplete={f.autoComplete}
                 autoFocus={f.autoFocus}
                 aria-invalid={err ? true : undefined}

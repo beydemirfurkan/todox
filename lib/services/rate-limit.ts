@@ -24,6 +24,9 @@ export const POLICIES = {
   resetPerIp: { limit: 8, windowMs: HOUR },
   resetPerEmail: { limit: 3, windowMs: HOUR },
   verifyResendPerUser: { limit: 5, windowMs: HOUR },
+  // Each one sends two emails -- a verification and a warning to the old
+  // address -- and nobody changes their address five times an hour.
+  emailChangePerUser: { limit: 5, windowMs: HOUR },
   badTokenPerIp: { limit: 20, windowMs: 15 * MINUTE },
 } as const;
 
