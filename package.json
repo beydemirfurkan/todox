@@ -13,7 +13,8 @@
     "smoke:report": "tsx scripts/report-smoke.ts",
     "smoke:auth": "tsx scripts/auth-smoke.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
-    "db:import-sqlite": "tsx scripts/import-sqlite.ts"
+    "db:import-sqlite": "tsx scripts/import-sqlite.ts",
+    "og": "tsx scripts/make-og.tsx"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

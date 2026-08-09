@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 74" width="76" height="74" role="img" aria-label="todox">
+  <g stroke="#17181d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M15 37C9 22 23 9 39 11c17 2 26 14 22 29-4 14-22 24-35 18-8-4-6-9-11-21Z" fill="#ffd84d"/>
+    <path d="M38 11c1-4 4-5 6-3"/>
+    <circle cx="30" cy="35" r="3.4" fill="#17181d" stroke="none"/>
+    <circle cx="47" cy="33" r="3.4" fill="#17181d" stroke="none"/>
+    <path d="M31 44q7 9 15 0"/>
+  </g>
+</svg>

@@ -1,4 +1,6 @@
-<h1>todox</h1>
+<img src="docs/logo.svg" width="60" alt="">
+
+# todox
 
 **Working memory for developers and their agents.**
 Not a checklist — a log your next session can actually resume from.
@@ -7,23 +9,13 @@ Not a checklist — a log your next session can actually resume from.
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-ffd84d)](LICENSE)
 [![live](https://img.shields.io/badge/live-todox--omega.vercel.app-6cb7f5)](https://todox-omega.vercel.app)
 
----
-
 An issue tracker is written human-to-human. todox is written agent-to-agent,
 with a human reading over its shoulder. Every task carries the decisions behind
 it, the approaches that failed, the questions still open, and the note the last
 session left behind.
 
-```mermaid
-flowchart LR
-    A([new session]) -->|get_context| B[reads the log<br/>decisions · dead ends<br/>open questions · handoff]
-    B --> C[does the work]
-    C -->|log_entry| D[writes what it chose<br/>and what did not work]
-    D -->|handoff| A
-```
-
-The point is the second lap. A fresh agent starts where the last one stopped,
-and does not walk into a wall somebody already hit.
+A fresh agent calls `get_context`, reads all of that, and starts where the last
+one stopped — without walking into a wall somebody already hit.
 
 ## What goes in a log
 
@@ -35,7 +27,7 @@ and does not walk into a wall somebody already hit.
 | `handoff` | end-of-session state, written for a stranger |
 | `note` | everything else |
 
-Two more things fall out of treating the log as the product:
+Two things fall out of treating the log as the product:
 
 - **Stale context is flagged.** Linked files are hashed when they are linked. If
   the code moves on, `get_context` says the note may be lying. Context that lies
@@ -47,8 +39,8 @@ Two more things fall out of treating the log as the product:
 ## Try it
 
 **[todox-omega.vercel.app](https://todox-omega.vercel.app)** — anyone can
-register. It is a small personal deployment, not a service with an uptime
-promise. Self-host if the log matters to you.
+register. Small personal deployment, no uptime promise. Self-host if the log
+matters to you.
 
 ## Run your own
 
@@ -61,12 +53,6 @@ pnpm dev
 ```
 
 ## Connect an agent
-
-```mermaid
-flowchart LR
-    M["MCP server<br/><i>your laptop</i>"] -->|bearer token| A["todox<br/><i>anywhere</i>"]
-    A --> P[(Postgres)]
-```
 
 The MCP server never touches the database. It authenticates with a per-user
 token and calls the HTTP API, so an agent on a laptop and data on a host stay in
@@ -136,7 +122,7 @@ Details, and an honest list of what is **not** covered, in
 
 ## Contributing
 
-Rules the codebase actually follows, and how to run the checks:
+The rules the codebase actually follows, and how to run the checks:
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 MIT — see [LICENSE](LICENSE).
