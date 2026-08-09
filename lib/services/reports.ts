@@ -12,9 +12,9 @@ export type TaskTiming = {
   closed_at: string | null;
   /** created -> closed. What a manager means by "how long did it take". */
   lead_ms: number | null;
-  /** Time actually spent in `doing`. What the developer means. */
+  /** Time actually spent in `doing`, over the task's whole life. */
   active_ms: number;
-  /** True when the task predates event tracking, so active_ms is a floor. */
+  /** True when active_ms is a floor: backfilled, or closed without ever starting. */
   partial: boolean;
 };
 
@@ -35,6 +35,11 @@ export type TaskReport = TaskTiming & {
   dead_ends: string[];
   open_questions: string[];
   last_handoff: string | null;
+  /**
+   * The slice of `active_ms` that falls inside the window being reported on.
+   * This is what the totals sum, so it is what a per-task line should show.
+   */
+  active_ms_in_period: number;
 };
 
 export type ActivityReport = {
@@ -91,30 +96,43 @@ export function timingFor(
   until = Date.now(),
 ): TaskTiming {
   const ordered = [...events].sort((a, b) => ms(a.at) - ms(b.at));
+  const closedAt = task.closed_at;
+
+  // A closed task stops accruing when it closed, not now.
+  //
+  // The task row and its status event are two separate writes, so a dropped
+  // second write leaves a task marked `done` whose last event is `doing`.
+  // Counting that interval up to `Date.now()` meant one lost event added a
+  // fresh 24 hours to every daily report from then on, forever.
+  const ceiling = closedAt ? Math.min(ms(closedAt), until) : until;
 
   let active = 0;
   let doingSince: number | null = null;
   let startedAt: string | null = null;
+  let sawDoing = false;
 
   for (const e of ordered) {
     if (e.to_status === "doing" && doingSince === null) {
       doingSince = ms(e.at);
       startedAt ??= e.at;
+      sawDoing = true;
     } else if (e.to_status !== "doing" && doingSince !== null) {
       active += ms(e.at) - doingSince;
       doingSince = null;
     }
   }
-  if (doingSince !== null) active += until - doingSince;
+  if (doingSince !== null) active += Math.max(0, ceiling - doingSince);
 
-  const closedAt = task.closed_at;
   return {
     started_at: startedAt,
     closed_at: closedAt,
     lead_ms: closedAt ? ms(closedAt) - ms(task.created_at) : null,
     active_ms: active,
-    // A backfilled task has no real transition history before today.
-    partial: ordered.some((e) => e.actor === "backfill"),
+    // Partial when the numbers cannot be trusted at face value: a backfilled
+    // task has no real history, and one that closed without ever being `doing`
+    // reports zero for work that plainly took time.
+    partial:
+      ordered.some((e) => e.actor === "backfill") || (!sawDoing && Boolean(closedAt)),
   };
 }
 
@@ -124,6 +142,7 @@ function reportFor(
   projectName: string,
   log: Entry[],
   events: TaskEvent[],
+  period: Period,
 ): TaskReport {
   const counts = EMPTY_COUNTS();
   for (const e of log) counts[e.kind] += 1;
@@ -151,6 +170,11 @@ function reportFor(
     open_questions: log.filter((e) => e.kind === "question").map((e) => e.body),
     last_handoff: handoff?.body ?? null,
     ...timingFor(task, events),
+    // Both figures, because they answer different questions and mixing them up
+    // is what made the markdown report show line items summing to several
+    // times its own header: `active_ms` is the task's whole life, this one is
+    // only the part that falls inside the window being reported on.
+    active_ms_in_period: activeMsWithin(task.closed_at, events, period),
   };
 }
 
@@ -186,6 +210,7 @@ export async function activityReport(
       project?.name ?? "unknown",
       logs.get(task.id) ?? [],
       eventsByTask.get(task.id) ?? [],
+      period,
     );
   });
 
@@ -216,8 +241,7 @@ export async function activityReport(
     (r) => OPEN_STATUSES.includes(r.status) && !completed.includes(r),
   );
 
-  const activeInPeriod = (r: TaskReport) =>
-    activeMsWithin(eventsByTask.get(r.id) ?? [], period);
+  const activeInPeriod = (r: TaskReport) => r.active_ms_in_period;
 
   const byProject = [...new Set(reports.map((r) => r.project_slug))]
     .map((slug) => {
@@ -273,10 +297,20 @@ export async function activityReport(
 /**
  * Time in `doing` clipped to the reporting window, so a task started last
  * month doesn't dump all its hours into today's summary.
+ *
+ * Takes the task, not just its events, for the same reason `timingFor` does: a
+ * dangling `doing` on a closed task has to stop at `closed_at`. Without it the
+ * phantom interval runs to now, which means it overlaps *every* window and
+ * quietly adds a full day to each one.
  */
-function activeMsWithin(events: TaskEvent[], period: Period): number {
+function activeMsWithin(
+  closedAt: string | null,
+  events: TaskEvent[],
+  period: Period,
+): number {
   const from = ms(period.from);
   const to = ms(period.to);
+  const ceiling = closedAt ? Math.min(ms(closedAt), Date.now()) : Date.now();
 
   let total = 0;
   let doingSince: number | null = null;
@@ -287,7 +321,7 @@ function activeMsWithin(events: TaskEvent[], period: Period): number {
       doingSince = null;
     }
   }
-  if (doingSince !== null) total += overlap(doingSince, Date.now(), from, to);
+  if (doingSince !== null) total += overlap(doingSince, ceiling, from, to);
   return total;
 }
 

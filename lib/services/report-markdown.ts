@@ -69,7 +69,7 @@ export function renderMarkdown(r: ActivityReport, t: T): string {
     for (const task of r.in_progress) {
       out.push(
         `- **${task.title}** (${task.project_slug}) — ${t(`st_${task.status}` as Key)}, ` +
-          `${t("activeTime")} ${duration(task.active_ms, t)}`,
+          `${t("activeTime")} ${duration(task.active_ms_in_period, t)}`,
       );
     }
     out.push("");
@@ -116,7 +116,7 @@ function taskLines(task: TaskReport, t: T): string[] {
   const tilde = task.partial ? "~" : "";
   const meta = [
     `${t("importance")}: ${t(`imp_${task.importance}` as Key)}`,
-    `${t("activeTime")}: ${tilde}${duration(task.active_ms, t)}`,
+    `${t("activeTime")}: ${tilde}${duration(task.active_ms_in_period, t)}`,
     `${t("leadTime")}: ${duration(task.lead_ms, t)}`,
     task.models.length ? `${t("modelLabel")}: ${task.models.join(", ")}` : null,
   ].filter(Boolean);
