@@ -220,6 +220,10 @@ export const en = {
   searchNoResults: "Nothing matched.",
   searchPrompt: "Type a query up top.",
   resultsCount: "results",
+  hit_task: "task",
+  hit_entry: "log",
+  hit_context: "note",
+  globalScope: "all projects",
 
   /* report */
   reportTitle: "What got done",

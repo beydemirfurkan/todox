@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ago } from "@/lib/i18n";
+import { ago, type Key } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
 import { search } from "@/lib/services/search";
@@ -53,10 +53,11 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Chip color={TYPE_COLOR[h.type]} tilt={-2}>
-                    {h.type}
+                    {/* Was `h.type`, i.e. the raw discriminant, in both languages. */}
+                    {t(`hit_${h.type}` as Key)}
                   </Chip>
                   <span className="mono text-[12px] text-faint">
-                    {h.project_slug ?? "global"}
+                    {h.project_slug ?? t("globalScope")}
                   </span>
                   <span className="text-[15px] font-medium">{h.title}</span>
                   <span className="mono ml-auto shrink-0 text-[11px] text-faint">

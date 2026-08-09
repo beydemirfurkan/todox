@@ -210,6 +210,10 @@ export const tr: Record<Key, string> = {
   searchNoResults: "Eşleşen bir şey yok.",
   searchPrompt: "Yukarıdaki kutuya bir şey yaz.",
   resultsCount: "sonuç",
+  hit_task: "görev",
+  hit_entry: "kayıt",
+  hit_context: "not",
+  globalScope: "tüm projeler",
 
   reportTitle: "Ne yapıldı",
   reportIntro:
