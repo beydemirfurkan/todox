@@ -9,6 +9,7 @@ import { logoutAction } from "./auth-actions";
 import { Blob } from "./components";
 import { LangSwitcher } from "./features/lang-switcher";
 import { SearchBox } from "./features/search-box";
+import { TzProbe } from "./features/tz-probe";
 
 const shantell = Shantell_Sans({ variable: "--font-shantell", subsets: ["latin"] });
 const instrument = Instrument_Sans({ variable: "--font-instrument", subsets: ["latin"] });
@@ -36,6 +37,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${shantell.variable} ${instrument.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <TzProbe />
+
         <a href="#main" className="skip-link display">
           {t("skipToContent")}
         </a>

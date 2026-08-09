@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { duration, translator, type Key, type T } from "@/lib/i18n";
-import { getT } from "@/lib/lang";
+import { getT, getTz } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
 import { mustResolve } from "@/lib/services/project-resolver";
 import { periodLabel, renderMarkdown } from "@/lib/services/report-markdown";
@@ -26,7 +26,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
   const period: PeriodName = isPeriod(raw) ? raw : "today";
   const projectRef = Array.isArray(sp.project) ? sp.project[0] : sp.project;
 
-  const window = resolvePeriod(period);
+  const window = resolvePeriod(period, { tz: await getTz() });
   const projectId = projectRef ? (await mustResolve(user.id, projectRef)).id : undefined;
   const report = await activityReport(user.id, window, { projectId });
   const markdown = renderMarkdown(report, translator(lang));
@@ -44,7 +44,13 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
           return (
             <Link
               key={p}
-              href={`/report?period=${p}`}
+              // Carry the project through: switching period used to silently
+              // widen the report back out to every project.
+              href={
+                projectRef
+                  ? `/report?period=${p}&project=${encodeURIComponent(projectRef)}`
+                  : `/report?period=${p}`
+              }
               aria-current={active ? "page" : undefined}
               className="display rounded-full border-[1.5px] border-line px-3 pt-[3px] pb-[4px] text-[13.5px] leading-none font-bold"
               style={
@@ -250,7 +256,7 @@ function TaskRow({ task, t }: { task: TaskReport; t: T }) {
       <div className="mono mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
         <span>
           {t("activeTime")}: {tilde}
-          {duration(task.active_ms, t)}
+          {duration(task.active_ms_in_period, t)}
         </span>
         <span>
           {t("leadTime")}: {duration(task.lead_ms, t)}
