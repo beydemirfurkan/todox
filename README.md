@@ -46,8 +46,14 @@ web server has to be running for the agent to work.
 Create a token on the Account page; it hands you the exact command:
 
 ```bash
-claude mcp add todox --env TODOX_TOKEN=todox_… --env TODOX_URL=https://your-todox.example -- pnpm -C /path/to/todox exec tsx mcp/server.ts
+claude mcp add todox --env TODOX_TOKEN=todox_… --env TODOX_URL=https://todox-omega.vercel.app -- pnpm -C /path/to/todox exec tsx mcp/server.ts
 ```
+
+## Live
+
+A public instance runs at **https://todox-omega.vercel.app** — anyone can
+register. It is a small personal deployment, not a service with an uptime
+promise; self-host if the log matters to you.
 
 ## Deploying
 
