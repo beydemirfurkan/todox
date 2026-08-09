@@ -5,9 +5,11 @@ import * as projectsRepo from "../repositories/projects";
 import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
+import { BadRequest } from "./errors";
 import { assertProject, assertTask } from "./ownership";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
+import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { search } from "./search";
 import * as taskService from "./task-service";
 import { resolvePeriod, type PeriodName } from "../util/time";
@@ -29,7 +31,7 @@ type Handler = (ctx: RpcContext, params: Record<string, never>) => Promise<unkno
 
 const pickRef = (p: { project?: string; cwd?: string }) => {
   const ref = p.project ?? p.cwd;
-  if (!ref) throw new Error("pass either `project` or `cwd`");
+  if (!ref) throw new BadRequest("pass either `project` or `cwd`");
   return ref;
 };
 
@@ -197,24 +199,40 @@ export const methods = {
 
   activityReport: async (
     { userId },
-    p: { period?: PeriodName; from?: string; to?: string; project?: string },
+    p: { period?: PeriodName; from?: string; to?: string; project?: string; tz?: string },
   ) => {
-    const window = resolvePeriod(p.period ?? "today", { from: p.from, to: p.to });
+    // The agent runs on the developer's machine, so it is the one that knows
+    // what "today" means to them. The server would only ever answer UTC.
+    const window = resolvePeriod(p.period ?? "today", {
+      from: p.from,
+      to: p.to,
+      tz: p.tz,
+    });
     const projectId = p.project ? (await mustResolve(userId, p.project)).id : undefined;
     return activityReport(userId, window, { projectId });
   },
+  // Keyed by MethodName rather than string, so a handler without a schema in
+  // rpc-schemas.ts -- or a schema without a handler -- fails to compile. The
+  // two lists have to stay in step; that is the whole point of validating here.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-} satisfies Record<string, (ctx: RpcContext, params: any) => unknown> as unknown as Record<
-  string,
+} satisfies Record<MethodName, (ctx: RpcContext, params: any) => unknown> as unknown as Record<
+  MethodName,
   Handler
 >;
 
-export type MethodName = keyof typeof methods;
+export type { MethodName };
 
-export const isMethod = (name: string): name is string & MethodName =>
-  Object.hasOwn(methods, name);
-
-export function invoke(ctx: RpcContext, method: string, params: unknown) {
-  if (!isMethod(method)) throw new Error(`unknown method "${method}"`);
-  return methods[method](ctx, (params ?? {}) as Record<string, never>);
+/**
+ * Params are validated here, not trusted here.
+ *
+ * The cast below is the only thing standing between the handler signatures and
+ * the JSON on the wire, and a cast does nothing at runtime -- so `parseParams`
+ * has to run first. Without it `updateTask`'s `...patch` collects arbitrary
+ * caller-chosen keys, which the repositories then have to defend against on
+ * their own.
+ */
+export async function invoke(ctx: RpcContext, method: string, params: unknown) {
+  if (!isMethod(method)) throw new BadRequest(`unknown method "${method}"`);
+  const clean = parseParams(method, params);
+  return methods[method](ctx, clean as Record<string, never>);
 }

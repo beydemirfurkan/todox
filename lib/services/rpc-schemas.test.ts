@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+
+import { parseParams } from "./rpc-schemas";
+
+/**
+ * The second layer of the injection fix. The repositories allow-list their
+ * columns, but nothing should reach them unvalidated in the first place: the
+ * route used to cast `payload.params` and hand it straight to a handler.
+ */
+describe("parseParams", () => {
+  it("rejects the injected key outright", () => {
+    expect(() =>
+      parseParams("updateTask", {
+        task_id: 1,
+        "title = (SELECT password_hash FROM users WHERE id=1), body": "x",
+      }),
+    ).toThrow(/invalid params/);
+  });
+
+  it("rejects any unrecognised key rather than ignoring it", () => {
+    expect(() => parseParams("updateTask", { task_id: 1, colour: "red" })).toThrow(
+      /invalid params/,
+    );
+  });
+
+  it("rejects a patch that would write nothing", () => {
+    // This used to return the unchanged row, which reads to an agent exactly
+    // like a successful write.
+    expect(() => parseParams("updateTask", { task_id: 1 })).toThrow(/at least one/);
+    expect(() => parseParams("updateTask", { task_id: 1, model: "opus" })).toThrow(
+      /at least one/,
+    );
+  });
+
+  it("lets a real update through", () => {
+    expect(parseParams("updateTask", { task_id: 1, status: "done", model: "opus" })).toEqual(
+      { task_id: 1, status: "done", model: "opus" },
+    );
+  });
+
+  it("rejects a status outside the vocabulary", () => {
+    expect(() => parseParams("updateTask", { task_id: 1, status: "finished" })).toThrow();
+  });
+
+  it("refuses a date it cannot parse instead of throwing RangeError later", () => {
+    // `activity_report({from: "last monday"})` is a natural thing for a model
+    // to emit; it used to surface as an unhelpful "Invalid time value".
+    expect(() => parseParams("activityReport", { from: "last monday" })).toThrow(
+      /invalid params/,
+    );
+    expect(parseParams("activityReport", { from: "2026-08-09T00:00:00Z" })).toEqual({
+      from: "2026-08-09T00:00:00Z",
+    });
+  });
+
+  it("clamps search limits", () => {
+    expect(() => parseParams("search", { query: "x", limit: -1 })).toThrow();
+    expect(() => parseParams("search", { query: "x", limit: 1_000_000 })).toThrow();
+  });
+
+  it("refuses an empty link_files call that would look like success", () => {
+    expect(() => parseParams("linkFiles", { task_id: 1, paths: [] })).toThrow();
+  });
+
+  it("rejects an unknown method", () => {
+    // @ts-expect-error -- the point is the runtime guard, not the type
+    expect(() => parseParams("dropEverything", {})).toThrow();
+  });
+});

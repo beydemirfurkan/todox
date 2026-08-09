@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { userForApiToken } from "@/lib/services/auth";
+import { BadRequest } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
 import { invoke } from "@/lib/services/rpc";
@@ -52,8 +53,15 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     // Ownership failures are the caller's problem, not a server fault, and
     // they must not reveal whether the id exists for somebody else.
-    const status = e instanceof NotYours ? 404 : 400;
-    return fail(status, (e as Error).message);
+    if (e instanceof NotYours) return fail(404, e.message);
+
+    // Things the agent can fix get the real message. Anything else is ours:
+    // returning the raw text handed a caller Postgres' own parse errors, which
+    // is exactly the feedback loop you want when probing a query.
+    if (e instanceof BadRequest) return fail(400, e.message);
+
+    console.error("rpc", payload.method, e);
+    return fail(500, "the server could not complete that call");
   }
 }
 

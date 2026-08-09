@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import * as projects from "../repositories/projects";
 import type { Project } from "../types";
 import { findProjectRoot, isInside, slugify } from "../util/paths";
+import { BadRequest } from "./errors";
 
 /** Resolve a project by slug, by name, or by a filesystem path inside it. */
 export async function resolve(
@@ -28,7 +29,7 @@ export async function mustResolve(userId: number, ref: string): Promise<Project>
     slug: x.slug,
     root_path: x.root_path,
   }));
-  throw new Error(
+  throw new BadRequest(
     `no project matches "${ref}". Known projects: ${JSON.stringify(known)}. ` +
       `Pass an absolute path to create one.`,
   );
