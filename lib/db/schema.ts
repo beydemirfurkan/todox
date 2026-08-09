@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at        TEXT NOT NULL,
   email_verified_at TEXT
 );
--- case-insensitive uniqueness: "Furkan" and "furkan" are the same account
+-- case-insensitive uniqueness: "Ada" and "ada" are the same account
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (lower(username));
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users (lower(email));
 

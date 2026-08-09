@@ -59,11 +59,13 @@ async function main() {
       "This app. Working memory for a developer and their agents. Next.js + Postgres, plus an MCP server that is the primary write path.",
   });
 
-  const gametable = await project({
-    name: "GameTable 3D",
-    slug: "gametable-3d",
+  // A second project so the demo shows cross-project context and a report
+  // with more than one row in it. Deliberately invented.
+  const example = await project({
+    name: "Example Service",
+    slug: "example-service",
     summary:
-      "Blender-driven 3D hero renders for a board-game site. Headless bpy scripts plus a live BlenderMCP bridge.",
+      "A stand-in project, here only to show what a second one looks like. Delete it once you have your own.",
   });
 
   if (!(await contextsRepo.listByProject(user.id, null)).length) {
@@ -71,15 +73,15 @@ async function main() {
       user_id: user.id,
       project_id: null,
       kind: "preference",
-      title: "Talk through the design before writing code",
-      body: "For anything larger than a bug fix: state the thesis and the trade-offs first, get a yes, then build. Do not open with a scaffold.",
+      title: "Say what the change is before making it",
+      body: "For anything larger than a bug fix: state the approach and the trade-offs, get a yes, then build. An example of a standing rule that applies to every project.",
     });
     await contextsRepo.create({
       user_id: user.id,
       project_id: null,
       kind: "convention",
-      title: "pnpm everywhere, never npm install",
-      body: "Every local project uses pnpm. Lockfile churn from a stray `npm install` has cost real time before.",
+      title: "One package manager, everywhere",
+      body: "Pick one and stick to it; lockfile churn from a stray install costs real time. An example of a convention worth writing down once.",
     });
   }
 
@@ -166,23 +168,25 @@ async function main() {
     });
   }
 
-  if (!(await tasksRepo.listByProject(gametable.id, "all")).length) {
+  // Shows the shape that matters most: a blocked task carrying a dead end, so
+  // the next session knows which wall has already been walked into.
+  if (!(await tasksRepo.listByProject(example.id, "all")).length) {
     const g = await taskService.create({
-      project_id: gametable.id,
-      title: "Hero render: light rig blows out the board's white pieces",
-      body: "Key light at 4.2 blows the highlights on the white meeples. Needs a rethink, not another exposure tweak.",
+      project_id: example.id,
+      title: "Checkout times out under load, but only on the first request",
+      body: "Cold start, roughly one request in fifty. Needs a different approach, not another timeout bump.",
       status: "blocked",
       priority: 1,
     });
     await taskService.addEntry({
       task_id: g.id,
       kind: "dead_end",
-      body: "Dropping key intensity to 2.8 — fixes the clipping but kills the shadow separation the whole composition depends on. Tried twice across two sessions; do not try a third.",
+      body: "Raising the client timeout to 30s — hides it in staging and does nothing under real load, because the connection is already gone by then. Tried twice across two sessions; do not try a third.",
     });
     await taskService.addEntry({
       task_id: g.id,
       kind: "handoff",
-      body: "Next thing to try is a bounce card camera-left plus a filmic highlight rolloff in the post chain, keeping key at 4.2.",
+      body: "Next thing to try is a warm connection on boot rather than lazily on first use. The timeout is a symptom.",
     });
   }
 
