@@ -8,6 +8,7 @@
 import "./env";
 
 import { one, run } from "../lib/db/client";
+import * as apiTokensRepo from "../lib/repositories/api-tokens";
 import * as authTokensRepo from "../lib/repositories/auth-tokens";
 import * as sessionsRepo from "../lib/repositories/sessions";
 import * as usersRepo from "../lib/repositories/users";
@@ -15,9 +16,10 @@ import {
   completePasswordReset,
   completeVerification,
   requestPasswordReset,
+  sendEmailChanged,
   sendVerification,
 } from "../lib/services/account-recovery";
-import { issueSession, login, publicUser, register } from "../lib/services/auth";
+import { changeEmail, issueSession, login, register } from "../lib/services/auth";
 import * as limit from "../lib/services/rate-limit";
 import { hashToken } from "../lib/util/tokens";
 
@@ -151,11 +153,40 @@ async function main() {
     (await completePasswordReset(secondReset, "another-one")).ok === false,
   );
 
-  line("changing the email un-verifies it");
-  await usersRepo.updateEmail(user.id, "moved@todox.local");
-  const moved = await usersRepo.byId(user.id);
-  expect("verification cleared", moved?.email_verified_at === null);
-  await sendVerification(publicUser(moved!), "en");
+  line("a reset revokes agent tokens, not just sessions");
+  // A token that never expires and carries the whole account is exactly what
+  // an intruder keeps. Killing sessions and leaving these would be theatre.
+  await apiTokensRepo.create({ user_id: user.id, name: "smoke", token: rnd("todox") });
+  expect("token exists before reset", (await apiTokensRepo.listByUser(user.id)).length === 1);
+  const thirdReset = await issueRaw(user.id, "reset", rnd("reset"));
+  await completePasswordReset(thirdReset, "another-good-password");
+  expect(
+    "tokens died with the reset",
+    (await apiTokensRepo.listByUser(user.id)).length === 0,
+  );
+
+  line("changing the email costs the password");
+  const wrong = await changeEmail(user.id, "not-the-password", "moved@todox.local");
+  expect("refused without the current password", wrong.ok === false);
+  expect(
+    "address unchanged after a refusal",
+    (await usersRepo.byId(user.id))?.email === USER.email,
+  );
+
+  const badFormat = await changeEmail(user.id, "another-good-password", "not-an-address");
+  expect("refused a malformed address", badFormat.ok === false);
+
+  const moved = await changeEmail(user.id, "another-good-password", "moved@todox.local");
+  expect("accepted with the current password", moved.ok === true);
+  expect(
+    "verification cleared",
+    (await usersRepo.byId(user.id))?.email_verified_at === null,
+  );
+  if (moved.ok) {
+    expect("reports the previous address", moved.value.previousEmail === USER.email);
+    await sendVerification(moved.value.user, "en");
+    await sendEmailChanged(moved.value.previousEmail, moved.value.user, "en");
+  }
 
   await run("DELETE FROM users WHERE id = ?", [user.id]);
   await limit.sweep();

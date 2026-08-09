@@ -21,7 +21,16 @@ There is no bounty. There will be a quick, honest answer.
   agent tokens and email links are stored as SHA-256 hashes only.
 - **Password reset does not reveal whether an address is registered.** The
   response is identical either way, and a delivery failure never changes it.
-- **A password reset destroys every session** for that account.
+- **A password reset destroys every session and every agent token.** It is the
+  recovery path, so it assumes you lost control of the account; a token that
+  never expires and carries full permissions is what an intruder would keep.
+- **Changing the email costs the current password**, and the previous address
+  is told. Without that gate a stolen session cookie was permanent ownership:
+  point the account at an address you control, then run the reset flow.
+- **Parameters are validated before they reach the data layer.**
+  `lib/services/rpc-schemas.ts` is the runtime contract for every RPC method,
+  and repositories build `SET` clauses from a column allow-list, never from the
+  caller's own keys.
 - **Rate limits live in the database**, so they hold across instances rather
   than per process. Login counts failures only.
 - **The proxy is not the gate.** `proxy.ts` redirects on a missing cookie for
@@ -40,7 +49,10 @@ These are known and documented, not oversights:
 - Share links (`/s/<token>`) are unlisted, not access-controlled. Anyone with
   the URL can read the shared task list. Rotate or disable the link to revoke.
 - Agent tokens carry the full permissions of the account that created them.
-  There are no scopes. Revoke from the Account page.
+  There are no scopes and no expiry. A password *reset* revokes them all;
+  a deliberate password *change* does not, on the grounds that you still had
+  the old password, so use "revoke every token" on the Account page when that
+  is what you actually mean.
 
 ## Running it yourself
 
