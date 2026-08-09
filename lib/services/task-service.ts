@@ -3,6 +3,7 @@ import * as events from "../repositories/events";
 import * as refs from "../repositories/refs";
 import * as tasks from "../repositories/tasks";
 import type { Entry, Task } from "../types";
+import { now } from "../util/time";
 
 /**
  * Writes that must stay consistent across tables live here, not in the
@@ -30,6 +31,22 @@ export async function create(
   return task;
 }
 
+/**
+ * `closed_at` follows the status, and only a real transition moves it.
+ *
+ * It used to be derived inside the repository from `patch.status`, which meant
+ * every update wrote the column: saving a title change on a finished task set
+ * it to NULL and the task fell out of every report, and re-saving a done task
+ * as done pushed the completion time forward. Both were invisible until a
+ * report came out wrong.
+ */
+function closedAtFor(patch: tasks.TaskPatch, before: Task): tasks.TaskPatch {
+  const next = patch.status;
+  if (!next || next === before.status) return patch;
+  const closes = next === "done" || next === "dropped";
+  return { ...patch, closed_at: closes ? now() : null };
+}
+
 export async function update(
   id: number,
   patch: tasks.TaskPatch,
@@ -38,7 +55,7 @@ export async function update(
   const before = await tasks.byId(id);
   if (!before) return undefined;
 
-  const after = await tasks.update(id, patch);
+  const after = await tasks.update(id, closedAtFor(patch, before));
   if (after && patch.status && patch.status !== before.status) {
     await events.create({
       task_id: id,

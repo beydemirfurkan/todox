@@ -1,5 +1,5 @@
 import { OPEN_STATUSES, type Status } from "../constants";
-import { all, one, run } from "../db/client";
+import { all, one, run, setClause } from "../db/client";
 import type { Task } from "../types";
 import { now } from "../util/time";
 
@@ -13,7 +13,12 @@ export type NewTask = {
   priority?: number;
 };
 
-export type TaskPatch = Partial<Pick<Task, "title" | "body" | "status" | "priority">>;
+export type TaskPatch = Partial<
+  Pick<Task, "title" | "body" | "status" | "priority" | "closed_at">
+>;
+
+/** The only columns `update` will write. See `setClause` for why this exists. */
+const COLUMNS = ["title", "body", "status", "priority", "closed_at"] as const;
 
 export function listByProject(projectId: number, status: StatusFilter = "open") {
   if (status === "all")
@@ -72,14 +77,19 @@ export async function create(input: NewTask): Promise<Task> {
   return row!;
 }
 
+/**
+ * `closed_at` is a normal column here and is written only when the caller asks
+ * for it. Deriving it from `patch.status` inside this function meant every
+ * update touched it, so editing the title of a finished task erased the date
+ * it was finished. `task-service.update` owns that rule now, because it is the
+ * only caller that knows the previous status.
+ */
 export async function update(id: number, patch: TaskPatch): Promise<Task | undefined> {
-  const fields = Object.entries(patch).filter(([, v]) => v !== undefined);
-  if (!fields.length) return byId(id);
-  const closing = patch.status === "done" || patch.status === "dropped" ? now() : null;
+  const set = setClause(patch, COLUMNS);
+  if (!set.sql) return byId(id);
   return one<Task>(
-    `UPDATE tasks SET ${fields.map(([k]) => `${k} = ?`).join(", ")},
-       updated_at = ?, closed_at = ? WHERE id = ? RETURNING *`,
-    [...fields.map(([, v]) => v), now(), closing, id],
+    `UPDATE tasks SET ${set.sql}, updated_at = ? WHERE id = ? RETURNING *`,
+    [...set.values, now(), id],
   );
 }
 
