@@ -14,13 +14,16 @@ pnpm dev
 
 ```bash
 pnpm lint
+pnpm test
 pnpm exec tsc --noEmit
 pnpm build
 pnpm smoke:auth                # if you touched anything under auth
 ```
 
-CI runs the first three. The smoke suites need a database, so they only run
-where one is configured.
+CI runs the first four. `pnpm test` needs no database — it covers the logic
+that has none: column allow-lists, RPC parameter validation, report windows,
+duration replay. The smoke suites do need one, so they only run where it is
+configured.
 
 ## The rules the codebase actually follows
 
@@ -42,6 +45,15 @@ see in review.
   default language; write it properly rather than machine-translating.
 - **No `?` inside SQL string literals.** `lib/db/client.ts` rewrites `?` to
   `$n` positionally and does not parse strings.
+- **Never build a `SET` clause by hand.** Use `setClause(patch, COLUMNS)` from
+  `lib/db/client.ts`. Column names cannot be bound as parameters, so they get
+  interpolated; patches arrive from `const { id, ...patch } = params` at the
+  RPC boundary, and iterating the patch's own keys put caller-chosen text into
+  the statement. This was a live SQL injection, not a hypothetical one.
+- **Every RPC method has a schema.** `lib/services/rpc-schemas.ts` is the
+  runtime contract and the MCP tool surface at once; the handler signatures in
+  `rpc.ts` are erased at build time and guard nothing. `methods` is keyed by
+  `MethodName`, so a handler without a schema will not compile.
 - **Colour never carries meaning alone.** Every status, kind and badge has a
   text equivalent, and controls have real labels.
 
