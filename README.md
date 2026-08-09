@@ -29,9 +29,10 @@ one stopped — without walking into a wall somebody already hit.
 
 Two things fall out of treating the log as the product:
 
-- **Stale context is flagged.** Linked files are hashed when they are linked. If
-  the code moves on, `get_context` says the note may be lying. Context that lies
-  is worse than none.
+- **Stale context is flagged.** Linked files are hashed by the agent, which is
+  the side that can see them; the server stores the hashes and compares. If the
+  code moves on, `get_context` says the note may be lying. Context that lies is
+  worse than none.
 - **Reports come from the log, not from commits.** Every status change is an
   event, so *what did I finish today, how long did it take, which model did it*
   is a query rather than archaeology.
@@ -77,7 +78,7 @@ claude mcp add todox \
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. |
 | `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
-| `link_files` | Attach paths and hash them for staleness. |
+| `link_files` | Attach paths. The MCP server hashes them locally, so staleness works even though the web host has no checkout. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
 | `search` | Across all your projects — *have I solved this before?* |
 

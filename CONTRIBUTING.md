@@ -54,6 +54,11 @@ see in review.
   runtime contract and the MCP tool surface at once; the handler signatures in
   `rpc.ts` are erased at build time and guard nothing. `methods` is keyed by
   `MethodName`, so a handler without a schema will not compile.
+- **The server never touches the filesystem.** It has no checkout, so anything
+  that reads a path belongs in `mcp/workspace.ts`, on the machine that holds
+  the code. Hashing files and finding a repository root used to happen in
+  request handlers, where they returned nonsense and turned a caller-supplied
+  path into a real `readFileSync`.
 - **Colour never carries meaning alone.** Every status, kind and badge has a
   text equivalent, and controls have real labels.
 
