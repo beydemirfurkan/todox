@@ -25,6 +25,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
 
+      # Unit tests, so they run whether or not a database secret is configured.
+      # The smoke suites below need one and are usually skipped; these cover the
+      # logic that has no database in it -- SQL column allow-lists, RPC param
+      # validation, report windows and duration replay.
+      - run: pnpm test
+
       # Build first: PageProps and LayoutProps are globals Next generates into
       # .next/types, so a bare tsc run before it cannot resolve them.
       # Nothing queries the database at build time -- every page is

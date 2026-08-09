@@ -1,5 +1,5 @@
 import type { ContextKind } from "../constants";
-import { all, one, run } from "../db/client";
+import { all, one, run, setClause } from "../db/client";
 import type { Context } from "../types";
 import { now } from "../util/time";
 
@@ -39,17 +39,19 @@ export async function create(input: NewContext): Promise<Context> {
   return row!;
 }
 
+const COLUMNS = ["kind", "title", "body"] as const;
+
 export async function update(
   id: number,
   patch: Partial<Pick<Context, "kind" | "title" | "body">>,
 ) {
-  const fields = Object.entries(patch).filter(([, v]) => v !== undefined);
-  if (!fields.length) return;
-  await run(
-    `UPDATE contexts SET ${fields.map(([k]) => `${k} = ?`).join(", ")},
-       updated_at = ? WHERE id = ?`,
-    [...fields.map(([, v]) => v), now(), id],
-  );
+  const set = setClause(patch, COLUMNS);
+  if (!set.sql) return;
+  await run(`UPDATE contexts SET ${set.sql}, updated_at = ? WHERE id = ?`, [
+    ...set.values,
+    now(),
+    id,
+  ]);
 }
 
 export const remove = (id: number) => run("DELETE FROM contexts WHERE id = ?", [id]);

@@ -55,6 +55,32 @@ export async function run(text: string, params: Params = []): Promise<void> {
   await all(text, params);
 }
 
+/**
+ * Builds a `SET a = ?, b = ?` fragment from a patch, keeping only the columns
+ * named in `allowed`.
+ *
+ * Column names cannot be bound as parameters, so they are interpolated into
+ * the SQL. That is safe only while the names come from us. Patches reach the
+ * repositories from `const { id, ...patch } = params` at the RPC boundary, so
+ * an unfiltered `Object.entries(patch)` puts caller-controlled text straight
+ * into the statement -- `{"title = (SELECT password_hash FROM users), body":"x"}`
+ * binds cleanly, because the placeholder count still matches.
+ *
+ * Iterating `allowed` rather than the patch's own keys is the point: an
+ * unknown key cannot reach the SQL whatever it is called. Never assemble a SET
+ * clause any other way.
+ */
+export function setClause(
+  patch: Record<string, unknown>,
+  allowed: readonly string[],
+): { sql: string; values: unknown[] } {
+  const columns = allowed.filter((c) => patch[c] !== undefined);
+  return {
+    sql: columns.map((c) => `${c} = ?`).join(", "),
+    values: columns.map((c) => patch[c]),
+  };
+}
+
 /** Multiple statements, all-or-nothing. */
 export async function tx(statements: { text: string; params?: Params }[]) {
   const s = sql();

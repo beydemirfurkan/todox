@@ -1,4 +1,4 @@
-import { all, one, run } from "../db/client";
+import { all, one, run, setClause } from "../db/client";
 import type { Project } from "../types";
 import { shareToken, slugify } from "../util/paths";
 import { now } from "../util/time";
@@ -13,6 +13,14 @@ export type NewProject = {
 export type ProjectPatch = Partial<
   Pick<Project, "name" | "root_path" | "summary" | "archived">
 >;
+
+/**
+ * The only columns `update` will write. `user_id` is absent on purpose: it is
+ * a real column, so without this list `{"project":"x","user_id":2}` would be a
+ * legal patch that hands the project -- and its tasks, by cascade -- to
+ * another account. `share_token` and `share_log` go through `setShare`.
+ */
+const COLUMNS = ["name", "root_path", "summary", "archived"] as const;
 
 /**
  * Every read here is scoped by owner. The only deliberate exception is
@@ -64,13 +72,13 @@ export async function create(userId: number, input: NewProject): Promise<Project
 }
 
 export async function update(userId: number, id: number, patch: ProjectPatch) {
-  const fields = Object.entries(patch).filter(([, v]) => v !== undefined);
-  if (!fields.length) return;
-  await run(
-    `UPDATE projects SET ${fields.map(([k]) => `${k} = ?`).join(", ")}
-     WHERE id = ? AND user_id = ?`,
-    [...fields.map(([, v]) => v), id, userId],
-  );
+  const set = setClause(patch, COLUMNS);
+  if (!set.sql) return;
+  await run(`UPDATE projects SET ${set.sql} WHERE id = ? AND user_id = ?`, [
+    ...set.values,
+    id,
+    userId,
+  ]);
 }
 
 export const remove = (userId: number, id: number) =>

@@ -1,4 +1,4 @@
-import { all, one, run } from "../db/client";
+import { all, one, run, setClause } from "../db/client";
 import type { User } from "../types";
 import { now } from "../util/time";
 
@@ -46,13 +46,13 @@ export const updateEmail = (id: number, email: string) =>
 export const updatePassword = (id: number, passwordHash: string) =>
   run("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, id]);
 
+/** Never `password_hash` or `email_verified_at`: those have their own writers. */
+const PROFILE_COLUMNS = ["name", "email"] as const;
+
 export async function updateProfile(id: number, patch: { name?: string; email?: string }) {
-  const fields = Object.entries(patch).filter(([, v]) => v !== undefined);
-  if (!fields.length) return;
-  await run(
-    `UPDATE users SET ${fields.map(([k]) => `${k} = ?`).join(", ")} WHERE id = ?`,
-    [...fields.map(([, v]) => v), id],
-  );
+  const set = setClause(patch, PROFILE_COLUMNS);
+  if (!set.sql) return;
+  await run(`UPDATE users SET ${set.sql} WHERE id = ?`, [...set.values, id]);
 }
 
 export const remove = (id: number) => run("DELETE FROM users WHERE id = ?", [id]);

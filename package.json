@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "mcp": "tsx mcp/server.ts",
     "seed": "tsx scripts/seed.ts",
     "smoke:mcp": "tsx scripts/mcp-smoke.ts",
@@ -33,7 +34,8 @@
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.11",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   },
   "packageManager": "pnpm@10.33.0"
 }
