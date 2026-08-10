@@ -55,7 +55,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <>
               <Link
                 href="/account"
-                className="pill ml-auto min-w-0 max-w-[9rem]"
+                className="pill ml-auto min-w-0 max-w-[7rem] sm:max-w-[9rem]"
                 title={user.name}
               >
                 {/* The ellipsis needs a real box to happen in: the pill is a
