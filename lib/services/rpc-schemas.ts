@@ -101,14 +101,24 @@ export const SHAPES = {
   },
 
   getContext: {
-    project: ref.describe(
-      "Project slug, name, or any absolute path inside the project",
-    ),
+    project: ref
+      .optional()
+      .describe("Project slug, name, or any absolute path inside the project"),
+    /**
+     * The instructions have always told agents to "call get_context with the
+     * absolute path of the directory you are working in (cwd)", and the field
+     * was called `project`. With `strict()` on, an agent that followed the
+     * instruction literally got `Unrecognized key: "cwd"` on its very first
+     * call. `listTasks` already accepted both; this now matches it.
+     */
+    cwd: ref
+      .optional()
+      .describe("Absolute working directory, used if project is omitted"),
     create_if_missing: z
       .boolean()
       .optional()
       .describe(
-        "When `project` is an absolute path that matches nothing, register a project for that repo instead of erroring. Default false.",
+        "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call.",
       ),
     repo_root: repoRoot,
   },
@@ -288,6 +298,21 @@ const OBJECTS: Record<string, z.ZodType> = {
         p.name !== undefined || p.root_path !== undefined || p.summary !== undefined,
       { message: "pass at least one of name, root_path or summary" },
     ),
+
+  // Both fields are optional and one of them is required, which the schema is
+  // the right place to say. It used to be a runtime throw halfway through the
+  // handler, so the tool advertised a call it would always refuse.
+  ...Object.fromEntries(
+    (["getContext", "listTasks"] as const).map((name) => [
+      name,
+      z
+        .object(SHAPES[name])
+        .strict()
+        .refine((p) => p.project !== undefined || p.cwd !== undefined, {
+          message: "pass either `project` or `cwd`",
+        }),
+    ]),
+  ),
 };
 
 export const isMethod = (name: string): name is MethodName =>

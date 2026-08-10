@@ -13,8 +13,19 @@ import type { Project } from "../types";
  * linked files per task would be a round trip each, and this is the call every
  * session starts with.
  */
+/**
+ * Open tasks carried in one briefing.
+ *
+ * There was no ceiling, and this is the payload every session opens with: a
+ * project that has drifted to two hundred open tasks would spend an agent's
+ * context on the backlog before it read a line of code. The list is ordered by
+ * priority, so what falls off the end is the least urgent.
+ */
+const BRIEFING_TASKS = 50;
+
 export async function briefing(userId: number, project: Project) {
-  const open = await tasks.listByProject(project.id, "open");
+  const allOpen = await tasks.listByProject(project.id, "open");
+  const open = allOpen.slice(0, BRIEFING_TASKS);
   const ids = open.map((t) => t.id);
 
   const [globalContext, projectContext, logs, files] = await Promise.all([
@@ -72,6 +83,7 @@ export async function briefing(userId: number, project: Project) {
     global_context: globalContext.map(strip),
     project_context: projectContext.map(strip),
     open_tasks: openTasks,
+    open_tasks_omitted: allOpen.length - open.length,
     stale_refs: stale,
     hint:
       "Before you finish, call log_entry(kind:'handoff') on any task you touched, " +
@@ -86,7 +98,23 @@ const strip = (c: { id: number; kind: string; title: string; body: string }) => 
   body: c.body,
 });
 
-/** Just the staleness lines, for the banner on the project page. */
-export async function staleRefs(userId: number, project: Project): Promise<string[]> {
-  return (await briefing(userId, project)).stale_refs;
+/**
+ * Just the staleness lines, for the banner on the project page.
+ *
+ * Two queries, not the whole briefing. This used to build the entire payload --
+ * context notes, every task's log, the lot -- and throw all but this array
+ * away, on the page that already loads the tasks and their entries itself.
+ */
+export async function staleRefs(_userId: number, project: Project): Promise<string[]> {
+  const open = await tasks.listByProject(project.id, "open");
+  const files = await refs.listByTasks(open.map((t) => t.id));
+
+  return open.flatMap((t) =>
+    (files.get(t.id) ?? [])
+      .filter((r) => {
+        const status = refs.freshness(r);
+        return status === "changed" || status === "missing";
+      })
+      .map((r) => `task #${t.id} "${t.title}" -> ${r.path} (${refs.freshness(r)})`),
+  );
 }

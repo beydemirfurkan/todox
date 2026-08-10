@@ -12,6 +12,7 @@ import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { search } from "./search";
 import * as taskService from "./task-service";
+import { isAbsolutePath } from "../util/paths";
 import { resolvePeriod, type PeriodName } from "../util/time";
 
 /**
@@ -34,6 +35,22 @@ const pickRef = (p: { project?: string; cwd?: string }) => {
   if (!ref) throw new BadRequest("pass either `project` or `cwd`");
   return ref;
 };
+
+/**
+ * How much of a list one call will hand back.
+ *
+ * Every result here was unbounded, and these are the calls an agent is told to
+ * make first. A tool result is spent context: a project with a thousand tasks,
+ * bodies included, is an answer nobody can afford to read.
+ */
+const PAGE = 200;
+
+/** Always the same shape, truncated or not: a result that changes type under
+ *  load is a result an agent cannot parse with any confidence. */
+const capped = <T>(rows: T[]) => ({
+  tasks: rows.slice(0, PAGE),
+  omitted: Math.max(0, rows.length - PAGE),
+});
 
 export const methods = {
   listProjects: async ({ userId }) => {
@@ -74,20 +91,30 @@ export const methods = {
 
   getContext: async (
     { userId },
-    p: { project: string; create_if_missing?: boolean; repo_root?: string },
+    p: { project?: string; cwd?: string; create_if_missing?: boolean; repo_root?: string },
   ) => {
-    if (p.create_if_missing) {
-      const { project, created } = await resolveOrCreate(userId, p.project, p.repo_root);
+    const which = pickRef(p);
+    // The first session in a new repo is the case this product exists for, and
+    // it used to be the one that failed: `create_if_missing` defaulted to false
+    // and nothing in the instructions mentioned it, so the agent got an error
+    // and no stated way forward. A path is an unambiguous "this repo"; a slug
+    // that matches nothing is still a typo worth reporting.
+    const create = p.create_if_missing ?? isAbsolutePath(which);
+
+    if (create) {
+      const { project, created } = await resolveOrCreate(userId, which, p.repo_root);
       return { project_created: created, ...(await briefing(userId, project)) };
     }
-    return briefing(userId, await mustResolve(userId, p.project));
+    return briefing(userId, await mustResolve(userId, which));
   },
 
-  listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) =>
-    tasksRepo.listByProject(
+  listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {
+    const rows = await tasksRepo.listByProject(
       (await mustResolve(userId, pickRef(p))).id,
       p.status as never,
-    ),
+    );
+    return capped(rows);
+  },
 
   getTask: async ({ userId }, p: { task_id: number }) => {
     await assertTask(userId, p.task_id);
@@ -96,9 +123,15 @@ export const methods = {
       entriesRepo.listByTask(p.task_id),
       refsRepo.listByTask(p.task_id),
     ]);
+    // The newest end of a long log is the useful end; the rest is history the
+    // handoff already summarises.
+    const shown = entries.slice(-PAGE);
     return {
       ...task!,
-      entries,
+      entries: shown,
+      ...(shown.length < entries.length
+        ? { entries_omitted: entries.length - shown.length }
+        : {}),
       files: refs.map((r) => ({
         id: r.id,
         path: r.path,

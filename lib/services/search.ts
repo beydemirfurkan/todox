@@ -37,13 +37,19 @@ type ContextRow = {
 
 const cut = (s: string | null) => (s ?? "").replace(/\s+/g, " ").slice(0, 240);
 
+/**
+ * `%` and `_` are wildcards to ILIKE, so a search for either matched
+ * everything and a search for a literal one found nothing.
+ */
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
 /** ILIKE, not full-text search -- honest for this scale and zero index upkeep. */
 export async function search(
   userId: number,
   query: string,
   limit = 30,
 ): Promise<SearchHit[]> {
-  const like = `%${query}%`;
+  const like = `%${escapeLike(query)}%`;
 
   const [taskRows, entryRows, contextRows] = await Promise.all([
     all<TaskRow>(
@@ -101,5 +107,10 @@ export async function search(
         created_at: c.created_at,
       }),
     ),
-  ].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  ]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    // The limit is a limit on the answer, not on each of the three queries.
+    // Asking for 100 and receiving 300 is the kind of surprise that fills an
+    // agent's context window without anyone deciding to.
+    .slice(0, limit);
 }

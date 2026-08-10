@@ -2,14 +2,16 @@
  * The agent-facing surface, defined once for both ways in.
  *
  * todox reaches agents over two transports: a stdio process on the developer's
- * own machine, and an HTTP endpoint on the server. The tools, their
- * descriptions and the session instructions must be identical across the two —
- * so they live here, and each transport supplies what only it can.
+ * own machine, and an HTTP endpoint on the server. One definition serves both,
+ * so a tool cannot exist on one and not the other by accident.
  *
- * What differs is not the transport but whether there is a filesystem to read.
- * That is the `Workspace` below: the local process can hash a file and find a
- * repository root, the server cannot and says so by returning null. Nothing
- * here branches on "stdio" or "http".
+ * They are not byte-identical, and pretending otherwise would be the lie worth
+ * avoiding: what differs is whether this side has a filesystem. That is the
+ * `Workspace` below. Locally the process hashes files itself and fills in the
+ * repository root and timezone, so those arguments are hidden from the model.
+ * Remotely there is no disk here — but there is one where the agent runs, so
+ * the same jobs are asked of it instead, and `report_file_hashes` exists only
+ * on that side. Nothing branches on "stdio" or "http"; it branches on `local`.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -53,10 +55,21 @@ const BASE = [
   "weeks from now would be worse off without it. A log nobody trusts because",
   "it is full of noise is the failure mode to avoid.",
   "",
-  "START OF SESSION: call get_context with the absolute path of the directory",
-  "you are working in (cwd). It resolves the project from that path and",
-  "returns the standing rules, prior decisions, known dead ends and in-flight",
-  "tasks. Do this before planning any non-trivial work.",
+  "START OF SESSION: call get_context with `cwd` set to the absolute path of",
+  "the directory you are working in. It resolves the project from that path --",
+  "registering one for the repo if todox has never seen it -- and returns the",
+  "standing rules, prior decisions, known dead ends and in-flight tasks. Do",
+  "this before planning any non-trivial work. Prefer it to list_tasks: it is",
+  "one call and it carries the reasoning as well as the list.",
+  "",
+  "LOOKING THINGS UP: search covers every project you have. Reach for it when",
+  "the question is 'have I hit this before?' or 'where did we decide X?' --",
+  "the answer is often in a project other than this one.",
+  "",
+  "WHAT NOT TO READ: list_tasks with status:'all' and activity_report with",
+  "period:'all' return everything there has ever been, bodies included. They",
+  "will fill your context with a backlog instead of the work in front of you.",
+  "Ask for the window you actually need.",
   "",
   "CAPTURING WORK: whenever the developer mentions something that will not be",
   "finished in this session -- a follow-up, a deferred fix, a known rough",
@@ -69,6 +82,13 @@ const BASE = [
   "actually start -- that is what makes the time reports real); log_entry to",
   "record decisions ('decision'), approaches that failed ('dead_end'), and",
   "things only the human can answer ('question').",
+  "",
+  "WHAT OUTLIVES A TASK: add_context, for the things that constrain everything",
+  "else -- a convention the codebase follows, a gotcha that will bite the next",
+  "session, a standing preference. These lead the briefing, so a rule recorded",
+  "here is read before any task is. Omit both `project` and `cwd` to make one",
+  "apply across every project. Do not park these as notes on whichever task",
+  "happened to be open.",
   "",
   "ALWAYS pass `model` with your own model id on create_task, update_task and",
   "log_entry. It costs you nothing and it is how the developer can later show",
@@ -94,14 +114,22 @@ const LOCAL_NOTE = [
 
 const REMOTE_NOTE = [
   "",
-  "THIS SERVER HAS NO FILESYSTEM. It cannot see the developer's code, so:",
+  "THIS SERVER HAS NO FILESYSTEM, BUT YOU DO. It cannot see the developer's",
+  "code; you are running on the machine that holds it. So the parts that need",
+  "a disk are yours to do:",
   "- pass `cwd` as an absolute path, and `repo_root` as the directory holding",
   "  the .git you are working under; without it a project can end up",
   "  registered against a subfolder;",
-  "- pass `tz` (IANA, e.g. 'Europe/Istanbul') on reports, or 'today' is",
-  "  measured in UTC;",
-  "- link_files records the paths, but a note whose file you cannot hash is",
-  "  marked as never checked rather than claimed to be fresh.",
+  "- pass `tz` (IANA, e.g. 'Europe/Istanbul') on reports. If you cannot",
+  "  determine it, say in your answer that the window is measured in UTC",
+  "  rather than letting the developer assume it is their day;",
+  "- when you link a file, send its `hash`: the sha256 of the file's bytes.",
+  "  That hash is the only thing that lets todox tell you later that a note",
+  "  describes code which has since changed. Omit it and the note is recorded",
+  "  as never checked -- honest, but useless;",
+  "- after get_context or get_task hands you linked files, re-hash the ones",
+  "  you can read and send them to report_file_hashes with the ids you were",
+  "  given. That is what turns a stale note into a warning.",
 ];
 
 export function instructions(ws: { local: boolean }) {
@@ -125,9 +153,24 @@ const fail = (msg: string) => ({
  */
 type RegisterTool = (
   name: string,
-  config: { title: string; description: string; inputSchema: z.ZodRawShape },
+  config: {
+    title: string;
+    description: string;
+    inputSchema: z.ZodRawShape;
+    annotations?: { readOnlyHint?: boolean; idempotentHint?: boolean };
+  },
   handler: (args: Record<string, unknown>) => Promise<CallToolResult>,
 ) => void;
+
+/**
+ * Marks a tool as reading nothing but state it does not change.
+ *
+ * Clients use this to decide what can run without asking. Without it, the very
+ * first instruction this server gives -- call get_context before planning
+ * anything -- lands on a permission prompt at the start of every session, which
+ * is exactly the friction that gets a habit dropped.
+ */
+const READ_ONLY = { readOnlyHint: true, idempotentHint: true } as const;
 
 /**
  * Parameters a local process fills in from its own environment rather than
@@ -160,12 +203,14 @@ function registerPrompts(server: McpServer) {
           content: {
             type: "text",
             text: [
-              `Call get_context with project "${cwd}" before planning anything.`,
+              `Call get_context with cwd "${cwd}" before planning anything.`,
               "",
               "Then tell me, briefly: what is already decided, what has been tried",
               "and failed, what is still open, and where the last session stopped.",
-              "If any linked file is flagged as changed, say which — the note",
-              "describing it may no longer be true.",
+              "",
+              "If it hands back linked files, hash the ones you can read and send",
+              "them to report_file_hashes — that is what lets todox tell us a note",
+              "describes code that has since changed. Say which notes are affected.",
             ].join("\n"),
           },
         },
@@ -213,10 +258,13 @@ function registerPrompts(server: McpServer) {
       description:
         "A report built from the log rather than from commits: durations, decisions, dead ends and open questions.",
       argsSchema: {
+        // The same enum the tool validates against. As a free-form string this
+        // offered no completion in the client and turned a typo into a schema
+        // error one call later.
         period: z
-          .string()
+          .enum(["today", "yesterday", "week", "last_week", "month"])
           .optional()
-          .describe("today, yesterday, week, last_week, month or all. Default: today"),
+          .describe("Default: today"),
       },
     },
     ({ period }) => ({
@@ -227,9 +275,9 @@ function registerPrompts(server: McpServer) {
             type: "text",
             text: [
               `Call activity_report for "${period || "today"}" with format:"markdown"`,
-              "and show me the result. Include your timezone if this server has no",
-              "way of knowing it. Then call out anything still open that I should",
-              "decide on.",
+              "and show me the result. Pass `tz` with my timezone and `lang` with",
+              "the language I have been writing to you in. Then call out anything",
+              "still open that I should decide on.",
             ].join("\n"),
           },
         },
@@ -259,7 +307,11 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   function tool(
     name: string,
     method: MethodName,
-    config: { title: string; description: string },
+    config: {
+      title: string;
+      description: string;
+      annotations?: { readOnlyHint?: boolean; idempotentHint?: boolean };
+    },
     opts: {
       /** Arguments this side consumes itself; added to the schema, never sent. */
       presentation?: z.ZodRawShape;
@@ -382,6 +434,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     title: "List projects",
     description:
       "Every project in your todox account, with open/done counts and root paths. Cheap; call it when unsure which slug to use.",
+    annotations: READ_ONLY,
   });
 
   tool("create_project", "createProject", {
@@ -407,7 +460,8 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       // shows them -- a tool description is the one place an agent always
       // looks.
       description:
-        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `project`.",
+        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`.",
+      annotations: READ_ONLY,
     },
     { after: checkLinkedFiles },
   );
@@ -417,6 +471,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("list_tasks", "listTasks", {
     title: "List tasks",
     description: "Tasks in a project, filtered by status.",
+    annotations: READ_ONLY,
   });
 
   tool(
@@ -425,7 +480,8 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Get task with full log",
       description:
-        "One task with its complete entry log and linked files (each marked fresh/changed/missing).",
+        "One task with its entry log (most recent 200; `entries_omitted` says if there were more) and its linked files, each marked fresh/changed/missing.",
+      annotations: READ_ONLY,
     },
     { after: checkLinkedFiles },
   );
@@ -438,22 +494,26 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       description:
         "Capture work that will not finish in this session. Pass `cwd` (your absolute working directory) and todox picks the right project — registering one for that repo if it has never seen it. Put the goal and the definition of done in `body`, not just a title.",
     },
-    {
-      // The model names files; this side hashes them where it can. Asking a
-      // model for a sha256 would be asking it to invent one.
-      overrides: {
-        files: z
-          .array(z.string())
-          .optional()
-          .describe("Absolute paths of files in play; hashed here for staleness"),
-      },
-      prepare: (p) => ({
-        ...p,
-        files: Array.isArray(p.files)
-          ? (p.files as string[]).map((path) => ({ path, hash: ws.hash(path) }))
-          : undefined,
-      }),
-    },
+    // Local only. A process sitting next to the code can hash it, so the model
+    // is asked for paths and nothing else -- asking it for a sha256 would be
+    // asking it to invent one. Remote, the schema's own `{path, hash}` stands,
+    // because there the agent is the one with the file.
+    local
+      ? {
+          overrides: {
+            files: z
+              .array(z.string())
+              .optional()
+              .describe("Absolute paths of files in play; hashed here for staleness"),
+          },
+          prepare: (p) => ({
+            ...p,
+            files: Array.isArray(p.files)
+              ? (p.files as string[]).map((path) => ({ path, hash: ws.hash(path) }))
+              : undefined,
+          }),
+        }
+      : {},
   );
 
   tool("update_task", "updateTask", {
@@ -478,23 +538,42 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       description:
         "Attach file paths to a task and hash them now, so todox can later warn that a note describes code that has since changed.",
     },
-    {
-      overrides: {
-        paths: z
-          .array(z.object({ path: z.string().min(1), note: z.string().optional() }))
-          .min(1),
-      },
-      prepare: (p) => ({
-        ...p,
-        paths: Array.isArray(p.paths)
-          ? (p.paths as { path: string; note?: string }[]).map((x) => ({
-              ...x,
-              hash: ws.hash(x.path),
-            }))
-          : p.paths,
-      }),
-    },
+    local
+      ? {
+          overrides: {
+            paths: z
+              .array(z.object({ path: z.string().min(1), note: z.string().optional() }))
+              .min(1),
+          },
+          prepare: (p) => ({
+            ...p,
+            paths: Array.isArray(p.paths)
+              ? (p.paths as { path: string; note?: string }[]).map((x) => ({
+                  ...x,
+                  hash: ws.hash(x.path),
+                }))
+              : p.paths,
+          }),
+        }
+      : {},
   );
+
+  /**
+   * The remote half of staleness.
+   *
+   * Locally this happens by itself: `checkLinkedFiles` hashes what the briefing
+   * mentions and posts the result back. Hosted, the server has no filesystem —
+   * but the agent calling it does, and that is the whole point. Without this
+   * tool the hosted transport could never record a single hash, so every ref
+   * read "not checked" for ever and the feature the product leads with was
+   * dead on the way in most people use.
+   */
+  if (!local)
+    tool("report_file_hashes", "reportRefs", {
+      title: "Report what linked files look like now",
+      description:
+        "After get_context or get_task, hash each linked file you can read (sha256 of its bytes; null if it is gone) and send the results back with the ids you were given. This is how todox learns that a note describes code that has since changed — the server has no copy of the repository and cannot work it out on its own.",
+    });
 
   /* -------------------------------------------------- durable knowledge */
 
@@ -509,7 +588,8 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("search", "search", {
     title: "Search across every project",
     description:
-      "Full-text-ish search over task titles/bodies, log entries and context notes, across ALL of your projects. Use it to answer 'have I solved this before?' and 'where did I decide X?'.",
+      "Full-text-ish search over task titles/bodies, log entries and context notes, across ALL of your projects. Use it to answer 'have I solved this before?' and 'where did I decide X?'. Returns at most `limit` hits in total (default 30).",
+    annotations: READ_ONLY,
   });
 
   /* ------------------------------------------------------------- reports */
@@ -520,18 +600,27 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "What got done (today / this week / any window)",
       description:
-        "A summary built from the log, not reconstructed from commits: tasks completed and opened, how long each took (time actually spent in 'doing', plus start-to-finish lead time), which models worked on them, their importance, the decisions made, the dead ends hit and the questions still open. Use format:'markdown' for something the developer can hand straight to a manager; 'json' when you need to reason over the numbers.",
+        "A summary built from the log, not reconstructed from commits: tasks completed and opened, how long each took (time actually spent in 'doing', plus start-to-finish lead time), which models worked on them, their importance, the decisions made, the dead ends hit and the questions still open. Use format:'markdown' for something the developer can hand straight to a manager; 'json' when you need to reason over the numbers. Prefer a named period over 'all', which returns the whole account's history in one result.",
+      annotations: READ_ONLY,
     },
     {
       presentation: {
         format: z.enum(["json", "markdown"]).optional().describe("Default 'json'"),
-        lang: z.enum(["tr", "en"]).optional().describe("Markdown language. Default 'tr'."),
+        lang: z
+          .enum(["tr", "en"])
+          .optional()
+          .describe("Markdown language. Default 'en'; pass 'tr' if the developer writes Turkish."),
       },
       // Rendering stays on this side: it is presentation, and it keeps the
       // report payload the server returns purely structural.
+      //
+      // English by default because every other word on this surface is English.
+      // It used to default to Turkish, so the `standup` prompt -- which passes
+      // no language at all -- handed back a Turkish document to an agent that
+      // had been briefed entirely in English.
       transform: (result, args) =>
         args.format === "markdown"
-          ? renderMarkdown(result as ActivityReport, translator((args.lang as Lang) ?? "tr"))
+          ? renderMarkdown(result as ActivityReport, translator((args.lang as Lang) ?? "en"))
           : result,
     },
   );

@@ -18,7 +18,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -32,6 +33,10 @@ import { hashPassword } from "../lib/util/password";
 const SCRATCH = join(tmpdir(), "todox-smoke-repo");
 const URL_BASE = process.env.TODOX_URL ?? "http://localhost:3000";
 const MODEL = "claude-opus-5";
+
+/** What a remote agent is expected to compute for itself. */
+const sha256 = (path: string) =>
+  createHash("sha256").update(readFileSync(path)).digest("hex");
 
 async function ensureUser(username: string, name: string) {
   return (
@@ -141,18 +146,54 @@ async function runSuite(mode: Mode, token: string) {
   console.log("status:", full.status, "| entries:", full.entries.length);
 
   console.log("\n--- linked files ---");
+  const marker = join(SCRATCH, "package.json");
   await text("link_files", {
     task_id: taskId,
-    paths: [{ path: join(SCRATCH, "package.json"), note: "SMOKE" }],
+    paths: [
+      {
+        path: marker,
+        note: "SMOKE",
+        // Locally the process hashes it and the schema does not even offer the
+        // field. Remotely the agent is the one with the file, which is the
+        // whole reason staleness can work over HTTP at all.
+        ...(mode.local ? {} : { hash: sha256(marker) }),
+      },
+    ],
   });
   const linked = JSON.parse(await text("get_task", { task_id: taskId }));
-  const status = linked.files?.[0]?.status;
-  // The point of the two modes: only the side that can read the file is
-  // allowed to claim it is unchanged. The other must say it has not looked.
-  const expected = mode.local ? "fresh" : "unknown";
-  if (status !== expected)
-    throw new Error(`linked file status should be ${expected} in ${mode.label}, got ${status}`);
-  console.log("linked file status:", status);
+  const refId = linked.files[0].id;
+  const status = linked.files[0].status;
+
+  // Locally the process reads the file on the way through, so the answer is
+  // already there. Remotely the server has been told a hash but nobody has
+  // looked since -- and "not checked" is what it must say until somebody has.
+  const first = mode.local ? "fresh" : "unknown";
+  if (status !== first)
+    throw new Error(`linked file should read ${first} in ${mode.label}, got ${status}`);
+  console.log("straight after linking:", status);
+
+  if (!mode.local) {
+    // The remote half of the loop, which had no tool at all: the agent hashes
+    // what it was handed and reports back. Without it every hosted ref stayed
+    // "unknown" for ever and the staleness feature never ran.
+    await text("report_file_hashes", { refs: [{ id: refId, hash: sha256(marker) }] });
+    const seen = JSON.parse(await text("get_task", { task_id: taskId }));
+    if (seen.files[0].status !== "fresh")
+      throw new Error(`after reporting, remote should read fresh, got ${seen.files[0].status}`);
+    console.log("after the agent reported:", seen.files[0].status);
+  }
+
+  console.log("\n--- and an edit is caught ---");
+  writeFileSync(marker, '{"name":"smoke-repo","edited":true}\n');
+  if (!mode.local)
+    await text("report_file_hashes", { refs: [{ id: refId, hash: sha256(marker) }] });
+
+  const rechecked = JSON.parse(await text("get_task", { task_id: taskId }));
+  const after = rechecked.files[0].status;
+  if (after !== "changed")
+    throw new Error(`an edited file should read changed in ${mode.label}, got ${after}`);
+  console.log("after editing the file:", after);
+  writeFileSync(marker, '{"name":"smoke-repo"}\n');
 
   console.log("\n--- report sees it ---");
   const md = await text("activity_report", {

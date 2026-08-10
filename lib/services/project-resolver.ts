@@ -26,15 +26,30 @@ export async function resolve(
     .sort((a, b) => b.root_path!.length - a.root_path!.length)[0];
 }
 
+/**
+ * Enough to pick from, not the whole account.
+ *
+ * The message used to carry every slug and every absolute `root_path` the
+ * account had, so one typo'd reference dumped the developer's entire directory
+ * layout into the agent's transcript -- and into any log that records 400
+ * bodies. Slugs alone identify a project; the paths were never the useful part.
+ */
+const SUGGESTIONS = 8;
+
 export async function mustResolve(userId: number, ref: string): Promise<Project> {
   const p = await resolve(userId, ref);
   if (p) return p;
-  const known = (await projects.list(userId)).map((x) => ({
-    slug: x.slug,
-    root_path: x.root_path,
-  }));
+
+  const all = await projects.list(userId);
+  const slugs = all.map((x) => x.slug);
+  const shown = slugs.slice(0, SUGGESTIONS).join(", ");
+  const rest = slugs.length - SUGGESTIONS;
+
   throw new BadRequest(
-    `no project matches "${ref}". Known projects: ${JSON.stringify(known)}. ` +
+    `no project matches "${ref}". ` +
+      (slugs.length
+        ? `Known slugs: ${shown}${rest > 0 ? ` (+${rest} more)` : ""}. `
+        : "You have no projects yet. ") +
       `Pass an absolute path to create one.`,
   );
 }
