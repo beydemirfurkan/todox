@@ -40,16 +40,34 @@ export async function link(input: {
 }): Promise<Ref[]> {
   if (!input.paths.length) return [];
 
+  // Deduplicated before the statement is built, not only by the index below:
+  // `ON CONFLICT DO UPDATE` refuses to touch the same row twice inside one
+  // command, so a caller listing a path twice would take the whole call down.
+  const byPath = new Map(input.paths.map((p) => [p.path, p]));
+  const paths = [...byPath.values()];
+
   const ts = now();
   const values: unknown[] = [];
-  const tuples = input.paths.map((p) => {
+  const tuples = paths.map((p) => {
     values.push(input.task_id ?? null, input.context_id ?? null, p.path, p.note ?? null, p.hash ?? null, ts);
     return "(?, ?, ?, ?, ?, ?)";
   });
 
+  // Re-linking a file is not an error, it is an agent doing what the tool
+  // description tells it to. The first link keeps its `hash`, because that is
+  // the baseline the existing note was written against; a note supplied later
+  // fills in one that was missing.
+  const onConflict = input.task_id
+    ? `ON CONFLICT (task_id, path) WHERE task_id IS NOT NULL
+       DO UPDATE SET note      = COALESCE(EXCLUDED.note, refs.note),
+                     hash      = COALESCE(refs.hash, EXCLUDED.hash),
+                     linked_at = EXCLUDED.linked_at`
+    : "";
+
   return all<Ref>(
     `INSERT INTO refs (task_id, context_id, path, note, hash, linked_at)
-     VALUES ${tuples.join(", ")} RETURNING *`,
+     VALUES ${tuples.join(", ")}
+     ${onConflict} RETURNING *`,
     values,
   );
 }
@@ -80,16 +98,31 @@ export const acceptSeen = (id: number) =>
 export async function recordCheck(seen: { id: number; hash: string | null }[]) {
   if (!seen.length) return;
   const ts = now();
-  for (const s of seen)
-    await run(
-      // COALESCE gives a baseline to rows linked from the web form, where the
-      // browser cannot hash a path on the developer's machine. The first time
-      // an agent looks, what it finds becomes the reference; without this those
-      // rows would read "unknown" for ever.
-      `UPDATE refs SET hash = COALESCE(hash, ?), hash_seen = ?, checked_at = ?
-       WHERE id = ?`,
-      [s.hash, s.hash, ts, s.id],
-    );
+
+  // One statement, for the same reason `link` above is one: over HTTP each row
+  // was a round trip. An agent reporting on a couple of hundred linked files
+  // spent that many hops here, in series, inside a 30-second function -- and
+  // the caller swallows a failure, so it simply stopped recording staleness
+  // without telling anyone.
+  const values: unknown[] = [ts];
+  const tuples = seen.map((s) => {
+    values.push(s.id, s.hash);
+    // The casts are not decoration: a column of all-NULL hashes gives Postgres
+    // nothing to infer a type from, and the statement fails to plan.
+    return "(?::int, ?::text)";
+  });
+
+  await run(
+    // COALESCE gives a baseline to rows linked from the web form, where the
+    // browser cannot hash a path on the developer's machine. The first time
+    // an agent looks, what it finds becomes the reference; without this those
+    // rows would read "unknown" for ever.
+    `UPDATE refs r
+     SET hash = COALESCE(r.hash, v.hash), hash_seen = v.hash, checked_at = ?
+     FROM (VALUES ${tuples.join(", ")}) AS v(id, hash)
+     WHERE r.id = v.id`,
+    values,
+  );
 }
 
 /**

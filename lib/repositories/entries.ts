@@ -28,11 +28,28 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, Entry[
   return groupBy(rows, (r) => r.task_id);
 }
 
-export const listBetween = (from: string, to: string) =>
-  all<Entry>("SELECT * FROM entries WHERE created_at BETWEEN ? AND ? ORDER BY id", [
-    from,
-    to,
-  ]);
+/**
+ * The window's entries, narrowed to the tasks a report is already about.
+ *
+ * This replaced a `WHERE created_at BETWEEN ? AND ?` with no owner in it. The
+ * report scoped the rows afterwards, in JavaScript, which was correct but meant
+ * one account's monthly report pulled every account's log across the network
+ * first -- and `period: "all"` made that window the whole table.
+ */
+export async function listByTasksBetween(
+  taskIds: number[],
+  from: string,
+  to: string,
+): Promise<Entry[]> {
+  if (!taskIds.length) return [];
+  return all<Entry>(
+    `SELECT * FROM entries
+     WHERE task_id IN (${taskIds.map(() => "?").join(",")})
+       AND created_at BETWEEN ? AND ?
+     ORDER BY id`,
+    [...taskIds, from, to],
+  );
+}
 
 export const byId = (id: number) =>
   one<Entry>("SELECT * FROM entries WHERE id = ?", [id]);

@@ -56,6 +56,17 @@ export async function run(text: string, params: Params = []): Promise<void> {
 }
 
 /**
+ * A statement that has not been sent yet.
+ *
+ * Repositories expose a `…Stmt` builder beside any write that a service may
+ * need to run inside a transaction with another table's write. The SQL stays
+ * with the table that owns it; only the sequencing moves.
+ */
+export type Statement = { text: string; params: Params };
+
+export const runStmt = (s: Statement) => run(s.text, s.params);
+
+/**
  * Builds a `SET a = ?, b = ?` fragment from a patch, keeping only the columns
  * named in `allowed`.
  *
@@ -81,12 +92,22 @@ export function setClause(
   };
 }
 
-/** Multiple statements, all-or-nothing. */
-export async function tx(statements: { text: string; params?: Params }[]) {
+/**
+ * Multiple statements, all-or-nothing, returning each one's rows.
+ *
+ * The driver takes a list of prepared queries rather than a callback, so no
+ * JavaScript runs between them: a statement cannot use a value the previous one
+ * returned. Where a write genuinely needs the id of the row just inserted, the
+ * answer is one statement with a CTE, not this.
+ */
+export async function tx<T = unknown>(
+  statements: { text: string; params?: Params }[],
+): Promise<T[][]> {
   const s = sql();
-  await s.transaction(
+  const results = await s.transaction(
     statements.map((q) => s.query(positional(q.text), (q.params ?? []) as unknown[])),
   );
+  return results as T[][];
 }
 
 /** DDL and anything else that must run verbatim, without placeholders. */

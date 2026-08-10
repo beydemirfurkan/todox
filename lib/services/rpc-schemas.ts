@@ -18,12 +18,40 @@ import { BadRequest } from "./errors";
  * `.describe()` text is written for an agent reading the tool list.
  */
 
+/**
+ * Length ceilings, set far above anything real work produces.
+ *
+ * Nothing here had one. `reportRefs.refs` was the single bounded collection in
+ * the file, and its neighbours are the ones an agent is most likely to build
+ * from a loop: `refs.link` spends six bind parameters per path, so a caller
+ * that hands over a monorepo's file list crosses Postgres' 65535-parameter
+ * ceiling and gets a driver error -- which is not a `BadRequest`, so it lands
+ * in the generic 500 branch and tells the agent nothing. A refusal it can read
+ * is the point of these numbers, not the numbers themselves.
+ */
+const MAX = {
+  /** Titles, names, slugs -- anything meant to fit on one line. */
+  line: 500,
+  /** A filesystem path. Windows stops well short of this; Linux allows 4096. */
+  path: 4_096,
+  /** Bodies, summaries, notes. Long prose is the point of this product. */
+  text: 100_000,
+  /** A search term. Longer than this is not a search. */
+  query: 200,
+  /** Paths in one call, matching the ceiling `reportRefs` already had. */
+  files: 500,
+} as const;
+
 const model = z
   .string()
+  .max(MAX.line)
   .optional()
   .describe("Your own model id, e.g. 'claude-opus-5'. Always pass this.");
 
-const projectRef = z.string().describe("Slug, name, or a path inside the project");
+const projectRef = z
+  .string()
+  .max(MAX.path)
+  .describe("Slug, name, or a path inside the project");
 
 /**
  * Filled in by the MCP server, not by the model. The web host has no checkout,
@@ -31,8 +59,12 @@ const projectRef = z.string().describe("Slug, name, or a path inside the project
  */
 const repoRoot = z
   .string()
+  .max(MAX.path)
   .optional()
   .describe("Absolute path of the repository root containing `cwd`.");
+
+/** A path or a slug arriving from a caller, wherever one is accepted. */
+const ref = z.string().max(MAX.path);
 
 /** Accepts anything `new Date()` understands, which is what `resolvePeriod` uses. */
 const datetime = z
@@ -46,26 +78,32 @@ export const SHAPES = {
   listProjects: {},
 
   createProject: {
-    name: z.string().min(1).describe("Human name, e.g. 'Checkout Service'"),
-    slug: z.string().min(1).optional().describe("Defaults to a slug of the name"),
-    root_path: z.string().optional().describe("Absolute path of the repo/working dir"),
+    name: z.string().min(1).max(MAX.line).describe("Human name, e.g. 'Checkout Service'"),
+    slug: z
+      .string()
+      .min(1)
+      .max(MAX.line)
+      .optional()
+      .describe("Defaults to a slug of the name"),
+    root_path: ref.optional().describe("Absolute path of the repo/working dir"),
     summary: z
       .string()
+      .max(MAX.text)
       .optional()
       .describe("What this project is, in 1-3 sentences, for a cold agent"),
   },
 
   updateProject: {
     project: projectRef,
-    name: z.string().min(1).optional(),
-    root_path: z.string().optional(),
-    summary: z.string().optional(),
+    name: z.string().min(1).max(MAX.line).optional(),
+    root_path: ref.optional(),
+    summary: z.string().max(MAX.text).optional(),
   },
 
   getContext: {
-    project: z
-      .string()
-      .describe("Project slug, name, or any absolute path inside the project"),
+    project: ref.describe(
+      "Project slug, name, or any absolute path inside the project",
+    ),
     create_if_missing: z
       .boolean()
       .optional()
@@ -76,9 +114,8 @@ export const SHAPES = {
   },
 
   listTasks: {
-    project: z.string().optional(),
-    cwd: z
-      .string()
+    project: ref.optional(),
+    cwd: ref
       .optional()
       .describe("Absolute working directory, used if project is omitted"),
     status: z
@@ -90,18 +127,16 @@ export const SHAPES = {
   getTask: { task_id: z.number().int() },
 
   createTask: {
-    cwd: z
-      .string()
+    cwd: ref
       .optional()
       .describe(
         "Absolute working directory. Resolves — and if needed creates — the project.",
       ),
-    project: z
-      .string()
+    project: ref
       .optional()
       .describe("Explicit slug or name. Use when the task does not belong to `cwd`."),
-    title: z.string().min(1),
-    body: z.string().optional().describe("Goal, constraints, acceptance"),
+    title: z.string().min(1).max(MAX.line),
+    body: z.string().max(MAX.text).optional().describe("Goal, constraints, acceptance"),
     status: z.enum(STATUSES).optional(),
     priority: z
       .number()
@@ -113,13 +148,14 @@ export const SHAPES = {
     files: z
       .array(
         z.object({
-          path: z.string().min(1),
+          path: z.string().min(1).max(MAX.path),
           hash: z
             .string()
             .regex(/^[a-f0-9]{64}$/)
             .nullish(),
         }),
       )
+      .max(MAX.files)
       .optional()
       .describe("Absolute paths of files in play, with their sha256"),
     repo_root: repoRoot,
@@ -128,8 +164,8 @@ export const SHAPES = {
 
   updateTask: {
     task_id: z.number().int(),
-    title: z.string().min(1).optional(),
-    body: z.string().optional(),
+    title: z.string().min(1).max(MAX.line).optional(),
+    body: z.string().max(MAX.text).optional(),
     status: z.enum(STATUSES).optional(),
     priority: z.number().int().min(1).max(3).optional(),
     model,
@@ -138,7 +174,11 @@ export const SHAPES = {
   logEntry: {
     task_id: z.number().int(),
     kind: z.enum(ENTRY_KINDS),
-    body: z.string().min(1).describe("Write for a stranger, not for yourself"),
+    body: z
+      .string()
+      .min(1)
+      .max(MAX.text)
+      .describe("Write for a stranger, not for yourself"),
     author: z.enum(["agent", "human"]).optional(),
     model,
   },
@@ -148,8 +188,8 @@ export const SHAPES = {
     paths: z
       .array(
         z.object({
-          path: z.string().min(1),
-          note: z.string().optional(),
+          path: z.string().min(1).max(MAX.path),
+          note: z.string().max(MAX.line).optional(),
           hash: z
             .string()
             .regex(/^[a-f0-9]{64}$/)
@@ -157,7 +197,8 @@ export const SHAPES = {
             .describe("sha256 of the file, computed by you. The server has no copy."),
         }),
       )
-      .min(1),
+      .min(1)
+      .max(MAX.files),
   },
 
   /**
@@ -181,21 +222,15 @@ export const SHAPES = {
   },
 
   addContext: {
-    project: z
-      .string()
-      .optional()
-      .describe("Omit to apply across every project in your account"),
-    cwd: z
-      .string()
-      .optional()
-      .describe("Absolute working directory, used if project is omitted"),
+    project: ref.optional().describe("Omit to apply across every project in your account"),
+    cwd: ref.optional().describe("Absolute working directory, used if project is omitted"),
     kind: z.enum(CONTEXT_KINDS),
-    title: z.string().min(1),
-    body: z.string().min(1),
+    title: z.string().min(1).max(MAX.line),
+    body: z.string().min(1).max(MAX.text),
   },
 
   search: {
-    query: z.string().min(1),
+    query: z.string().min(1).max(MAX.query),
     // Unbounded, this is three unindexed ILIKE scans with no ceiling.
     limit: z.number().int().min(1).max(100).optional(),
   },
@@ -207,12 +242,10 @@ export const SHAPES = {
       .describe("Default 'today'. 'week' is the current Monday-based week."),
     from: datetime.optional(),
     to: datetime.optional(),
-    project: z
-      .string()
-      .optional()
-      .describe("Slug, name or path. Omit to cover every project."),
+    project: ref.optional().describe("Slug, name or path. Omit to cover every project."),
     tz: z
       .string()
+      .max(64)
       .optional()
       .describe(
         "IANA timezone the period is measured in, e.g. 'Europe/Istanbul'. Defaults to the account's. Send yours so 'today' means the developer's today.",

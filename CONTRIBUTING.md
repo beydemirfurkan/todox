@@ -15,8 +15,8 @@ pnpm dev
 ```bash
 pnpm lint
 pnpm test
-pnpm exec tsc --noEmit
-pnpm build
+pnpm build                     # before tsc: PageProps and LayoutProps are
+pnpm exec tsc --noEmit         # globals Next generates into .next/types
 pnpm smoke:auth                # if you touched anything under auth
 ```
 
@@ -45,6 +45,16 @@ see in review.
   default language; write it properly rather than machine-translating.
 - **No `?` inside SQL string literals.** `lib/db/client.ts` rewrites `?` to
   `$n` positionally and does not parse strings.
+- **Writes that must agree run in one transaction.** `tx()` in
+  `lib/db/client.ts` takes a list of prepared statements, so a repository
+  exposes a `…Stmt` builder beside any write a service may need to pair with
+  another table's — the SQL stays with the table that owns it and only the
+  sequencing moves. There is no JavaScript between the statements, so a write
+  that needs the id of the row just inserted cannot use it; `tasks.create` is
+  a CTE for exactly that reason, and is the one place a repository writes
+  another table. This is not theoretical tidiness: a dropped second write once
+  left a task marked `done` whose last event was `doing`, and every daily
+  report after it gained a permanent 24 hours.
 - **Never build a `SET` clause by hand.** Use `setClause(patch, COLUMNS)` from
   `lib/db/client.ts`. Column names cannot be bound as parameters, so they get
   interpolated; patches arrive from `const { id, ...patch } = params` at the

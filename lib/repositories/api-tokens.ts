@@ -1,4 +1,4 @@
-import { all, one, run } from "../db/client";
+import { all, one, run, runStmt, type Statement } from "../db/client";
 import type { ApiToken, User } from "../types";
 import { hashToken } from "../util/tokens";
 import { now } from "../util/time";
@@ -41,5 +41,9 @@ export const remove = (id: number, userId: number) =>
   run("DELETE FROM api_tokens WHERE id = ? AND user_id = ?", [id, userId]);
 
 /** Every agent token for one account. Used when the account itself is in doubt. */
-export const destroyAllFor = (userId: number) =>
-  run("DELETE FROM api_tokens WHERE user_id = ?", [userId]);
+export const destroyAllForStmt = (userId: number): Statement => ({
+  text: "DELETE FROM api_tokens WHERE user_id = ?",
+  params: [userId],
+});
+
+export const destroyAllFor = (userId: number) => runStmt(destroyAllForStmt(userId));

@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { isInside } from "../lib/util/paths";
+
 /**
  * The half of todox that needs a filesystem.
  *
@@ -39,13 +41,19 @@ function asDirectory(p: string) {
  * Walk up from a path looking for a project root marker, so an agent can hand
  * over any file it happens to be editing and still get the repository rather
  * than the folder the file sits in.
+ *
+ * `stopAt` bounds the walk to a subtree. Nothing in the product passes it: a
+ * developer's checkout really can be anywhere. It exists because a test cannot
+ * make claims about the fallback otherwise -- the machine running it owns every
+ * directory above the sandbox, and a stray `package.json` in one of them (this
+ * happens in `%TEMP%`) is the function working, not failing.
  */
-export function findProjectRoot(start: string): string {
+export function findProjectRoot(start: string, stopAt?: string): string {
   let dir = asDirectory(start);
   for (let i = 0; i < 40; i++) {
     if (ROOT_MARKERS.some((m) => existsSync(join(dir, m)))) return dir;
     const up = dirname(dir);
-    if (up === dir) break;
+    if (up === dir || (stopAt && !isInside(up, stopAt))) break;
     dir = up;
   }
   return asDirectory(start);

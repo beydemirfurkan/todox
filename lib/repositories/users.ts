@@ -1,4 +1,4 @@
-import { all, one, run, setClause } from "../db/client";
+import { all, one, run, runStmt, setClause, type Statement } from "../db/client";
 import type { User } from "../types";
 import { now } from "../util/time";
 
@@ -36,15 +36,24 @@ export async function create(input: NewUser): Promise<User> {
   return row!;
 }
 
-export const markEmailVerified = (id: number) =>
-  run("UPDATE users SET email_verified_at = ? WHERE id = ?", [now(), id]);
+export const markEmailVerifiedStmt = (id: number): Statement => ({
+  text: "UPDATE users SET email_verified_at = ? WHERE id = ?",
+  params: [now(), id],
+});
+
+export const markEmailVerified = (id: number) => runStmt(markEmailVerifiedStmt(id));
 
 /** Changing the address un-verifies it; the new one has proved nothing yet. */
 export const updateEmail = (id: number, email: string) =>
   run("UPDATE users SET email = ?, email_verified_at = NULL WHERE id = ?", [email, id]);
 
+export const updatePasswordStmt = (id: number, passwordHash: string): Statement => ({
+  text: "UPDATE users SET password_hash = ? WHERE id = ?",
+  params: [passwordHash, id],
+});
+
 export const updatePassword = (id: number, passwordHash: string) =>
-  run("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, id]);
+  runStmt(updatePasswordStmt(id, passwordHash));
 
 /** Never `password_hash` or `email_verified_at`: those have their own writers. */
 const PROFILE_COLUMNS = ["name", "email"] as const;

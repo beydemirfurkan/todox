@@ -49,7 +49,11 @@ describe("findProjectRoot", () => {
 
   it("returns a containing directory when there is no marker", () => {
     const p = write("loose.ts", "x");
-    expect(findProjectRoot(p)).toBe(dir);
+    // Bounded to the sandbox on purpose. Without it this asserted something
+    // about the machine rather than the function: a `package.json` sitting in
+    // the system temp directory made the walk find a real marker and the test
+    // failed locally while passing in CI.
+    expect(findProjectRoot(p, dir)).toBe(dir);
   });
 });
 

@@ -330,6 +330,20 @@ export const tr: Record<Key, string> = {
   c_gotcha: "tuzak",
   c_preference: "tercih",
 
+  verifyConfirmTitle: "Tek tık kaldı",
+  verifyConfirmBody:
+    "Bu adresin sana ait olduğunu onayla. Bağlantı sayfa açıldığında değil, butona bastığında harcanır.",
+  verifyConfirmCta: "E-postamı doğrula",
+
+  errorTitle: "Bu iş olmadı",
+  errorBody:
+    "Bu sayfaya giderken sunucu tarafında bir şey ters gitti. Baktığın hiçbir şey kaybolmadı.",
+  errorRetry: "Yeniden dene",
+  notFoundTitle: "Burada bir şey yok",
+  notFoundBody:
+    "Böyle bir sayfa yok; ya da işaret ettiği projenin adı değişmiş veya silinmiş.",
+  backHome: "Projelerine dön",
+
   justNow: "az önce",
   minutesAgo: "{n} dk önce",
   hoursAgo: "{n} sa önce",

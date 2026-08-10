@@ -71,6 +71,17 @@ export async function POST(req: Request) {
     return unauthorised("invalid or revoked token");
   }
 
+  // Same bucket as /api/rpc, keyed on the token: a valid one used to buy an
+  // unlimited number of calls, and an agent loop is the likeliest thing on
+  // earth to make several thousand of them by accident.
+  const pace = await limit.consume("agentPerToken", token);
+  if (!pace.allowed)
+    return json(
+      { jsonrpc: "2.0", error: { code: -32000, message: "too many calls; slow down" } },
+      429,
+      { "retry-after": String(pace.retryAfterSec) },
+    );
+
   let body: unknown;
   try {
     body = await req.json();

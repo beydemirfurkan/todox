@@ -8,6 +8,10 @@ import { invoke } from "@/lib/services/rpc";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// Matches the hosted MCP endpoint. Without it this route inherits the platform
+// default, so a slow query holds a function open far longer than any agent is
+// willing to wait for an answer.
+export const maxDuration = 30;
 
 /**
  * The endpoint the MCP server talks to. Bearer token in, one method call out.
@@ -38,6 +42,15 @@ export async function POST(req: NextRequest) {
     await limit.penalise("badTokenPerIp", ip);
     return fail(401, "invalid or revoked token");
   }
+
+  // A valid token bought unlimited calls until now. The subject is the token
+  // rather than the account, so one runaway agent cannot lock the others out.
+  const pace = await limit.consume("agentPerToken", token);
+  if (!pace.allowed)
+    return NextResponse.json(
+      { ok: false, error: "too many calls; slow down" },
+      { status: 429, headers: { "retry-after": String(pace.retryAfterSec) } },
+    );
 
   let payload: { method?: unknown; params?: unknown };
   try {

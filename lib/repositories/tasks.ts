@@ -59,11 +59,30 @@ export const activeBetween = (userId: number, from: string, to: string) =>
     [userId, from, to, from, to, from, to, from, to],
   );
 
-export async function create(input: NewTask): Promise<Task> {
+/**
+ * Creates the task and its opening event in one statement.
+ *
+ * This is the one place a repository writes another module's table, and the
+ * driver is the reason: it takes a list of prepared queries with no JavaScript
+ * between them, so a second statement cannot use the id the first returned.
+ * Two round trips would leave a task whose status was never recorded whenever
+ * the second one dropped -- and `timingFor` replays those events to produce
+ * every duration in every report. A CTE is the only way to make it atomic.
+ */
+export async function create(
+  input: NewTask & { actor?: string; model?: string | null },
+): Promise<Task> {
   const ts = now();
   const row = await one<Task>(
-    `INSERT INTO tasks (project_id, title, body, status, priority, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+    `WITH t AS (
+       INSERT INTO tasks (project_id, title, body, status, priority, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       RETURNING *
+     ), e AS (
+       INSERT INTO task_events (task_id, from_status, to_status, at, actor, model)
+       SELECT t.id, NULL, t.status, ?, ?, ? FROM t
+     )
+     SELECT * FROM t`,
     [
       input.project_id,
       input.title,
@@ -72,9 +91,26 @@ export async function create(input: NewTask): Promise<Task> {
       input.priority ?? 2,
       ts,
       ts,
+      ts,
+      input.actor ?? "agent",
+      input.model ?? null,
     ],
   );
   return row!;
+}
+
+/**
+ * The `UPDATE` on its own, for a caller that has to run it beside another
+ * table's write in one transaction. `update` is the same statement executed by
+ * itself; neither builds its `SET` clause by hand.
+ */
+export function updateStmt(id: number, patch: TaskPatch) {
+  const set = setClause(patch, COLUMNS);
+  if (!set.sql) return undefined;
+  return {
+    text: `UPDATE tasks SET ${set.sql}, updated_at = ? WHERE id = ? RETURNING *`,
+    params: [...set.values, now(), id],
+  };
 }
 
 /**
@@ -85,12 +121,9 @@ export async function create(input: NewTask): Promise<Task> {
  * only caller that knows the previous status.
  */
 export async function update(id: number, patch: TaskPatch): Promise<Task | undefined> {
-  const set = setClause(patch, COLUMNS);
-  if (!set.sql) return byId(id);
-  return one<Task>(
-    `UPDATE tasks SET ${set.sql}, updated_at = ? WHERE id = ? RETURNING *`,
-    [...set.values, now(), id],
-  );
+  const stmt = updateStmt(id, patch);
+  if (!stmt) return byId(id);
+  return one<Task>(stmt.text, stmt.params);
 }
 
 export const touch = (id: number) =>

@@ -1,4 +1,4 @@
-import { one, run } from "../db/client";
+import { one, run, runStmt, type Statement } from "../db/client";
 import type { AuthTokenPurpose, AuthTokenRow, User } from "../types";
 import { hashToken } from "../util/tokens";
 import { now } from "../util/time";
@@ -34,8 +34,12 @@ export async function resolve(
   return user ? { row: found, user } : undefined;
 }
 
-export const consume = (id: number) =>
-  run("UPDATE auth_tokens SET used_at = ? WHERE id = ?", [now(), id]);
+export const consumeStmt = (id: number): Statement => ({
+  text: "UPDATE auth_tokens SET used_at = ? WHERE id = ?",
+  params: [now(), id],
+});
+
+export const consume = (id: number) => runStmt(consumeStmt(id));
 
 /** Issuing a new one retires the old: two live reset links is one too many. */
 export const invalidateAll = (userId: number, purpose: AuthTokenPurpose) =>

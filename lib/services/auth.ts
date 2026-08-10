@@ -1,3 +1,4 @@
+import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
@@ -5,6 +6,7 @@ import type { ApiToken, PublicUser, User } from "../types";
 import { hashPassword, verifyPassword } from "../util/password";
 import { SESSION_DAYS, newApiToken, newSessionToken, tokenPreview } from "../util/tokens";
 import { addDays } from "../util/time";
+import { sweep } from "./rate-limit";
 
 /** `retryAfterSec` is only set by the rate limiter, and is minutes by the time
  *  it reaches the UI -- the field carries whatever the message needs. */
@@ -86,7 +88,10 @@ export async function issueSession(userId: number, userAgent?: string | null) {
     expiresAt: addDays(new Date(), SESSION_DAYS).toISOString(),
     userAgent: userAgent ?? null,
   });
-  await sessions.purgeExpired();
+  // Signing in is the natural moment to take out the rubbish. `rate_limits`
+  // grew without bound before this: its rows expire within the hour but nothing
+  // ever deleted them, and there is no cron in this deployment to do it.
+  await Promise.all([sessions.purgeExpired(), sweep()]);
   return token;
 }
 
@@ -109,9 +114,14 @@ export async function changePassword(
   if (next.length < MIN_PASSWORD)
     return { ok: false, errors: [{ field: "password", code: "passwordShort" }] };
 
-  await users.updatePassword(userId, await hashPassword(next));
-  // Every other session dies with the old password.
-  await sessions.destroyAllFor(userId);
+  // One transaction: a password change that reports success while the old
+  // sessions survive is worse than one that fails outright, because the owner
+  // stops looking for the intruder.
+  await tx([
+    users.updatePasswordStmt(userId, await hashPassword(next)),
+    // Every other session dies with the old password.
+    sessions.destroyAllForStmt(userId),
+  ]);
   return { ok: true, value: true };
 }
 

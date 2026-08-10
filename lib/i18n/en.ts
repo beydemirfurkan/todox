@@ -344,6 +344,21 @@ export const en = {
   c_gotcha: "gotcha",
   c_preference: "preference",
 
+  verifyConfirmTitle: "One click to go",
+  verifyConfirmBody:
+    "Confirm this address is yours. The link is spent when you press the button, not when the page opens.",
+  verifyConfirmCta: "Verify my email",
+
+  /* when a page cannot be shown */
+  errorTitle: "That did not work",
+  errorBody:
+    "Something on the server went wrong on the way to this page. Nothing you were looking at has been lost.",
+  errorRetry: "Try again",
+  notFoundTitle: "Nothing here",
+  notFoundBody:
+    "This page does not exist, or the project it pointed at has been renamed or deleted.",
+  backHome: "Back to your projects",
+
   /* relative time */
   justNow: "just now",
   minutesAgo: "{n}m ago",

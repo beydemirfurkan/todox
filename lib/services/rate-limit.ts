@@ -28,6 +28,16 @@ export const POLICIES = {
   // address -- and nobody changes their address five times an hour.
   emailChangePerUser: { limit: 5, windowMs: HOUR },
   badTokenPerIp: { limit: 20, windowMs: 15 * MINUTE },
+  /**
+   * Everything an authenticated agent does, per token.
+   *
+   * Presenting a valid token used to buy unlimited calls, which made a leaked
+   * one an unmetered way to run `ILIKE '%…%'` scans over somebody's whole log.
+   * The ceiling is set well above real work -- a busy session is tens of calls,
+   * not hundreds -- so it should only ever be met by a loop that has come off
+   * its rails.
+   */
+  agentPerToken: { limit: 600, windowMs: 15 * MINUTE },
 } as const;
 
 export type PolicyName = keyof typeof POLICIES;

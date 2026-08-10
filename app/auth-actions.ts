@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { getLang } from "@/lib/lang";
 import {
   completePasswordReset,
+  completeVerification,
   requestPasswordReset,
   sendEmailChanged,
   sendVerification,
@@ -150,6 +151,20 @@ export async function resetPasswordAction(
 }
 
 /* --------------------------------------------------------- verification */
+
+/**
+ * Verification happens here rather than while the page renders.
+ *
+ * It used to be a side effect of the GET: opening the link consumed the token.
+ * Corporate mail scanners fetch every link in a message before the human sees
+ * it, so the token was spent by a robot and the person who clicked was told
+ * their link was invalid.
+ */
+export async function verifyEmailAction(fd: FormData) {
+  const token = str(fd, "token");
+  const ok = token ? await completeVerification(token) : false;
+  redirect(ok ? "/verify?state=ok" : "/verify?state=failed");
+}
 
 export async function resendVerificationAction() {
   const user = await requireUser();

@@ -1,4 +1,4 @@
-import { one, run } from "../db/client";
+import { one, run, runStmt, type Statement } from "../db/client";
 import type { Session, User } from "../types";
 import { hashToken } from "../util/tokens";
 import { now } from "../util/time";
@@ -35,8 +35,12 @@ export const userForToken = (token: string) =>
 export const destroy = (token: string) =>
   run("DELETE FROM sessions WHERE token_hash = ?", [hashToken(token)]);
 
-export const destroyAllFor = (userId: number) =>
-  run("DELETE FROM sessions WHERE user_id = ?", [userId]);
+export const destroyAllForStmt = (userId: number): Statement => ({
+  text: "DELETE FROM sessions WHERE user_id = ?",
+  params: [userId],
+});
+
+export const destroyAllFor = (userId: number) => runStmt(destroyAllForStmt(userId));
 
 export const purgeExpired = () =>
   run("DELETE FROM sessions WHERE expires_at <= ?", [now()]);

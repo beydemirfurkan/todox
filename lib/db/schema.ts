@@ -164,6 +164,23 @@ CREATE INDEX IF NOT EXISTS idx_refs_context ON refs (context_id);
 -- idempotent, so it belongs inline rather than in a migration history.
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS hash_seen  TEXT;
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS checked_at TEXT;
+
+-- Linking the same file to the same task twice was allowed, and \`link_files\`
+-- is described to agents as safe to call again. Every repeat added a row: the
+-- briefing listed the file N times, the agent re-hashed it N times, and once a
+-- task passed 500 refs the write-back stopped fitting in its own limit.
+-- The oldest row wins the de-duplication, because its \`hash\` is the baseline
+-- the note was actually written against.
+DELETE FROM refs a USING refs b
+ WHERE a.id > b.id
+   AND a.path = b.path
+   AND a.task_id IS NOT DISTINCT FROM b.task_id
+   AND a.context_id IS NOT DISTINCT FROM b.context_id;
+
+-- Partial: a ref belongs to a task or to a context, and NULLs would otherwise
+-- compare as distinct and let the duplicates straight back in.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_task ON refs (task_id, path)
+  WHERE task_id IS NOT NULL;
 `;
 
 /**

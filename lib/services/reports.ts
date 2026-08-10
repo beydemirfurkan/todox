@@ -196,10 +196,10 @@ export async function activityReport(
 
   // Three queries total, whatever the window contains. Loading the log and the
   // events per task turned the monthly report into hundreds of round trips.
-  const [logs, eventsByTask, periodEntriesAll] = await Promise.all([
+  const [logs, eventsByTask, periodEntries] = await Promise.all([
     entriesRepo.listByTasks(ids),
     eventsRepo.listByTasks(ids),
-    entriesRepo.listBetween(period.from, period.to),
+    entriesRepo.listByTasksBetween(ids, period.from, period.to),
   ]);
 
   const reports = candidates.map((task) => {
@@ -214,11 +214,10 @@ export async function activityReport(
     );
   });
 
-  const known = new Set(ids);
-  const periodEntries = periodEntriesAll.filter((e) => known.has(e.task_id));
-
-  const titleOf = (taskId: number) =>
-    reports.find((r) => r.id === taskId)?.title ?? `#${taskId}`;
+  // `titleOf` used to be a linear scan of `reports` per entry, which is a
+  // quadratic on a month with a few thousand entries in it.
+  const titles = new Map(reports.map((r) => [r.id, r.title]));
+  const titleOf = (taskId: number) => titles.get(taskId) ?? `#${taskId}`;
 
   const pick = (kind: EntryKind) =>
     periodEntries
@@ -237,37 +236,47 @@ export async function activityReport(
   const dropped = reports.filter(
     (r) => r.status === "dropped" && withinPeriod(r.closed_at, period),
   );
+  const isCompleted = new Set(completed.map((r) => r.id));
   const inProgress = reports.filter(
-    (r) => OPEN_STATUSES.includes(r.status) && !completed.includes(r),
+    (r) => OPEN_STATUSES.includes(r.status) && !isCompleted.has(r.id),
   );
 
   const activeInPeriod = (r: TaskReport) => r.active_ms_in_period;
 
-  const byProject = [...new Set(reports.map((r) => r.project_slug))]
-    .map((slug) => {
-      const rows = reports.filter((r) => r.project_slug === slug);
-      return {
-        slug,
-        name: rows[0]?.project_name ?? slug,
-        created: rows.filter((r) => withinPeriod(r.created_at, period)).length,
-        completed: rows.filter(
-          (r) => r.status === "done" && withinPeriod(r.closed_at, period),
-        ).length,
-        touched: rows.length,
-        active_ms: rows.reduce((n, r) => n + activeInPeriod(r), 0),
-      };
-    })
+  // Grouped in one pass each. These were nested filters -- a scan of every task
+  // per project and of every entry per model -- which is fine for a day and
+  // quadratic for a month.
+  const perProject = new Map<string, TaskReport[]>();
+  for (const r of reports) {
+    const bucket = perProject.get(r.project_slug);
+    if (bucket) bucket.push(r);
+    else perProject.set(r.project_slug, [r]);
+  }
+
+  const byProject = [...perProject.entries()]
+    .map(([slug, rows]) => ({
+      slug,
+      name: rows[0]?.project_name ?? slug,
+      created: rows.filter((r) => withinPeriod(r.created_at, period)).length,
+      completed: rows.filter(
+        (r) => r.status === "done" && withinPeriod(r.closed_at, period),
+      ).length,
+      touched: rows.length,
+      active_ms: rows.reduce((n, r) => n + activeInPeriod(r), 0),
+    }))
     .sort((a, b) => b.active_ms - a.active_ms || b.touched - a.touched);
 
-  const byModel = [
-    ...new Set(periodEntries.map((e) => e.model).filter((m): m is string => !!m)),
-  ]
-    .map((model) => ({
-      model,
-      entries: periodEntries.filter((e) => e.model === model).length,
-      tasks: new Set(periodEntries.filter((e) => e.model === model).map((e) => e.task_id))
-        .size,
-    }))
+  const perModel = new Map<string, { entries: number; tasks: Set<number> }>();
+  for (const e of periodEntries) {
+    if (!e.model) continue;
+    const bucket = perModel.get(e.model) ?? { entries: 0, tasks: new Set<number>() };
+    bucket.entries += 1;
+    bucket.tasks.add(e.task_id);
+    perModel.set(e.model, bucket);
+  }
+
+  const byModel = [...perModel.entries()]
+    .map(([model, b]) => ({ model, entries: b.entries, tasks: b.tasks.size }))
     .sort((a, b) => b.entries - a.entries);
 
   return {

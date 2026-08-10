@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import { duration, translator, type Key, type T } from "@/lib/i18n";
 import { getT, getTz } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
-import { mustResolve } from "@/lib/services/project-resolver";
+import { resolve } from "@/lib/services/project-resolver";
 import { periodLabel, renderMarkdown } from "@/lib/services/report-markdown";
 import { activityReport, type TaskReport } from "@/lib/services/reports";
 import { resolvePeriod, type PeriodName } from "@/lib/util/time";
@@ -27,7 +28,12 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
   const projectRef = Array.isArray(sp.project) ? sp.project[0] : sp.project;
 
   const window = resolvePeriod(period, { tz: await getTz() });
-  const projectId = projectRef ? (await mustResolve(user.id, projectRef)).id : undefined;
+  // `mustResolve` throws for an unknown reference, which is the right answer to
+  // an agent and the wrong one to a browser: a bookmark pointing at a renamed
+  // project rendered "Application error: a server-side exception has occurred".
+  // The sibling pages have always answered 404 here.
+  const projectId = projectRef ? (await resolve(user.id, projectRef))?.id : undefined;
+  if (projectRef && projectId === undefined) notFound();
   const report = await activityReport(user.id, window, { projectId });
   const markdown = renderMarkdown(report, translator(lang));
 

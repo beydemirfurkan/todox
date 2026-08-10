@@ -1,3 +1,4 @@
+import { tx } from "../db/client";
 import * as entries from "../repositories/entries";
 import * as events from "../repositories/events";
 import * as refs from "../repositories/refs";
@@ -19,17 +20,14 @@ export async function create(
     files?: { path: string; hash?: string | null }[];
   },
 ): Promise<Task> {
-  const { actor, model, files, ...row } = input;
+  const { files, ...row } = input;
+  // The task and its opening event go in together; see `tasks.create`.
   const task = await tasks.create(row);
 
-  await events.create({
-    task_id: task.id,
-    from_status: null,
-    to_status: task.status,
-    actor,
-    model,
-  });
-
+  // Deliberately outside that statement, and not in a transaction with it: the
+  // file links need the id it just returned. A dropped link costs a note its
+  // file, which the next `link_files` call fixes; a dropped event costs every
+  // future report its arithmetic, which nothing fixes.
   if (files?.length) await refs.link({ task_id: task.id, paths: files });
 
   return task;
@@ -59,17 +57,30 @@ export async function update(
   const before = await tasks.byId(id);
   if (!before) return undefined;
 
-  const after = await tasks.update(id, closedAtFor(patch, before));
-  if (after && patch.status && patch.status !== before.status) {
-    await events.create({
+  const stmt = tasks.updateStmt(id, closedAtFor(patch, before));
+  if (!stmt) return before;
+
+  const moved = patch.status && patch.status !== before.status;
+  if (!moved) {
+    const [rows] = await tx<Task>([stmt]);
+    return rows[0];
+  }
+
+  // One transaction, because the pair is the invariant: a status the event log
+  // never saw is a duration every later report gets wrong. This used to be two
+  // independent writes, and a dropped second one added a permanent 24 hours to
+  // the daily report -- see the note in `reports.ts`.
+  const [rows] = await tx<Task>([
+    stmt,
+    events.createStmt({
       task_id: id,
       from_status: before.status,
-      to_status: patch.status,
+      to_status: patch.status!,
       actor: meta.actor,
       model: meta.model,
-    });
-  }
-  return after;
+    }),
+  ]);
+  return rows[0];
 }
 
 export async function addEntry(input: entries.NewEntry): Promise<Entry> {

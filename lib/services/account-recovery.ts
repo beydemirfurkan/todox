@@ -1,3 +1,4 @@
+import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
 import * as authTokens from "../repositories/auth-tokens";
 import * as sessions from "../repositories/sessions";
@@ -76,18 +77,24 @@ export async function completePasswordReset(
   const hit = await authTokens.resolve("reset", token);
   if (!hit) return { ok: false, errors: [{ field: "form", code: "linkInvalid" }] };
 
-  await users.updatePassword(hit.user.id, await hashPassword(password));
-  await authTokens.consume(hit.row.id);
-  // Whoever knew the old password loses their grip on the account.
-  await sessions.destroyAllFor(hit.user.id);
-  // Agent tokens too. This is the recovery path -- you are here because you
-  // lost control of the account, and a token that never expires and carries
-  // full permissions is exactly what an intruder would keep. Killing sessions
-  // while leaving those alive would have been security theatre.
-  await apiTokens.destroyAllFor(hit.user.id);
-
-  // Reaching the inbox proves the address, so verification comes for free.
-  if (!hit.user.email_verified_at) await users.markEmailVerified(hit.user.id);
+  // All of it or none of it. These were five independent round trips, and every
+  // partial outcome is a security bug rather than an inconvenience: the new
+  // password without the token consumed leaves a reset link that still works,
+  // and the new password without the sessions dropped tells the owner they have
+  // recovered the account while the intruder is still signed in.
+  await tx([
+    users.updatePasswordStmt(hit.user.id, await hashPassword(password)),
+    authTokens.consumeStmt(hit.row.id),
+    // Whoever knew the old password loses their grip on the account.
+    sessions.destroyAllForStmt(hit.user.id),
+    // Agent tokens too. This is the recovery path -- you are here because you
+    // lost control of the account, and a token that never expires and carries
+    // full permissions is exactly what an intruder would keep. Killing sessions
+    // while leaving those alive would have been security theatre.
+    apiTokens.destroyAllForStmt(hit.user.id),
+    // Reaching the inbox proves the address, so verification comes for free.
+    ...(hit.user.email_verified_at ? [] : [users.markEmailVerifiedStmt(hit.user.id)]),
+  ]);
 
   return { ok: true, value: publicUser(hit.user) };
 }
@@ -180,7 +187,8 @@ export async function sendEmailChanged(
 export async function completeVerification(token: string): Promise<boolean> {
   const hit = await authTokens.resolve("verify", token);
   if (!hit) return false;
-  await users.markEmailVerified(hit.user.id);
-  await authTokens.consume(hit.row.id);
+  // Together: marking the address verified while leaving the link usable, or
+  // burning the link without recording the result, are both worse than failing.
+  await tx([users.markEmailVerifiedStmt(hit.user.id), authTokens.consumeStmt(hit.row.id)]);
   return true;
 }

@@ -25,17 +25,21 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, TaskEv
   return groupBy(rows, (r) => r.task_id);
 }
 
-export const listBetween = (from: string, to: string) =>
-  all<TaskEvent>("SELECT * FROM task_events WHERE at BETWEEN ? AND ? ORDER BY id", [
-    from,
-    to,
-  ]);
+/* There was a `listBetween(from, to)` here with no owner in the WHERE clause.
+   It had no callers, and its twin in `entries` was the query that made one
+   account's report read every account's log. Reach for `listByTasks` instead:
+   the task ids already carry the ownership check. */
 
-export async function create(input: NewEvent): Promise<TaskEvent> {
-  const row = await one<TaskEvent>(
-    `INSERT INTO task_events (task_id, from_status, to_status, at, actor, model)
-     VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
-    [
+/**
+ * The `INSERT` on its own, so a caller can run it inside the same transaction
+ * as the status change it records. That pairing is the whole invariant: a
+ * status the log never saw is a duration the report gets wrong, permanently.
+ */
+export function createStmt(input: NewEvent) {
+  return {
+    text: `INSERT INTO task_events (task_id, from_status, to_status, at, actor, model)
+           VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+    params: [
       input.task_id,
       input.from_status,
       input.to_status,
@@ -43,6 +47,11 @@ export async function create(input: NewEvent): Promise<TaskEvent> {
       input.actor ?? "agent",
       input.model ?? null,
     ],
-  );
+  };
+}
+
+export async function create(input: NewEvent): Promise<TaskEvent> {
+  const stmt = createStmt(input);
+  const row = await one<TaskEvent>(stmt.text, stmt.params);
   return row!;
 }
