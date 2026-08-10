@@ -15,6 +15,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import type { MethodName } from "../lib/services/rpc-schemas";
+import { isAbsolutePath } from "../lib/util/paths";
 import { createClient, readConfig } from "./rpc-client";
 import { instructions, registerTools, type Workspace } from "./tools";
 import { checkRefs, findProjectRoot, hashFile } from "./workspace";
@@ -22,7 +23,9 @@ import { checkRefs, findProjectRoot, hashFile } from "./workspace";
 /** The half of todox that has a filesystem, because it runs where the code is. */
 const localWorkspace: Workspace = {
   tz: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-  repoRoot: (path) => (path.startsWith("/") ? findProjectRoot(path) : undefined),
+  // `isAbsolutePath` rather than a leading slash: this process runs where the
+  // developer is, and on Windows every path they hand us starts `C:\`.
+  repoRoot: (path) => (isAbsolutePath(path) ? findProjectRoot(path) : undefined),
   hash: hashFile,
   checkRefs,
 };

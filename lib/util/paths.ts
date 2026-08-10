@@ -65,10 +65,40 @@ export const slugifyOr = (s: string, fallback = SLUG_FALLBACK) =>
   slugify(s) || fallback;
 
 /**
+ * Paths arrive from the developer's machine, and that machine is often not the
+ * one this code runs on. The server is Linux; the agent may be on Windows, in
+ * which case every path it sends looks like `C:\Users\me\repo`. Treating those
+ * as relative meant a Windows agent could never register a project from its
+ * working directory — the one thing the tool is supposed to do without asking.
+ */
+const isWindowsPath = (p: string) => /^[a-zA-Z]:[\\/]/.test(p);
+
+export const isAbsolutePath = (p: string) => p.startsWith("/") || isWindowsPath(p);
+
+/** Backslashes folded to slashes and any trailing separator dropped. */
+export const normalisePath = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+
+/** The last segment of a path, whichever separator it was written with. */
+export function lastSegment(p: string) {
+  const parts = normalisePath(p).split("/");
+  return parts[parts.length - 1] ?? "";
+}
+
+/**
  * Path containment on segment boundaries: "/src/todox-old" must not be treated
  * as living inside "/src/todox".
+ *
+ * Windows roots compare case-insensitively, because its filesystem does and an
+ * agent reporting `c:\users\...` for a project registered as `C:\Users\...` is
+ * reporting the same directory.
  */
 export function isInside(child: string, root: string) {
-  const r = root.replace(/\/+$/, "");
-  return child === r || child.startsWith(`${r}/`);
+  const fold = isWindowsPath(root);
+  const norm = (p: string) => {
+    const s = normalisePath(p);
+    return fold ? s.toLowerCase() : s;
+  };
+  const c = norm(child);
+  const r = norm(root);
+  return c === r || c.startsWith(`${r}/`);
 }

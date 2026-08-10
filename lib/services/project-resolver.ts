@@ -1,8 +1,12 @@
-import { basename } from "node:path";
-
 import * as projects from "../repositories/projects";
 import type { Project } from "../types";
-import { isInside, slugify } from "../util/paths";
+import {
+  isAbsolutePath,
+  isInside,
+  lastSegment,
+  normalisePath,
+  slugify,
+} from "../util/paths";
 import { BadRequest } from "./errors";
 
 /** Resolve a project by slug, by name, or by a filesystem path inside it. */
@@ -54,11 +58,14 @@ export async function resolveOrCreate(
   const found = await resolve(userId, ref);
   if (found) return { project: found, created: false };
 
-  if (!ref.startsWith("/"))
+  if (!isAbsolutePath(ref))
     return { project: await mustResolve(userId, ref), created: false };
 
-  const root = repoRoot?.startsWith("/") ? repoRoot.replace(/\/+$/, "") : ref;
-  const name = basename(root) || "untitled";
+  const root = repoRoot && isAbsolutePath(repoRoot) ? normalisePath(repoRoot) : ref;
+  // Not `node:path`'s basename: this process runs on Linux, where a backslash
+  // is an ordinary character, so a Windows path would come back whole and the
+  // project would be named "C:\Users\me\repo".
+  const name = lastSegment(root) || "untitled";
   return {
     project: await projects.create(userId, {
       name,

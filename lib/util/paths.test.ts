@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { isInside, shareToken, slugify, slugifyOr } from "./paths";
+import {
+  isAbsolutePath,
+  isInside,
+  lastSegment,
+  shareToken,
+  slugify,
+  slugifyOr,
+} from "./paths";
 
 /**
  * Stripping everything outside [a-z0-9] mangled the language this app defaults
@@ -65,6 +72,51 @@ describe("isInside", () => {
 
   it("tolerates a trailing slash on the root", () => {
     expect(isInside("/src/todox/lib", "/src/todox/")).toBe(true);
+  });
+
+  /**
+   * The server is Linux; the agent sending these paths often is not. A Windows
+   * path was treated as relative, so `cwd` never resolved to a project and
+   * never created one — the whole "just pass your working directory" promise
+   * was dead on that platform.
+   */
+  it("understands Windows paths", () => {
+    expect(isInside("C:\\Users\\me\\todox\\lib", "C:\\Users\\me\\todox")).toBe(true);
+    expect(isInside("C:\\Users\\me\\todox", "C:\\Users\\me\\todox")).toBe(true);
+    expect(isInside("C:\\Users\\me\\todox-old", "C:\\Users\\me\\todox")).toBe(false);
+  });
+
+  it("compares Windows paths case-insensitively, as that filesystem does", () => {
+    expect(isInside("c:\\users\\me\\todox\\lib", "C:\\Users\\me\\todox")).toBe(true);
+    // POSIX is case-sensitive and must stay that way.
+    expect(isInside("/src/TODOX/lib", "/src/todox")).toBe(false);
+  });
+
+  it("does not care which separator was used", () => {
+    expect(isInside("C:/Users/me/todox/lib", "C:\\Users\\me\\todox")).toBe(true);
+  });
+});
+
+describe("isAbsolutePath", () => {
+  it("accepts both platforms", () => {
+    expect(isAbsolutePath("/src/todox")).toBe(true);
+    expect(isAbsolutePath("C:\\Users\\me\\todox")).toBe(true);
+    expect(isAbsolutePath("D:/work/todox")).toBe(true);
+  });
+
+  it("rejects a slug or a bare name", () => {
+    expect(isAbsolutePath("todox")).toBe(false);
+    expect(isAbsolutePath("./todox")).toBe(false);
+    expect(isAbsolutePath("C:todox")).toBe(false);
+  });
+});
+
+describe("lastSegment", () => {
+  /** node:path.basename runs POSIX here, so it hands back the whole string. */
+  it("names a project from either kind of path", () => {
+    expect(lastSegment("/src/todox")).toBe("todox");
+    expect(lastSegment("C:\\Users\\me\\todox")).toBe("todox");
+    expect(lastSegment("C:\\Users\\me\\todox\\")).toBe("todox");
   });
 });
 
