@@ -23,12 +23,24 @@ export type AgentSetupLabels = {
   manualTitle: string;
   agentLabel: string;
   other: string;
+  scopeNote: string;
   verify: string;
   copy: string;
   copied: string;
 };
 
-/** Only the shapes differ; every one of them is url + bearer header. */
+/**
+ * Only the shapes differ; every one of them is url + bearer header.
+ *
+ * Every target here is the *global* one, and that is the whole point. Each of
+ * these tools defaults to a per-project location -- `claude mcp add` without a
+ * scope writes to the current directory, `.cursor/mcp.json` and
+ * `.vscode/mcp.json` live in a checkout -- so following the obvious
+ * instructions gave you a memory that worked in exactly one folder. For a tool
+ * whose reason to exist is knowing what happened in your other projects, that
+ * is the wrong default in the most expensive possible way: it looks like it
+ * worked.
+ */
 function snippets(url: string, token: string, otherLabel: string) {
   const bearer = `Bearer ${token}`;
   return [
@@ -36,7 +48,8 @@ function snippets(url: string, token: string, otherLabel: string) {
       id: "claude",
       name: "Claude Code",
       target: "terminal",
-      body: `claude mcp add --transport http todox ${url} \\\n  --header "Authorization: ${bearer}"`,
+      // `--scope user`, not the default `local`, which means this directory.
+      body: `claude mcp add --scope user --transport http todox ${url} \\\n  --header "Authorization: ${bearer}"`,
     },
     {
       id: "codex",
@@ -51,7 +64,9 @@ function snippets(url: string, token: string, otherLabel: string) {
     {
       id: "cursor",
       name: "Cursor",
-      target: ".cursor/mcp.json",
+      // The one in your home directory, not the `.cursor/mcp.json` inside a
+      // repository.
+      target: "~/.cursor/mcp.json",
       body: JSON.stringify(
         { mcpServers: { todox: { type: "http", url, headers: { Authorization: bearer } } } },
         null,
@@ -63,7 +78,7 @@ function snippets(url: string, token: string, otherLabel: string) {
       name: "VS Code",
       // Different root key from everyone else, which is the sort of thing that
       // costs an evening if the snippet is copied from the wrong tool.
-      target: ".vscode/mcp.json",
+      target: "mcp.json — “MCP: Open User Configuration”",
       body: JSON.stringify(
         { servers: { todox: { type: "http", url, headers: { Authorization: bearer } } } },
         null,
@@ -73,7 +88,7 @@ function snippets(url: string, token: string, otherLabel: string) {
     {
       id: "other",
       name: otherLabel,
-      target: "mcp.json",
+      target: "your client's user-level mcp.json",
       // The shape most clients settled on. `type` is spelled out because a
       // client that finds a url without one tends to assume a local command.
       body: JSON.stringify(
@@ -116,7 +131,8 @@ export function AgentSetup({
       </div>
 
       <div className="border-t border-dashed border-rule pt-3">
-        <p className="display mb-2 text-[14px] font-bold">{labels.manualTitle}</p>
+        <p className="display mb-1 text-[14px] font-bold">{labels.manualTitle}</p>
+        <p className="mb-2 text-[12.5px] text-muted">{labels.scopeNote}</p>
 
         <div role="group" aria-label={labels.agentLabel} className="flex flex-wrap gap-1.5">
           {all.map((s) => {

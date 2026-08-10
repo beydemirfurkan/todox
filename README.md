@@ -64,8 +64,8 @@ into whichever agent you use, plus the config snippet for the four common ones.
 The shape is always the same — one URL, one header:
 
 ```bash
-# Claude Code
-claude mcp add --transport http todox https://www.todox.dev/api/mcp \
+# Claude Code. --scope user, because the default is this directory only.
+claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp \
   --header "Authorization: Bearer todox_…"
 ```
 
@@ -77,7 +77,9 @@ http_headers = { Authorization = "Bearer todox_…" }
 ```
 
 ```json
-// Cursor — .cursor/mcp.json   (VS Code uses .vscode/mcp.json and "servers")
+// Cursor — ~/.cursor/mcp.json, the one in your home directory.
+// VS Code — the user-level mcp.json ("MCP: Open User Configuration"),
+// where the root key is "servers" rather than "mcpServers".
 {
   "mcpServers": {
     "todox": {
@@ -88,6 +90,12 @@ http_headers = { Authorization = "Bearer todox_…" }
   }
 }
 ```
+
+**Install it globally, not per project.** Every one of these tools defaults to
+the directory you are standing in — `claude mcp add` without a scope,
+`.cursor/mcp.json`, `.vscode/mcp.json` — and a memory that only exists in one
+repository is the opposite of the point. It also fails quietly: the tools
+simply are not there in the next project, so the agent never mentions them.
 
 Spell out `"type": "http"`. A client that finds a `url` without one tends to
 assume a local command and fails with something unhelpful.

@@ -108,6 +108,7 @@ export default async function AccountPage() {
             promptTitle: t("setupPromptTitle"),
             promptWarning: t("setupPromptWarning"),
             manualTitle: t("setupManualTitle"),
+            scopeNote: t("setupScopeNote"),
             agentLabel: t("setupAgentLabel"),
             other: t("setupAgentOther"),
             verify: t("setupVerify"),
