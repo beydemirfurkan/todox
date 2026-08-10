@@ -40,9 +40,9 @@ export async function link(input: {
 }): Promise<Ref[]> {
   if (!input.paths.length) return [];
 
-  // Deduplicated before the statement is built, not only by the index below:
-  // `ON CONFLICT DO UPDATE` refuses to touch the same row twice inside one
-  // command, so a caller listing a path twice would take the whole call down.
+  // Deduplicated before the statement is built: the same path listed twice in
+  // one call would otherwise be inserted twice by the same command, which no
+  // constraint can catch.
   const byPath = new Map(input.paths.map((p) => [p.path, p]));
   const paths = [...byPath.values()];
 
@@ -50,24 +50,48 @@ export async function link(input: {
   const values: unknown[] = [];
   const tuples = paths.map((p) => {
     values.push(input.task_id ?? null, input.context_id ?? null, p.path, p.note ?? null, p.hash ?? null, ts);
-    return "(?, ?, ?, ?, ?, ?)";
+    // Casts, not decoration: a column of only NULLs -- every `hash` on a link
+    // from the web form -- gives Postgres nothing to infer a type from.
+    return "(?::int, ?::int, ?::text, ?::text, ?::text, ?::text)";
   });
 
-  // Re-linking a file is not an error, it is an agent doing what the tool
+  // Update what is already linked, insert what is not, in one statement.
+  //
+  // Deliberately not `ON CONFLICT (task_id, path)`: a conflict target has to
+  // name an index that already exists, which would make this code fail on
+  // every call until the migration adding that index had run. Deploys and
+  // migrations are separate steps here, so anything that only works in one
+  // order is a broken window waiting to happen. `NOT EXISTS` behaves the same
+  // before and after. The bare `DO NOTHING` needs no target and is there for
+  // the race two concurrent calls could still lose once the index exists.
+  //
+  // Re-linking a file is not an error; it is an agent doing what the tool
   // description tells it to. The first link keeps its `hash`, because that is
-  // the baseline the existing note was written against; a note supplied later
-  // fills in one that was missing.
-  const onConflict = input.task_id
-    ? `ON CONFLICT (task_id, path) WHERE task_id IS NOT NULL
-       DO UPDATE SET note      = COALESCE(EXCLUDED.note, refs.note),
-                     hash      = COALESCE(refs.hash, EXCLUDED.hash),
-                     linked_at = EXCLUDED.linked_at`
-    : "";
+  // the baseline the existing note was written against; a note or a hash
+  // supplied later fills in one that was missing.
+  const same = `r.task_id IS NOT DISTINCT FROM v.task_id
+                AND r.context_id IS NOT DISTINCT FROM v.context_id
+                AND r.path = v.path`;
 
   return all<Ref>(
-    `INSERT INTO refs (task_id, context_id, path, note, hash, linked_at)
-     VALUES ${tuples.join(", ")}
-     ${onConflict} RETURNING *`,
+    `WITH v (task_id, context_id, path, note, hash, linked_at) AS (
+       VALUES ${tuples.join(", ")}
+     ), updated AS (
+       UPDATE refs r
+       SET note      = COALESCE(v.note, r.note),
+           hash      = COALESCE(r.hash, v.hash),
+           linked_at = v.linked_at
+       FROM v WHERE ${same}
+       RETURNING r.*
+     ), inserted AS (
+       INSERT INTO refs (task_id, context_id, path, note, hash, linked_at)
+       SELECT v.task_id, v.context_id, v.path, v.note, v.hash, v.linked_at
+       FROM v
+       WHERE NOT EXISTS (SELECT 1 FROM refs r WHERE ${same})
+       ON CONFLICT DO NOTHING
+       RETURNING *
+     )
+     SELECT * FROM updated UNION ALL SELECT * FROM inserted`,
     values,
   );
 }
