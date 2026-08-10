@@ -29,6 +29,7 @@ export function AuthForm({
   fields,
   submitLabel,
   pendingLabel,
+  submitClassName = "btn",
   messages,
   hidden,
   successLabel,
@@ -38,6 +39,8 @@ export function AuthForm({
   submitLabel: string;
   /** What the button says while the action runs. Sign-in is a round trip. */
   pendingLabel: string;
+  /** For the one form whose button should not look like "save". */
+  submitClassName?: string;
   messages: Record<string, string>;
   /** Values the form must carry but nobody should type, e.g. a reset token. */
   hidden?: Record<string, string>;
@@ -117,7 +120,7 @@ export function AuthForm({
       {/* aria-busy rather than disabled: a disabled button loses focus, and a
           keyboard user submitting with Enter would land nowhere. */}
       <button
-        className="btn"
+        className={submitClassName}
         aria-busy={pending}
         aria-disabled={pending}
         onClick={(e) => {

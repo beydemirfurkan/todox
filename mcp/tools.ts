@@ -39,6 +39,20 @@ export type Invoker = (method: MethodName, params: Record<string, unknown>) => P
 const BASE = [
   "todox is the persistent working memory for this developer's projects.",
   "",
+  "WHAT IT IS FOR: you start every session knowing nothing about the last one.",
+  "The developer pays for that twice -- once explaining the project again, and",
+  "once when you walk into a wall a previous session already found. todox is",
+  "where that knowledge is kept between sessions: what was decided and why,",
+  "which approaches were tried and failed, what is still open, and what state",
+  "the last session left things in. It is not a task tracker for humans to",
+  "groom; it is written agent-to-agent, with a human reading over the shoulder.",
+  "",
+  "WHEN NOT TO USE IT: not everything is worth keeping. Do not open a task for",
+  "something you are finishing right now, and do not log an entry that only",
+  "restates what the diff already shows. The test is whether a session two",
+  "weeks from now would be worse off without it. A log nobody trusts because",
+  "it is full of noise is the failure mode to avoid.",
+  "",
   "START OF SESSION: call get_context with the absolute path of the directory",
   "you are working in (cwd). It resolves the project from that path and",
   "returns the standing rules, prior decisions, known dead ends and in-flight",
@@ -122,10 +136,118 @@ type RegisterTool = (
  */
 const LOCAL_INTERNAL: string[] = ["repo_root", "tz"];
 
+/**
+ * The three moments todox is for, offered as prompts.
+ *
+ * Instructions are only read by an agent that is already connected and paying
+ * attention; prompts show up in the client's own menu, so somebody who has just
+ * installed this can see what it is for without reading anything. They are also
+ * the honest answer to "when should I use this" — these are the three times.
+ */
+function registerPrompts(server: McpServer) {
+  server.registerPrompt(
+    "start_session",
+    {
+      title: "Start a session on this project",
+      description:
+        "Read what previous sessions established before doing anything else — decisions, dead ends, open questions and the last handoff.",
+      argsSchema: { cwd: z.string().describe("Absolute path of the directory you are working in") },
+    },
+    ({ cwd }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: [
+              `Call get_context with project "${cwd}" before planning anything.`,
+              "",
+              "Then tell me, briefly: what is already decided, what has been tried",
+              "and failed, what is still open, and where the last session stopped.",
+              "If any linked file is flagged as changed, say which — the note",
+              "describing it may no longer be true.",
+            ].join("\n"),
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "wrap_up",
+    {
+      title: "Leave a handoff for the next session",
+      description:
+        "Write down what a fresh session would need to continue: state, decisions, dead ends, and what to watch out for.",
+      argsSchema: { cwd: z.string().describe("Absolute path of the directory you are working in") },
+    },
+    ({ cwd }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: [
+              `We are finishing. For every task you touched in "${cwd}":`,
+              "",
+              "- move its status if it changed (update_task)",
+              "- log any decision worth keeping and why the alternatives lost",
+              "- log every approach that did NOT work as a dead_end; that is the",
+              "  entry that saves the most time later",
+              "- log anything only I can answer as a question",
+              "- finish with log_entry(kind:'handoff') written for someone who was",
+              "  not here: what is done, what is next, what to watch out for",
+              "",
+              "Skip anything a diff would already show. Pass your own model id.",
+            ].join("\n"),
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "standup",
+    {
+      title: "What got done",
+      description:
+        "A report built from the log rather than from commits: durations, decisions, dead ends and open questions.",
+      argsSchema: {
+        period: z
+          .string()
+          .optional()
+          .describe("today, yesterday, week, last_week, month or all. Default: today"),
+      },
+    },
+    ({ period }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: [
+              `Call activity_report for "${period || "today"}" with format:"markdown"`,
+              "and show me the result. Include your timezone if this server has no",
+              "way of knowing it. Then call out anything still open that I should",
+              "decide on.",
+            ].join("\n"),
+          },
+        },
+      ],
+    }),
+  );
+}
+
+/**
+ * Registers the whole agent surface: the tools, and the prompts that tell a
+ * client what this server is for.
+ */
 export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace) {
   const register = server.registerTool.bind(server) as unknown as RegisterTool;
   const local = ws.checkRefs([]) !== null;
   const internal = local ? LOCAL_INTERNAL : [];
+
+  registerPrompts(server);
 
   /**
    * Every tool is the same shape: forward to the server, or report why not.
@@ -281,8 +403,11 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     "getContext",
     {
       title: "Get project context (call this first)",
+      // Repeats what the server instructions say, because not every client
+      // shows them -- a tool description is the one place an agent always
+      // looks.
       description:
-        "The session-start briefing: global rules, project decisions/conventions/gotchas, every open task with its decisions, dead ends, open questions, linked files and last handoff note. Also flags notes whose linked files have changed since they were written. Pass your working directory as `project`.",
+        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `project`.",
     },
     { after: checkLinkedFiles },
   );

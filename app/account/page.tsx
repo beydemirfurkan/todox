@@ -21,6 +21,15 @@ import { TokenForm } from "../features/token-form";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Ordered by what people come here to do.
+ *
+ * Connecting an agent is the reason this page exists, so it is the first thing
+ * under the identity card rather than the last panel on a long scroll. The
+ * profile forms are maintenance and sit below. Deleting the account is last,
+ * behind a disclosure and in the colour the log uses for things that went
+ * wrong — it should not sit open next to "save".
+ */
 export default async function AccountPage() {
   const user = await requireUser();
   const { t } = await getT();
@@ -28,14 +37,16 @@ export default async function AccountPage() {
 
   return (
     <div className="space-y-6">
-      <div className="pop flex items-center gap-3">
-        <Blob mood="happy" size={48} />
-        <div>
-          <h1 className="display text-[30px] leading-tight font-bold">
-            {t("accountTitle")}
+      <div className="sticker pop flex flex-wrap items-center gap-x-4 gap-y-3 p-4">
+        <Blob mood="happy" size={48} className="shrink-0" />
+        <div className="min-w-[12rem] flex-1">
+          <h1 className="display text-[26px] leading-tight font-bold sm:text-[30px]">
+            {user.name}
           </h1>
-          <p className="mono flex flex-wrap items-center gap-2 text-[13px] break-all text-muted">
-            @{user.username} · {user.email}
+          <p className="mono mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
+            <span>@{user.username}</span>
+            <span aria-hidden="true">·</span>
+            <span className="break-all">{user.email}</span>
             {user.email_verified_at && (
               <Chip color="var(--ok)">{t("verifyVerified")}</Chip>
             )}
@@ -79,8 +90,80 @@ export default async function AccountPage() {
         </div>
       )}
 
+      <Panel
+        delay={40}
+        title={t("apiTokens")}
+        right={<Counter n={tokens.length} label={t("apiTokens")} />}
+      >
+        <p className="mb-3 text-[14px] text-muted">{t("apiTokensIntro")}</p>
+
+        <TokenForm
+          url={`${publicUrl()}/api/mcp`}
+          promptTemplate={t("setupPromptTemplate")}
+          nameLabel={t("tokenName")}
+          submitLabel={t("createToken")}
+          pendingLabel={t("tokenCreating")}
+          onceLabel={t("tokenOnce")}
+          setup={{
+            promptTitle: t("setupPromptTitle"),
+            promptWarning: t("setupPromptWarning"),
+            manualTitle: t("setupManualTitle"),
+            agentLabel: t("setupAgentLabel"),
+            other: t("setupAgentOther"),
+            verify: t("setupVerify"),
+            copy: t("copySnippet"),
+            copied: t("shareCopied"),
+          }}
+        />
+
+        {tokens.length > 0 && (
+          <div className="mt-5 border-t border-dashed border-rule pt-4">
+            <ul className="space-y-2">
+              {tokens.map((tok) => (
+                <li
+                  key={tok.id}
+                  className="sticker-flat group flex flex-wrap items-center gap-2 p-2.5"
+                >
+                  <span className="display text-[14.5px] font-bold">{tok.name}</span>
+                  <Chip color={tok.last_used_at ? "var(--ok)" : undefined}>
+                    {tok.last_used_at
+                      ? `${t("lastUsed")} ${ago(tok.last_used_at, t)}`
+                      : t("neverUsed")}
+                  </Chip>
+                  <span className="mono ml-auto text-[11px] text-faint">
+                    {ago(tok.created_at, t)}
+                  </span>
+                  <form action={revokeTokenAction}>
+                    <input type="hidden" name="token_id" value={tok.id} />
+                    <SubmitButton
+                      className="link-more row-action !text-[12px]"
+                      pendingLabel={t("working")}
+                    >
+                      {t("revoke")}
+                      <span className="sr-only"> — {tok.name}</span>
+                    </SubmitButton>
+                  </form>
+                </li>
+              ))}
+            </ul>
+
+            <p className="mt-3 mb-2 text-[13.5px] text-muted">{t("revokeAllNote")}</p>
+            <form action={revokeAllTokensAction}>
+              <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
+                {t("revokeAll")}
+              </SubmitButton>
+            </form>
+          </div>
+        )}
+        {tokens.length === 0 && (
+          <div className="mt-4">
+            <Empty>{t("noTokens")}</Empty>
+          </div>
+        )}
+      </Panel>
+
       <div className="grid gap-5 lg:grid-cols-2">
-        <Panel delay={40} title={t("profile")}>
+        <Panel delay={70} title={t("profile")}>
           <AuthForm
             action={updateNameAction}
             submitLabel={t("save")}
@@ -98,7 +181,7 @@ export default async function AccountPage() {
           />
         </Panel>
 
-        <Panel delay={60} title={t("changeEmail")}>
+        <Panel delay={90} title={t("changeEmail")}>
           <p className="mb-3 text-[13.5px] text-muted">{t("changeEmailNote")}</p>
           <AuthForm
             action={changeEmailAction}
@@ -124,7 +207,7 @@ export default async function AccountPage() {
           />
         </Panel>
 
-        <Panel delay={80} title={t("changePassword")}>
+        <Panel delay={110} title={t("changePassword")}>
           <p className="mb-3 text-[13.5px] text-muted">{t("changePasswordNote")}</p>
           <AuthForm
             action={changePasswordAction}
@@ -149,100 +232,47 @@ export default async function AccountPage() {
         </Panel>
       </div>
 
-      <Panel
-        delay={120}
-        title={t("apiTokens")}
-        right={<Counter n={tokens.length} label={t("apiTokens")} />}
+      {/* Closed by default and marked in the colour of a dead end. It is gated
+          on both the password and the username: the password is the credential,
+          the username is there so this cannot happen by reflex. Everything
+          cascades from the user row. */}
+      <details
+        className="pop sticker overflow-hidden"
+        style={{ animationDelay: "130ms", borderColor: "var(--k-dead_end)" }}
       >
-        <p className="mb-3 text-[14px] text-muted">{t("apiTokensIntro")}</p>
-
-        <ul className="space-y-2">
-          {tokens.length === 0 && <Empty>{t("noTokens")}</Empty>}
-          {tokens.map((tok) => (
-            <li
-              key={tok.id}
-              className="sticker-flat group flex flex-wrap items-center gap-2 p-2.5"
-            >
-              <span className="display text-[14.5px] font-bold">{tok.name}</span>
-              <Chip color={tok.last_used_at ? "var(--ok)" : undefined}>
-                {tok.last_used_at
-                  ? `${t("lastUsed")} ${ago(tok.last_used_at, t)}`
-                  : t("neverUsed")}
-              </Chip>
-              <span className="mono ml-auto text-[11px] text-faint">
-                {ago(tok.created_at, t)}
-              </span>
-              <form action={revokeTokenAction}>
-                <input type="hidden" name="token_id" value={tok.id} />
-                <SubmitButton
-                  className="link-more row-action !text-[12px]"
-                  pendingLabel={t("working")}
-                >
-                  {t("revoke")}
-                  <span className="sr-only"> — {tok.name}</span>
-                </SubmitButton>
-              </form>
-            </li>
-          ))}
-        </ul>
-
-        <TokenForm
-          url={`${publicUrl()}/api/mcp`}
-          promptTemplate={t("setupPromptTemplate")}
-          nameLabel={t("tokenName")}
-          submitLabel={t("createToken")}
-          pendingLabel={t("tokenCreating")}
-          onceLabel={t("tokenOnce")}
-          setup={{
-            promptTitle: t("setupPromptTitle"),
-            promptWarning: t("setupPromptWarning"),
-            manualTitle: t("setupManualTitle"),
-            agentLabel: t("setupAgentLabel"),
-            other: t("setupAgentOther"),
-            verify: t("setupVerify"),
-            copy: t("copySnippet"),
-            copied: t("shareCopied"),
-          }}
-        />
-
-        {tokens.length > 0 && (
-          <div className="mt-4 border-t border-dashed border-rule pt-3">
-            <p className="mb-2 text-[13.5px] text-muted">{t("revokeAllNote")}</p>
-            <form action={revokeAllTokensAction}>
-              <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
-                {t("revokeAll")}
-              </SubmitButton>
-            </form>
-          </div>
-        )}
-      </Panel>
-
-      {/* Last on the page, and gated on both the password and the username: the
-          password is the credential, the username is there so this cannot
-          happen by reflex. Everything cascades from the user row. */}
-      <Panel delay={140} title={t("deleteAccount")}>
-        <p className="mb-3 text-[14px] text-muted">{t("deleteAccountNote")}</p>
-        <AuthForm
-          action={deleteAccountAction}
-          submitLabel={t("deleteAccountSubmit")}
-          pendingLabel={t("working")}
-          messages={authMessages(t)}
-          fields={[
-            {
-              name: "password",
-              label: t("currentPassword"),
-              type: "password",
-              autoComplete: "current-password",
-            },
-            {
-              name: "confirm",
-              label: t("deleteAccountConfirm"),
-              autoComplete: "off",
-              exact: true,
-            },
-          ]}
-        />
-      </Panel>
+        <summary className="display flex cursor-pointer items-center gap-2 px-4 py-3 text-[16px] font-bold">
+          <span
+            aria-hidden="true"
+            className="inline-block size-2.5 shrink-0 rounded-full border-[1.5px]"
+            style={{ background: "var(--k-dead_end)", borderColor: "var(--edge-dark)" }}
+          />
+          {t("deleteAccount")}
+        </summary>
+        <div className="border-t border-dashed border-rule p-4">
+          <p className="mb-3 text-[14px] text-muted">{t("deleteAccountNote")}</p>
+          <AuthForm
+            action={deleteAccountAction}
+            submitLabel={t("deleteAccountSubmit")}
+            pendingLabel={t("working")}
+            submitClassName="btn btn-danger"
+            messages={authMessages(t)}
+            fields={[
+              {
+                name: "password",
+                label: t("currentPassword"),
+                type: "password",
+                autoComplete: "current-password",
+              },
+              {
+                name: "confirm",
+                label: t("deleteAccountConfirm"),
+                autoComplete: "off",
+                exact: true,
+              },
+            ]}
+          />
+        </div>
+      </details>
     </div>
   );
 }

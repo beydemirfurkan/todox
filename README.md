@@ -120,6 +120,18 @@ Every write tool takes a `model`, and the server instructions tell the agent to
 always pass it. That is what makes the per-model breakdown real rather than
 guessed.
 
+### Prompts
+
+Three, because there are three moments this is for. They show up in your
+client's own menu, so you can see what the server does without reading
+anything:
+
+| prompt | when |
+| --- | --- |
+| `start_session` | before planning — read what earlier sessions established |
+| `wrap_up` | before finishing — leave a handoff, and the dead ends especially |
+| `standup` | when somebody asks what got done |
+
 ## Deploying
 
 Vercel plus a hosted Postgres.

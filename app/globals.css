@@ -279,6 +279,15 @@ body {
   border-color: var(--line-strong);
 }
 
+/* Irreversible. It should not look like the buttons that merely save
+   something -- and the colour is the one the log already uses for the thing
+   that did not work, so it is not a new idea to learn. */
+.btn-danger {
+  background: var(--k-dead_end);
+  color: var(--on-fill);
+  border-color: var(--edge-dark);
+}
+
 /* Something is in flight. Applied by aria-busy rather than :disabled so the
    control keeps focus while it waits -- losing focus mid-submit drops a
    keyboard user out of the form they were in. The pointer-events rule is what
