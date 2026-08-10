@@ -28,6 +28,7 @@ import * as tasksRepo from "../lib/repositories/tasks";
 import * as usersRepo from "../lib/repositories/users";
 import { createApiToken } from "../lib/services/auth";
 import { hashPassword } from "../lib/util/password";
+import { normalisePath } from "../lib/util/paths";
 
 /** A throwaway repo the agent has never heard of, to prove auto-registration. */
 const SCRATCH = join(tmpdir(), "todox-smoke-repo");
@@ -232,10 +233,18 @@ async function main() {
       body: JSON.stringify(body),
     });
 
-  const anyTask = (await tasksRepo.listByProject(
-    (await projectsRepo.list(user.id, true)).find((p) => p.root_path === SCRATCH)!.id,
-    "all",
-  ))[0];
+  // Compared normalised, because that is how it was stored: a root path
+  // arriving from a Windows agent has its separators folded on the way in, so
+  // `C:\…\todox-smoke-repo` is on file as `C:/…/todox-smoke-repo`. Comparing
+  // the raw string found nothing here and everything on Linux, which is the
+  // narrowest possible way for a suite to lie about what it covers.
+  const scratch = normalisePath(SCRATCH);
+  const project = (await projectsRepo.list(user.id, true)).find(
+    (p) => p.root_path && normalisePath(p.root_path) === scratch,
+  );
+  if (!project) throw new Error(`the smoke project for ${scratch} was never registered`);
+
+  const anyTask = (await tasksRepo.listByProject(project.id, "all"))[0];
 
   console.log("\n--- another account cannot touch this task ---");
   const intruder = await ensureUser("smoke-intruder", "Intruder");
