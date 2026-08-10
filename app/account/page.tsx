@@ -16,6 +16,7 @@ import {
 import { Blob, Chip, Counter, Empty, Panel } from "../components";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
+import { SubmitButton } from "../features/submit";
 import { TokenForm } from "../features/token-form";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,9 @@ export default async function AccountPage() {
             beside the wordmark -- so this is the only way out on the device
             most likely to be signed in. */}
         <form action={logoutAction} className="ml-auto shrink-0 sm:hidden">
-          <button className="btn btn-quiet">{t("signOut")}</button>
+          <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+            {t("signOut")}
+          </SubmitButton>
         </form>
       </div>
 
@@ -69,7 +72,9 @@ export default async function AccountPage() {
             <p className="text-[13.5px]">{t("verifyPendingNote")}</p>
           </div>
           <form action={resendVerificationAction} className="shrink-0">
-            <button className="btn btn-quiet">{t("verifyResend")}</button>
+            <SubmitButton className="btn btn-quiet" pendingLabel={t("sendingLink")}>
+              {t("verifyResend")}
+            </SubmitButton>
           </form>
         </div>
       )}
@@ -79,6 +84,7 @@ export default async function AccountPage() {
           <AuthForm
             action={updateNameAction}
             submitLabel={t("save")}
+            pendingLabel={t("saving")}
             successLabel={t("profileSaved")}
             messages={authMessages(t)}
             fields={[
@@ -97,6 +103,7 @@ export default async function AccountPage() {
           <AuthForm
             action={changeEmailAction}
             submitLabel={t("changeEmail")}
+            pendingLabel={t("sendingLink")}
             successLabel={t("changeEmailSent")}
             messages={authMessages(t)}
             fields={[
@@ -122,6 +129,7 @@ export default async function AccountPage() {
           <AuthForm
             action={changePasswordAction}
             submitLabel={t("changePassword")}
+            pendingLabel={t("saving")}
             messages={authMessages(t)}
             fields={[
               {
@@ -166,10 +174,13 @@ export default async function AccountPage() {
               </span>
               <form action={revokeTokenAction}>
                 <input type="hidden" name="token_id" value={tok.id} />
-                <button className="link-more row-action !text-[12px]">
+                <SubmitButton
+                  className="link-more row-action !text-[12px]"
+                  pendingLabel={t("working")}
+                >
                   {t("revoke")}
                   <span className="sr-only"> — {tok.name}</span>
-                </button>
+                </SubmitButton>
               </form>
             </li>
           ))}
@@ -198,7 +209,9 @@ export default async function AccountPage() {
           <div className="mt-4 border-t border-dashed border-rule pt-3">
             <p className="mb-2 text-[13.5px] text-muted">{t("revokeAllNote")}</p>
             <form action={revokeAllTokensAction}>
-              <button className="link-more !text-[13px]">{t("revokeAll")}</button>
+              <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
+                {t("revokeAll")}
+              </SubmitButton>
             </form>
           </div>
         )}
@@ -212,6 +225,7 @@ export default async function AccountPage() {
         <AuthForm
           action={deleteAccountAction}
           submitLabel={t("deleteAccountSubmit")}
+          pendingLabel={t("working")}
           messages={authMessages(t)}
           fields={[
             {
@@ -224,6 +238,7 @@ export default async function AccountPage() {
               name: "confirm",
               label: t("deleteAccountConfirm"),
               autoComplete: "off",
+              exact: true,
             },
           ]}
         />

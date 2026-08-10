@@ -9,6 +9,7 @@ import * as projects from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
 import { addContextAction, createProjectAction, deleteContextAction } from "./actions";
 import { Explainer, FirstRun } from "./features/explainer";
+import { SubmitButton } from "./features/submit";
 import { contextKindLabel } from "./kinds";
 import { Blob, Chip, Counter, Empty, Field, Panel } from "./components";
 
@@ -104,7 +105,7 @@ export default async function Home() {
             <Field label={t("projectSummaryPh")}>
               <textarea name="summary" placeholder={t("projectSummaryPh")} />
             </Field>
-            <button className="btn">{t("create")}</button>
+            <SubmitButton pendingLabel={t("working")}>{t("create")}</SubmitButton>
           </form>
         </details>
       </div>
@@ -138,10 +139,13 @@ export default async function Home() {
                 </span>
                 <form action={deleteContextAction}>
                   <input type="hidden" name="context_id" value={c.id} />
-                  <button className="link-more row-action !text-[12px]">
+                  <SubmitButton
+                    className="link-more row-action !text-[12px]"
+                    pendingLabel={t("working")}
+                  >
                     {t("delete")}
                     <span className="sr-only"> — {c.title}</span>
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
               <p className="mt-1.5 text-[14px] leading-relaxed whitespace-pre-wrap text-muted">
@@ -170,7 +174,9 @@ export default async function Home() {
               <Field label={t("noteBodyPh")}>
                 <textarea name="body" placeholder={t("noteBodyPh")} required />
               </Field>
-              <button className="btn btn-quiet">{t("save")}</button>
+              <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
+                {t("save")}
+              </SubmitButton>
             </form>
           </details>
         </div>

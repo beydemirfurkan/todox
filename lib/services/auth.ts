@@ -181,7 +181,11 @@ export async function deleteAccount(
   if (!(await verifyPassword(password, user.password_hash)))
     return { ok: false, errors: [{ field: "password", code: "badCredentials" }] };
 
-  if (confirmation.trim() !== user.username)
+  // Case-insensitive, like every other username comparison here: `byUsername`
+  // matches on `lower(username)` and login accepts either case. A phone that
+  // capitalises the first letter of a text field should not be able to tell
+  // somebody their own username is wrong.
+  if (confirmation.trim().toLowerCase() !== user.username.toLowerCase())
     return { ok: false, errors: [{ field: "confirm", code: "confirmMismatch" }] };
 
   await users.remove(userId);

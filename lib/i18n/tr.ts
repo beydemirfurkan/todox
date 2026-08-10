@@ -123,6 +123,12 @@ export const tr: Record<Key, string> = {
 
   add: "ekle",
   save: "kaydet",
+  /* bir butonun, işlemi sürerken söylediği */
+  working: "işleniyor…",
+  saving: "kaydediliyor…",
+  signingIn: "giriş yapılıyor…",
+  signingUp: "hesap oluşturuluyor…",
+  sendingLink: "gönderiliyor…",
   create: "oluştur",
   delete: "sil",
   link: "bağla",

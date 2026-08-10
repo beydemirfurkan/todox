@@ -92,11 +92,19 @@ function build(): Transport {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   const from = process.env.MAIL_FROM;
-  const port = Number(process.env.SMTP_PORT ?? 587);
+
+  // An unreadable port falls back rather than disabling mail: silently posting
+  // password resets to the log because of a typo in a number is a far worse
+  // outcome than using the default one.
+  const configured = Number(process.env.SMTP_PORT ?? 587);
+  const port = Number.isFinite(configured) && configured > 0 ? configured : 587;
+  if (port !== configured && process.env.SMTP_PORT !== undefined) {
+    console.warn(`[todox] SMTP_PORT is not a number; using ${port}.`);
+  }
 
   // All four or none. A half-configured transport is worse than an unconfigured
   // one, because it looks like mail should be going out.
-  if (host && user && pass && from && Number.isFinite(port)) {
+  if (host && user && pass && from) {
     return smtpTransport({ host, port, user, pass, from });
   }
 

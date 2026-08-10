@@ -26,6 +26,7 @@ import {
   statusLabel,
 } from "../../../../kinds";
 import { LogComposer, type KindStrings } from "../../../../features/log-composer";
+import { SubmitButton } from "../../../../features/submit";
 import {
   Blob,
   Chip,
@@ -101,9 +102,12 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                     </option>
                   ))}
                 </select>
-                <button className="btn btn-quiet !px-3 !py-[3px] !text-[13px]">
+                <SubmitButton
+                  className="btn btn-quiet !px-3 !py-[3px] !text-[13px]"
+                  pendingLabel={t("working")}
+                >
                   {t("apply")}
-                </button>
+                </SubmitButton>
               </form>
             }
           >
@@ -134,7 +138,9 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                     <option value="3">{t("p3")}</option>
                   </select>
                 </Field>
-                <button className="btn btn-quiet">{t("save")}</button>
+                <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
+                  {t("save")}
+                </SubmitButton>
                 <span className="mono ml-auto text-[11px] text-faint">
                   {t("updated")} {ago(task.updated_at, t)}
                 </span>
@@ -174,10 +180,13 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                       </span>
                       <form action={deleteEntryAction} className="ml-auto">
                         <input type="hidden" name="entry_id" value={e.id} />
-                        <button className="link-more row-action !text-[12px]">
+                        <SubmitButton
+                          className="link-more row-action !text-[12px]"
+                          pendingLabel={t("working")}
+                        >
                           {t("delete")}
                           <span className="sr-only"> — {kindLabel(t, e.kind)}</span>
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                     <p className="mt-1.5 text-[15px] leading-relaxed whitespace-pre-wrap">
@@ -195,6 +204,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
               groupLabel={t("kindsSummary")}
               bodyLabel={t("theLog")}
               submitLabel={t("append")}
+              pendingLabel={t("working")}
             />
           </Panel>
         </div>
@@ -226,12 +236,22 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                       {r.state === "changed" && (
                         <form action={acceptRefAction}>
                           <input type="hidden" name="ref_id" value={r.id} />
-                          <button className="link-more !text-[12px]">{t("acceptRef")}</button>
+                          <SubmitButton
+                            className="link-more !text-[12px]"
+                            pendingLabel={t("working")}
+                          >
+                            {t("acceptRef")}
+                          </SubmitButton>
                         </form>
                       )}
                       <form action={unlinkRefAction}>
                         <input type="hidden" name="ref_id" value={r.id} />
-                        <button className="link-more !text-[12px]">{t("unlink")}</button>
+                        <SubmitButton
+                          className="link-more !text-[12px]"
+                          pendingLabel={t("working")}
+                        >
+                          {t("unlink")}
+                        </SubmitButton>
                       </form>
                     </span>
                   </div>
@@ -250,7 +270,9 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                 <Field label={t("fileNotePh")}>
                   <input name="note" placeholder={t("fileNotePh")} className="!text-[14px]" />
                 </Field>
-                <button className="btn btn-quiet">{t("link")}</button>
+                <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+                  {t("link")}
+                </SubmitButton>
               </form>
             </div>
           </Panel>

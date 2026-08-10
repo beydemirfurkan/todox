@@ -3,6 +3,8 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 
 import { instructions, registerTools, type Workspace } from "@/mcp/tools";
 import { userForApiToken } from "@/lib/services/auth";
+import { BadRequest } from "@/lib/services/errors";
+import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
 import { invoke } from "@/lib/services/rpc";
 import type { MethodName } from "@/lib/services/rpc-schemas";
@@ -88,11 +90,26 @@ export async function POST(req: Request) {
   // the thing that breaks first behind deployment protection. `invoke` already
   // validates params and enforces ownership, and takes the user id from here
   // rather than from the caller.
-  registerTools(
-    server,
-    (method: MethodName, params) => invoke({ userId: user.id }, method, params),
-    remoteWorkspace,
-  );
+  //
+  // What the HTTP hop did give us was the error split in /api/rpc, and calling
+  // `invoke` directly skips it. Without this the tool result would carry
+  // whatever the failure said -- Postgres' own parse errors included, which is
+  // exactly the feedback loop `lib/services/errors.ts` was written to close --
+  // and nothing would reach the log.
+  const safeInvoke = async (method: MethodName, params: Record<string, unknown>) => {
+    try {
+      return await invoke({ userId: user.id }, method, params);
+    } catch (e) {
+      // Things the agent can act on keep their real message. Ownership
+      // failures must not say whether the id exists for somebody else, and
+      // `NotYours` is already worded for that.
+      if (e instanceof BadRequest || e instanceof NotYours) throw e;
+      console.error("mcp", method, e);
+      throw new Error("the server could not complete that call");
+    }
+  };
+
+  registerTools(server, safeInvoke, remoteWorkspace);
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     // Stateless: consecutive requests land on different instances, so there is

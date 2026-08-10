@@ -9,6 +9,7 @@ import { logoutAction } from "./auth-actions";
 import { Blob } from "./components";
 import { LangSwitcher } from "./features/lang-switcher";
 import { SearchBox } from "./features/search-box";
+import { SubmitButton } from "./features/submit";
 import { TzProbe } from "./features/tz-probe";
 
 const shantell = Shantell_Sans({ variable: "--font-shantell", subsets: ["latin"] });
@@ -88,7 +89,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 </Link>
                 <LangSwitcher lang={lang} t={t} />
                 <form action={logoutAction} className="hidden shrink-0 sm:block">
-                  <button className="link-more !text-[13px]">{t("signOut")}</button>
+                  <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
+                    {t("signOut")}
+                  </SubmitButton>
                 </form>
               </div>
             </>

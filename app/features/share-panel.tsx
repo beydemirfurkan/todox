@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { rotateShareAction, setSharingAction } from "../actions";
+import { SubmitButton } from "./submit";
 
 export type ShareStrings = {
   off: string;
@@ -17,6 +18,8 @@ export type ShareStrings = {
   reachNote: string;
   apply: string;
   blocked: string;
+  /** What every button here says while its action is in flight. */
+  working: string;
 };
 
 export function SharePanel({
@@ -65,9 +68,9 @@ export function SharePanel({
             />
             <span>{s.includeLog}</span>
           </label>
-          <button className="btn" disabled={!canShare}>
+          <SubmitButton disabled={!canShare} pendingLabel={s.working}>
             {s.enable}
-          </button>
+          </SubmitButton>
         </form>
         <p className="text-[13px] text-muted">{s.scopeNote}</p>
       </div>
@@ -117,18 +120,24 @@ export function SharePanel({
           />
           <span>{s.includeLog}</span>
         </label>
-        <button className="btn btn-quiet !text-[13px]">{s.apply}</button>
+        <SubmitButton className="btn btn-quiet !text-[13px]" pendingLabel={s.working}>
+          {s.apply}
+        </SubmitButton>
       </form>
 
       <div className="flex flex-wrap gap-2">
         <form action={rotateShareAction}>
           <input type="hidden" name="project_id" value={projectId} />
-          <button className="link-more">{s.rotate}</button>
+          <SubmitButton className="link-more" pendingLabel={s.working}>
+            {s.rotate}
+          </SubmitButton>
         </form>
         <form action={setSharingAction}>
           <input type="hidden" name="project_id" value={projectId} />
           <input type="hidden" name="enabled" value="0" />
-          <button className="link-more">{s.disable}</button>
+          <SubmitButton className="link-more" pendingLabel={s.working}>
+            {s.disable}
+          </SubmitButton>
         </form>
       </div>
 

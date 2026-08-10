@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 
 import { ENTRY_KINDS, type EntryKind } from "@/lib/constants";
 import { KIND_COLOR } from "../kinds";
+import { SubmitButton } from "./submit";
 
 export type KindStrings = Record<
   EntryKind,
@@ -24,6 +25,7 @@ export function LogComposer({
   groupLabel,
   bodyLabel,
   submitLabel,
+  pendingLabel,
 }: {
   taskId: number;
   action: (fd: FormData) => void;
@@ -31,6 +33,7 @@ export function LogComposer({
   groupLabel: string;
   bodyLabel: string;
   submitLabel: string;
+  pendingLabel: string;
 }) {
   const [kind, setKind] = useState<EntryKind>("note");
   const hintId = useId();
@@ -94,7 +97,7 @@ export function LogComposer({
         placeholder={strings[kind].placeholder}
         required
       />
-      <button className="btn">{submitLabel}</button>
+      <SubmitButton pendingLabel={pendingLabel}>{submitLabel}</SubmitButton>
     </form>
   );
 }

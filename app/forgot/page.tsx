@@ -39,6 +39,7 @@ export default async function ForgotPage({ searchParams }: PageProps<"/forgot">)
         <AuthForm
           action={requestResetAction}
           submitLabel={t("forgotSend")}
+          pendingLabel={t("sendingLink")}
           messages={authMessages(t)}
           fields={[
             {

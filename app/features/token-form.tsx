@@ -38,15 +38,17 @@ export function TokenForm({
   return (
     <>
       {state && (
-        // The redirect used to announce itself as a page change; without it a
-        // live region is the only thing a screen reader has to go on.
         <div
-          role="status"
-          aria-live="polite"
           className="sticker-flat mt-4 space-y-3 p-3"
           style={{ borderColor: "var(--accent)" }}
         >
-          <p className="display text-[14px] font-bold">{onceLabel}</p>
+          {/* The redirect used to announce itself as a page change; without it
+              a live region is the only thing a screen reader has to go on. It
+              wraps the notice alone: with the picker inside, every switch
+              re-announced the whole block, token and all. */}
+          <p role="status" aria-live="polite" className="display text-[14px] font-bold">
+            {onceLabel}
+          </p>
           <AgentSetup
             url={url}
             token={state.token}

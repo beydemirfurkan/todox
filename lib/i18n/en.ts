@@ -128,6 +128,12 @@ export const en = {
   /* generic */
   add: "add",
   save: "save",
+  /* what a button says while its action is in flight */
+  working: "working…",
+  saving: "saving…",
+  signingIn: "signing in…",
+  signingUp: "creating…",
+  sendingLink: "sending…",
   create: "create",
   delete: "delete",
   link: "link",

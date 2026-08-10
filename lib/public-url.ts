@@ -8,5 +8,9 @@
  * an SMTP client into a page that sends nothing.
  */
 export function publicUrl() {
-  return process.env.TODOX_PUBLIC_URL ?? "http://localhost:3000";
+  // Trailing slashes are stripped because callers append a path. A value ending
+  // in `/` would produce `//api/mcp`, which does not route — and that URL is
+  // what every generated agent snippet carries, so the failure would surface as
+  // a 404 inside somebody's editor with nothing pointing back here.
+  return (process.env.TODOX_PUBLIC_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 }

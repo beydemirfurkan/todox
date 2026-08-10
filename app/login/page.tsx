@@ -33,6 +33,7 @@ export default async function LoginPage() {
       <AuthForm
         action={loginAction}
         submitLabel={t("signIn")}
+        pendingLabel={t("signingIn")}
         messages={authMessages(t)}
         fields={[
           {

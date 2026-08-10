@@ -279,6 +279,26 @@ body {
   border-color: var(--line-strong);
 }
 
+/* Something is in flight. Applied by aria-busy rather than :disabled so the
+   control keeps focus while it waits -- losing focus mid-submit drops a
+   keyboard user out of the form they were in. The pointer-events rule is what
+   actually stops a second click. */
+.btn[aria-busy="true"],
+.link-more[aria-busy="true"],
+.pill[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: default;
+  pointer-events: none;
+}
+.btn[aria-busy="true"]:hover,
+.btn[aria-busy="true"]:active {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+}
+.btn:disabled {
+  opacity: 0.6;
+}
+
 /* The nav/period/language pill. It was three hand-copied class lists -- the
    header, the report periods and the language switch -- which meant the touch
    sizing below would have had to be written three times and kept in step.

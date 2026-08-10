@@ -233,7 +233,10 @@ export async function deleteAccountAction(
 ): Promise<AuthState> {
   const user = await requireUser();
 
-  const gate = await limit.consume("emailChangePerUser", String(user.id));
+  // Only failures count. Consuming up front meant five mistyped confirmations
+  // locked you out of deleting the account *and* changing the address for an
+  // hour, having succeeded at neither.
+  const gate = await limit.check("emailChangePerUser", String(user.id));
   if (!gate.allowed) return tooMany(gate.retryAfterSec);
 
   const result = await auth.deleteAccount(
@@ -241,7 +244,10 @@ export async function deleteAccountAction(
     raw(fd, "password"),
     str(fd, "confirm"),
   );
-  if (!result.ok) return { errors: result.errors };
+  if (!result.ok) {
+    await limit.penalise("emailChangePerUser", String(user.id));
+    return { errors: result.errors };
+  }
 
   // The session row went with the account; the cookie pointing at it has to go
   // too, or the next request spends a query proving it is dead.

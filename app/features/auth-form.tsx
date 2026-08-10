@@ -13,6 +13,8 @@ export type AuthFieldSpec = {
   autoFocus?: boolean;
   /** Prefill, for forms that edit something that already has a value. */
   defaultValue?: string;
+  /** For fields that must be typed verbatim — a phone helpfully capitalises. */
+  exact?: boolean;
 };
 
 /**
@@ -26,6 +28,7 @@ export function AuthForm({
   action,
   fields,
   submitLabel,
+  pendingLabel,
   messages,
   hidden,
   successLabel,
@@ -33,6 +36,8 @@ export function AuthForm({
   action: (prev: AuthState, fd: FormData) => Promise<AuthState>;
   fields: AuthFieldSpec[];
   submitLabel: string;
+  /** What the button says while the action runs. Sign-in is a round trip. */
+  pendingLabel: string;
   messages: Record<string, string>;
   /** Values the form must carry but nobody should type, e.g. a reset token. */
   hidden?: Record<string, string>;
@@ -88,6 +93,9 @@ export function AuthForm({
                 defaultValue={f.defaultValue}
                 autoComplete={f.autoComplete}
                 autoFocus={f.autoFocus}
+                autoCapitalize={f.exact ? "none" : undefined}
+                autoCorrect={f.exact ? "off" : undefined}
+                spellCheck={f.exact ? false : undefined}
                 aria-invalid={err ? true : undefined}
                 aria-describedby={err ? errId : undefined}
                 style={err ? { borderColor: "var(--k-dead_end)" } : undefined}
@@ -106,8 +114,17 @@ export function AuthForm({
         );
       })}
 
-      <button className="btn" disabled={pending} aria-busy={pending}>
-        {submitLabel}
+      {/* aria-busy rather than disabled: a disabled button loses focus, and a
+          keyboard user submitting with Enter would land nowhere. */}
+      <button
+        className="btn"
+        aria-busy={pending}
+        aria-disabled={pending}
+        onClick={(e) => {
+          if (pending) e.preventDefault();
+        }}
+      >
+        {pending ? pendingLabel : submitLabel}
       </button>
     </form>
   );

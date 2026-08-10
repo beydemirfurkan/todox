@@ -29,6 +29,7 @@ export default async function ResetPage({ searchParams }: PageProps<"/reset">) {
         <AuthForm
           action={resetPasswordAction}
           submitLabel={t("resetSubmit")}
+          pendingLabel={t("saving")}
           messages={authMessages(t)}
           hidden={{ token }}
           fields={[

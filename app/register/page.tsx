@@ -29,6 +29,7 @@ export default async function RegisterPage() {
       <AuthForm
         action={registerAction}
         submitLabel={t("signUp")}
+        pendingLabel={t("signingUp")}
         messages={authMessages(t)}
         fields={[
           { name: "name", label: t("displayName"), autoComplete: "name", autoFocus: true },

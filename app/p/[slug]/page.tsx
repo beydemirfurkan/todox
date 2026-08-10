@@ -19,6 +19,7 @@ import {
 } from "../../actions";
 import { contextKindLabel, statusLabel } from "../../kinds";
 import { SharePanel } from "../../features/share-panel";
+import { SubmitButton } from "../../features/submit";
 import { Blob, Chip, Counter, Empty, Field, Panel, StatusDot } from "../../components";
 
 export const dynamic = "force-dynamic";
@@ -187,7 +188,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                             <option value="3">{t("p3")}</option>
                           </select>
                         </Field>
-                        <button className="btn">{t("add")}</button>
+                        <SubmitButton pendingLabel={t("working")}>{t("add")}</SubmitButton>
                       </div>
                     </form>
                   </details>
@@ -241,10 +242,13 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                     </span>
                     <form action={deleteContextAction} className="ml-auto">
                       <input type="hidden" name="context_id" value={c.id} />
-                      <button className="link-more row-action !text-[12px]">
+                      <SubmitButton
+                        className="link-more row-action !text-[12px]"
+                        pendingLabel={t("working")}
+                      >
                         {t("delete")}
                         <span className="sr-only"> — {c.title}</span>
-                      </button>
+                      </SubmitButton>
                     </form>
                   </div>
                   <p className="mt-1.5 text-[14px] leading-relaxed whitespace-pre-wrap text-muted">
@@ -271,7 +275,9 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                   <Field label={t("noteBodyPh")}>
                     <textarea name="body" placeholder={t("noteBodyPh")} required />
                   </Field>
-                  <button className="btn btn-quiet">{t("save")}</button>
+                  <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
+                    {t("save")}
+                  </SubmitButton>
                 </form>
               </details>
             </div>
@@ -297,6 +303,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                 reachNote: t("shareReachNote"),
                 apply: t("apply"),
                 blocked: t("verifyBlockedShare"),
+                working: t("working"),
               }}
             />
           </Panel>
@@ -337,9 +344,12 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                         </option>
                       ))}
                     </select>
-                    <button className="btn btn-quiet !px-3 !py-[3px] !text-[13px]">
+                    <SubmitButton
+                      className="btn btn-quiet !px-3 !py-[3px] !text-[13px]"
+                      pendingLabel={t("working")}
+                    >
                       {t("apply")}
-                    </button>
+                    </SubmitButton>
                   </form>
                 ))}
               {all.filter((x) => x.status === "todo" || x.status === "doing").length ===
