@@ -158,6 +158,36 @@ export async function changeEmail(
   };
 }
 
+/**
+ * Ends the account and everything hanging off it.
+ *
+ * The password is the gate, for the same reason `changeEmail` needs one: a
+ * stolen session cookie must not be enough to destroy somebody's log. The
+ * username is asked for on the way in too, but that is a confirmation and not
+ * a credential -- it exists so this cannot happen by reflex.
+ *
+ * One statement is enough: every table that references a user does so with
+ * ON DELETE CASCADE, so projects, tasks, entries, events, refs, contexts,
+ * sessions and agent tokens all go with it. Deliberately unrecoverable.
+ */
+export async function deleteAccount(
+  userId: number,
+  password: string,
+  confirmation: string,
+): Promise<Result<true>> {
+  const user = await users.byId(userId);
+  if (!user) return { ok: false, errors: [{ field: "form", code: "badCredentials" }] };
+
+  if (!(await verifyPassword(password, user.password_hash)))
+    return { ok: false, errors: [{ field: "password", code: "badCredentials" }] };
+
+  if (confirmation.trim() !== user.username)
+    return { ok: false, errors: [{ field: "confirm", code: "confirmMismatch" }] };
+
+  await users.remove(userId);
+  return { ok: true, value: true };
+}
+
 export async function changeName(userId: number, name: string): Promise<Result<true>> {
   const trimmed = name.trim();
   if (trimmed.length < 2)

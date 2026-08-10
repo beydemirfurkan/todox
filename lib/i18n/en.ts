@@ -40,6 +40,7 @@ export const en = {
   err_badCredentials: "Those details do not match an account.",
   err_tooManyAttempts: "Too many attempts. Try again in about {n} minutes.",
   err_linkInvalid: "That link has expired or has already been used.",
+  err_confirmMismatch: "That is not your username.",
 
   /* recovery */
   forgotLink: "Forgot your password?",
@@ -95,6 +96,11 @@ export const en = {
   neverUsed: "never used",
   lastUsed: "last used",
   noTokens: "No tokens yet.",
+  deleteAccount: "Delete account",
+  deleteAccountNote:
+    "Ends the account and takes every project, task and log entry with it. There is no copy and no undo — export anything you want to keep first.",
+  deleteAccountConfirm: "type your username to confirm",
+  deleteAccountSubmit: "delete my account",
 
   /* generic */
   add: "add",

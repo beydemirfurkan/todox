@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import {
   changeEmailAction,
   changePasswordAction,
+  deleteAccountAction,
   logoutAction,
   resendVerificationAction,
   revokeAllTokensAction,
@@ -190,6 +191,31 @@ export default async function AccountPage() {
             </form>
           </div>
         )}
+      </Panel>
+
+      {/* Last on the page, and gated on both the password and the username: the
+          password is the credential, the username is there so this cannot
+          happen by reflex. Everything cascades from the user row. */}
+      <Panel delay={140} title={t("deleteAccount")}>
+        <p className="mb-3 text-[14px] text-muted">{t("deleteAccountNote")}</p>
+        <AuthForm
+          action={deleteAccountAction}
+          submitLabel={t("deleteAccountSubmit")}
+          messages={authMessages(t)}
+          fields={[
+            {
+              name: "password",
+              label: t("currentPassword"),
+              type: "password",
+              autoComplete: "current-password",
+            },
+            {
+              name: "confirm",
+              label: t("deleteAccountConfirm"),
+              autoComplete: "off",
+            },
+          ]}
+        />
       </Panel>
     </div>
   );

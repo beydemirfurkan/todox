@@ -223,6 +223,32 @@ export async function changeEmailAction(
   return { errors: [] };
 }
 
+/**
+ * Rate-limited on the same bucket as an email change: both are gated on the
+ * password, and a gate you can guess at without limit is not one.
+ */
+export async function deleteAccountAction(
+  _prev: AuthState,
+  fd: FormData,
+): Promise<AuthState> {
+  const user = await requireUser();
+
+  const gate = await limit.consume("emailChangePerUser", String(user.id));
+  if (!gate.allowed) return tooMany(gate.retryAfterSec);
+
+  const result = await auth.deleteAccount(
+    user.id,
+    raw(fd, "password"),
+    str(fd, "confirm"),
+  );
+  if (!result.ok) return { errors: result.errors };
+
+  // The session row went with the account; the cookie pointing at it has to go
+  // too, or the next request spends a query proving it is dead.
+  await clearSessionCookie();
+  redirect("/login");
+}
+
 /* ------------------------------------------------------------ api tokens */
 
 /**

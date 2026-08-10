@@ -39,6 +39,7 @@ export const tr: Record<Key, string> = {
   err_badCredentials: "Bu bilgiler bir hesapla eşleşmiyor.",
   err_tooManyAttempts: "Çok fazla deneme. Yaklaşık {n} dakika sonra tekrar dene.",
   err_linkInvalid: "Bu bağlantının süresi dolmuş ya da zaten kullanılmış.",
+  err_confirmMismatch: "Bu senin kullanıcı adın değil.",
 
   forgotLink: "Şifreni mi unuttun?",
   forgotTitle: "Şifreni sıfırla",
@@ -91,6 +92,11 @@ export const tr: Record<Key, string> = {
   neverUsed: "hiç kullanılmadı",
   lastUsed: "son kullanım",
   noTokens: "Henüz token yok.",
+  deleteAccount: "Hesabı sil",
+  deleteAccountNote:
+    "Hesabı kapatır; bütün projeleri, görevleri ve kayıt girdilerini de birlikte götürür. Kopyası yok, geri alınamaz — saklamak istediğin ne varsa önce dışarı aktar.",
+  deleteAccountConfirm: "onaylamak için kullanıcı adını yaz",
+  deleteAccountSubmit: "hesabımı sil",
 
   add: "ekle",
   save: "kaydet",

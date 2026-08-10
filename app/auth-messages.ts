@@ -12,6 +12,7 @@ const CODES = [
   "badCredentials",
   "tooManyAttempts",
   "linkInvalid",
+  "confirmMismatch",
 ] as const;
 
 export function authMessages(t: T): Record<string, string> {
