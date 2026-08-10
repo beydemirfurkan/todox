@@ -57,46 +57,46 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             </Link>
           )}
 
-          {/* Signed in, this group takes the whole second row on a phone: the
-              four controls together have never fitted beside the wordmark, and
-              this one was the row that made the page scroll sideways. Above
-              `sm` it goes back to a single nowrap group pushed right. */}
-          <div
-            className={`ml-auto flex flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap ${
-              user ? "w-full" : ""
-            }`}
-          >
+          {/* The language pills finish the first row on a phone; above `sm`
+              they are what pushes the whole right-hand group over. */}
+          <div className={user ? "sm:ml-auto" : "ml-auto"}>
             <LangSwitcher lang={lang} t={t} />
-            {user ? (
-              <>
-                {/* Leads the row on a phone and takes what is left of it. The
-                    fixed width -- and the widening on focus, which used to push
-                    the row off-screen -- only applies once there is room. */}
-                <div className="order-first min-w-0 flex-1 transition-[width] duration-200 sm:order-none sm:w-[210px] sm:flex-none sm:focus-within:w-[280px]">
-                  <Suspense>
-                    <SearchBox
-                      placeholder={t("searchPlaceholder")}
-                      label={t("searchLabel")}
-                      clearLabel={t("searchClear")}
-                    />
-                  </Suspense>
-                </div>
-                <Link href="/account" className="pill min-w-0 max-w-[9rem]" title={user.name}>
-                  {/* The ellipsis needs a real box to happen in: the pill is a
-                      flex container, and a bare text node in one is an
-                      anonymous item that text-overflow never reaches. */}
-                  <span className="truncate">@{user.username}</span>
-                </Link>
-                <form action={logoutAction}>
-                  <button className="link-more !text-[13px]">{t("signOut")}</button>
-                </form>
-              </>
-            ) : (
-              <Link href="/login" className="pill">
-                {t("signIn")}
-              </Link>
-            )}
           </div>
+
+          {user ? (
+            /* Search, account and sign-out take the second row on a phone. All
+               four controls on one line never fitted beside the wordmark, and
+               that is the row that used to drag the page sideways. Above `sm`
+               it is one nowrap group again, exactly where it was. */
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+              {/* `min-w` and not just `flex-1`: a basis of zero let the box
+                  squeeze to 22px rather than push anything onto a new line.
+                  The fixed width, and the widening on focus that used to shove
+                  the row off-screen, wait until there is room for them. */}
+              <div className="min-w-[7rem] flex-1 transition-[width] duration-200 sm:w-[210px] sm:flex-none sm:focus-within:w-[280px]">
+                <Suspense>
+                  <SearchBox
+                    placeholder={t("searchPlaceholder")}
+                    label={t("searchLabel")}
+                    clearLabel={t("searchClear")}
+                  />
+                </Suspense>
+              </div>
+              <Link href="/account" className="pill min-w-0 max-w-[9rem]" title={user.name}>
+                {/* The ellipsis needs a real box to happen in: the pill is a
+                    flex container, and a bare text node in one is an anonymous
+                    item that text-overflow never reaches. */}
+                <span className="truncate">@{user.username}</span>
+              </Link>
+              <form action={logoutAction}>
+                <button className="link-more !text-[13px]">{t("signOut")}</button>
+              </form>
+            </div>
+          ) : (
+            <Link href="/login" className="pill">
+              {t("signIn")}
+            </Link>
+          )}
         </header>
 
         <main
