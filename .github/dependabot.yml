@@ -12,6 +12,15 @@ updates:
         patterns: ["@types/*"]
       dev:
         dependency-type: development
+    ignore:
+      # typescript-eslint refuses to load against TS 7 and eslint-config-next
+      # pulls it in, so `pnpm lint` dies before it reads a line of source. The
+      # first grouped dev bump proved it. Neither major is worth taking until
+      # that support lands; patches and minors still come through.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
