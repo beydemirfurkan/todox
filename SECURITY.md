@@ -31,6 +31,10 @@ There is no bounty. There will be a quick, honest answer.
   a second, deliberate step. It is irreversible and takes every project, task,
   entry, ref, context, session and agent token with it, by cascade from the
   user row.
+- **Mail goes out over authenticated SMTP with STARTTLS required.** The
+  connection is refused rather than downgraded if the server will not upgrade,
+  so the mailbox password is never sent in the clear. A delivery failure is
+  still swallowed on purpose (see above) and logged with the address masked.
 - **Parameters are validated before they reach the data layer.**
   `lib/services/rpc-schemas.ts` is the runtime contract for every RPC method,
   and repositories build `SET` clauses from a column allow-list, never from the
@@ -57,6 +61,13 @@ These are known and documented, not oversights:
   a deliberate password *change* does not, on the grounds that you still had
   the old password, so use "revoke every token" on the Account page when that
   is what you actually mean.
+- A token used with a remote agent ends up in that agent's configuration file,
+  and if you use the paste-this-to-your-agent route, in its transcript too.
+  That is the cost of a setup step nobody gets wrong; treat a token as
+  something the tools you paste it into can see.
+- If the mail provider's sending limit is reached, messages are dropped. It
+  cannot leak whether an address is registered — the response is identical
+  either way — but the only place it shows up is the server log.
 
 ## Running it yourself
 

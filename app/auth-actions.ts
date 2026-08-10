@@ -27,7 +27,7 @@ export type AuthState = { errors: auth.FieldError[] } | null;
  * carry, and folding it in would hand the token form the "no errors means it
  * worked" success banner the auth forms rely on.
  */
-export type TokenState = { command: string } | null;
+export type TokenState = { token: string } | null;
 
 const tooMany = (retryAfterSec: number): AuthState => ({
   errors: [
@@ -252,21 +252,16 @@ export async function deleteAccountAction(
 /* ------------------------------------------------------------ api tokens */
 
 /**
- * The command the agent is configured with. Built here rather than on the page
- * because the token never leaves this response: it is returned to the form that
- * asked for it, not carried in a URL the browser would keep.
- */
-function mcpCommand(token: string) {
-  const url = process.env.TODOX_PUBLIC_URL ?? "http://localhost:3000";
-  return `claude mcp add todox --env TODOX_TOKEN=${token} --env TODOX_URL=${url} -- pnpm -C ${process.cwd()} exec tsx mcp/server.ts`;
-}
-
-/**
  * Shown exactly once, in the reply to the submission that created it.
  *
  * It used to travel as `?created=`, which cost the caller their scroll position
  * -- a redirect is a navigation -- and left a live token in browser history, in
  * `Referer`, and in every access log between here and the user.
+ *
+ * The token is all that comes back. The setup snippets are built in the browser
+ * from it, because there is no version of them the server should be composing
+ * for a client it cannot see: the last attempt at that hard-coded the server's
+ * own working directory into a command meant for somebody else's laptop.
  */
 export async function createTokenAction(
   _prev: TokenState,
@@ -278,7 +273,7 @@ export async function createTokenAction(
   // Without this the new row is missing from the list until something else
   // re-renders the page.
   revalidatePath("/account");
-  return { command: mcpCommand(token) };
+  return { token };
 }
 
 export async function revokeTokenAction(fd: FormData) {

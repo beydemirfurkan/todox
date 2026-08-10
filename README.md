@@ -7,7 +7,7 @@ Not a checklist — a log your next session can actually resume from.
 
 [![ci](https://github.com/beydemirfurkan/todox/actions/workflows/ci.yml/badge.svg)](https://github.com/beydemirfurkan/todox/actions/workflows/ci.yml)
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-ffd84d)](LICENSE)
-[![live](https://img.shields.io/badge/live-todox--omega.vercel.app-6cb7f5)](https://todox-omega.vercel.app)
+[![live](https://img.shields.io/badge/live-todox.dev-6cb7f5)](https://www.todox.dev)
 
 An issue tracker is written human-to-human. todox is written agent-to-agent,
 with a human reading over its shoulder. Every task carries the decisions behind
@@ -29,19 +29,20 @@ one stopped — without walking into a wall somebody already hit.
 
 Two things fall out of treating the log as the product:
 
-- **Stale context is flagged.** Linked files are hashed by the agent, which is
-  the side that can see them; the server stores the hashes and compares. If the
-  code moves on, `get_context` says the note may be lying. Context that lies is
-  worse than none.
+- **Stale context is flagged, and never faked.** Linked files are hashed by the
+  side that can see them — the agent — and the server stores the hashes and
+  compares. If the code moves on, `get_context` says the note may be lying.
+  When the agent cannot hash a file, the note is marked as never checked rather
+  than claimed to be fresh: context that lies is worse than none, and that
+  includes lying about how sure we are.
 - **Reports come from the log, not from commits.** Every status change is an
   event, so *what did I finish today, how long did it take, which model did it*
   is a query rather than archaeology.
 
 ## Try it
 
-**[todox-omega.vercel.app](https://todox-omega.vercel.app)** — anyone can
-register. Small personal deployment, no uptime promise. Self-host if the log
-matters to you.
+**[todox.dev](https://www.todox.dev)** — anyone can register. Small personal
+deployment, no uptime promise. Self-host if the log matters to you.
 
 ## Run your own
 
@@ -55,18 +56,51 @@ pnpm dev
 
 ## Connect an agent
 
-The MCP server never touches the database. It authenticates with a per-user
-token and calls the HTTP API, so an agent on a laptop and data on a host stay in
-step — one code path, no local/remote drift. The trade-off: the server has to be
-up for the agent to work.
+todox is a remote MCP server. There is nothing to install and no repository to
+clone: point any MCP client at the URL with an agent token.
 
-Create a token on the Account page and it hands you the command:
+Create a token on the Account page and it hands you text you can paste straight
+into whichever agent you use, plus the config snippet for the four common ones.
+The shape is always the same — one URL, one header:
 
 ```bash
-claude mcp add todox \
-  --env TODOX_TOKEN=todox_… \
-  --env TODOX_URL=https://todox-omega.vercel.app \
-  -- pnpm -C /path/to/todox exec tsx mcp/server.ts
+# Claude Code
+claude mcp add --transport http todox https://www.todox.dev/api/mcp \
+  --header "Authorization: Bearer todox_…"
+```
+
+```toml
+# Codex — ~/.codex/config.toml
+[mcp_servers.todox]
+url = "https://www.todox.dev/api/mcp"
+http_headers = { Authorization = "Bearer todox_…" }
+```
+
+```json
+// Cursor — .cursor/mcp.json   (VS Code uses .vscode/mcp.json and "servers")
+{
+  "mcpServers": {
+    "todox": {
+      "type": "http",
+      "url": "https://www.todox.dev/api/mcp",
+      "headers": { "Authorization": "Bearer todox_…" }
+    }
+  }
+}
+```
+
+Spell out `"type": "http"`. A client that finds a `url` without one tends to
+assume a local command and fails with something unhelpful.
+
+### Optional: local mode
+
+The hosted server has no filesystem, so it cannot hash the files a note links
+to — those are recorded as never checked. If you want staleness detection, run
+the stdio server from a clone instead; it hashes files on the machine that has
+them and reports what it found:
+
+```bash
+TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
 ```
 
 ### Tools
@@ -78,7 +112,7 @@ claude mcp add todox \
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. |
 | `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
-| `link_files` | Attach paths. The MCP server hashes them locally, so staleness works even though the web host has no checkout. |
+| `link_files` | Attach paths. In local mode they are hashed on the machine that has them, which is what makes staleness work; hosted, they are recorded as never checked. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
 | `search` | Across all your projects — *have I solved this before?* |
 
@@ -93,8 +127,8 @@ Vercel plus a hosted Postgres.
 | variable | why |
 | --- | --- |
 | `DATABASE_URL` | Postgres. Use the pooled connection string. |
-| `TODOX_PUBLIC_URL` | Verification and reset links are built from it — get it wrong and people land on the wrong host. |
-| `RESEND_API_KEY` · `MAIL_FROM` | Optional. Without them, mail is printed to the server log rather than sent. |
+| `TODOX_PUBLIC_URL` | Verification links, reset links and the agent setup snippet are built from it — get it wrong and people, and their agents, land on the wrong host. |
+| `SMTP_HOST` · `SMTP_PORT` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` | Optional, but all five together. Without them mail is printed to the server log rather than sent. Port defaults to 587 (STARTTLS); the address in `MAIL_FROM` should match `SMTP_USER`, since most providers reject a `From` they did not authenticate. If the provider's sending limit is hit, messages are dropped and the failure shows up only in the log. |
 
 Run `pnpm db:migrate` when the schema changes. It deliberately does not run on
 cold start: DDL racing across serverless instances is a bad way to discover lock
@@ -116,7 +150,10 @@ Details, and an honest list of what is **not** covered, in
 ## Known gaps
 
 - Search is `ILIKE`, not full-text.
-- Staleness is per-file hash; per-symbol would be the honest version.
+- Staleness is per-file hash; per-symbol would be the honest version. Hosted,
+  there is no hash at all — see "Optional: local mode".
+- `smoke:auth` needs a database and CI has no secret for one, so it is run by
+  hand rather than on every push.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

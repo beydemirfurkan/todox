@@ -7,7 +7,8 @@ import { hashPassword } from "../util/password";
 import { newSessionToken } from "../util/tokens";
 import { addDays } from "../util/time";
 import { MIN_PASSWORD, publicUser, type Result } from "./auth";
-import { baseUrl, send } from "./mailer";
+import { publicUrl } from "../public-url";
+import { send } from "./mailer";
 
 const RESET_TTL_MIN = 60;
 const VERIFY_TTL_DAYS = 3;
@@ -35,7 +36,7 @@ export async function requestPasswordReset(email: string, lang: "tr" | "en") {
   if (!user) return;
 
   const token = await issue(user.id, "reset", expiryIn(RESET_TTL_MIN * 60_000));
-  const link = `${baseUrl()}/reset?token=${encodeURIComponent(token)}`;
+  const link = `${publicUrl()}/reset?token=${encodeURIComponent(token)}`;
 
   await send({
     to: user.email,
@@ -109,7 +110,7 @@ export async function sendVerification(user: PublicUser, lang: "tr" | "en") {
   if (user.email_verified_at) return;
 
   const token = await issue(user.id, "verify", expiryIn(VERIFY_TTL_DAYS * 86_400_000));
-  const link = `${baseUrl()}/verify?token=${encodeURIComponent(token)}`;
+  const link = `${publicUrl()}/verify?token=${encodeURIComponent(token)}`;
 
   await send({
     to: user.email,
@@ -161,7 +162,7 @@ export async function sendEmailChanged(
             "",
             "Bunu sen yaptıysan yapman gereken bir şey yok.",
             "Yapmadıysan hesabına başkası erişiyor demektir: hemen şifreni",
-            `sıfırla (${baseUrl()}/forgot) ve ajan tokenlarını iptal et.`,
+            `sıfırla (${publicUrl()}/forgot) ve ajan tokenlarını iptal et.`,
           ].join("\n")
         : [
             `Hi ${user.name},`,
@@ -171,7 +172,7 @@ export async function sendEmailChanged(
             "",
             "If that was you, there is nothing to do.",
             "If it was not, somebody else has access: reset your password now",
-            `(${baseUrl()}/forgot) and revoke your agent tokens.`,
+            `(${publicUrl()}/forgot) and revoke your agent tokens.`,
           ].join("\n"),
   });
 }

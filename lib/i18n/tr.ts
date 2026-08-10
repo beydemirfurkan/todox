@@ -80,7 +80,7 @@ export const tr: Record<Key, string> = {
     "Her yerden çıkış yapılır. Ajan token'ları çalışmaya devam eder — sorun onlardan biriyse aşağıdan iptal et.",
   apiTokens: "Ajan token'ları",
   apiTokensIntro:
-    "MCP sunucusu bunlardan biriyle giriş yapar. Bir tane oluştur, aşağıdaki komuta yapıştır; ajan yalnızca senin hesabına erişir.",
+    "Ajan bunlardan biriyle giriş yapar. Bir tane oluştur; hangi ajanı kullanıyorsan ona olduğu gibi yapıştırabileceğin bir kurulum metni çıkar. Ajan yalnızca senin hesabına erişir.",
   tokenName: "ne için",
   createToken: "token oluştur",
   tokenCreating: "oluşturuluyor…",
@@ -89,6 +89,29 @@ export const tr: Record<Key, string> = {
   revokeAllNote:
     "Token'ların son kullanma tarihi yok ve her biri hesabın tamamını taşıyor. Biri sızdıysa ve hangisi olduğunu bilmiyorsan hepsini birden bitir.",
   tokenOnce: "Şimdi kopyala — bir daha gösterilmeyecek.",
+  setupPromptTitle: "Ajanına yapıştır",
+  setupPromptTemplate: [
+    "todox'u MCP sunucusu olarak ekle. Uzak (HTTP) bir sunucu, kurulacak bir",
+    "şey yok:",
+    "",
+    "  ad     : todox",
+    "  tip    : http (streamable-http)",
+    "  url    : {url}",
+    "  header : Authorization: Bearer {token}",
+    "",
+    "Bunun için kendi MCP yapılandırmanı düzenle (Claude Code: `claude mcp add",
+    "--transport http`; Codex: ~/.codex/config.toml; Cursor: .cursor/mcp.json;",
+    "VS Code: .vscode/mcp.json). Sonra get_context aracını bu dizinin mutlak",
+    "yoluyla çağır ve ne bulduğunu bana anlat.",
+  ].join("\n"),
+  setupPromptWarning:
+    "Bu metin token'ını taşıyor, yani o ajanın oturum kaydına giriyor. İstediğin bu değilse aşağıdan iptal et.",
+  setupManualTitle: "Ya da elle ekle",
+  setupAgentLabel: "Ajanını seç",
+  setupAgentOther: "diğer",
+  setupVerify:
+    "Bağlandıktan sonra ajana get_context çağırt — çalıştığını böyle görürsün.",
+  copySnippet: "kopyala",
   neverUsed: "hiç kullanılmadı",
   lastUsed: "son kullanım",
   noTokens: "Henüz token yok.",
@@ -115,7 +138,7 @@ export const tr: Record<Key, string> = {
 
   heroTitle: "Sana ve ajanlarına ait bir hafıza",
   heroBody:
-    "todox bir yapılacaklar listesi değil. Her görev bir kayıt taşır — arkasındaki kararlar, işe yaramamış denemeler, hâlâ açık sorular ve son oturumun bıraktığı not. Yeni açılan bir Claude bunu tek bir get_context çağrısıyla okur ve sana hiçbir şey sormadan devam eder.",
+    "todox bir yapılacaklar listesi değil. Her görev bir kayıt taşır — arkasındaki kararlar, işe yaramamış denemeler, hâlâ açık sorular ve son oturumun bıraktığı not. Yeni açılan bir ajan bunu tek bir get_context çağrısıyla okur ve sana hiçbir şey sormadan devam eder.",
   step1Title: "Yazıya geçer",
   step1Body:
     "Çoğunu ajan çalışırken yazar: neye karar verdiği, neyi deneyip tutturamadığı, senden neyi öğrenmesi gerektiği.",
@@ -137,13 +160,13 @@ export const tr: Record<Key, string> = {
     "Henüz boş. Projeler arası bilgi burada yaşar: değişmeyen tercihlerin, her repoyu bağlayan kararlar, sürekli düştüğün tuzaklar.",
   addGlobalNote: "+ genel not ekle",
   noteBodyPh: "notun kendisi",
-  hookTitle: "Claude'a bağla",
+  hookTitle: "Ajanını bağla",
   hookBody:
-    "Bir ajan token'ı oluştur, verdiği komutu yapıştır; sonrasında ajan bu kaydı kendisi okuyup yazar.",
+    "Bir ajan token'ı oluştur ve çıkan kurulum metnini ajanına yapıştır — Claude Code, Codex, Cursor, VS Code, MCP konuşan her şey. Sonrasında bu kaydı kendisi okuyup yazar.",
   hookCta: "Hesap sayfasına git →",
   firstRunTitle: "Burası henüz boş",
   firstRunBody:
-    "Aşağıdan ilk projeni ekle — bir ad ver ve bir repo yolu göster. Sonra todox'u Claude'a bağla, yazma işini ajana bırak.",
+    "Aşağıdan ilk projeni ekle — bir ad ver ve bir repo yolu göster. Sonra todox'u ajanına bağla, yazma işini ona bırak.",
   countInFlight: "uçuşta",
   countStuck: "takıldı",
   countQueued: "sırada",

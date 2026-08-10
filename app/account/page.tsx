@@ -1,5 +1,6 @@
 import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
+import { publicUrl } from "@/lib/public-url";
 import { listApiTokens } from "@/lib/services/auth";
 import { requireUser } from "@/lib/session";
 import {
@@ -175,12 +176,22 @@ export default async function AccountPage() {
         </ul>
 
         <TokenForm
+          url={`${publicUrl()}/api/mcp`}
+          promptTemplate={t("setupPromptTemplate")}
           nameLabel={t("tokenName")}
           submitLabel={t("createToken")}
           pendingLabel={t("tokenCreating")}
           onceLabel={t("tokenOnce")}
-          copyLabel={t("shareCopy")}
-          copiedLabel={t("shareCopied")}
+          setup={{
+            promptTitle: t("setupPromptTitle"),
+            promptWarning: t("setupPromptWarning"),
+            manualTitle: t("setupManualTitle"),
+            agentLabel: t("setupAgentLabel"),
+            other: t("setupAgentOther"),
+            verify: t("setupVerify"),
+            copy: t("copySnippet"),
+            copied: t("shareCopied"),
+          }}
         />
 
         {tokens.length > 0 && (

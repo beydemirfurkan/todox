@@ -84,7 +84,7 @@ export const en = {
     "Signs you out everywhere. Agent tokens keep working — revoke them below if one of those is the problem.",
   apiTokens: "Agent tokens",
   apiTokensIntro:
-    "The MCP server signs in with one of these. Create one, paste it into the command below, and the agent reaches your account and nothing else.",
+    "An agent signs in with one of these. Create one and you get setup text you can paste straight into whichever agent you use; it reaches your account and nothing else.",
   tokenName: "what is it for",
   createToken: "create token",
   tokenCreating: "creating…",
@@ -93,6 +93,29 @@ export const en = {
   revokeAllNote:
     "Tokens do not expire and each one carries the whole account. If you think one has leaked and cannot tell which, end all of them.",
   tokenOnce: "Copy it now — it is never shown again.",
+  setupPromptTitle: "Paste this to your agent",
+  setupPromptTemplate: [
+    "Add todox as an MCP server. It is a remote (HTTP) server, so there is",
+    "nothing to install:",
+    "",
+    "  name   : todox",
+    "  type   : http (streamable-http)",
+    "  url    : {url}",
+    "  header : Authorization: Bearer {token}",
+    "",
+    "Edit your own MCP configuration for this (Claude Code: `claude mcp add",
+    "--transport http`; Codex: ~/.codex/config.toml; Cursor: .cursor/mcp.json;",
+    "VS Code: .vscode/mcp.json). Then call the get_context tool with the",
+    "absolute path of this directory and tell me what it found.",
+  ].join("\n"),
+  setupPromptWarning:
+    "This text carries your token, so it ends up in that agent's transcript. Revoke it below if that is not what you want.",
+  setupManualTitle: "Or add it by hand",
+  setupAgentLabel: "Choose your agent",
+  setupAgentOther: "other",
+  setupVerify:
+    "Once it connects, have the agent call get_context. That is how you know it worked.",
+  copySnippet: "copy",
   neverUsed: "never used",
   lastUsed: "last used",
   noTokens: "No tokens yet.",
@@ -121,7 +144,7 @@ export const en = {
   /* home */
   heroTitle: "A memory for you and your agents",
   heroBody:
-    "todox is not a checklist. Each task carries a log — the decisions behind it, the approaches that failed, the questions still open, and the note the last session left behind. A fresh Claude reads it with one get_context call and continues without asking you anything.",
+    "todox is not a checklist. Each task carries a log — the decisions behind it, the approaches that failed, the questions still open, and the note the last session left behind. A fresh agent reads it with one get_context call and continues without asking you anything.",
   step1Title: "It gets written down",
   step1Body:
     "Mostly by the agent, while it works: what it decided, what it tried that failed, what it needs you to answer.",
@@ -143,13 +166,13 @@ export const en = {
     "Nothing yet. This is where cross-project knowledge lives: standing preferences, decisions that bind every repo, traps you keep falling into.",
   addGlobalNote: "+ add global note",
   noteBodyPh: "the note itself",
-  hookTitle: "Hook it up to Claude",
+  hookTitle: "Hook up your agent",
   hookBody:
-    "Create an agent token, paste the command it gives you, and the agent reads and writes this log by itself.",
+    "Create an agent token and paste the setup text into your agent — Claude Code, Codex, Cursor, VS Code, anything that speaks MCP. After that it reads and writes this log by itself.",
   hookCta: "go to Account →",
   firstRunTitle: "Nothing here yet",
   firstRunBody:
-    "Add your first project below — name it and point it at a repo path. After that, hook todox up to Claude and let the agent do the writing.",
+    "Add your first project below — name it and point it at a repo path. After that, hook todox up to your agent and let it do the writing.",
   countInFlight: "in flight",
   countStuck: "stuck",
   countQueued: "queued",

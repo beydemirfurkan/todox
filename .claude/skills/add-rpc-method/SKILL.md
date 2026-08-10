@@ -21,8 +21,10 @@ advertise an argument the server rejects.
 - If the method is a patch, add a `.refine()` next to `updateTask` /
   `updateProject` requiring at least one field. A patch of nothing used to
   return the unchanged row, which reads to an agent exactly like a success.
-- Fields the MCP process fills in itself (`repo_root`, `tz`) go in the schema
-  but are listed in `INTERNAL` in `mcp/server.ts` so they are never advertised.
+- Fields a local process can fill in itself (`repo_root`, `tz`) go in the schema
+  and are hidden from the model **only in local mode** (`LOCAL_INTERNAL` in
+  `mcp/tools.ts`). Hosted, nobody but the agent knows them, so they are
+  advertised and the `.describe()` text has to tell it what to send.
 
 ## 2. Handler — `lib/services/rpc.ts`
 
@@ -43,20 +45,28 @@ nothing. Validation happened in step 1.
   not inline `WHERE user_id = ?` at the call site. A row belonging to somebody
   else answers **404**, never 403.
 
-## 4. Tool registration — `mcp/server.ts`
+## 4. Tool registration — `mcp/tools.ts` (both transports)
 
-Register with the `tool()` helper; it pulls the input schema from `SHAPES`, so
-do not restate it. Use the options when the model should not be filling
-something in itself:
+One definition serves the hosted endpoint (`app/api/mcp/route.ts`) and the
+stdio process (`mcp/server.ts`). Register with the `tool()` helper; it pulls the
+input schema from `SHAPES`, so do not restate it. Use the options when the model
+should not be filling something in itself:
 
 - `overrides` — advertise a friendlier shape (`create_task` takes plain paths
   and this side attaches the hashes; a model cannot invent a sha256).
-- `prepare` — last chance to add what only this process knows.
+- `prepare` — last chance to add what only this side knows.
 - `after` — runs on the result and may call back (`checkLinkedFiles`).
 - `transform` / `presentation` — rendering that belongs on this side.
 
+**Anything that needs a disk goes through `Workspace`** — `hash`, `repoRoot`,
+`tz`, `checkRefs`. The hosted server answers all of them with `null`/`undefined`
+and the tool must **degrade, not fail**: record what it was given and let the
+status fall to `unknown`. Never let one side claim a file is unchanged when it
+could not read it.
+
 If the tool changes what an agent should do at session start or before
-finishing, update `INSTRUCTIONS` in the same file.
+finishing, update `BASE` in the same file — and if the advice differs by mode,
+`LOCAL_NOTE` / `REMOTE_NOTE`.
 
 ## 5. README
 
@@ -67,6 +77,9 @@ it does not exist as far as a reader is concerned.
 
 `lib/services/rpc-schemas.test.ts` — assert the params that must be rejected.
 These tests need no database, so they run in CI on every push.
+
+`pnpm smoke:mcp` runs the whole agent surface through both transports against a
+live server. If a tool only works one way in, that is where it shows.
 
 ## Before you call it done
 

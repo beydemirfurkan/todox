@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { createTokenAction } from "../auth-actions";
 import { Field } from "../components";
-import { CopyMarkdown } from "./copy-markdown";
+import { AgentSetup, type AgentSetupLabels } from "./agent-setup";
 
 /**
  * The token comes back in the action's reply and lives only in this component's
@@ -15,19 +15,23 @@ import { CopyMarkdown } from "./copy-markdown";
  * into a client component.
  */
 export function TokenForm({
+  url,
+  promptTemplate,
   nameLabel,
   submitLabel,
   pendingLabel,
   onceLabel,
-  copyLabel,
-  copiedLabel,
+  setup,
 }: {
+  /** Where this instance answers; the snippets are built from it. */
+  url: string;
+  /** Translated on the server, with {url} and {token} still in place. */
+  promptTemplate: string;
   nameLabel: string;
   submitLabel: string;
   pendingLabel: string;
   onceLabel: string;
-  copyLabel: string;
-  copiedLabel: string;
+  setup: AgentSetupLabels;
 }) {
   const [state, formAction, pending] = useActionState(createTokenAction, null);
 
@@ -39,17 +43,17 @@ export function TokenForm({
         <div
           role="status"
           aria-live="polite"
-          className="sticker-flat mt-4 space-y-2 p-3"
+          className="sticker-flat mt-4 space-y-3 p-3"
           style={{ borderColor: "var(--accent)" }}
         >
           <p className="display text-[14px] font-bold">{onceLabel}</p>
-          <pre className="mono overflow-x-auto rounded-[8px] border-[1.5px] border-line bg-paper p-2.5 text-[12px] break-all whitespace-pre-wrap">
-            {state.command}
-          </pre>
-          <CopyMarkdown
-            markdown={state.command}
-            label={copyLabel}
-            copiedLabel={copiedLabel}
+          <AgentSetup
+            url={url}
+            token={state.token}
+            prompt={promptTemplate
+              .replaceAll("{url}", url)
+              .replaceAll("{token}", state.token)}
+            labels={setup}
           />
         </div>
       )}

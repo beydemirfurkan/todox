@@ -53,7 +53,8 @@ export function readConfig() {
   if (!token) {
     throw new Error(
       "TODOX_TOKEN is not set. Create an agent token on the Account page and pass it " +
-        "with --env TODOX_TOKEN=...",
+        "to this process in the environment. Most people do not need this mode at " +
+        "all: the hosted server at /api/mcp needs no local process.",
     );
   }
   return { token, url };

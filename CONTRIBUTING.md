@@ -58,7 +58,20 @@ see in review.
   that reads a path belongs in `mcp/workspace.ts`, on the machine that holds
   the code. Hashing files and finding a repository root used to happen in
   request handlers, where they returned nonsense and turned a caller-supplied
-  path into a real `readFileSync`.
+  path into a real `readFileSync` (`lib/repositories/refs.ts` still carries the
+  note). `app/api/mcp/route.ts` is where that temptation comes back, because it
+  is an agent surface running in the server process: it answers the filesystem
+  questions with `null`, and the tools degrade to "not checked" rather than
+  guessing.
+- **The agent surface is defined once.** Tools, descriptions and session
+  instructions live in `mcp/tools.ts` and are registered by both the hosted
+  endpoint and the stdio process. What differs between them is a `Workspace`,
+  not a copy of the tool list. `pnpm smoke:mcp` runs the same suite through
+  both, which is what keeps that true.
+- **Mail bodies are the one place strings are not in both dictionaries.** They
+  are inline `lang === "tr" ? … : …` in `lib/services/account-recovery.ts`, so
+  the compile-time guarantee below does not cover them. Known, not an
+  invitation.
 - **Colour never carries meaning alone.** Every status, kind and badge has a
   text equivalent, and controls have real labels.
 

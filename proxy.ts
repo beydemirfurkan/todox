@@ -15,7 +15,12 @@ const PUBLIC = [
   "/reset",
   "/verify",
   "/s/",
+  // Both agent surfaces carry their own bearer token and have no session
+  // cookie. Leave either out and the redirect below turns every agent call
+  // into an HTML login page, which reads to a client as a broken server
+  // rather than as a refusal.
   "/api/rpc",
+  "/api/mcp",
   // Metadata files. Redirecting these to /login silently breaks the favicon
   // and every social link preview, which is the sort of thing nobody notices
   // until somebody pastes the URL into Slack.
