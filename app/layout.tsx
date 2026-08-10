@@ -51,51 +51,54 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             {t("tagline")}
           </span>
 
-          {user && (
-            <Link href="/report" className="pill">
-              {t("navReport")}
-            </Link>
-          )}
-
-          {/* The language pills finish the first row on a phone; above `sm`
-              they are what pushes the whole right-hand group over. */}
-          <div className={user ? "sm:ml-auto" : "ml-auto"}>
-            <LangSwitcher lang={lang} t={t} />
-          </div>
-
           {user ? (
-            /* Search, account and sign-out take the second row on a phone. All
-               four controls on one line never fitted beside the wordmark, and
-               that is the row that used to drag the page sideways. Above `sm`
-               it is one nowrap group again, exactly where it was. */
-            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-              {/* `min-w` and not just `flex-1`: a basis of zero let the box
-                  squeeze to 22px rather than push anything onto a new line.
-                  The fixed width, and the widening on focus that used to shove
-                  the row off-screen, wait until there is room for them. */}
-              <div className="min-w-[7rem] flex-1 transition-[width] duration-200 sm:w-[210px] sm:flex-none sm:focus-within:w-[280px]">
-                <Suspense>
-                  <SearchBox
-                    placeholder={t("searchPlaceholder")}
-                    label={t("searchLabel")}
-                    clearLabel={t("searchClear")}
-                  />
-                </Suspense>
-              </div>
-              <Link href="/account" className="pill min-w-0 max-w-[9rem]" title={user.name}>
+            <>
+              <Link
+                href="/account"
+                className="pill ml-auto min-w-0 max-w-[9rem]"
+                title={user.name}
+              >
                 {/* The ellipsis needs a real box to happen in: the pill is a
                     flex container, and a bare text node in one is an anonymous
                     item that text-overflow never reaches. */}
                 <span className="truncate">@{user.username}</span>
               </Link>
-              <form action={logoutAction}>
-                <button className="link-more !text-[13px]">{t("signOut")}</button>
-              </form>
-            </div>
+
+              {/* The tools take the second row on a phone. A 320px screen fits
+                  the wordmark and one control, so all four beside it is what
+                  used to drag the page sideways; sign-out moved to the account
+                  page rather than being wrapped onto a third row. Above `sm`
+                  this is one nowrap group again. */}
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                {/* `min-w` and not just `flex-1`: a basis of zero let the box
+                    squeeze to 22px rather than push anything onto a new line.
+                    The fixed width, and the widening on focus that used to
+                    shove the row off-screen, wait until there is room. */}
+                <div className="min-w-[7rem] flex-1 transition-[width] duration-200 sm:w-[210px] sm:flex-none sm:focus-within:w-[280px]">
+                  <Suspense>
+                    <SearchBox
+                      placeholder={t("searchPlaceholder")}
+                      label={t("searchLabel")}
+                      clearLabel={t("searchClear")}
+                    />
+                  </Suspense>
+                </div>
+                <Link href="/report" className="pill shrink-0">
+                  {t("navReport")}
+                </Link>
+                <LangSwitcher lang={lang} t={t} />
+                <form action={logoutAction} className="hidden shrink-0 sm:block">
+                  <button className="link-more !text-[13px]">{t("signOut")}</button>
+                </form>
+              </div>
+            </>
           ) : (
-            <Link href="/login" className="pill">
-              {t("signIn")}
-            </Link>
+            <div className="ml-auto flex items-center gap-2">
+              <LangSwitcher lang={lang} t={t} />
+              <Link href="/login" className="pill">
+                {t("signIn")}
+              </Link>
+            </div>
           )}
         </header>
 

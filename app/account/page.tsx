@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import {
   changeEmailAction,
   changePasswordAction,
+  logoutAction,
   resendVerificationAction,
   revokeAllTokensAction,
   revokeTokenAction,
@@ -37,6 +38,12 @@ export default async function AccountPage() {
             )}
           </p>
         </div>
+        {/* The header drops sign-out on a phone -- there is no room for it
+            beside the wordmark -- so this is the only way out on the device
+            most likely to be signed in. */}
+        <form action={logoutAction} className="ml-auto shrink-0 sm:hidden">
+          <button className="btn btn-quiet">{t("signOut")}</button>
+        </form>
       </div>
 
       {!user.email_verified_at && (
