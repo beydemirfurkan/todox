@@ -27,9 +27,12 @@ export function AuthShell({
 }) {
   return (
     <div className="relative flex min-h-[calc(100vh-160px)] flex-col items-center justify-center py-8">
+      {/* Sized against its container, not in absolute pixels: at 520px wide it
+          hung 100px off the side of a phone and made the whole page drag
+          sideways. Percentages, because `vw` counts the scrollbar. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[420px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-[0.07] blur-3xl"
+        className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[min(420px,60vh)] w-[90%] max-w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-[0.07] blur-3xl"
         style={{ background: fill }}
       />
 

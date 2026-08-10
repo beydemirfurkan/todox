@@ -7,6 +7,7 @@ export const tr: Record<Key, string> = {
   searchLabel: "Görevlerde, kayıt girdilerinde ve notlarda ara",
   searchClear: "Aramayı temizle",
   languageLabel: "Dil",
+  langSwitching: "dil değiştiriliyor…",
   breadcrumb: "Sayfa yolu",
   navReport: "Rapor",
   navAccount: "Hesap",
@@ -81,6 +82,7 @@ export const tr: Record<Key, string> = {
     "MCP sunucusu bunlardan biriyle giriş yapar. Bir tane oluştur, aşağıdaki komuta yapıştır; ajan yalnızca senin hesabına erişir.",
   tokenName: "ne için",
   createToken: "token oluştur",
+  tokenCreating: "oluşturuluyor…",
   revoke: "iptal et",
   revokeAll: "bütün token'ları iptal et",
   revokeAllNote:

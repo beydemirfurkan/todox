@@ -59,13 +59,18 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
             </Link>{" "}
             / <span aria-current="page">{project.slug}</span>
           </nav>
-          <h1 className="display text-[33px] leading-[1.1] font-bold">{project.name}</h1>
+          <h1 className="display text-[26px] leading-[1.1] font-bold sm:text-[33px]">
+            {project.name}
+          </h1>
           {project.summary && (
             <p className="mt-1.5 text-[14.5px] text-muted">{project.summary}</p>
           )}
         </div>
         {project.root_path && (
-          <span className="mono sticker-flat ml-auto px-2 py-1 text-[12px] text-muted">
+          <span
+            title={project.root_path}
+            className="mono sticker-flat ml-auto max-w-full min-w-0 truncate px-2 py-1 text-[12px] text-muted"
+          >
             {project.root_path}
           </span>
         )}
@@ -305,13 +310,16 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                   <form
                     key={task.id}
                     action={setStatusAction}
-                    className="flex items-center gap-2"
+                    className="flex flex-wrap items-center gap-2"
                   >
                     <input type="hidden" name="task_id" value={task.id} />
                     <span className="mono w-8 shrink-0 text-[12px] text-faint">
                       #{task.id}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-muted">
+                    {/* Takes the whole first line on a phone, so the select and
+                        its button keep their own -- the three of them never fitted
+                        across a narrow screen. */}
+                    <span className="min-w-0 flex-1 basis-full truncate text-[13.5px] text-muted sm:basis-auto">
                       {task.title}
                     </span>
                     <label className="sr-only" htmlFor={`st-${task.id}`}>
@@ -321,7 +329,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                       id={`st-${task.id}`}
                       name="status"
                       defaultValue={task.status}
-                      className="!w-[116px] !px-2 !py-1 !text-[13px]"
+                      className="!w-[116px] shrink-0 !px-2 !py-1 !text-[13px]"
                     >
                       {STATUSES.map((s) => (
                         <option key={s} value={s}>

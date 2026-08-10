@@ -52,7 +52,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                   : `/report?period=${p}`
               }
               aria-current={active ? "page" : undefined}
-              className="display rounded-full border-[1.5px] border-line px-3 pt-[3px] pb-[4px] text-[13.5px] leading-none font-bold"
+              className="pill"
               style={
                 active
                   ? {
@@ -167,7 +167,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                 <ul className="space-y-1.5">
                   {report.by_model.map((m) => (
                     <li key={m.model} className="flex flex-wrap items-center gap-2">
-                      <code className="mono rounded border-[1.5px] border-line bg-inset px-1.5 text-[12.5px]">
+                      <code className="mono rounded border-[1.5px] border-line bg-inset px-1.5 text-[12.5px] break-all">
                         {m.model}
                       </code>
                       <span className="text-[13.5px] text-muted">
@@ -190,7 +190,9 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                   label={t("copyReport")}
                   copiedLabel={t("reportCopied")}
                 />
-                <pre className="mono max-h-80 overflow-auto rounded-[10px] border-[1.5px] border-line bg-inset p-3 text-[12.5px] whitespace-pre-wrap">
+                {/* `break-words`, not `break-all`: a long path or URL has to
+                    give way, but ordinary prose should still break at spaces. */}
+                <pre className="mono max-h-80 overflow-auto rounded-[10px] border-[1.5px] border-line bg-inset p-3 text-[12.5px] break-words whitespace-pre-wrap">
                   {markdown}
                 </pre>
               </div>

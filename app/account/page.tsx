@@ -5,29 +5,22 @@ import { requireUser } from "@/lib/session";
 import {
   changeEmailAction,
   changePasswordAction,
-  createTokenAction,
   resendVerificationAction,
   revokeAllTokensAction,
   revokeTokenAction,
   updateNameAction,
 } from "../auth-actions";
-import { Blob, Chip, Counter, Empty, Field, Panel } from "../components";
+import { Blob, Chip, Counter, Empty, Panel } from "../components";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
-import { CopyMarkdown } from "../features/copy-markdown";
+import { TokenForm } from "../features/token-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function AccountPage({ searchParams }: PageProps<"/account">) {
+export default async function AccountPage() {
   const user = await requireUser();
   const { t } = await getT();
-  const sp = await searchParams;
-  const created = Array.isArray(sp.created) ? sp.created[0] : sp.created;
   const tokens = await listApiTokens(user.id);
-
-  const mcpCommand = created
-    ? `claude mcp add todox --env TODOX_TOKEN=${created} --env TODOX_URL=${process.env.TODOX_PUBLIC_URL ?? "http://localhost:3000"} -- pnpm -C ${process.cwd()} exec tsx mcp/server.ts`
-    : null;
 
   return (
     <div className="space-y-6">
@@ -37,7 +30,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           <h1 className="display text-[30px] leading-tight font-bold">
             {t("accountTitle")}
           </h1>
-          <p className="mono flex flex-wrap items-center gap-2 text-[13px] text-muted">
+          <p className="mono flex flex-wrap items-center gap-2 text-[13px] break-all text-muted">
             @{user.username} · {user.email}
             {user.email_verified_at && (
               <Chip color="var(--ok)">{t("verifyVerified")}</Chip>
@@ -52,12 +45,21 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           className="on-fill sticker pop flex flex-wrap items-center gap-3 p-4"
           style={{ background: "var(--k-question)" }}
         >
-          <Blob mood="worried" size={40} fill="var(--paper)" stroke="var(--ink)" />
-          <div className="min-w-0 flex-1">
+          <Blob
+            mood="worried"
+            size={40}
+            fill="var(--paper)"
+            stroke="var(--ink)"
+            className="shrink-0"
+          />
+          {/* `flex-1` alone means a basis of zero, so this box would rather
+              squeeze to one word per line than let the row wrap. A real minimum
+              is what makes the wrap happen. */}
+          <div className="min-w-[15rem] flex-1">
             <p className="display text-[15px] font-bold">{t("verifyPending")}</p>
             <p className="text-[13.5px]">{t("verifyPendingNote")}</p>
           </div>
-          <form action={resendVerificationAction}>
+          <form action={resendVerificationAction} className="shrink-0">
             <button className="btn btn-quiet">{t("verifyResend")}</button>
           </form>
         </div>
@@ -137,23 +139,6 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       >
         <p className="mb-3 text-[14px] text-muted">{t("apiTokensIntro")}</p>
 
-        {created && mcpCommand && (
-          <div
-            className="sticker-flat mb-4 space-y-2 p-3"
-            style={{ borderColor: "var(--accent)" }}
-          >
-            <p className="display text-[14px] font-bold">{t("tokenOnce")}</p>
-            <pre className="mono overflow-x-auto rounded-[8px] border-[1.5px] border-line bg-paper p-2.5 text-[12px] break-all whitespace-pre-wrap">
-              {mcpCommand}
-            </pre>
-            <CopyMarkdown
-              markdown={mcpCommand}
-              label={t("shareCopy")}
-              copiedLabel={t("shareCopied")}
-            />
-          </div>
-        )}
-
         <ul className="space-y-2">
           {tokens.length === 0 && <Empty>{t("noTokens")}</Empty>}
           {tokens.map((tok) => (
@@ -181,12 +166,14 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           ))}
         </ul>
 
-        <form action={createTokenAction} className="mt-4 flex flex-wrap items-end gap-2">
-          <Field label={t("tokenName")} className="min-w-48 flex-1">
-            <input name="name" placeholder={t("tokenName")} />
-          </Field>
-          <button className="btn">{t("createToken")}</button>
-        </form>
+        <TokenForm
+          nameLabel={t("tokenName")}
+          submitLabel={t("createToken")}
+          pendingLabel={t("tokenCreating")}
+          onceLabel={t("tokenOnce")}
+          copyLabel={t("shareCopy")}
+          copiedLabel={t("shareCopied")}
+        />
 
         {tokens.length > 0 && (
           <div className="mt-4 border-t border-dashed border-rule pt-3">

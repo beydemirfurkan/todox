@@ -84,7 +84,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
               </span>
             }
             right={
-              <form action={setStatusAction} className="flex items-center gap-1.5">
+              <form action={setStatusAction} className="flex flex-wrap items-center gap-1.5">
                 <input type="hidden" name="task_id" value={task.id} />
                 <label className="sr-only" htmlFor="task-status">
                   {t("statusLabel")}
@@ -93,7 +93,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                   id="task-status"
                   name="status"
                   defaultValue={task.status}
-                  className="!w-[116px] !px-2 !py-1 !text-[13px]"
+                  className="!w-[116px] shrink-0 !px-2 !py-1 !text-[13px]"
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -259,7 +259,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
             <div className="flex items-start gap-3">
               <Blob mood="idle" size={44} fill="var(--k-handoff)" className="shrink-0" />
               <p className="text-[14px] text-muted">
-                <code className="mono rounded border-[1.5px] border-line bg-accent px-1 text-[13px] text-onFill">
+                <code className="mono rounded border-[1.5px] border-line bg-accent px-1 text-[13px] break-all text-onFill">
                   get_context(&quot;{slug}&quot;)
                 </code>{" "}
                 {t("agentSeesBody")}

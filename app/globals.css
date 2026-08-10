@@ -65,11 +65,21 @@ html {
   scrollbar-width: thin;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  html {
-    scroll-behavior: smooth;
-  }
+/* A net, not a fix: anything that still overflows is a bug to be found and
+   closed at its source. It is here for what cannot be -- the entry animation
+   rotates a full-width panel, and a degree of rotation is a few pixels of
+   scrollable width. `clip` rather than `hidden` because `hidden` makes this a
+   scroll container, which costs scroll anchoring and breaks `position: sticky`
+   for anything added later. */
+html,
+body {
+  overflow-x: clip;
 }
+
+/* No `scroll-behavior: smooth` here. The router resets and restores scroll on
+   every navigation, and smoothing those turns them into a visible drift the
+   reader did not ask for -- which is what "the page keeps scrolling" was. The
+   skip link jumping instantly is the better behaviour anyway. */
 
 /* ------------------------------------------------------------- selection */
 
@@ -267,6 +277,24 @@ body {
   background: var(--card);
   color: var(--ink);
   border-color: var(--line-strong);
+}
+
+/* The nav/period/language pill. It was three hand-copied class lists -- the
+   header, the report periods and the language switch -- which meant the touch
+   sizing below would have had to be written three times and kept in step.
+   Callers still set their own background when they mark one active. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-shantell), cursive;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1;
+  padding: 3px 12px 4px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
 }
 
 .link-more {
@@ -474,4 +502,42 @@ pre {
   background: var(--rule);
   border: 3px solid var(--paper);
   border-radius: 999px;
+}
+
+/* ---------------------------------------------------------------- touch */
+
+/* Row actions were revealed on hover only, so on a phone -- where there is no
+   hover -- revoking a token, deleting a note or unlinking a file could not be
+   done at all. The width query is the belt to the `hover: none` braces: it
+   also covers a narrow desktop window, where the row is just as cramped. */
+@media (max-width: 640px), (hover: none) {
+  .row-action {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  /* 44px is the smallest target a thumb hits reliably. min-height rather than
+     padding because several call sites override padding with `!py-[3px]`, and
+     an override would quietly undo this. */
+  .btn {
+    min-height: 44px;
+    padding-block: 8px 9px;
+  }
+  .link-more {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .pill {
+    min-height: 44px;
+  }
+
+  /* Under 16px, iOS Safari zooms the page when a field takes focus and never
+     zooms back out -- which reads as the page drifting on its own. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }

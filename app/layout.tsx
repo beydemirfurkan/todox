@@ -24,9 +24,6 @@ export const metadata: Metadata = {
   description: "Working memory for developers and their agents",
 };
 
-const navPill =
-  "display rounded-full border-[1.5px] border-line bg-card px-3 pt-[3px] pb-[4px] text-[13.5px] leading-none font-bold";
-
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { lang, t } = await getT();
   const user = await currentUser();
@@ -43,9 +40,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {t("skipToContent")}
         </a>
 
-        <header className="relative z-10 mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-6 pb-3">
+        <header className="relative z-10 mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
           <Link href={user ? "/" : "/login"} className="flex items-center gap-2.5">
-            <Blob mood="happy" size={40} className="bob" />
+            <Blob mood="happy" size={36} className="bob" />
             <span className="display text-[26px] leading-none font-bold tracking-tight">
               todox
             </span>
@@ -55,16 +52,27 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </span>
 
           {user && (
-            <Link href="/report" className={navPill}>
+            <Link href="/report" className="pill">
               {t("navReport")}
             </Link>
           )}
 
-          <div className="ml-auto flex items-center gap-2">
+          {/* Signed in, this group takes the whole second row on a phone: the
+              four controls together have never fitted beside the wordmark, and
+              this one was the row that made the page scroll sideways. Above
+              `sm` it goes back to a single nowrap group pushed right. */}
+          <div
+            className={`ml-auto flex flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap ${
+              user ? "w-full" : ""
+            }`}
+          >
             <LangSwitcher lang={lang} t={t} />
             {user ? (
               <>
-                <div className="w-[210px] transition-[width] duration-200 focus-within:w-[280px]">
+                {/* Leads the row on a phone and takes what is left of it. The
+                    fixed width -- and the widening on focus, which used to push
+                    the row off-screen -- only applies once there is room. */}
+                <div className="order-first min-w-0 flex-1 transition-[width] duration-200 sm:order-none sm:w-[210px] sm:flex-none sm:focus-within:w-[280px]">
                   <Suspense>
                     <SearchBox
                       placeholder={t("searchPlaceholder")}
@@ -73,15 +81,18 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     />
                   </Suspense>
                 </div>
-                <Link href="/account" className={navPill} title={user.name}>
-                  @{user.username}
+                <Link href="/account" className="pill min-w-0 max-w-[9rem]" title={user.name}>
+                  {/* The ellipsis needs a real box to happen in: the pill is a
+                      flex container, and a bare text node in one is an
+                      anonymous item that text-overflow never reaches. */}
+                  <span className="truncate">@{user.username}</span>
                 </Link>
                 <form action={logoutAction}>
                   <button className="link-more !text-[13px]">{t("signOut")}</button>
                 </form>
               </>
             ) : (
-              <Link href="/login" className={navPill}>
+              <Link href="/login" className="pill">
                 {t("signIn")}
               </Link>
             )}

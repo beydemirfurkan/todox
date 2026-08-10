@@ -22,6 +22,13 @@ const raw = (fd: FormData, k: string) => (fd.get(k) as string | null) ?? "";
 
 export type AuthState = { errors: auth.FieldError[] } | null;
 
+/**
+ * Kept apart from `AuthState`: creating a token has no failure a field could
+ * carry, and folding it in would hand the token form the "no errors means it
+ * worked" success banner the auth forms rely on.
+ */
+export type TokenState = { command: string } | null;
+
 const tooMany = (retryAfterSec: number): AuthState => ({
   errors: [
     {
@@ -218,12 +225,34 @@ export async function changeEmailAction(
 
 /* ------------------------------------------------------------ api tokens */
 
-export async function createTokenAction(fd: FormData) {
+/**
+ * The command the agent is configured with. Built here rather than on the page
+ * because the token never leaves this response: it is returned to the form that
+ * asked for it, not carried in a URL the browser would keep.
+ */
+function mcpCommand(token: string) {
+  const url = process.env.TODOX_PUBLIC_URL ?? "http://localhost:3000";
+  return `claude mcp add todox --env TODOX_TOKEN=${token} --env TODOX_URL=${url} -- pnpm -C ${process.cwd()} exec tsx mcp/server.ts`;
+}
+
+/**
+ * Shown exactly once, in the reply to the submission that created it.
+ *
+ * It used to travel as `?created=`, which cost the caller their scroll position
+ * -- a redirect is a navigation -- and left a live token in browser history, in
+ * `Referer`, and in every access log between here and the user.
+ */
+export async function createTokenAction(
+  _prev: TokenState,
+  fd: FormData,
+): Promise<TokenState> {
   const user = await requireUser();
   const name = str(fd, "name") || "mcp";
   const { token } = await auth.createApiToken(user.id, name);
-  // Shown exactly once, via the URL, then never recoverable.
-  redirect(`/account?created=${encodeURIComponent(token)}`);
+  // Without this the new row is missing from the list until something else
+  // re-renders the page.
+  revalidatePath("/account");
+  return { command: mcpCommand(token) };
 }
 
 export async function revokeTokenAction(fd: FormData) {

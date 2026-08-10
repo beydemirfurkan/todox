@@ -25,9 +25,11 @@ export function Panel({
           counter dropped it silently -- the search page has shown no result
           count since it was written. */}
       {(title || right) && (
-        <header className="flex items-center gap-3 border-b border-dashed border-rule px-4 py-2.5">
+        // Wraps, because `right` is a status select and a button on the task
+        // pages and that never fitted beside a heading on a phone.
+        <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-dashed border-rule px-4 py-2.5">
           {title && (
-            <h2 id={headingId} className="display text-[16px] font-bold">
+            <h2 id={headingId} className="display min-w-0 text-[16px] font-bold">
               {title}
             </h2>
           )}

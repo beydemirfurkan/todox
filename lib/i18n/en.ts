@@ -6,6 +6,7 @@ export const en = {
   searchLabel: "Search tasks, log entries and notes",
   searchClear: "Clear search",
   languageLabel: "Language",
+  langSwitching: "switching language…",
   breadcrumb: "Breadcrumb",
   navReport: "Report",
   navAccount: "Account",
@@ -85,6 +86,7 @@ export const en = {
     "The MCP server signs in with one of these. Create one, paste it into the command below, and the agent reaches your account and nothing else.",
   tokenName: "what is it for",
   createToken: "create token",
+  tokenCreating: "creating…",
   revoke: "revoke",
   revokeAll: "revoke every token",
   revokeAllNote:

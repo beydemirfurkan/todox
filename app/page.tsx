@@ -29,7 +29,9 @@ export default async function Home() {
   return (
     <div className="space-y-8">
       <div className="pop prose">
-        <h1 className="display text-[36px] leading-[1.1] font-bold">{t("heroTitle")}</h1>
+        <h1 className="display text-[28px] leading-[1.1] font-bold sm:text-[36px]">
+          {t("heroTitle")}
+        </h1>
         <p className="mt-2 text-[15.5px] leading-relaxed text-muted">{t("heroBody")}</p>
       </div>
 

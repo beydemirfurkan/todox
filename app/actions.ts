@@ -35,6 +35,11 @@ export async function setLangAction(fd: FormData) {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",
+    // Only the server reads this; matching the session cookie's flags costs
+    // nothing. `secure` stays conditional -- unconditional, it would stop the
+    // cookie being stored over plain http and break language switching in dev.
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
   });
   revalidatePath("/", "layout");
 }
