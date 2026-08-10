@@ -207,7 +207,9 @@ export default async function AccountPage() {
           />
         </Panel>
 
-        <Panel delay={110} title={t("changePassword")}>
+        {/* Full width on its own row: the two above are short and this one is
+            not, so leaving it in a column strands an empty half-screen. */}
+        <Panel delay={110} title={t("changePassword")} className="lg:col-span-2">
           <p className="mb-3 text-[13.5px] text-muted">{t("changePasswordNote")}</p>
           <AuthForm
             action={changePasswordAction}
