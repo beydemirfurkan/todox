@@ -38,9 +38,10 @@ export function LangButton({
       type="submit"
       aria-current={active ? "true" : undefined}
       aria-busy={switching}
-      // Two letters are not a target. The height comes from `.pill` on mobile;
-      // this is the other half of the 44px.
-      className="pill min-w-11 !px-2.5 !text-[12px]"
+      // 34x44 rather than 44x44: the height is what a thumb was missing, and
+      // the width is what the header row cannot spare. Still well past the
+      // 24x24 floor, and the two pills sit 6px apart.
+      className="pill !px-2.5 !text-[12px]"
       style={{
         opacity: switching ? 0.6 : 1,
         ...(active

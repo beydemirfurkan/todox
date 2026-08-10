@@ -74,7 +74,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     squeeze to 22px rather than push anything onto a new line.
                     The fixed width, and the widening on focus that used to
                     shove the row off-screen, wait until there is room. */}
-                <div className="min-w-[7rem] flex-1 transition-[width] duration-200 sm:w-[210px] sm:flex-none sm:focus-within:w-[280px]">
+                <div className="min-w-[6.5rem] flex-1 transition-[width] duration-200 sm:w-[210px] sm:flex-none sm:focus-within:w-[280px]">
                   <Suspense>
                     <SearchBox
                       placeholder={t("searchPlaceholder")}

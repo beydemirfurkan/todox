@@ -75,7 +75,11 @@ export function SearchBox({
           <CrossIcon />
         </button>
       ) : (
-        <kbd aria-hidden="true">/</kbd>
+        // A keyboard hint is worth nothing on a touch device, and the 28px it
+        // takes is 28px the field does not have there.
+        <kbd aria-hidden="true" className="hidden sm:block">
+          /
+        </kbd>
       )}
     </form>
   );
