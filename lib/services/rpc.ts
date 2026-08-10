@@ -89,6 +89,19 @@ export const methods = {
     return projectsRepo.byId(userId, found.id);
   },
 
+  deleteProject: async ({ userId }, p: { project: string; confirm: string }) => {
+    const found = await mustResolve(userId, p.project);
+    // Case-insensitive, like the account page's own confirmation: the point is
+    // to stop this happening by reflex, not to test anybody's typing.
+    if (p.confirm.trim().toLowerCase() !== found.slug.toLowerCase())
+      throw new BadRequest(
+        `confirm must be the project's slug, "${found.slug}", to delete it and everything in it`,
+      );
+    const counts = await tasksRepo.counts(found.id);
+    await projectsRepo.remove(userId, found.id);
+    return { deleted: found.slug, tasks_removed: Object.values(counts).reduce((a, b) => a + b, 0) };
+  },
+
   getContext: async (
     { userId },
     p: { project?: string; cwd?: string; create_if_missing?: boolean; repo_root?: string },

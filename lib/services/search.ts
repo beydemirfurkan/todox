@@ -41,7 +41,7 @@ const cut = (s: string | null) => (s ?? "").replace(/\s+/g, " ").slice(0, 240);
  * `%` and `_` are wildcards to ILIKE, so a search for either matched
  * everything and a search for a literal one found nothing.
  */
-const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+export const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 /** ILIKE, not full-text search -- honest for this scale and zero index upkeep. */
 export async function search(

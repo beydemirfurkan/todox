@@ -330,6 +330,12 @@ export const tr: Record<Key, string> = {
   c_gotcha: "tuzak",
   c_preference: "tercih",
 
+  deleteProject: "Bu projeyi sil",
+  deleteProjectNote:
+    "Projeyi ve içindeki her şeyi siler: {n} görev, hepsinin kaydı, notlar ve dosya bağlantıları. Geri alma yok, önce dışa aktarma da yok.",
+  deleteProjectConfirm: "Onaylamak için {slug} yaz",
+  deleteProjectSubmit: "Sil, içindekilerle birlikte",
+
   landingLede:
     "Ajanın her oturuma bir öncekinden hiçbir şey bilmeden başlıyor. Bunun bedelini iki kez ödüyorsun — bir kez projeyi baştan anlatırken, bir kez de önceki oturumun çoktan tosladığı duvara yeniden toslarken.",
   landingCta: "Hesap oluştur",

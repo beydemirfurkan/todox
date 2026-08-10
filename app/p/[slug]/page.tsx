@@ -15,9 +15,12 @@ import {
   addContextAction,
   createTaskAction,
   deleteContextAction,
+  deleteProjectAction,
   setStatusAction,
 } from "../../actions";
+import { authMessages } from "../../auth-messages";
 import { contextKindLabel, statusLabel } from "../../kinds";
+import { AuthForm } from "../../features/auth-form";
 import { SharePanel } from "../../features/share-panel";
 import { SubmitButton } from "../../features/submit";
 import { Blob, Chip, Counter, Empty, Field, Panel, StatusDot } from "../../components";
@@ -356,6 +359,45 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                 0 && <Empty mood="happy">{t("allClear")}</Empty>}
             </div>
           </Panel>
+
+          {/* Closed, last, and in the colour the log uses for a dead end.
+              Registering a project costs an agent nothing -- any absolute path
+              it passes becomes one -- so there has to be a way back, and it
+              should not sit open next to "save". */}
+          <details
+            className="pop sticker overflow-hidden"
+            style={{ animationDelay: "280ms", borderColor: "var(--k-dead_end)" }}
+          >
+            <summary className="display flex cursor-pointer items-center gap-2 px-4 py-3 text-[16px] font-bold">
+              <span
+                aria-hidden="true"
+                className="inline-block size-2.5 shrink-0 rounded-full border-[1.5px]"
+                style={{ background: "var(--k-dead_end)", borderColor: "var(--edge-dark)" }}
+              />
+              {t("deleteProject")}
+            </summary>
+            <div className="border-t border-dashed border-rule p-4">
+              <p className="mb-3 text-[14px] text-muted">
+                {t("deleteProjectNote", { n: all.length })}
+              </p>
+              <AuthForm
+                action={deleteProjectAction}
+                submitLabel={t("deleteProjectSubmit")}
+                pendingLabel={t("working")}
+                submitClassName="btn btn-danger"
+                messages={authMessages(t)}
+                hidden={{ project_id: String(project.id) }}
+                fields={[
+                  {
+                    name: "confirm",
+                    label: t("deleteProjectConfirm", { slug: project.slug }),
+                    autoComplete: "off",
+                    exact: true,
+                  },
+                ]}
+              />
+            </div>
+          </details>
         </div>
       </div>
     </div>

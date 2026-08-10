@@ -141,6 +141,15 @@ describe("annotations", () => {
     for (const name of ["create_task", "update_task", "log_entry", "link_files"])
       expect(tools.get(name)!.config.annotations?.readOnlyHint).toBeUndefined();
   });
+
+  /** The one that deletes a project and everything under it, most of all. */
+  it("does not let the destructive one look safe", () => {
+    const { tools } = harness(remoteWs);
+    const del = tools.get("delete_project")!;
+    expect(del.config.annotations?.readOnlyHint).toBeUndefined();
+    expect(del.config.description).toContain("confirm");
+    expect(Object.keys(del.config.inputSchema)).toContain("confirm");
+  });
 });
 
 describe("instructions", () => {

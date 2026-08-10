@@ -449,6 +449,12 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       "Set the name, root_path or summary. Worth calling right after a project is auto-created, to give it a summary a cold agent can use.",
   });
 
+  tool("delete_project", "deleteProject", {
+    title: "Delete a project",
+    description:
+      "Removes a project and everything under it — every task, every log entry, every note and file link. Not recoverable. `confirm` must be the project's slug. This exists because a mistyped `cwd` registers a project like any other path does; ask the human before calling it.",
+  });
+
   /* ------------------------------------------------------- the briefing */
 
   tool(

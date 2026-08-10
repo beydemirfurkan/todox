@@ -21,6 +21,7 @@ import {
 import * as sharing from "@/lib/services/sharing";
 import * as taskService from "@/lib/services/task-service";
 import { requireUser } from "@/lib/session";
+import type { AuthState } from "./auth-actions";
 
 const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() || "";
 const num = (fd: FormData, k: string) => Number(fd.get(k));
@@ -94,6 +95,34 @@ export async function updateProjectAction(fd: FormData) {
     summary: str(fd, "summary") || null,
   });
   revalidatePath("/", "layout");
+}
+
+/**
+ * Gated on typing the slug, and on nothing else being ambiguous about it.
+ *
+ * Registering a project is deliberately free -- any absolute path an agent
+ * hands over becomes one -- so there has to be a way back. There was not, and
+ * a project created by a mistyped `cwd` stayed in the account for good.
+ * Everything below it goes: the schema cascades from this row.
+ */
+export async function deleteProjectAction(
+  _prev: AuthState,
+  fd: FormData,
+): Promise<AuthState> {
+  const user = await requireUser();
+  const id = num(fd, "project_id");
+  await assertProject(user.id, id);
+
+  const project = await projects.byId(user.id, id);
+  if (!project) redirect("/");
+  // Said out loud rather than returned silently: a form that posts, comes
+  // back unchanged and explains nothing is the worst of both answers.
+  if (str(fd, "confirm").toLowerCase() !== project.slug.toLowerCase())
+    return { errors: [{ field: "confirm", code: "confirmMismatch" }] };
+
+  await projects.remove(user.id, id);
+  revalidatePath("/", "layout");
+  redirect("/");
 }
 
 /* ----------------------------------------------------------------- tasks */

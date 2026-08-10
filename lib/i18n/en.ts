@@ -344,6 +344,12 @@ export const en = {
   c_gotcha: "gotcha",
   c_preference: "preference",
 
+  deleteProject: "Delete this project",
+  deleteProjectNote:
+    "Removes the project and everything in it: {n} tasks with their whole log, the notes and the file links. There is no undo, and no export first.",
+  deleteProjectConfirm: "Type {slug} to confirm",
+  deleteProjectSubmit: "Delete it and everything in it",
+
   /* the page a visitor who is not signed in sees */
   landingLede:
     "Your agent starts every session knowing nothing about the last one. You pay for that twice — once explaining the project again, and once when it walks into a wall a previous session already found.",

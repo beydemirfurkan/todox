@@ -100,6 +100,25 @@ export const SHAPES = {
     summary: z.string().max(MAX.text).optional(),
   },
 
+  /**
+   * The counterweight to registering a project from any path it is handed.
+   *
+   * That is what makes capture frictionless, and it means one mistyped `cwd`
+   * used to leave a project in the account for good: nothing anywhere could
+   * remove one. The confirmation is the slug, in the same shape the account
+   * page asks for a username -- this cascades to every task, entry and note
+   * underneath it.
+   */
+  deleteProject: {
+    project: projectRef,
+    confirm: z
+      .string()
+      .max(MAX.line)
+      .describe(
+        "The project's slug, typed again. Everything under it goes with it: tasks, log entries, notes and file links. Ask the human first.",
+      ),
+  },
+
   getContext: {
     project: ref
       .optional()
