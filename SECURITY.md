@@ -27,6 +27,10 @@ There is no bounty. There will be a quick, honest answer.
 - **Changing the email costs the current password**, and the previous address
   is told. Without that gate a stolen session cookie was permanent ownership:
   point the account at an address you control, then run the reset flow.
+- **Deleting the account costs the current password too**, and the username as
+  a second, deliberate step. It is irreversible and takes every project, task,
+  entry, ref, context, session and agent token with it, by cascade from the
+  user row.
 - **Parameters are validated before they reach the data layer.**
   `lib/services/rpc-schemas.ts` is the runtime contract for every RPC method,
   and repositories build `SET` clauses from a column allow-list, never from the
