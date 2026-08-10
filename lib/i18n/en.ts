@@ -344,6 +344,17 @@ export const en = {
   c_gotcha: "gotcha",
   c_preference: "preference",
 
+  /* the page a visitor who is not signed in sees */
+  landingLede:
+    "Your agent starts every session knowing nothing about the last one. You pay for that twice — once explaining the project again, and once when it walks into a wall a previous session already found.",
+  landingCta: "Create an account",
+  landingSecondary: "I already have one",
+  landingConnectTitle: "Works with the agent you already use",
+  landingConnectBody:
+    "One URL and a token. No package to install, no local process to keep running — anything that speaks MCP can connect: Claude Code, Codex, Cursor, VS Code.",
+  landingOpenSource: "Open source, MIT. Read the code, or run your own.",
+  landingHonest: "A small personal deployment. No uptime promise, and no charge.",
+
   verifyConfirmTitle: "One click to go",
   verifyConfirmBody:
     "Confirm this address is yours. The link is spent when you press the button, not when the page opens.",

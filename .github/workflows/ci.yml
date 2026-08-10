@@ -40,6 +40,24 @@ jobs:
       # Covers what the build does not: scripts/ and mcp/.
       - run: pnpm exec tsc --noEmit
 
+      - run: pnpm audit --prod
+
+  # Path handling is the one place this codebase is platform-specific, and the
+  # machine it runs on is almost never the machine the paths come from. A
+  # Windows agent could not register its own project for a while, and every
+  # check above was green throughout.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
   smoke:
     runs-on: ubuntu-latest
     needs: check
@@ -70,3 +88,19 @@ jobs:
       - name: Auth guarantees
         if: env.DATABASE_URL != ''
         run: pnpm smoke:auth
+
+      - name: Report arithmetic
+        if: env.DATABASE_URL != ''
+        run: pnpm smoke:report
+
+      # The suite that keeps mcp/tools.ts honest as one definition: it runs the
+      # same assertions through the hosted endpoint and the stdio process, and
+      # a tool that only works one way in fails here. It needs the app running,
+      # which is why it is last.
+      - name: Agent surface, both transports
+        if: env.DATABASE_URL != ''
+        run: |
+          pnpm build
+          pnpm start &
+          npx --yes wait-on http://localhost:3000/login --timeout 60000
+          pnpm smoke:mcp

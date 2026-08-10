@@ -3,12 +3,13 @@ import Link from "next/link";
 import { CONTEXT_KINDS } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
-import { requireUser } from "@/lib/session";
+import { currentUser } from "@/lib/session";
 import * as contexts from "@/lib/repositories/contexts";
 import * as projects from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
 import { addContextAction, createProjectAction, deleteContextAction } from "./actions";
 import { Explainer, FirstRun } from "./features/explainer";
+import { Landing } from "./features/landing";
 import { SubmitButton } from "./features/submit";
 import { contextKindLabel } from "./kinds";
 import { Blob, Chip, Counter, Empty, Field, Panel } from "./components";
@@ -18,8 +19,11 @@ export const dynamic = "force-dynamic";
 const TILTS = [-0.6, 0.5, -0.4, 0.7];
 
 export default async function Home() {
-  const user = await requireUser();
   const { t } = await getT();
+  const user = await currentUser();
+  // The one page with two audiences. Signed out this is the only description
+  // of the product anyone can reach; signed in it is the dashboard.
+  if (!user) return <Landing t={t} />;
   // One counts query for the whole page instead of one per project card.
   const [allProjects, globalContext, counts] = await Promise.all([
     projects.list(user.id),

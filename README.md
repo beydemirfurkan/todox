@@ -32,9 +32,9 @@ Two things fall out of treating the log as the product:
 - **Stale context is flagged, and never faked.** Linked files are hashed by the
   side that can see them — the agent — and the server stores the hashes and
   compares. If the code moves on, `get_context` says the note may be lying.
-  When the agent cannot hash a file, the note is marked as never checked rather
-  than claimed to be fresh: context that lies is worse than none, and that
-  includes lying about how sure we are.
+  Until an agent has actually looked, the note is marked as never checked
+  rather than claimed to be fresh: context that lies is worse than none, and
+  that includes lying about how sure we are.
 - **Reports come from the log, not from commits.** Every status change is an
   event, so *what did I finish today, how long did it take, which model did it*
   is a query rather than archaeology.
@@ -94,10 +94,13 @@ assume a local command and fails with something unhelpful.
 
 ### Optional: local mode
 
-The hosted server has no filesystem, so it cannot hash the files a note links
-to — those are recorded as never checked. If you want staleness detection, run
-the stdio server from a clone instead; it hashes files on the machine that has
-them and reports what it found:
+The hosted server has no filesystem — but your agent does, and that is enough:
+it sends the hash when it links a file and calls `report_file_hashes` with what
+it finds afterwards, so staleness works over HTTP like anywhere else.
+
+The stdio server does that part itself rather than asking. Worth running if you
+would rather not spend an agent's attention on it, or want the hashing to
+happen even when the agent forgets:
 
 ```bash
 TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
@@ -112,9 +115,13 @@ TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. |
 | `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
-| `link_files` | Attach paths. In local mode they are hashed on the machine that has them, which is what makes staleness work; hosted, they are recorded as never checked. |
+| `link_files` | Attach paths with their hashes. Safe to call again for the same file. |
+| `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
 | `search` | Across all your projects — *have I solved this before?* |
+| `get_task` | One task with its log and linked files. |
+| `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |
+| `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. |
 
 Every write tool takes a `model`, and the server instructions tell the agent to
 always pass it. That is what makes the per-model breakdown real rather than
@@ -140,7 +147,7 @@ Vercel plus a hosted Postgres.
 | --- | --- |
 | `DATABASE_URL` | Postgres. Use the pooled connection string. |
 | `TODOX_PUBLIC_URL` | Verification links, reset links and the agent setup snippet are built from it — get it wrong and people, and their agents, land on the wrong host. |
-| `SMTP_HOST` · `SMTP_PORT` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` | Optional, but all five together. Without them mail is printed to the server log rather than sent. Port defaults to 587 (STARTTLS); the address in `MAIL_FROM` should match `SMTP_USER`, since most providers reject a `From` they did not authenticate. If the provider's sending limit is hit, messages are dropped and the failure shows up only in the log. |
+| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional, but the first four together. Without them mail is printed to the server log rather than sent. Port defaults to 587 (STARTTLS); the address in `MAIL_FROM` should match `SMTP_USER`, since most providers reject a `From` they did not authenticate. If the provider's sending limit is hit, messages are dropped and the failure shows up only in the log. |
 
 Run `pnpm db:migrate` when the schema changes. It deliberately does not run on
 cold start: DDL racing across serverless instances is a bad way to discover lock
@@ -163,9 +170,10 @@ Details, and an honest list of what is **not** covered, in
 
 - Search is `ILIKE`, not full-text.
 - Staleness is per-file hash; per-symbol would be the honest version. Hosted,
-  there is no hash at all — see "Optional: local mode".
-- `smoke:auth` needs a database and CI has no secret for one, so it is run by
-  hand rather than on every push.
+  it depends on the agent actually sending hashes — the instructions ask, and
+  nothing can make it.
+- The smoke suites need a database. Point `DATABASE_URL` at a throwaway branch
+  and CI runs them; without the secret that job skips and says so.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

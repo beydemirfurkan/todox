@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Weekly rather than daily: this is a small dependency list — seven runtime
+  # packages — and a pull request per patch bump is noise nobody reads.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      types:
+        patterns: ["@types/*"]
+      dev:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

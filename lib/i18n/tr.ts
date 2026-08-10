@@ -330,6 +330,16 @@ export const tr: Record<Key, string> = {
   c_gotcha: "tuzak",
   c_preference: "tercih",
 
+  landingLede:
+    "Ajanın her oturuma bir öncekinden hiçbir şey bilmeden başlıyor. Bunun bedelini iki kez ödüyorsun — bir kez projeyi baştan anlatırken, bir kez de önceki oturumun çoktan tosladığı duvara yeniden toslarken.",
+  landingCta: "Hesap oluştur",
+  landingSecondary: "Zaten hesabım var",
+  landingConnectTitle: "Hâlihazırda kullandığın ajanla çalışır",
+  landingConnectBody:
+    "Tek bir adres ve bir token. Kurulacak paket yok, ayakta tutulacak yerel süreç yok — MCP konuşan her şey bağlanır: Claude Code, Codex, Cursor, VS Code.",
+  landingOpenSource: "Açık kaynak, MIT. Kodu oku, ya da kendi kurulumunu çalıştır.",
+  landingHonest: "Küçük, kişisel bir kurulum. Ne çalışma süresi sözü var ne de ücret.",
+
   verifyConfirmTitle: "Tek tık kaldı",
   verifyConfirmBody:
     "Bu adresin sana ait olduğunu onayla. Bağlantı sayfa açıldığında değil, butona bastığında harcanır.",

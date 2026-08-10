@@ -30,8 +30,19 @@ const PUBLIC = [
   "/sitemap.xml",
 ];
 
+/**
+ * Paths that are public and have no children.
+ *
+ * Kept apart from `PUBLIC` because the match below is a prefix match, so "/"
+ * in that list would hand the entire application to anyone who asked. The
+ * landing page lives at "/" and the dashboard lives behind it at the same
+ * address, which is why this distinction has to exist at all.
+ */
+const PUBLIC_EXACT = ["/"];
+
 export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  if (PUBLIC_EXACT.includes(pathname)) return NextResponse.next();
   if (PUBLIC.some((p) => pathname === p || pathname.startsWith(p)))
     return NextResponse.next();
 

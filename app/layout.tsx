@@ -42,7 +42,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </a>
 
         <header className="relative z-10 mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
-          <Link href={user ? "/" : "/login"} className="flex items-center gap-2.5">
+          {/* "/" for everyone now: signed out it is the page that explains what
+              this is, which used to be nowhere. */}
+          <Link href="/" className="flex items-center gap-2.5">
             <Blob mood="happy" size={36} className="bob" />
             <span className="display text-[26px] leading-none font-bold tracking-tight">
               todox
