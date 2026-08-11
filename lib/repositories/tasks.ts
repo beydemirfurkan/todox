@@ -48,15 +48,16 @@ export const byId = (id: number) => one<Task>("SELECT * FROM tasks WHERE id = ?"
 export const activeBetween = (userId: number, from: string, to: string) =>
   all<Task>(
     `SELECT DISTINCT t.* FROM tasks t
-     JOIN projects p ON p.id = t.project_id AND p.user_id = ?
+     JOIN projects p ON p.id = t.project_id
+     LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
      LEFT JOIN entries e     ON e.task_id = t.id AND e.created_at BETWEEN ? AND ?
      LEFT JOIN task_events v ON v.task_id = t.id AND v.at         BETWEEN ? AND ?
-     WHERE (t.created_at BETWEEN ? AND ?)
-        OR (t.closed_at  BETWEEN ? AND ?)
-        OR e.id IS NOT NULL
-        OR v.id IS NOT NULL
+      WHERE (p.user_id = ? OR pm.user_id IS NOT NULL) AND ((t.created_at BETWEEN ? AND ?)
+         OR (t.closed_at  BETWEEN ? AND ?)
+         OR e.id IS NOT NULL
+         OR v.id IS NOT NULL)
      ORDER BY t.updated_at DESC`,
-    [userId, from, to, from, to, from, to, from, to],
+    [userId, from, to, from, to, userId, from, to, from, to],
   );
 
 /**
@@ -169,10 +170,11 @@ export async function countsByProject(userId: number) {
        COUNT(*) FILTER (WHERE t.status = 'blocked') AS blocked,
        COUNT(*) FILTER (WHERE t.status = 'done')    AS done,
        COUNT(*) FILTER (WHERE t.status = 'dropped') AS dropped
-     FROM tasks t JOIN projects p ON p.id = t.project_id
-     WHERE p.user_id = ?
+      FROM tasks t JOIN projects p ON p.id = t.project_id
+      LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+      WHERE p.user_id = ? OR pm.user_id IS NOT NULL
      GROUP BY t.project_id`,
-    [userId],
+    [userId, userId],
   );
 
   const empty = { todo: 0, doing: 0, blocked: 0, done: 0, dropped: 0 };

@@ -9,6 +9,8 @@ import { requireUser } from "@/lib/session";
 import * as contexts from "@/lib/repositories/contexts";
 import * as entriesRepo from "@/lib/repositories/entries";
 import * as projects from "@/lib/repositories/projects";
+import * as invitationsRepo from "@/lib/repositories/project-invitations";
+import * as membershipsRepo from "@/lib/repositories/project-memberships";
 import * as tasksRepo from "@/lib/repositories/tasks";
 import { staleRefs } from "@/lib/services/briefing";
 import { repoLabel, repoLink } from "@/lib/util/paths";
@@ -19,12 +21,16 @@ import {
   deleteContextAction,
   deleteProjectAction,
   setStatusAction,
+  inviteProjectAction,
+  removeProjectMemberAction,
+  revokeProjectInviteAction,
 } from "../../actions";
 import { authMessages } from "../../auth-messages";
 import { contextKindLabel, statusLabel } from "../../kinds";
 import { AuthForm } from "../../features/auth-form";
 import { SharePanel } from "../../features/share-panel";
 import { SubmitButton } from "../../features/submit";
+import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
 import { Blob, Chip, Counter, Empty, Field, Panel, StatusDot } from "../../components";
 
 export const dynamic = "force-dynamic";
@@ -59,10 +65,13 @@ export default async function ProjectPage({
   const project = await projects.bySlug(user.id, slug);
   if (!project) notFound();
 
-  const [all, projectContext, stale] = await Promise.all([
+  const owner = project.access_role === "owner";
+  const [all, projectContext, stale, members, invitations] = await Promise.all([
     tasksRepo.listByProject(project.id, "all"),
     contexts.listByProject(user.id, project.id),
     staleRefs(user.id, project),
+    owner ? membershipsRepo.listByProject(project.id) : Promise.resolve([]),
+    owner ? invitationsRepo.listByProject(project.id) : Promise.resolve([]),
   ]);
 
   // Counted in the database. This used to load every entry of every task to
@@ -138,7 +147,7 @@ export default async function ProjectPage({
         </div>
 
         {project.summary && (
-          <p className="prose text-[14.5px] leading-relaxed text-muted">
+          <p className="prose min-w-3xl text-[14.5px] leading-relaxed text-muted">
             {project.summary}
           </p>
         )}
@@ -349,9 +358,10 @@ export default async function ProjectPage({
 
         {/* Sticky, and bounded by the viewport with its own scroll: pinned
             content taller than the screen has a bottom nobody can reach. */}
-        <aside className="min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        <aside className="min-w-0 mt-9 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           <Panel
             delay={140}
+            className={"border-none shadow-none dropshadow-none"}
             title={t("projectContext")}
             right={<Counter n={projectContext.length} label={t("projectContext")} />}
           >
@@ -416,12 +426,54 @@ export default async function ProjectPage({
       {/* Settings, once, at the end, closed. Sharing and deletion used to hold
           permanent space beside the work; nobody comes to this page to
           configure it. */}
-      <details className="pop sticker overflow-hidden" style={{ animationDelay: "220ms" }}>
-        <summary className="display cursor-pointer px-4 py-3 text-[16px] font-bold">
-          {t("projectSettings")}
-        </summary>
+      {owner && (
+        <ProjectSettingsDrawer title={t("projectSettings")} closeLabel={t("close")}>
+          <div className="space-y-5">
+          <section>
+            <h3 className="display mb-2 text-[15px] font-bold">{t("invitePeople")}</h3>
+            <form action={inviteProjectAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="project_id" value={project.id} />
+              <Field label={t("inviteEmail")} className="min-w-[15rem] flex-1">
+                <input name="email" type="email" autoComplete="email" required />
+              </Field>
+              <SubmitButton className="btn" pendingLabel={t("working")}>
+                {t("inviteSend")}
+              </SubmitButton>
+            </form>
+            {(members.length > 0 || invitations.length > 0) && (
+              <div className="mt-4 space-y-2">
+                {members.map((member) => (
+                  <div key={member.id} className="sticker-flat flex flex-wrap items-center gap-3 p-3">
+                    <div className="min-w-[12rem] flex-1">
+                      <p className="display font-bold">{member.name}</p>
+                      <p className="break-all text-[12.5px] text-muted">{member.email}</p>
+                    </div>
+                    <form action={removeProjectMemberAction}>
+                      <input type="hidden" name="membership_id" value={member.id} />
+                      <SubmitButton className="link-more" pendingLabel={t("working")}>
+                        {t("removeCollaborator")}
+                      </SubmitButton>
+                    </form>
+                  </div>
+                ))}
+                {invitations.map((invitation) => (
+                  <div key={invitation.id} className="sticker-flat flex flex-wrap items-center gap-3 p-3">
+                    <div className="min-w-[12rem] flex-1">
+                      <p className="break-all font-medium">{invitation.email}</p>
+                      <p className="text-[12.5px] text-muted">{t("pending")}</p>
+                    </div>
+                    <form action={revokeProjectInviteAction}>
+                      <input type="hidden" name="invitation_id" value={invitation.id} />
+                      <SubmitButton className="link-more" pendingLabel={t("working")}>
+                        {t("revoke")}
+                      </SubmitButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
-        <div className="space-y-5 border-t border-dashed border-rule p-4">
           <section>
             <h3 className="display mb-2 text-[15px] font-bold">{t("sharing")}</h3>
             <SharePanel
@@ -483,8 +535,9 @@ export default async function ProjectPage({
               ]}
             />
           </section>
-        </div>
-      </details>
+          </div>
+        </ProjectSettingsDrawer>
+      )}
     </div>
   );
 }

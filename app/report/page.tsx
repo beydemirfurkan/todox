@@ -8,7 +8,7 @@ import { resolve } from "@/lib/services/project-resolver";
 import { periodLabel, renderMarkdown } from "@/lib/services/report-markdown";
 import { activityReport, type TaskReport } from "@/lib/services/reports";
 import { resolvePeriod, type PeriodName } from "@/lib/util/time";
-import { Blob, Chip, Counter, Empty, Panel } from "../components";
+import { Blob, Chip, Counter, Empty, MarkdownPreview, Panel } from "../components";
 import { CopyMarkdown } from "../features/copy-markdown";
 import { IMPORTANCE_COLOR, KIND_COLOR, statusLabel } from "../kinds";
 
@@ -196,11 +196,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                   label={t("copyReport")}
                   copiedLabel={t("reportCopied")}
                 />
-                {/* `break-words`, not `break-all`: a long path or URL has to
-                    give way, but ordinary prose should still break at spaces. */}
-                <pre className="mono max-h-80 overflow-auto rounded-[10px] border-[1.5px] border-line bg-inset p-3 text-[12.5px] break-words whitespace-pre-wrap">
-                  {markdown}
-                </pre>
+                <MarkdownPreview markdown={markdown} />
               </div>
             </div>
           </Panel>

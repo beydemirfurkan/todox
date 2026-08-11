@@ -53,25 +53,35 @@ export async function search(
 
   const [taskRows, entryRows, contextRows] = await Promise.all([
     all<TaskRow>(
-      `SELECT t.id, t.title, t.body, t.created_at, p.slug AS project_slug
-       FROM tasks t JOIN projects p ON p.id = t.project_id
-       WHERE p.user_id = ? AND (t.title ILIKE ? OR t.body ILIKE ?)
-       ORDER BY t.updated_at DESC LIMIT ?`,
-      [userId, like, like, limit],
+       `SELECT t.id, t.title, t.body, t.created_at,
+               CASE WHEN p.user_id = ? THEN p.slug ELSE pm.access_slug END AS project_slug
+        FROM tasks t JOIN projects p ON p.id = t.project_id
+        LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+        WHERE (p.user_id = ? OR pm.user_id IS NOT NULL)
+          AND (t.title ILIKE ? OR t.body ILIKE ?)
+        ORDER BY t.updated_at DESC LIMIT ?`,
+       [userId, userId, userId, like, like, limit],
     ),
     all<EntryRow>(
-      `SELECT e.id, e.task_id, e.kind, e.body, e.created_at, t.title, p.slug AS project_slug
-       FROM entries e JOIN tasks t ON t.id = e.task_id
-       JOIN projects p ON p.id = t.project_id
-       WHERE p.user_id = ? AND e.body ILIKE ? ORDER BY e.id DESC LIMIT ?`,
-      [userId, like, limit],
+       `SELECT e.id, e.task_id, e.kind, e.body, e.created_at, t.title,
+               CASE WHEN p.user_id = ? THEN p.slug ELSE pm.access_slug END AS project_slug
+        FROM entries e JOIN tasks t ON t.id = e.task_id
+        JOIN projects p ON p.id = t.project_id
+        LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+        WHERE (p.user_id = ? OR pm.user_id IS NOT NULL) AND e.body ILIKE ?
+        ORDER BY e.id DESC LIMIT ?`,
+       [userId, userId, userId, like, limit],
     ),
     all<ContextRow>(
-      `SELECT c.id, c.kind, c.title, c.body, c.created_at, p.slug AS project_slug
-       FROM contexts c LEFT JOIN projects p ON p.id = c.project_id
-       WHERE c.user_id = ? AND (c.title ILIKE ? OR c.body ILIKE ?)
-       ORDER BY c.updated_at DESC LIMIT ?`,
-      [userId, like, like, limit],
+       `SELECT c.id, c.kind, c.title, c.body, c.created_at,
+               CASE WHEN p.user_id = ? THEN p.slug ELSE pm.access_slug END AS project_slug
+        FROM contexts c LEFT JOIN projects p ON p.id = c.project_id
+        LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+        WHERE (c.project_id IS NULL AND c.user_id = ?
+          OR c.project_id IS NOT NULL AND (p.user_id = ? OR pm.user_id IS NOT NULL))
+          AND (c.title ILIKE ? OR c.body ILIKE ?)
+        ORDER BY c.updated_at DESC LIMIT ?`,
+       [userId, userId, userId, userId, like, like, limit],
     ),
   ]);
 

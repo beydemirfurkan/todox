@@ -10,8 +10,13 @@ import { AuthShell } from "../features/auth-shell";
 
 export const dynamic = "force-dynamic";
 
-export default async function RegisterPage() {
-  if (await currentUser()) redirect("/");
+const first = (value: string | string[] | undefined) =>
+  (Array.isArray(value) ? value[0] : value) ?? "";
+
+export default async function RegisterPage({ searchParams }: PageProps<"/register">) {
+  const next = first((await searchParams).next);
+  const safeNext = /^\/invite\?token=[A-Za-z0-9_-]{32,}$/.test(next) ? next : "";
+  if (await currentUser()) redirect(safeNext || "/");
   const { t } = await getT();
 
   return (
@@ -21,7 +26,10 @@ export default async function RegisterPage() {
       title={t("registerTitle")}
       intro={t("registerIntro")}
       footer={
-        <Link href="/login" className="link-more">
+         <Link
+           href={safeNext ? `/login?next=${encodeURIComponent(safeNext)}` : "/login"}
+           className="link-more"
+         >
           {t("haveAccount")}
         </Link>
       }
@@ -30,7 +38,8 @@ export default async function RegisterPage() {
         action={registerAction}
         submitLabel={t("signUp")}
         pendingLabel={t("signingUp")}
-        messages={authMessages(t)}
+       messages={authMessages(t)}
+       hidden={safeNext ? { next: safeNext } : undefined}
         fields={[
           { name: "name", label: t("displayName"), autoComplete: "name", autoFocus: true },
           { name: "username", label: t("username"), autoComplete: "username" },

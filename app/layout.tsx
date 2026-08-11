@@ -5,12 +5,11 @@ import { Suspense } from "react";
 import "./globals.css";
 import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
-import { logoutAction } from "./auth-actions";
 import { Blob } from "./components";
 import { LangSwitcher } from "./features/lang-switcher";
 import { SearchBox } from "./features/search-box";
-import { SubmitButton } from "./features/submit";
 import { TzProbe } from "./features/tz-probe";
+import { UserMenu } from "./features/user-menu";
 
 const shantell = Shantell_Sans({ variable: "--font-shantell", subsets: ["latin"] });
 const instrument = Instrument_Sans({ variable: "--font-instrument", subsets: ["latin"] });
@@ -41,7 +40,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {t("skipToContent")}
         </a>
 
-        <header className="relative z-10 mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
+        <header className="relative z-20 mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
           {/* "/" for everyone now: signed out it is the page that explains what
               this is, which used to be nowhere. */}
           <Link href="/" className="flex items-center gap-2.5">
@@ -56,23 +55,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
           {user ? (
             <>
-              <Link
-                href="/account"
-                className="pill ml-auto min-w-0 max-w-[7rem] sm:max-w-[9rem]"
-                title={user.name}
-              >
-                {/* The ellipsis needs a real box to happen in: the pill is a
-                    flex container, and a bare text node in one is an anonymous
-                    item that text-overflow never reaches. */}
-                <span className="truncate">@{user.username}</span>
-              </Link>
-
               {/* The tools take the second row on a phone. A 320px screen fits
                   the wordmark and one control, so all four beside it is what
-                  used to drag the page sideways; sign-out moved to the account
-                  page rather than being wrapped onto a third row. Above `sm`
-                  this is one nowrap group again. */}
-              <div className="flex w-full items-center gap-2 sm:w-auto">
+                  used to drag the page sideways; sign-out and the report link
+                  moved into the user menu rather than being wrapped onto a
+                  third row. On larger screens this group pushes itself and the
+                  profile menu right, while the profile remains the last item. */}
+              <div className="order-2 flex w-full items-center gap-2 sm:order-none sm:ml-auto sm:w-auto">
                 {/* `min-w` and not just `flex-1`: a basis of zero let the box
                     squeeze to 22px rather than push anything onto a new line.
                     The fixed width, and the widening on focus that used to
@@ -86,16 +75,19 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     />
                   </Suspense>
                 </div>
-                <Link href="/report" className="pill shrink-0">
-                  {t("navReport")}
-                </Link>
                 <LangSwitcher lang={lang} t={t} />
-                <form action={logoutAction} className="hidden shrink-0 sm:block">
-                  <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
-                    {t("signOut")}
-                  </SubmitButton>
-                </form>
               </div>
+
+              <UserMenu
+                user={user}
+                labels={{
+                  navAccount: t("navAccount"),
+                  navReport: t("navReport"),
+                  signOut: t("signOut"),
+                  working: t("working"),
+                }}
+                className="ml-auto shrink-0 sm:ml-0"
+              />
             </>
           ) : (
             <div className="ml-auto flex items-center gap-2">

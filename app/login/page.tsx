@@ -10,8 +10,13 @@ import { AuthShell } from "../features/auth-shell";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
-  if (await currentUser()) redirect("/");
+const first = (value: string | string[] | undefined) =>
+  (Array.isArray(value) ? value[0] : value) ?? "";
+
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  const next = first((await searchParams).next);
+  const safeNext = /^\/invite\?token=[A-Za-z0-9_-]{32,}$/.test(next) ? next : "";
+  if (await currentUser()) redirect(safeNext || "/");
   const { t } = await getT();
 
   return (
@@ -24,7 +29,10 @@ export default async function LoginPage() {
           <Link href="/forgot" className="link-more">
             {t("forgotLink")}
           </Link>
-          <Link href="/register" className="link-more">
+           <Link
+             href={safeNext ? `/register?next=${encodeURIComponent(safeNext)}` : "/register"}
+             className="link-more"
+           >
             {t("noAccount")}
           </Link>
         </>
@@ -34,7 +42,8 @@ export default async function LoginPage() {
         action={loginAction}
         submitLabel={t("signIn")}
         pendingLabel={t("signingIn")}
-        messages={authMessages(t)}
+       messages={authMessages(t)}
+       hidden={safeNext ? { next: safeNext } : undefined}
         fields={[
           {
             name: "identifier",

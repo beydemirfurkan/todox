@@ -62,6 +62,31 @@ export type Project = {
   created_at: string;
   share_token: string | null;
   share_log: number;
+  /** The caller's relationship to this project, when loaded privately. */
+  access_role?: "owner" | "member";
+};
+
+export type ProjectMembership = {
+  id: number;
+  project_id: number;
+  user_id: number;
+  access_slug: string;
+  root_path: string | null;
+  invited_by: number | null;
+  created_at: string;
+};
+
+export type ProjectInvitation = {
+  id: number;
+  project_id: number;
+  email: string;
+  token_hash: string;
+  invited_by: number | null;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  accepted_by: number | null;
+  revoked_at: string | null;
 };
 
 export type Task = {

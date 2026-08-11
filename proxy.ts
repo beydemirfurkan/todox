@@ -14,6 +14,7 @@ const PUBLIC = [
   "/forgot",
   "/reset",
   "/verify",
+  "/invite",
   "/s/",
   // Both agent surfaces carry their own bearer token and have no session
   // cookie. Leave either out and the redirect below turns every agent call

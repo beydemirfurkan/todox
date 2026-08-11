@@ -23,32 +23,64 @@ export type ProjectPatch = Partial<
  */
 const COLUMNS = ["name", "root_path", "repo_url", "summary", "archived"] as const;
 
-/**
- * Every read here is scoped by owner. The only deliberate exception is
- * `byShareToken`, which is what a public share link resolves through.
- */
+const ACCESS_SELECT = `SELECT p.*,
+  CASE WHEN p.user_id = ? THEN p.slug ELSE pm.access_slug END AS slug,
+  CASE WHEN p.user_id = ? THEN p.root_path ELSE pm.root_path END AS root_path,
+  CASE WHEN p.user_id = ? THEN 'owner' ELSE 'member' END AS access_role
+ FROM projects p
+ LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+ WHERE (p.user_id = ? OR pm.user_id IS NOT NULL)`;
 
 export const list = (userId: number, includeArchived = false) =>
   all<Project>(
-    `SELECT * FROM projects WHERE user_id = ?
-     ${includeArchived ? "" : "AND archived = 0"} ORDER BY name`,
-    [userId],
+    `${ACCESS_SELECT} ${includeArchived ? "" : "AND p.archived = 0"} ORDER BY p.name`,
+    [userId, userId, userId, userId, userId],
   );
 
 export const bySlug = (userId: number, slug: string) =>
-  one<Project>("SELECT * FROM projects WHERE user_id = ? AND slug = ?", [userId, slug]);
+  one<Project>(`${ACCESS_SELECT} AND (p.user_id = ? AND p.slug = ? OR pm.access_slug = ?)`, [
+    userId,
+    userId,
+    userId,
+    userId,
+    userId,
+    userId,
+    slug,
+    slug,
+  ]);
 
 export const byName = (userId: number, name: string) =>
-  one<Project>("SELECT * FROM projects WHERE user_id = ? AND lower(name) = lower(?)", [
+  one<Project>(`${ACCESS_SELECT} AND lower(p.name) = lower(?)`, [
+    userId,
+    userId,
+    userId,
+    userId,
     userId,
     name,
   ]);
 
 export const byId = (userId: number, id: number) =>
-  one<Project>("SELECT * FROM projects WHERE id = ? AND user_id = ?", [id, userId]);
+  one<Project>(`${ACCESS_SELECT} AND p.id = ?`, [
+    userId,
+    userId,
+    userId,
+    userId,
+    userId,
+    id,
+  ]);
+
+export const ownedById = (userId: number, id: number) =>
+  one<Project>("SELECT *, 'owner' AS access_role FROM projects WHERE id = ? AND user_id = ?", [
+    id,
+    userId,
+  ]);
 
 export const withRootPath = (userId: number) =>
-  all<Project>("SELECT * FROM projects WHERE user_id = ? AND root_path IS NOT NULL", [
+  all<Project>(`${ACCESS_SELECT} AND COALESCE(pm.root_path, p.root_path) IS NOT NULL`, [
+    userId,
+    userId,
+    userId,
+    userId,
     userId,
   ]);
 
@@ -108,8 +140,10 @@ export async function nextFreeSlug(userId: number, base: string) {
   const taken = new Set(
     (
       await all<{ slug: string }>(
-        "SELECT slug FROM projects WHERE user_id = ? AND slug LIKE ?",
-        [userId, `${root}%`],
+        `SELECT slug FROM projects WHERE user_id = ? AND slug LIKE ?
+         UNION SELECT access_slug AS slug FROM project_memberships
+          WHERE user_id = ? AND access_slug LIKE ?`,
+        [userId, `${root}%`, userId, `${root}%`],
       )
     ).map((r) => r.slug),
   );

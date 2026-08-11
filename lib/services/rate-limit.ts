@@ -27,6 +27,8 @@ export const POLICIES = {
   // Each one sends two emails -- a verification and a warning to the old
   // address -- and nobody changes their address five times an hour.
   emailChangePerUser: { limit: 5, windowMs: HOUR },
+  invitePerUser: { limit: 20, windowMs: HOUR },
+  invitePerRecipient: { limit: 5, windowMs: HOUR },
   badTokenPerIp: { limit: 20, windowMs: 15 * MINUTE },
   /**
    * Everything an authenticated agent does, per token.

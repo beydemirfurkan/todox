@@ -23,3 +23,4 @@ export function loadEnv(file = ".env.local") {
 }
 
 loadEnv();
+loadEnv(".env");
