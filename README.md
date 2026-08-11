@@ -100,6 +100,30 @@ simply are not there in the next project, so the agent never mentions them.
 Spell out `"type": "http"`. A client that finds a `url` without one tends to
 assume a local command and fails with something unhelpful.
 
+### Then tell your agent to use it
+
+Connecting is not the same as being used, and the gap is bigger than it looks.
+An MCP server's `instructions` are background reading; a skill or a CLAUDE.md
+rule is an instruction. When they disagree, the server loses — measured, in a
+fresh project, with todox connected the whole time and never once called.
+
+So put four lines in the memory file your agent actually obeys — user-level
+`CLAUDE.md`, `AGENTS.md`, or whatever your tool reads:
+
+```markdown
+todox MCP is installed here — persistent memory across projects.
+
+- Call `get_context` before starting non-trivial work (cwd = your working
+  directory). It registers a new repo by itself.
+- `create_task` for anything that will not finish this session.
+- Before stopping, `log_entry(kind:'handoff')` on every task you touched,
+  and `dead_end` for approaches that failed.
+- Always pass your own model id.
+```
+
+The token stays out of that file — it lives in your MCP config. This is the
+habit, not the credential.
+
 ### Optional: local mode
 
 The hosted server has no filesystem — but your agent does, and that is enough:
