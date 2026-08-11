@@ -45,34 +45,22 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
       </div>
 
       <nav aria-label={t("reportTitle")} className="pop flex flex-wrap gap-2">
-        {PERIODS.map((p) => {
-          const active = p === period;
-          return (
-            <Link
-              key={p}
-              // Carry the project through: switching period used to silently
-              // widen the report back out to every project.
-              href={
-                projectRef
-                  ? `/report?period=${p}&project=${encodeURIComponent(projectRef)}`
-                  : `/report?period=${p}`
-              }
-              aria-current={active ? "page" : undefined}
-              className="pill"
-              style={
-                active
-                  ? {
-                      background: "var(--accent)",
-                      color: "var(--on-fill)",
-                      boxShadow: "3px 3px 0 var(--shadow-col)",
-                    }
-                  : { background: "var(--inset)", color: "var(--muted)" }
-              }
-            >
-              {periodLabel(p, t)}
-            </Link>
-          );
-        })}
+        {PERIODS.map((p) => (
+          <Link
+            key={p}
+            // Carry the project through: switching period used to silently
+            // widen the report back out to every project.
+            href={
+              projectRef
+                ? `/report?period=${p}&project=${encodeURIComponent(projectRef)}`
+                : `/report?period=${p}`
+            }
+            aria-current={p === period ? "page" : undefined}
+            className="pill seg"
+          >
+            {periodLabel(p, t)}
+          </Link>
+        ))}
       </nav>
 
       {report.totals.touched === 0 ? (

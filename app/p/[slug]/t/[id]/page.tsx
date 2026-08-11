@@ -36,11 +36,26 @@ import {
   Panel,
   RefBadge,
   StatusDot,
+  Tabs,
+  currentTab,
+  type Tab,
 } from "../../../../components";
 
 export const dynamic = "force-dynamic";
 
-export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">) {
+/**
+ * The task at the top, then one thing at a time.
+ *
+ * This was a 1.5fr/1fr grid with everything open at once, which meant the log
+ * -- the reason the page exists, and the only part that grows without bound --
+ * was reading in the narrower two-thirds while a static explainer held a
+ * column beside it. The log gets the full width now and the files get their
+ * own tab, which is where the explainer belongs anyway.
+ */
+export default async function TaskPage({
+  params,
+  searchParams,
+}: PageProps<"/p/[slug]/t/[id]">) {
   const { slug, id } = await params;
   const user = await requireUser();
   const { t } = await getT();
@@ -63,6 +78,17 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
     ]),
   ) as KindStrings;
 
+  const tabs: Tab[] = [
+    { id: "log", label: t("tabLog"), href: `/p/${slug}/t/${id}`, count: entries.length },
+    {
+      id: "files",
+      label: t("tabFiles"),
+      href: `/p/${slug}/t/${id}?t=files`,
+      count: refs.length,
+    },
+  ];
+  const tab = currentTab(tabs, (await searchParams).t);
+
   return (
     <div className="space-y-5">
       <nav aria-label={t("breadcrumb")} className="mono pop text-[12px] text-faint">
@@ -76,9 +102,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
         / <span aria-current="page">#{task.id}</span>
       </nav>
 
-      <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
-        <div className="min-w-0 space-y-5">
-          <Panel
+      <Panel
             title={
               <span className="flex items-center gap-2">
                 <StatusDot status={task.status} t={t} /> {t("task")} #{task.id}
@@ -94,7 +118,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                   id="task-status"
                   name="status"
                   defaultValue={task.status}
-                  className="!w-[116px] shrink-0 !px-2 !py-1 !text-[13px]"
+                  className="control-sm w-28 shrink-0"
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -103,7 +127,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                   ))}
                 </select>
                 <SubmitButton
-                  className="btn btn-quiet !px-3 !py-[3px] !text-[13px]"
+                  className="btn btn-quiet control-sm"
                   pendingLabel={t("working")}
                 >
                   {t("apply")}
@@ -115,23 +139,19 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
               <input type="hidden" name="task_id" value={task.id} />
               {/* textarea, not input: long titles are the norm here and an
                   input would clip the thing you most need to read */}
-              <Field label={t("taskTitlePh")}>
+              <Field label={t("taskTitlePh")} hidden>
                 <textarea
                   name="title"
                   rows={2}
                   defaultValue={task.title}
-                  className="display !min-h-0 !text-[20px] !leading-snug !font-bold"
+                  className="textarea-title"
                 />
               </Field>
               <Field label={t("taskBodyPh")}>
-                <textarea
-                  name="body"
-                  defaultValue={task.body ?? ""}
-                  placeholder={t("taskBodyPh")}
-                />
+                <textarea name="body" defaultValue={task.body ?? ""} />
               </Field>
               <div className="flex flex-wrap items-end gap-2">
-                <Field label={t("priorityLabel")} className="!w-40">
+                <Field label={t("priorityLabel")} className="w-40">
                   <select name="priority" defaultValue={String(task.priority)}>
                     <option value="1">{t("p1")}</option>
                     <option value="2">{t("p2")}</option>
@@ -148,7 +168,10 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
             </form>
           </Panel>
 
-          <Panel
+      <Tabs tabs={tabs} current={tab} label={t("taskSections")} />
+
+      {tab === "log" && (
+        <Panel
             delay={70}
             title={t("theLog")}
             right={<Counter n={entries.length} label={t("theLog")} />}
@@ -181,7 +204,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                       <form action={deleteEntryAction} className="ml-auto">
                         <input type="hidden" name="entry_id" value={e.id} />
                         <SubmitButton
-                          className="link-more row-action !text-[12px]"
+                          className="link-more row-action text-meta"
                           pendingLabel={t("working")}
                         >
                           {t("delete")}
@@ -206,10 +229,11 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
               submitLabel={t("append")}
               pendingLabel={t("working")}
             />
-          </Panel>
-        </div>
+        </Panel>
+      )}
 
-        <div className="min-w-0 space-y-5">
+      {tab === "files" && (
+        <div className="space-y-5">
           <Panel
             delay={130}
             title={t("filesInPlay")}
@@ -237,7 +261,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                         <form action={acceptRefAction}>
                           <input type="hidden" name="ref_id" value={r.id} />
                           <SubmitButton
-                            className="link-more !text-[12px]"
+                            className="link-more text-meta"
                             pendingLabel={t("working")}
                           >
                             {t("acceptRef")}
@@ -247,7 +271,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                       <form action={unlinkRefAction}>
                         <input type="hidden" name="ref_id" value={r.id} />
                         <SubmitButton
-                          className="link-more !text-[12px]"
+                          className="link-more text-meta"
                           pendingLabel={t("working")}
                         >
                           {t("unlink")}
@@ -263,12 +287,12 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
                   <input
                     name="path"
                     placeholder={`${project.root_path ?? ""}${t("filePathPh")}`}
-                    className="mono !text-[12.5px]"
+                    className="mono text-small"
                     required
                   />
                 </Field>
                 <Field label={t("fileNotePh")}>
-                  <input name="note" placeholder={t("fileNotePh")} className="!text-[14px]" />
+                  <input name="note" className="text-body" />
                 </Field>
                 <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
                   {t("link")}
@@ -289,7 +313,7 @@ export default async function TaskPage({ params }: PageProps<"/p/[slug]/t/[id]">
             </div>
           </Panel>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -75,7 +75,7 @@ export function Landing({ t }: { t: T }) {
       <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-[13.5px] text-faint">
         <a
           href="https://github.com/beydemirfurkan/todox"
-          className="link-more !text-[13.5px]"
+          className="link-more text-small"
           rel="noreferrer"
         >
           {t("landingOpenSource")}

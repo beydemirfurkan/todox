@@ -97,17 +97,13 @@ export default async function Home() {
           <summary className="link-more">{t("newProject")}</summary>
           <form action={createProjectAction} className="mt-3 space-y-2">
             <Field label={t("projectNamePh")}>
-              <input name="name" placeholder={t("projectNamePh")} required />
+              <input name="name" required />
             </Field>
             <Field label={t("projectPathPh")}>
-              <input
-                name="root_path"
-                placeholder={t("projectPathPh")}
-                className="mono !text-[13px]"
-              />
+              <input name="root_path" className="mono text-small" />
             </Field>
             <Field label={t("projectSummaryPh")}>
-              <textarea name="summary" placeholder={t("projectSummaryPh")} />
+              <textarea name="summary" />
             </Field>
             <SubmitButton pendingLabel={t("working")}>{t("create")}</SubmitButton>
           </form>
@@ -144,7 +140,7 @@ export default async function Home() {
                 <form action={deleteContextAction}>
                   <input type="hidden" name="context_id" value={c.id} />
                   <SubmitButton
-                    className="link-more row-action !text-[12px]"
+                    className="link-more row-action text-meta"
                     pendingLabel={t("working")}
                   >
                     {t("delete")}
@@ -162,7 +158,7 @@ export default async function Home() {
             <summary className="link-more">{t("addGlobalNote")}</summary>
             <form action={addContextAction} className="mt-3 space-y-2">
               <div className="flex flex-wrap gap-2">
-                <Field label={t("globalContext")} className="!w-40">
+                <Field label={t("globalContext")} className="w-40">
                   <select name="kind">
                     {CONTEXT_KINDS.map((k) => (
                       <option key={k} value={k}>
@@ -172,11 +168,11 @@ export default async function Home() {
                   </select>
                 </Field>
                 <Field label={t("title")} className="min-w-40 flex-1">
-                  <input name="title" placeholder={t("title")} required />
+                  <input name="title" required />
                 </Field>
               </div>
               <Field label={t("noteBodyPh")}>
-                <textarea name="body" placeholder={t("noteBodyPh")} required />
+                <textarea name="body" required />
               </Field>
               <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
                 {t("save")}

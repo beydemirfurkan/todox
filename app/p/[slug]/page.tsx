@@ -130,7 +130,7 @@ export default async function ProjectPage({
               href={repo}
               target="_blank"
               rel="noreferrer"
-              className="mono link-more !text-[12.5px]"
+              className="mono link-more text-small"
             >
               {repoLabel(repo)} ↗
             </a>
@@ -190,25 +190,17 @@ export default async function ProjectPage({
             className="pop flex flex-wrap gap-1.5"
             style={{ animationDelay: "60ms" }}
           >
-            {filters.map((f) => {
-              const active = f.id === filter;
-              return (
-                <Link
-                  key={f.id}
-                  href={f.id === "open" ? `/p/${slug}` : `/p/${slug}?s=${f.id}`}
-                  aria-current={active ? "page" : undefined}
-                  className="pill !text-[12.5px]"
-                  style={
-                    active
-                      ? { background: "var(--accent)", color: "var(--on-fill)" }
-                      : { background: "var(--inset)", color: "var(--muted)" }
-                  }
-                >
-                  {f.label}
-                  <span className="mono ml-1.5 opacity-70">{f.n}</span>
-                </Link>
-              );
-            })}
+            {filters.map((f) => (
+              <Link
+                key={f.id}
+                href={f.id === "open" ? `/p/${slug}` : `/p/${slug}?s=${f.id}`}
+                aria-current={f.id === filter ? "page" : undefined}
+                className="pill seg"
+              >
+                {f.label}
+                <span className="mono ml-1.5 opacity-70">{f.n}</span>
+              </Link>
+            ))}
           </nav>
 
           <Panel
@@ -296,7 +288,7 @@ export default async function ProjectPage({
                         id={`st-${task.id}`}
                         name="status"
                         defaultValue={task.status}
-                        className="!w-[108px] !px-2 !py-1 !text-[12.5px]"
+                        className="control-sm w-28"
                       >
                         {STATUSES.map((s) => (
                           <option key={s} value={s}>
@@ -305,7 +297,7 @@ export default async function ProjectPage({
                         ))}
                       </select>
                       <SubmitButton
-                        className="btn btn-quiet !px-2.5 !py-[3px] !text-[12.5px]"
+                        className="btn btn-quiet control-sm"
                         pendingLabel={t("working")}
                       >
                         {t("apply")}
@@ -327,13 +319,13 @@ export default async function ProjectPage({
               <form action={createTaskAction} className="mt-3 space-y-2">
                 <input type="hidden" name="slug" value={slug} />
                 <Field label={t("taskTitlePh")}>
-                  <input name="title" placeholder={t("taskTitlePh")} required />
+                  <input name="title" required />
                 </Field>
                 <Field label={t("taskBodyPh")}>
-                  <textarea name="body" placeholder={t("taskBodyPh")} />
+                  <textarea name="body" />
                 </Field>
                 <div className="flex flex-wrap items-end gap-2">
-                  <Field label={t("priorityLabel")} className="!w-40">
+                  <Field label={t("priorityLabel")} className="w-40">
                     <select name="priority" defaultValue="2">
                       <option value="1">{t("p1")}</option>
                       <option value="2">{t("p2")}</option>
@@ -369,7 +361,7 @@ export default async function ProjectPage({
                     <form action={deleteContextAction} className="ml-auto">
                       <input type="hidden" name="context_id" value={c.id} />
                       <SubmitButton
-                        className="link-more row-action !text-[12px]"
+                        className="link-more row-action text-meta"
                         pendingLabel={t("working")}
                       >
                         {t("delete")}
@@ -398,10 +390,10 @@ export default async function ProjectPage({
                     </select>
                   </Field>
                   <Field label={t("title")}>
-                    <input name="title" placeholder={t("title")} required />
+                    <input name="title" required />
                   </Field>
                   <Field label={t("noteBodyPh")}>
-                    <textarea name="body" placeholder={t("noteBodyPh")} required />
+                    <textarea name="body" required />
                   </Field>
                   <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
                     {t("save")}

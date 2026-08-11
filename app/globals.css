@@ -56,6 +56,20 @@
   --font-display: var(--font-shantell);
   --font-sans: var(--font-instrument);
   --font-mono: var(--font-dm-mono);
+
+  /* A type scale, because there was not one. Ten call sites had reached for an
+     arbitrary value and between them invented five different "small":
+     12, 12.5, 13, 13.5 and 14px, all written as `!text-[…]` because the base
+     control rule defines a single size and no variant. Four names is enough
+     for this app, and `text-body` matches what a field renders at. */
+  --text-meta: 11.5px;
+  --text-meta--line-height: 1.4;
+  --text-small: 13px;
+  --text-small--line-height: 1.45;
+  --text-body: 15px;
+  --text-body--line-height: 1.6;
+  --text-lead: 17px;
+  --text-lead--line-height: 1.4;
 }
 
 html {
@@ -188,6 +202,17 @@ body {
 :focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* The ring follows whatever shape the element already has, so only the things
+   with no shape of their own need one given to them.
+   `border-radius` used to sit on the blanket rule above, where it beat the
+   `input, textarea, select` selector on specificity: tabbing into any field
+   snapped its corners from 10px to 4px and back out again. Buttons and pills
+   escaped it only because they are declared later in this file. */
+a:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible {
   border-radius: 4px;
 }
 
@@ -326,6 +351,25 @@ body {
   background: var(--card);
 }
 
+/* `.pill` in a group: filters, periods, languages, the agent picker, the entry
+   kinds. Five of them, and the "selected" look was the same inline style object
+   hand-copied into four files.
+   Selection is read off ARIA rather than a parallel `active` boolean, so the
+   look and the announcement cannot drift apart -- a call site that forgets the
+   attribute renders as unselected, which is visible rather than silent. */
+.seg {
+  background: var(--inset);
+  color: var(--muted);
+}
+.seg[aria-current],
+.seg[aria-pressed="true"],
+.peer:checked ~ .seg {
+  background: var(--accent);
+  color: var(--on-fill);
+  border-color: var(--edge-dark);
+  box-shadow: var(--shadow-sm);
+}
+
 .link-more {
   font-family: var(--font-shantell), cursive;
   font-weight: 700;
@@ -381,8 +425,26 @@ textarea::placeholder {
 }
 textarea {
   resize: vertical;
+  /* Grows with what is typed into it. Browsers without it ignore the line and
+     keep the min-height below, so this is a gain where supported and never a
+     loss -- which matters for a product whose main input is prose nobody can
+     predict the length of. The ceiling stops one long entry taking the page. */
+  field-sizing: content;
   min-height: 74px;
+  max-height: 60vh;
   line-height: 1.55;
+}
+
+/* The task title is a textarea because titles wrap, but it is a heading first.
+   It used to carry `!min-h-0 !text-[20px] !leading-snug !font-bold` -- four
+   overrides standing in for one missing variant. */
+.textarea-title {
+  font-family: var(--font-shantell), cursive;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  min-height: 0;
+  resize: none;
 }
 select {
   appearance: none;
@@ -391,9 +453,45 @@ select {
   background-repeat: no-repeat;
   background-position: right 9px center;
 }
-/* native controls follow the dark scheme rather than rendering white */
-input[type="checkbox"] {
+/* The rule above is written for text fields, and a checkbox is not one: it was
+   inheriting `width: 100%`, `padding: 7px 11px`, a 1.5px border and a 10px
+   radius, which Chromium paints *around* the native box. Both call sites were
+   patching a piece of that by hand and disagreeing with this file about the
+   colour while they were at it. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  /* native controls follow the dark scheme rather than rendering white */
   accent-color: var(--accent);
+}
+
+/* A field that cannot be used should look like one. There was nothing here, so
+   a disabled input was pixel-identical to a live one. */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.55;
+}
+select:disabled {
+  background-image: none;
+}
+
+/* Inline controls: the status select on a task row, a form in a panel header.
+   Its absence is what produced `!w-[108px] !px-2 !py-1 !text-[12.5px]` in one
+   place and `!w-[116px] … !text-[13px]` in another for the same control. */
+.control-sm {
+  font-size: var(--text-small);
+  padding: 4px 9px;
+  border-radius: 8px;
+  width: auto;
+}
+select.control-sm {
+  padding-right: 22px;
+  background-position: right 7px center;
 }
 
 button {
@@ -563,10 +661,25 @@ pre {
   }
 
   /* Under 16px, iOS Safari zooms the page when a field takes focus and never
-     zooms back out -- which reads as the page drifting on its own. */
+     zooms back out -- which reads as the page drifting on its own.
+     This rule was written and then defeated in six places: five `!text-[…]`
+     call sites and `.searchbox input`, which is in the header of every page.
+     The overrides are gone; the two classes that legitimately restyle a field
+     are listed here so they cannot quietly reopen it. */
   input,
   textarea,
-  select {
+  select,
+  .control-sm,
+  .searchbox input {
     font-size: 16px;
+  }
+
+  /* The same 44px floor the buttons beside them get. A status select was
+     computing to about 31px next to a 44px button, on the row the code itself
+     calls the commonest thing anybody does here. */
+  .control-sm,
+  select,
+  input:not([type="checkbox"]):not([type="radio"]) {
+    min-height: 44px;
   }
 }

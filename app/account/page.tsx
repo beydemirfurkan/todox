@@ -13,7 +13,7 @@ import {
   revokeTokenAction,
   updateNameAction,
 } from "../auth-actions";
-import { Blob, Chip, Counter, Empty, Panel } from "../components";
+import { Blob, Chip, Counter, Empty, Panel, Tabs, currentTab, type Tab } from "../components";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
 import { SubmitButton } from "../features/submit";
@@ -22,18 +22,25 @@ import { TokenForm } from "../features/token-form";
 export const dynamic = "force-dynamic";
 
 /**
- * Ordered by what people come here to do.
+ * Who you are stays at the top; the rest is three unrelated errands.
  *
- * Connecting an agent is the reason this page exists, so it is the first thing
- * under the identity card rather than the last panel on a long scroll. The
- * profile forms are maintenance and sit below. Deleting the account is last,
- * behind a disclosure and in the colour the log uses for things that went
- * wrong — it should not sit open next to "save".
+ * This used to be one scroll, ordered by importance, and the comment that stood
+ * here argued about that order — which is the tell: ordering was being used as
+ * the disclosure mechanism. Connecting an agent, editing a profile and closing
+ * an account have nothing to do with each other and nobody does two of them in
+ * one visit. Agents lead because that is why the page exists.
  */
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: PageProps<"/account">) {
   const user = await requireUser();
   const { t } = await getT();
   const tokens = await listApiTokens(user.id);
+
+  const tabs: Tab[] = [
+    { id: "agents", label: t("tabAgents"), href: "/account", count: tokens.length },
+    { id: "profile", label: t("tabProfile"), href: "/account?t=profile" },
+    { id: "danger", label: t("tabDanger"), href: "/account?t=danger" },
+  ];
+  const tab = currentTab(tabs, (await searchParams).t);
 
   return (
     <div className="space-y-6">
@@ -90,6 +97,9 @@ export default async function AccountPage() {
         </div>
       )}
 
+      <Tabs tabs={tabs} current={tab} label={t("accountSections")} />
+
+      {tab === "agents" && (
       <Panel
         delay={40}
         title={t("apiTokens")}
@@ -137,7 +147,7 @@ export default async function AccountPage() {
                   <form action={revokeTokenAction}>
                     <input type="hidden" name="token_id" value={tok.id} />
                     <SubmitButton
-                      className="link-more row-action !text-[12px]"
+                      className="link-more row-action text-meta"
                       pendingLabel={t("working")}
                     >
                       {t("revoke")}
@@ -150,7 +160,7 @@ export default async function AccountPage() {
 
             <p className="mt-3 mb-2 text-[13.5px] text-muted">{t("revokeAllNote")}</p>
             <form action={revokeAllTokensAction}>
-              <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
+              <SubmitButton className="link-more text-small" pendingLabel={t("working")}>
                 {t("revokeAll")}
               </SubmitButton>
             </form>
@@ -162,7 +172,9 @@ export default async function AccountPage() {
           </div>
         )}
       </Panel>
+      )}
 
+      {tab === "profile" && (
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel delay={70} title={t("profile")}>
           <AuthForm
@@ -234,23 +246,25 @@ export default async function AccountPage() {
           />
         </Panel>
       </div>
+      )}
 
-      {/* Closed by default and marked in the colour of a dead end. It is gated
+      {/* Its own tab, and still marked in the colour of a dead end. It is gated
           on both the password and the username: the password is the credential,
           the username is there so this cannot happen by reflex. Everything
           cascades from the user row. */}
-      <details
+      {tab === "danger" && (
+      <section
         className="pop sticker overflow-hidden"
-        style={{ animationDelay: "130ms", borderColor: "var(--k-dead_end)" }}
+        style={{ animationDelay: "40ms", borderColor: "var(--k-dead_end)" }}
       >
-        <summary className="display flex cursor-pointer items-center gap-2 px-4 py-3 text-[16px] font-bold">
+        <h2 className="display flex items-center gap-2 px-4 py-3 text-[16px] font-bold">
           <span
             aria-hidden="true"
             className="inline-block size-2.5 shrink-0 rounded-full border-[1.5px]"
             style={{ background: "var(--k-dead_end)", borderColor: "var(--edge-dark)" }}
           />
           {t("deleteAccount")}
-        </summary>
+        </h2>
         <div className="border-t border-dashed border-rule p-4">
           <p className="mb-3 text-[14px] text-muted">{t("deleteAccountNote")}</p>
           <AuthForm
@@ -275,7 +289,8 @@ export default async function AccountPage() {
             ]}
           />
         </div>
-      </details>
+      </section>
+      )}
     </div>
   );
 }

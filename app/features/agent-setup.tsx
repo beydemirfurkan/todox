@@ -146,12 +146,9 @@ export function AgentSetup({
                 // button is indistinguishable from a missed tap.
                 aria-pressed={active}
                 onClick={() => setChosen(s.id)}
-                className="pill !text-[12.5px]"
-                style={
-                  active
-                    ? { background: "var(--accent)", color: "var(--on-fill)" }
-                    : { background: "var(--inset)", color: "var(--muted)" }
-                }
+                // `.seg` reads the selection off `aria-pressed`, so there is no
+                // second copy of it to keep in step.
+                className="pill seg"
               >
                 {s.name}
               </button>

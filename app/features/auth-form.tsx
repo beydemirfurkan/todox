@@ -89,7 +89,7 @@ export function AuthForm({
         const errId = `${f.name}-error`;
         return (
           <div key={f.name}>
-            <Field label={f.label} hidden={false}>
+            <Field label={f.label}>
               <input
                 name={f.name}
                 type={f.type ?? "text"}

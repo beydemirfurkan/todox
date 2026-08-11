@@ -59,16 +59,16 @@ export function LogComposer({
                 onChange={() => setKind(k)}
                 className="peer sr-only"
               />
+              {/* `.pill` rather than a hand-copied version of its geometry:
+                  the copy missed the 44px touch floor and rendered at about
+                  22px on a phone. `.seg` paints the selection off `:checked`,
+                  and the kind's own colour rides on top of it. */}
               <span
-                className="display inline-block rounded-full border-[1.5px] border-line px-2.5 pt-[2px] pb-[3px] text-[12.5px] leading-none font-bold transition peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink"
+                className="pill seg peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
                 style={
                   kind === k
-                    ? {
-                        background: KIND_COLOR[k],
-                        color: "var(--on-fill)",
-                        boxShadow: "3px 3px 0 var(--ink)",
-                      }
-                    : { background: "var(--inset)", color: "var(--muted)" }
+                    ? { background: KIND_COLOR[k], color: "var(--on-fill)" }
+                    : undefined
                 }
               >
                 {strings[k].label}

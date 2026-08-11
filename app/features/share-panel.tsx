@@ -64,7 +64,7 @@ export function SharePanel({
             <input
               type="checkbox"
               name="include_log"
-              className="mt-0.5 !w-auto !p-0 accent-[color:var(--ink)]"
+              className="mt-0.5"
             />
             <span>{s.includeLog}</span>
           </label>
@@ -90,7 +90,7 @@ export function SharePanel({
         </a>
         <button
           type="button"
-          className="btn btn-quiet !text-[13px]"
+          className="btn btn-quiet text-small"
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(url);
@@ -116,11 +116,11 @@ export function SharePanel({
             type="checkbox"
             name="include_log"
             defaultChecked={includeLog}
-            className="mt-0.5 !w-auto !p-0 accent-[color:var(--ink)]"
+            className="mt-0.5"
           />
           <span>{s.includeLog}</span>
         </label>
-        <SubmitButton className="btn btn-quiet !text-[13px]" pendingLabel={s.working}>
+        <SubmitButton className="btn btn-quiet text-small" pendingLabel={s.working}>
           {s.apply}
         </SubmitButton>
       </form>

@@ -41,13 +41,8 @@ export function LangButton({
       // 34x44 rather than 44x44: the height is what a thumb was missing, and
       // the width is what the header row cannot spare. Still well past the
       // 24x24 floor, and the two pills sit 6px apart.
-      className="pill !px-2.5 !text-[12px]"
-      style={{
-        opacity: switching ? 0.6 : 1,
-        ...(active
-          ? { background: "var(--accent)", color: "var(--on-fill)" }
-          : { background: "var(--inset)", color: "var(--muted)" }),
-      }}
+      className="pill seg px-2.5"
+      style={{ opacity: switching ? 0.6 : 1 }}
     >
       <span className="sr-only">
         {name}

@@ -91,7 +91,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 </Link>
                 <LangSwitcher lang={lang} t={t} />
                 <form action={logoutAction} className="hidden shrink-0 sm:block">
-                  <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
+                  <SubmitButton className="link-more text-small" pendingLabel={t("working")}>
                     {t("signOut")}
                   </SubmitButton>
                 </form>
