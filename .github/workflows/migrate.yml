@@ -1,0 +1,44 @@
+name: migrate production
+
+# By hand, never on a push. Applying DDL is a decision, and the schema file is
+# idempotent precisely so that decision can be made after a deploy rather than
+# during one.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "production" to confirm'
+        required: true
+
+concurrency: migrate-production
+
+jobs:
+  migrate:
+    if: inputs.confirm == 'production'
+    runs-on: ubuntu-latest
+    # A separate secret from the one the smoke suites use. Those run on every
+    # push against a throwaway branch and must never be able to reach this one.
+    env:
+      DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: No production database configured
+        if: env.DATABASE_URL == ''
+        run: |
+          echo "Set a PROD_DATABASE_URL secret first." >&2
+          exit 1
+
+      # This exists because the credential became unreachable once: it was
+      # written to Vercel as sensitive, which is write-only, and every local
+      # copy was deleted. The app kept running and nothing could migrate it.
+      # A secret here is the operator's way in, and it is the only one.
+      - name: Apply the schema
+        run: pnpm db:migrate

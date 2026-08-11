@@ -184,7 +184,15 @@ Vercel plus a hosted Postgres.
 
 Run `pnpm db:migrate` when the schema changes. It deliberately does not run on
 cold start: DDL racing across serverless instances is a bad way to discover lock
-contention.
+contention. In this deployment it is the **migrate production** workflow, run by
+hand from the Actions tab against a `PROD_DATABASE_URL` secret.
+
+That secret is the operator's only way in, and it is worth saying why it exists.
+The connection string lives in Vercel marked sensitive, which is write-only —
+neither the CLI nor the dashboard will show it again — so a deployment can end
+up running happily against a database nobody can reach to migrate. Keep one
+credential somewhere a human can retrieve it, or keep the ability to mint a new
+one (Neon's console resets a role's password in a click).
 
 Coming from the old SQLite version? `pnpm db:import-sqlite [path]` copies a
 `~/.todox/todox.db` across.
