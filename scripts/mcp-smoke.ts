@@ -32,6 +32,8 @@ import { normalisePath } from "../lib/util/paths";
 
 /** A throwaway repo the agent has never heard of, to prove auto-registration. */
 const SCRATCH = join(tmpdir(), "todox-smoke-repo");
+/** A second one, because one account holds many and they must not mix. */
+const OTHER = join(tmpdir(), "todox-smoke-other");
 const URL_BASE = process.env.TODOX_URL ?? "http://localhost:3000";
 const MODEL = "claude-opus-5";
 
@@ -196,6 +198,70 @@ async function runSuite(mode: Mode, token: string) {
   console.log("after editing the file:", after);
   writeFileSync(marker, '{"name":"smoke-repo"}\n');
 
+  /**
+   * One account, two repositories.
+   *
+   * Everything above proves the log survives a session. This proves it lands
+   * in the right place: a second project resolved from a second `cwd`, a dead
+   * end that stays in the project it belongs to, and an account-wide note that
+   * reaches both. Cross-account isolation was covered; this pair was not, and
+   * the two failure modes are not the same shape. A dead end bleeding into
+   * another repo's briefing is precisely the thing that would make the log not
+   * worth reading.
+   *
+   * Raised by alkhunizan in #1, who wanted the "memory across every repo, not
+   * one" claim to be something a stranger could check rather than believe.
+   */
+  console.log("\n--- one account, two repos, no bleeding ---");
+  await text("create_task", {
+    cwd: OTHER,
+    title: "SMOKE: work in the second repo",
+    model: MODEL,
+    ...(mode.local ? {} : { repo_root: OTHER }),
+  });
+  await text("log_entry", {
+    task_id: taskId,
+    kind: "dead_end",
+    body: "SMOKE-A-ONLY: this belongs to the first repo and must not surface in the second.",
+    model: MODEL,
+  });
+  await text("add_context", {
+    kind: "preference",
+    title: "SMOKE-EVERYWHERE",
+    body: "Account-wide: no project passed, so both briefings should carry it.",
+  });
+
+  const a = JSON.parse(await text("get_context", { cwd: SCRATCH }));
+  const b = JSON.parse(await text("get_context", { cwd: OTHER }));
+
+  if (a.project.slug === b.project.slug)
+    throw new Error(`two working directories resolved to one project: ${a.project.slug}`);
+
+  const deadEnds = (brief: { open_tasks: { dead_ends: string[] }[] }) =>
+    brief.open_tasks.flatMap((t) => t.dead_ends).join("\n");
+  if (!deadEnds(a).includes("SMOKE-A-ONLY"))
+    throw new Error("the first project lost its own dead end");
+  if (deadEnds(b).includes("SMOKE-A-ONLY"))
+    throw new Error("a dead end from one project reached another project's briefing");
+
+  const globals = (brief: { global_context: { title: string }[] }) =>
+    brief.global_context.map((c) => c.title);
+  for (const [label, brief] of [
+    ["first", a],
+    ["second", b],
+  ] as const)
+    if (!globals(brief).includes("SMOKE-EVERYWHERE"))
+      throw new Error(`the account-wide note is missing from the ${label} briefing`);
+
+  // Staleness belongs to the project holding the file, not to the account.
+  if (b.stale_refs.length)
+    throw new Error(`the second project inherited a stale warning: ${b.stale_refs.join(", ")}`);
+
+  console.log(
+    `projects: ${a.project.slug} / ${b.project.slug} · dead end stayed in ${a.project.slug} ·`,
+    "account-wide note reached both · stale warning did not travel",
+  );
+
   console.log("\n--- report sees it ---");
   const md = await text("activity_report", {
     period: "today",
@@ -217,6 +283,8 @@ async function main() {
 
   mkdirSync(join(SCRATCH, "src", "deep"), { recursive: true });
   writeFileSync(join(SCRATCH, "package.json"), '{"name":"smoke-repo"}\n');
+  mkdirSync(OTHER, { recursive: true });
+  writeFileSync(join(OTHER, "package.json"), '{"name":"smoke-other"}\n');
 
   const user = await ensureUser("smoke-agent", "Smoke");
   const { token } = await createApiToken(user.id, "mcp-smoke");
@@ -272,13 +340,16 @@ async function main() {
     throw new Error(`/api/mcp answered ${anonMcp.status} as ${ct}; is it in proxy.ts PUBLIC?`);
   console.log("/api/mcp:", anonMcp.status, (await anonMcp.json()).error?.message);
 
-  // leave no trace
+  // leave no trace. Paths are compared normalised because that is how they
+  // were stored -- a Windows agent's separators are folded on the way in.
+  const ours = new Set([normalisePath(SCRATCH), normalisePath(OTHER)]);
   for (const p of await projectsRepo.list(user.id, true)) {
     for (const t of await tasksRepo.listByProject(p.id, "all"))
       if (t.title.startsWith("SMOKE:")) await tasksRepo.remove(t.id);
-    if (p.root_path === SCRATCH) await projectsRepo.remove(user.id, p.id);
+    if (p.root_path && ours.has(normalisePath(p.root_path)))
+      await projectsRepo.remove(user.id, p.id);
   }
-  rmSync(SCRATCH, { recursive: true, force: true });
+  for (const dir of [SCRATCH, OTHER]) rmSync(dir, { recursive: true, force: true });
 
   console.log("\nOK (cleaned up)");
 }
