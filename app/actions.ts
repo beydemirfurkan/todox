@@ -159,10 +159,14 @@ export async function removeProjectMemberAction(fd: FormData) {
 
 export async function acceptProjectInviteAction(fd: FormData) {
   const user = await requireUser();
+  // The token when the link supplied one, the id when it came from the list on
+  // the account page. `accept` decides what each is worth.
   const slug = await accept({
     userId: user.id,
     email: user.email,
-    invitationId: num(fd, "invitation_id"),
+    emailVerified: Boolean(user.email_verified_at),
+    token: str(fd, "token") || undefined,
+    invitationId: num(fd, "invitation_id") || undefined,
   });
   if (!slug) redirect("/account?tab=invites&invite=failed");
   revalidatePath("/", "layout");

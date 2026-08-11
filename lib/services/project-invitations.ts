@@ -69,10 +69,48 @@ export function nextMembershipSlug(userId: number, base: string) {
   return projects.nextFreeSlug(userId, base);
 }
 
-export async function accept(input: { userId: number; email: string; invitationId: number }) {
+/**
+ * Joins a project, once the caller has been shown to hold the address it was
+ * offered to.
+ *
+ * There are only two ways to show that, and both are here:
+ *
+ * - `token`, which arrived in the invitation email. Holding it *is* the proof,
+ *   so this route works for an address that has never been verified — and, as
+ *   the one thing that does prove the inbox, it is also what may mark the
+ *   address verified.
+ * - a verified address plus the invitation's id, for the list on the account
+ *   page, where the token is not to hand. The verification already happened,
+ *   through a link sent to the same inbox.
+ *
+ * The id on its own proves nothing, and it used to be enough. An account may
+ * claim any address and keep working unverified, the account page listed every
+ * pending invitation for the address it claimed, and accepting one both granted
+ * write access to somebody else's project and marked the claimed address
+ * verified — which is the gate on publishing a public share link. Sequential
+ * ids meant it was not even necessary to see the list.
+ */
+export async function accept(input: {
+  userId: number;
+  email: string;
+  invitationId?: number;
+  token?: string;
+  /** Only consulted on the id route; a token speaks for itself. */
+  emailVerified?: boolean;
+}) {
   const acceptedAt = now();
-  const invitation = await invitations.byIdForEmail(input.invitationId, input.email, acceptedAt);
+
+  const invitation = input.token
+    ? await invitations.byToken(input.token, acceptedAt)
+    : input.emailVerified && input.invitationId
+      ? await invitations.byIdForEmail(input.invitationId, input.email, acceptedAt)
+      : null;
+
+  // A token is bound to one address, and the person holding it has to be the
+  // one it was sent to. Otherwise a forwarded link would be a way in.
   if (!invitation) return null;
+  if (invitation.email.toLowerCase() !== input.email.toLowerCase()) return null;
+
   const accessSlug = await nextMembershipSlug(input.userId, invitation.project_slug);
   const [accepted, member] = await tx([
     invitations.acceptStmt(invitation.id, input.userId, acceptedAt),
@@ -82,7 +120,10 @@ export async function accept(input: { userId: number; email: string; invitationI
       accessSlug,
       acceptedAt,
     }),
-    users.markEmailVerifiedStmt(input.userId),
+    // Reaching the link proves the inbox, which is the same thing the
+    // verification mail asks for. Accepting from the account list does not, and
+    // does not need to: that address is already verified.
+    ...(input.token ? [users.markEmailVerifiedStmt(input.userId)] : []),
   ]);
   if (!accepted.length) return null;
   // Existing members can encounter a retried invitation; their usable route is

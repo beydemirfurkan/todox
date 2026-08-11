@@ -64,7 +64,10 @@ export default async function InvitePage({
     >
       {matches ? (
         <form action={acceptProjectInviteAction}>
-          <input type="hidden" name="invitation_id" value={invitation.id} />
+          {/* The token, not the id: holding it is what proves this inbox is
+              yours, and it is the only thing that lets an address which has
+              never been verified accept an invitation at all. */}
+          <input type="hidden" name="token" value={token} />
           <SubmitButton className="btn w-full" pendingLabel={t("working")}>
             {t("acceptInvite")}
           </SubmitButton>

@@ -92,9 +92,17 @@ export default async function AccountPage({
 }) {
   const user = await requireUser();
   const { t } = await getT();
+  // Only for an address this account has proved it holds. Registration does not
+  // require verification and the app works without it, so listing by the claimed
+  // address told anyone who signed up as somebody else exactly which projects
+  // that person had been invited to -- and handed over the id needed to take
+  // one. The link in the invitation email still works for an unverified
+  // address, because holding it is the proof this list cannot ask for.
   const [tokens, pendingInvites, joinedProjects] = await Promise.all([
     listApiTokens(user.id),
-    invitationsRepo.listPendingForEmail(user.email, new Date().toISOString()),
+    user.email_verified_at
+      ? invitationsRepo.listPendingForEmail(user.email, new Date().toISOString())
+      : Promise.resolve([]),
     membershipsRepo.listByUser(user.id),
   ]);
   const requestedTab = (await searchParams).tab;
