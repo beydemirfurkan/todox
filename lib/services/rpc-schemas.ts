@@ -328,8 +328,11 @@ const OBJECTS: Record<string, z.ZodType> = {
     .strict()
     .refine(
       (p) =>
-        p.name !== undefined || p.root_path !== undefined || p.summary !== undefined,
-      { message: "pass at least one of name, root_path or summary" },
+        p.name !== undefined ||
+        p.root_path !== undefined ||
+        p.repo_url !== undefined ||
+        p.summary !== undefined,
+      { message: "pass at least one of name, root_path, repo_url or summary" },
     ),
 
   // Both fields are optional and one of them is required, which the schema is

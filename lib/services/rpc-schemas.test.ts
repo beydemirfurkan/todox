@@ -3,6 +3,33 @@ import { describe, expect, it } from "vitest";
 import { parseParams } from "./rpc-schemas";
 
 /**
+ * Adding a field to a shape whose refinement lists the others by hand is a
+ * two-step change, and the second step is easy to miss: `repo_url` was
+ * accepted by the schema and then refused by the guard that asks for "at
+ * least one of", which named its siblings and not it.
+ */
+describe("update refinements cover every field they gate", () => {
+  it("updateProject accepts each of its fields on its own", () => {
+    for (const field of ["name", "root_path", "repo_url", "summary"] as const)
+      expect(() =>
+        parseParams("updateProject", { project: "todox", [field]: "x" }),
+      ).not.toThrow();
+  });
+
+  it("updateTask accepts each of its fields on its own", () => {
+    expect(() => parseParams("updateTask", { task_id: 1, title: "x" })).not.toThrow();
+    expect(() => parseParams("updateTask", { task_id: 1, body: "x" })).not.toThrow();
+    expect(() => parseParams("updateTask", { task_id: 1, status: "done" })).not.toThrow();
+    expect(() => parseParams("updateTask", { task_id: 1, priority: 1 })).not.toThrow();
+  });
+
+  it("still refuses a patch of nothing", () => {
+    expect(() => parseParams("updateProject", { project: "todox" })).toThrow();
+    expect(() => parseParams("updateTask", { task_id: 1 })).toThrow();
+  });
+});
+
+/**
  * The second layer of the injection fix. The repositories allow-list their
  * columns, but nothing should reach them unvalidated in the first place: the
  * route used to cast `payload.params` and hand it straight to a handler.
