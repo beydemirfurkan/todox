@@ -6,19 +6,23 @@ export function ProjectSettingsDrawer({
   title,
   closeLabel,
   children,
+  className = "",
 }: {
   title: string;
   closeLabel: string;
   children: React.ReactNode;
+  /** Where the trigger sits is the page's business, not this component's. */
+  className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
   return (
     <>
+      {/* Not `w-full`, and not a filled button. This opens a dialog nobody
+          visits this page for; at full width it outweighed every task on it. */}
       <button
         type="button"
-        className="btn btn-quiet pop w-full"
-        style={{ animationDelay: "220ms" }}
+        className={`link-more ${className}`.trim()}
         onClick={() => dialog.current?.showModal()}
       >
         {title}

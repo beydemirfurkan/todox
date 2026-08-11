@@ -135,12 +135,89 @@ export default async function ProjectPage({
           at full width; it is where the repo happens to be on this laptop,
           which is plumbing, not a name. */}
       <header className="pop space-y-2">
-        <nav aria-label={t("breadcrumb")} className="mono text-[12px] text-faint">
-          <Link href="/" className="hover:text-ink">
-            {t("projects")}
-          </Link>{" "}
-          / <span aria-current="page">{project.slug}</span>
-        </nav>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <nav aria-label={t("breadcrumb")} className="mono text-[12px] text-faint">
+            <Link href="/" className="hover:text-ink">
+              {t("projects")}
+            </Link>{" "}
+            / <span aria-current="page">{project.slug}</span>
+          </nav>
+          {/* Beside the name, not after the work. It used to be a full-width
+              button at the foot of the page, which gave a settings dialog more
+              visual weight than anything on the page it configures -- and put
+              it past the end of a list that can run to sixty rows. */}
+          {owner && (
+            <ProjectSettingsDrawer
+              title={t("projectSettings")}
+              closeLabel={t("close")}
+              className="ml-auto shrink-0 text-small"
+            >
+              <div className="space-y-5">
+              <section>
+                <h3 className="display mb-2 text-[15px] font-bold">{t("sharing")}</h3>
+                <SharePanel
+                  projectId={project.id}
+                  token={project.share_token}
+                  includeLog={project.share_log === 1}
+                  origin={origin}
+                  canShare={Boolean(user.email_verified_at)}
+                  s={{
+                    off: t("shareOff"),
+                    on: t("shareOn"),
+                    enable: t("shareEnable"),
+                    disable: t("shareDisable"),
+                    rotate: t("shareRotate"),
+                    includeLog: t("shareIncludeLog"),
+                    copy: t("shareCopy"),
+                    copied: t("shareCopied"),
+                    scopeNote: t("shareScopeNote"),
+                    reachNote: t("shareReachNote"),
+                    apply: t("apply"),
+                    blocked: t("verifyBlockedShare"),
+                    working: t("working"),
+                  }}
+                />
+              </section>
+
+              <section
+                className="rounded-[10px] border-[1.5px] p-4"
+                style={{ borderColor: "var(--k-dead_end)" }}
+              >
+                <h3 className="display mb-1 flex items-center gap-2 text-[15px] font-bold">
+                  <span
+                    aria-hidden="true"
+                    className="inline-block size-2.5 shrink-0 rounded-full border-[1.5px]"
+                    style={{
+                      background: "var(--k-dead_end)",
+                      borderColor: "var(--edge-dark)",
+                    }}
+                  />
+                  {t("deleteProject")}
+                </h3>
+                <p className="mb-3 text-[13.5px] text-muted">
+                  {t("deleteProjectNote", { n: all.length })}
+                </p>
+                <AuthForm
+                  action={deleteProjectAction}
+                  submitLabel={t("deleteProjectSubmit")}
+                  pendingLabel={t("working")}
+                  submitClassName="btn btn-danger"
+                  messages={authMessages(t)}
+                  hidden={{ project_id: String(project.id) }}
+                  fields={[
+                    {
+                      name: "confirm",
+                      label: t("deleteProjectConfirm", { slug: project.slug }),
+                      autoComplete: "off",
+                      exact: true,
+                    },
+                  ]}
+                />
+              </section>
+              </div>
+            </ProjectSettingsDrawer>
+          )}
+        </div>
 
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="display text-[26px] leading-[1.1] font-bold sm:text-[33px]">
@@ -360,13 +437,19 @@ export default async function ProjectPage({
           </Panel>
         </main>
 
-        {/* Sticky, and bounded by the viewport with its own scroll: pinned
-            content taller than the screen has a bottom nobody can reach. */}
+        {/* Not pinned, and not scrolling inside itself.
+            It was both, which meant a second scroll context nested in the
+            page: cards came away sliced through the middle at the top and
+            bottom edges with nothing to say why, and the seam moved as the
+            page moved. The rail is reference material -- notes and a roster --
+            and there is no reason it has to stay on screen while the work
+            scrolls past it. As an ordinary column every card is whole and
+            every one of them is reachable. */}
         {/* `space-y` because the rail holds two panels now. It held one for as
             long as it existed, so nothing here had ever needed a gap -- and
             the two arrived stacked edge to edge, reading as one broken card.
             Same 1.25rem the grid puts between the rail and the work. */}
-        <aside className="min-w-0 mt-9 space-y-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        <aside className="min-w-0 mt-9 space-y-5">
           {/* Who is in this, above the notes, because it is the fact the rest
               of the page reads differently in light of. The owner keeps the
               controls; everybody else gets the roster, which is the part that
@@ -527,77 +610,6 @@ export default async function ProjectPage({
           </Panel>
         </aside>
       </div>
-
-      {/* Settings, once, at the end, closed. Sharing and deletion used to hold
-          permanent space beside the work; nobody comes to this page to
-          configure it. */}
-      {owner && (
-        <ProjectSettingsDrawer title={t("projectSettings")} closeLabel={t("close")}>
-          <div className="space-y-5">
-          <section>
-            <h3 className="display mb-2 text-[15px] font-bold">{t("sharing")}</h3>
-            <SharePanel
-              projectId={project.id}
-              token={project.share_token}
-              includeLog={project.share_log === 1}
-              origin={origin}
-              canShare={Boolean(user.email_verified_at)}
-              s={{
-                off: t("shareOff"),
-                on: t("shareOn"),
-                enable: t("shareEnable"),
-                disable: t("shareDisable"),
-                rotate: t("shareRotate"),
-                includeLog: t("shareIncludeLog"),
-                copy: t("shareCopy"),
-                copied: t("shareCopied"),
-                scopeNote: t("shareScopeNote"),
-                reachNote: t("shareReachNote"),
-                apply: t("apply"),
-                blocked: t("verifyBlockedShare"),
-                working: t("working"),
-              }}
-            />
-          </section>
-
-          <section
-            className="rounded-[10px] border-[1.5px] p-4"
-            style={{ borderColor: "var(--k-dead_end)" }}
-          >
-            <h3 className="display mb-1 flex items-center gap-2 text-[15px] font-bold">
-              <span
-                aria-hidden="true"
-                className="inline-block size-2.5 shrink-0 rounded-full border-[1.5px]"
-                style={{
-                  background: "var(--k-dead_end)",
-                  borderColor: "var(--edge-dark)",
-                }}
-              />
-              {t("deleteProject")}
-            </h3>
-            <p className="mb-3 text-[13.5px] text-muted">
-              {t("deleteProjectNote", { n: all.length })}
-            </p>
-            <AuthForm
-              action={deleteProjectAction}
-              submitLabel={t("deleteProjectSubmit")}
-              pendingLabel={t("working")}
-              submitClassName="btn btn-danger"
-              messages={authMessages(t)}
-              hidden={{ project_id: String(project.id) }}
-              fields={[
-                {
-                  name: "confirm",
-                  label: t("deleteProjectConfirm", { slug: project.slug }),
-                  autoComplete: "off",
-                  exact: true,
-                },
-              ]}
-            />
-          </section>
-          </div>
-        </ProjectSettingsDrawer>
-      )}
     </div>
   );
 }
