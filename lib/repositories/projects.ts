@@ -7,11 +7,12 @@ export type NewProject = {
   name: string;
   slug?: string;
   root_path?: string | null;
+  repo_url?: string | null;
   summary?: string | null;
 };
 
 export type ProjectPatch = Partial<
-  Pick<Project, "name" | "root_path" | "summary" | "archived">
+  Pick<Project, "name" | "root_path" | "repo_url" | "summary" | "archived">
 >;
 
 /**
@@ -20,7 +21,7 @@ export type ProjectPatch = Partial<
  * legal patch that hands the project -- and its tasks, by cascade -- to
  * another account. `share_token` and `share_log` go through `setShare`.
  */
-const COLUMNS = ["name", "root_path", "summary", "archived"] as const;
+const COLUMNS = ["name", "root_path", "repo_url", "summary", "archived"] as const;
 
 /**
  * Every read here is scoped by owner. The only deliberate exception is
@@ -65,13 +66,14 @@ export const byShareToken = (token: string) =>
  */
 export async function create(userId: number, input: NewProject): Promise<Project> {
   const row = await one<Project>(
-    `INSERT INTO projects (user_id, slug, name, root_path, summary, created_at)
-     VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+    `INSERT INTO projects (user_id, slug, name, root_path, repo_url, summary, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     [
       userId,
       input.slug ?? slugifyOr(input.name),
       input.name,
       input.root_path ?? null,
+      input.repo_url ?? null,
       input.summary ?? null,
       now(),
     ],

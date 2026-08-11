@@ -55,6 +55,8 @@ export type Project = {
   slug: string;
   name: string;
   root_path: string | null;
+  /** Where the repository is for everyone, rather than where it sits on one laptop. */
+  repo_url: string | null;
   summary: string | null;
   archived: number;
   created_at: string;

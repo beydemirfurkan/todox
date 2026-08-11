@@ -72,7 +72,13 @@ export const methods = {
 
   createProject: async (
     { userId },
-    p: { name: string; slug?: string; root_path?: string; summary?: string },
+    p: {
+      name: string;
+      slug?: string;
+      root_path?: string;
+      repo_url?: string;
+      summary?: string;
+    },
   ) =>
     projectsRepo.create(userId, {
       ...p,
@@ -81,7 +87,13 @@ export const methods = {
 
   updateProject: async (
     { userId },
-    p: { project: string; name?: string; root_path?: string; summary?: string },
+    p: {
+      project: string;
+      name?: string;
+      root_path?: string;
+      repo_url?: string;
+      summary?: string;
+    },
   ) => {
     const { project, ...patch } = p;
     const found = await mustResolve(userId, project);
@@ -192,7 +204,7 @@ export const methods = {
       project_created: created,
       ...(created
         ? {
-            next: `Registered a new project "${project.slug}". Call update_project with a one-paragraph summary so the next cold session knows what this repo is.`,
+            next: `Registered a new project "${project.slug}". Call update_project with a one-paragraph summary and repo_url set to \`git remote get-url origin\` — the summary is what a cold session reads, and the remote is the only name this project has on any machine but this one.`,
           }
         : {}),
     };

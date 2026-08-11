@@ -66,6 +66,18 @@ const repoRoot = z
 /** A path or a slug arriving from a caller, wherever one is accepted. */
 const ref = z.string().max(MAX.path);
 
+/**
+ * The only identifier a project has that means the same thing on somebody
+ * else's machine. `root_path` is where it sits on one laptop.
+ */
+const repoUrl = z
+  .string()
+  .max(MAX.line)
+  .optional()
+  .describe(
+    "Output of `git remote get-url origin`, verbatim — ssh or https, both fine. This is what identifies the project anywhere other than this one machine.",
+  );
+
 /** Accepts anything `new Date()` understands, which is what `resolvePeriod` uses. */
 const datetime = z
   .string()
@@ -86,6 +98,7 @@ export const SHAPES = {
       .optional()
       .describe("Defaults to a slug of the name"),
     root_path: ref.optional().describe("Absolute path of the repo/working dir"),
+    repo_url: repoUrl,
     summary: z
       .string()
       .max(MAX.text)
@@ -97,6 +110,7 @@ export const SHAPES = {
     project: projectRef,
     name: z.string().min(1).max(MAX.line).optional(),
     root_path: ref.optional(),
+    repo_url: repoUrl,
     summary: z.string().max(MAX.text).optional(),
   },
 

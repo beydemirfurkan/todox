@@ -5,6 +5,8 @@ import {
   isInside,
   lastSegment,
   normalisePath,
+  repoLabel,
+  repoLink,
   shareToken,
   slugify,
   slugifyOr,
@@ -126,6 +128,47 @@ describe("shareToken", () => {
     // 32 bytes base64url. It used to be 12, the weakest secret in the app.
     expect(shareToken()).toHaveLength(43);
     expect(shareToken()).not.toBe(shareToken());
+  });
+});
+
+describe("repoLink", () => {
+  /** `git remote get-url origin` answers in whichever form the clone used. */
+  it("turns an scp-style remote into something a browser can open", () => {
+    expect(repoLink("git@github.com:beydemirfurkan/todox.git")).toBe(
+      "https://github.com/beydemirfurkan/todox",
+    );
+    expect(repoLink("git@gitlab.com:group/sub/proj.git")).toBe(
+      "https://gitlab.com/group/sub/proj",
+    );
+  });
+
+  it("tidies the https form", () => {
+    expect(repoLink("https://github.com/me/repo.git")).toBe("https://github.com/me/repo");
+    expect(repoLink("https://github.com/me/repo/")).toBe("https://github.com/me/repo");
+    expect(repoLink("http://github.com/me/repo")).toBe("https://github.com/me/repo");
+  });
+
+  it("drops credentials, because this string gets rendered", () => {
+    expect(repoLink("https://user:tok@github.com/me/repo.git")).toBe(
+      "https://github.com/me/repo",
+    );
+  });
+
+  it("returns null rather than guessing", () => {
+    expect(repoLink(null)).toBeNull();
+    expect(repoLink("")).toBeNull();
+    expect(repoLink("   ")).toBeNull();
+    expect(repoLink("not a url")).toBeNull();
+    expect(repoLink("ssh://git@host/repo")).toBeNull();
+    expect(repoLink("file:///srv/repo.git")).toBeNull();
+    expect(repoLink("https://github.com")).toBeNull();
+  });
+});
+
+describe("repoLabel", () => {
+  it("prints the part anybody recognises", () => {
+    expect(repoLabel("https://github.com/me/repo")).toBe("github.com/me/repo");
+    expect(repoLabel("https://www.gitea.example/me/repo")).toBe("gitea.example/me/repo");
   });
 });
 

@@ -162,6 +162,11 @@ CREATE INDEX IF NOT EXISTS idx_refs_context ON refs (context_id);
 
 -- Existing installs predate the two columns above. Postgres makes this
 -- idempotent, so it belongs inline rather than in a migration history.
+-- A project used to be identified by where it sat on one laptop, which means
+-- nothing on the next machine, in CI, or to anybody else. The remote is the
+-- name it has everywhere.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS repo_url TEXT;
+
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS hash_seen  TEXT;
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS checked_at TEXT;
 

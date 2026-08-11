@@ -51,6 +51,44 @@ export async function listByTasksBetween(
   );
 }
 
+export type EntryCounts = { total: number; dead_ends: number; questions: number };
+
+/**
+ * Just the numbers a list needs, counted in the database.
+ *
+ * The project page used to load every entry of every task to render three
+ * badges per row -- the whole log of the whole project, in memory, to print
+ * some integers.
+ */
+export async function countsByTasks(taskIds: number[]): Promise<Map<number, EntryCounts>> {
+  if (!taskIds.length) return new Map();
+  const rows = await all<{
+    task_id: number;
+    total: string;
+    dead_ends: string;
+    questions: string;
+  }>(
+    `SELECT task_id,
+       COUNT(*)                                    AS total,
+       COUNT(*) FILTER (WHERE kind = 'dead_end')   AS dead_ends,
+       COUNT(*) FILTER (WHERE kind = 'question')   AS questions
+     FROM entries WHERE task_id IN (${taskIds.map(() => "?").join(",")})
+     GROUP BY task_id`,
+    taskIds,
+  );
+
+  return new Map(
+    rows.map((r) => [
+      r.task_id,
+      {
+        total: Number(r.total),
+        dead_ends: Number(r.dead_ends),
+        questions: Number(r.questions),
+      },
+    ]),
+  );
+}
+
 export const byId = (id: number) =>
   one<Entry>("SELECT * FROM entries WHERE id = ?", [id]);
 

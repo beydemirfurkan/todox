@@ -85,6 +85,44 @@ export function lastSegment(p: string) {
 }
 
 /**
+ * A git remote as something a browser can open.
+ *
+ * `git remote get-url origin` answers in whichever form the clone used, and
+ * the two common ones are not links: `git@github.com:me/repo.git` is an scp
+ * address, and even the https form usually carries a `.git` nobody wants to
+ * read. Credentials sometimes ride along in the userinfo, which must not end
+ * up rendered on a page.
+ *
+ * Returns null when it is not something worth linking to, rather than guessing.
+ */
+export function repoLink(raw: string | null | undefined): string | null {
+  const s = raw?.trim();
+  if (!s) return null;
+
+  // scp-like: [user@]host:path — no scheme, and the colon is not a port.
+  const scp = /^(?:[\w.-]+@)?([\w.-]+):(?!\/)([\w./~-]+?)(?:\.git)?\/?$/.exec(s);
+  if (scp) return `https://${scp[1]}/${scp[2]}`;
+
+  let url: URL;
+  try {
+    url = new URL(s);
+  } catch {
+    return null;
+  }
+  if (url.protocol === "http:") url.protocol = "https:";
+  if (url.protocol !== "https:") return null;
+  // Anything in the userinfo is a credential, and this string gets rendered.
+  url.username = "";
+  url.password = "";
+  url.pathname = url.pathname.replace(/\.git$/, "").replace(/\/$/, "");
+  return url.pathname && url.pathname !== "/" ? url.toString() : null;
+}
+
+/** What to print for a repository: "github.com/me/repo", not the whole URL. */
+export const repoLabel = (link: string) =>
+  link.replace(/^https:\/\//, "").replace(/^www\./, "");
+
+/**
  * Path containment on segment boundaries: "/src/todox-old" must not be treated
  * as living inside "/src/todox".
  *

@@ -123,6 +123,10 @@ const REMOTE_NOTE = [
   "- pass `tz` (IANA, e.g. 'Europe/Istanbul') on reports. If you cannot",
   "  determine it, say in your answer that the window is measured in UTC",
   "  rather than letting the developer assume it is their day;",
+  "- when a project is registered for the first time, follow up with",
+  "  update_project: a one-paragraph summary, and repo_url set to the output",
+  "  of `git remote get-url origin`. The path you sent is where the repo sits",
+  "  on this machine and means nothing on the next one;",
   "- when you link a file, send its `hash`: the sha256 of the file's bytes.",
   "  That hash is the only thing that lets todox tell you later that a note",
   "  describes code which has since changed. Omit it and the note is recorded",
@@ -446,7 +450,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("update_project", "updateProject", {
     title: "Update project",
     description:
-      "Set the name, root_path or summary. Worth calling right after a project is auto-created, to give it a summary a cold agent can use.",
+      "Set the name, root_path, repo_url or summary. Worth calling right after a project is auto-created: a one-paragraph summary and the output of `git remote get-url origin` are what make it legible to a session on another machine, where the local path means nothing.",
   });
 
   tool("delete_project", "deleteProject", {
