@@ -5,6 +5,7 @@ import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import * as contexts from "@/lib/repositories/contexts";
+import * as memberships from "@/lib/repositories/project-memberships";
 import * as projects from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
 import { addContextAction, createProjectAction, deleteContextAction } from "./actions";
@@ -31,6 +32,8 @@ export default async function Home() {
     contexts.listByProject(user.id, null),
     tasks.countsByProject(user.id),
   ]);
+  // One grouped query for every card, not one per card.
+  const teamSizes = await memberships.countsByProjects(allProjects.map((p) => p.id));
 
   return (
     <div className="space-y-8">
@@ -60,9 +63,22 @@ export default async function Home() {
                 rotate: `${TILTS[i % TILTS.length]}deg`,
               }}
             >
-              <div className="flex items-baseline gap-2">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <h3 className="display text-[20px] font-bold">{p.name}</h3>
                 <span className="mono text-[12px] text-faint">{p.slug}</span>
+                {/* Somebody else's project, or one of yours that is not only
+                    yours. Two cards used to look identical either way. */}
+                {p.access_role === "member" && p.owner_name ? (
+                  <Chip color="var(--k-handoff)">
+                    {t("sharedBy", { name: p.owner_name })}
+                  </Chip>
+                ) : (
+                  (teamSizes.get(p.id) ?? 0) > 0 && (
+                    <Chip color="var(--k-handoff)">
+                      {t("memberCount", { n: (teamSizes.get(p.id) ?? 0) + 1 })}
+                    </Chip>
+                  )
+                )}
               </div>
               {p.summary && (
                 <p className="mt-1.5 line-clamp-2 text-[14px] text-muted">{p.summary}</p>

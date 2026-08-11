@@ -23,11 +23,21 @@ export type ProjectPatch = Partial<
  */
 const COLUMNS = ["name", "root_path", "repo_url", "summary", "archived"] as const;
 
+/**
+ * `owner_name` joins on a primary key and rides along with every private read.
+ *
+ * It is what lets a page say whose project this is without a second query --
+ * the dashboard card and the project header both need it, and this select is
+ * already the single door every private read goes through.
+ */
 const ACCESS_SELECT = `SELECT p.*,
   CASE WHEN p.user_id = ? THEN p.slug ELSE pm.access_slug END AS slug,
   CASE WHEN p.user_id = ? THEN p.root_path ELSE pm.root_path END AS root_path,
-  CASE WHEN p.user_id = ? THEN 'owner' ELSE 'member' END AS access_role
+  CASE WHEN p.user_id = ? THEN 'owner' ELSE 'member' END AS access_role,
+  owner.name AS owner_name
  FROM projects p
+
+ LEFT JOIN users owner ON owner.id = p.user_id
  LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
  WHERE (p.user_id = ? OR pm.user_id IS NOT NULL)`;
 

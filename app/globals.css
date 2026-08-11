@@ -806,6 +806,72 @@ pre {
   background: rgba(241, 238, 229, 0.08);
 }
 
+/* The bell. Third dropdown in that row and deliberately the same one: it
+   borrows the trigger, panel and item wholesale, and only drops the chevron
+   and the text so it fits beside the other two on a 320px screen. */
+.bell-trigger {
+  gap: 0;
+  padding: 0;
+  width: 36px;
+  justify-content: center;
+  position: relative;
+  max-width: none;
+}
+.bell-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-dm-mono), monospace;
+  font-size: 10.5px;
+  line-height: 1;
+  color: var(--on-fill);
+  background: var(--accent);
+  border: 1.5px solid var(--edge-dark);
+  border-radius: 999px;
+}
+.bell-panel {
+  width: min(21rem, calc(100vw - 2.5rem));
+  max-height: min(26rem, 70vh);
+  overflow-y: auto;
+  /* Heavier than the menus beside it, and deliberately. Those hold two-word
+     labels; this holds sentences that wrap, and at the shared opacity the
+     page underneath read straight through them. */
+  background: rgba(24, 27, 34, 0.94);
+}
+/* Items here are two lines and wrap, unlike the one-line menu items above. */
+.bell-item {
+  display: block;
+  padding: 9px 11px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+.bell-item[data-unread="true"] {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.bell-when {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-dm-mono), monospace;
+  font-size: 11px;
+  color: var(--faint);
+}
+/* A row with nowhere to go: the project it names is gone for this account.
+   Same shape as the others, minus the affordance. */
+.bell-item-flat {
+  cursor: default;
+  color: var(--muted);
+}
+.bell-item-flat:hover {
+  background: transparent;
+}
+
 /* ------------------------------------------------------------ account tabs */
 
 .account-tabs {
@@ -1206,6 +1272,11 @@ pre {
   .picker-trigger {
     height: 44px;
     min-height: 44px;
+  }
+  /* Square, not 36 wide and 44 tall: the rule above gives every trigger the
+     height, and an icon-only one has to be told about the other axis too. */
+  .bell-trigger {
+    width: 44px;
   }
   .account-tab {
     min-height: 44px;

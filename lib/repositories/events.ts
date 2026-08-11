@@ -9,6 +9,8 @@ export type NewEvent = {
   to_status: Status;
   actor?: string;
   model?: string | null;
+  /** Resolved from the session or the token, never from the caller. */
+  user_id?: number | null;
 };
 
 export const listByTask = (taskId: number) =>
@@ -37,8 +39,8 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, TaskEv
  */
 export function createStmt(input: NewEvent) {
   return {
-    text: `INSERT INTO task_events (task_id, from_status, to_status, at, actor, model)
-           VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+    text: `INSERT INTO task_events (task_id, from_status, to_status, at, actor, model, user_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     params: [
       input.task_id,
       input.from_status,
@@ -46,6 +48,7 @@ export function createStmt(input: NewEvent) {
       now(),
       input.actor ?? "agent",
       input.model ?? null,
+      input.user_id ?? null,
     ],
   };
 }

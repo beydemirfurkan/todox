@@ -20,6 +20,20 @@ export const CONTEXT_KINDS = [
 ] as const;
 export type ContextKind = (typeof CONTEXT_KINDS)[number];
 
+/**
+ * What a notification can be about.
+ *
+ * A union rather than free text, because every kind needs a sentence in both
+ * dictionaries and nothing else guarantees that a new one gets written. The
+ * test walks this list.
+ */
+export const NOTIFICATION_KINDS = [
+  "invite_received",
+  "invite_accepted",
+  "member_removed",
+] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
 export const STATUSES = ["todo", "doing", "blocked", "done", "dropped"] as const;
 export type Status = (typeof STATUSES)[number];
 export const OPEN_STATUSES: Status[] = ["todo", "doing", "blocked"];

@@ -188,8 +188,13 @@ export default async function TaskPage({
                       >
                         {kindLabel(t, e.kind)}
                       </Chip>
+                      {/* A name when there is one. `author` only ever said
+                          'human' or 'agent', which answers nothing once two
+                          people share a project -- and it is still the answer
+                          for entries written before the column existed, or
+                          whose author has since deleted their account. */}
                       <span className="mono text-[11px] text-faint">
-                        {t("by")} {e.author} · {ago(e.created_at, t)}
+                        {t("by")} {e.author_name ?? e.author} · {ago(e.created_at, t)}
                       </span>
                       <form action={deleteEntryAction} className="ml-auto">
                         <input type="hidden" name="entry_id" value={e.id} />

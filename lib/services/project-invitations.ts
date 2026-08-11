@@ -3,6 +3,7 @@ import type { Lang } from "../i18n";
 import { publicUrl } from "../public-url";
 import * as invitations from "../repositories/project-invitations";
 import * as memberships from "../repositories/project-memberships";
+import * as notifications from "../repositories/notifications";
 import * as projects from "../repositories/projects";
 import * as users from "../repositories/users";
 import { send } from "./mailer";
@@ -49,6 +50,17 @@ export async function invite(input: {
     createdAt,
     expiresAt,
   });
+
+  // Somebody who already has an account gets the bell as well as the mail.
+  // Somebody who does not has only the mail, which is what the link is for.
+  const recipient = await users.byEmail(email);
+  if (recipient)
+    await notifications.create({
+      userId: recipient.id,
+      kind: "invite_received",
+      projectId: project.id,
+      actorId: input.userId,
+    });
 
   const link = `${publicUrl()}/invite?token=${encodeURIComponent(token)}`;
   await send({
@@ -97,6 +109,15 @@ export async function accept(input: {
   token?: string;
   /** Only consulted on the id route; a token speaks for itself. */
   emailVerified?: boolean;
+  /**
+   * The accepting person's language, used for the owner's mail.
+   *
+   * The wrong person's, strictly: nobody's preferred language is stored. It is
+   * the same borrow `invite` already makes in the other direction, where the
+   * inviter's language decides what the invitee reads. One inconsistency, in
+   * two places, rather than a new one.
+   */
+  lang: Lang;
 }) {
   const acceptedAt = now();
 
@@ -124,8 +145,25 @@ export async function accept(input: {
     // verification mail asks for. Accepting from the account list does not, and
     // does not need to: that address is already verified.
     ...(input.token ? [users.markEmailVerifiedStmt(input.userId)] : []),
+    // Last, so it can look at what the statements above just wrote. Guarded
+    // the same way the membership insert is: a replayed invitation must not
+    // hand the owner a second "they accepted".
+    ...(invitation.owner_id
+      ? [
+          notifications.createForAcceptedInvitationStmt({
+            userId: invitation.owner_id,
+            kind: "invite_accepted",
+            projectId: invitation.project_id,
+            actorId: input.userId,
+            invitationId: invitation.id,
+            acceptedBy: input.userId,
+            acceptedAt,
+          }),
+        ]
+      : []),
   ]);
   if (!accepted.length) return null;
+  await announce(invitation.owner_id, invitation.project_name, input.userId, input.lang);
   // Existing members can encounter a retried invitation; their usable route is
   // already present even if ON CONFLICT returned no newly inserted row.
   const row = member[0] as { access_slug: string } | undefined;
@@ -136,7 +174,7 @@ export async function accept(input: {
   return existing?.access_slug ?? null;
 }
 
-export async function acceptWithNewAccount(token: string) {
+export async function acceptWithNewAccount(token: string, lang: Lang) {
   const acceptedAt = now();
   const invitation = await invitations.byToken(token, acceptedAt);
   if (!invitation || (await users.byEmail(invitation.email))) return null;
@@ -145,11 +183,62 @@ export async function acceptWithNewAccount(token: string) {
   // random credential is never exposed; they can set one through email reset.
   const randomCredential = newSessionToken();
   const username = `invited-${newSessionToken().slice(0, 12).toLowerCase()}`;
-  return invitations.acceptWithNewUser({
+  const result = await invitations.acceptWithNewUser({
     token,
     username,
     passwordHash: await hashPassword(randomCredential),
     accessSlug,
     acceptedAt,
   });
+  if (!result) return null;
+
+  // Written after the fact rather than inside that CTE, which already carries
+  // three dependent writes. A dropped notification is not the class of loss
+  // the transaction rule exists for: nothing later is computed from it.
+  if (invitation.owner_id) {
+    await notifications.create({
+      userId: invitation.owner_id,
+      kind: "invite_accepted",
+      projectId: invitation.project_id,
+      actorId: result.user_id,
+    });
+    await announce(invitation.owner_id, invitation.project_name, result.user_id, lang);
+  }
+  return result;
+}
+
+/**
+ * Tells the owner, by mail, that somebody took up their invitation.
+ *
+ * Bodies are inline rather than in the dictionaries: that is where every mail
+ * in this codebase lives, and it is written down in CONTRIBUTING as the one
+ * known exception. Failures are swallowed -- the membership is already real,
+ * and an SMTP outage must not turn a successful join into an error page.
+ */
+async function announce(
+  ownerId: number | null,
+  projectName: string,
+  actorId: number,
+  lang: Lang,
+) {
+  if (!ownerId) return;
+  const [owner, actor] = await Promise.all([users.byId(ownerId), users.byId(actorId)]);
+  if (!owner) return;
+  const who = actor?.name?.trim() || actor?.email || "";
+
+  try {
+    await send({
+      to: owner.email,
+      subject:
+        lang === "tr"
+          ? `${projectName} davetin kabul edildi`
+          : `Your invitation to ${projectName} was accepted`,
+      text:
+        lang === "tr"
+          ? `${who} ${projectName} projesine katıldı.\n\nArtık görevleri ve kaydı birlikte görüyorsunuz:\n${publicUrl()}`
+          : `${who} joined ${projectName}.\n\nYou now share its tasks and its log:\n${publicUrl()}`,
+    });
+  } catch {
+    // Nothing to recover: the join happened either way.
+  }
 }

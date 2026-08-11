@@ -122,6 +122,29 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_project_invitations_pending
   ON project_invitations (project_id, lower(email))
   WHERE accepted_at IS NULL AND revoked_at IS NULL;
 
+-- The one place that tells an account something happened while it was not
+-- looking. Deliberately a table rather than a query over invitations and
+-- memberships: "read" has to survive, and a badge that cannot be cleared stops
+-- being a notification and becomes decoration.
+-- actor_id is SET NULL rather than CASCADE for the same reason the log is:
+-- somebody deleting their account should cost the notice its name, not its
+-- existence.
+CREATE TABLE IF NOT EXISTS notifications (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL,
+  project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  actor_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  -- The only handle on somebody who has no account yet: the invited address.
+  detail     TEXT,
+  created_at TEXT NOT NULL,
+  read_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user
+  ON notifications (user_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread
+  ON notifications (user_id) WHERE read_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS tasks (
   id         SERIAL PRIMARY KEY,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -208,6 +231,15 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS repo_url TEXT;
 
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS hash_seen  TEXT;
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS checked_at TEXT;
+
+-- Who wrote it. \`author\` only ever said 'human' or 'agent', which is enough
+-- in an account of one and useless in a shared project: two people and their
+-- agents all wrote 'human' and 'agent'.
+-- SET NULL, not CASCADE: a collaborator who deletes their account must not
+-- take the project's log with them. The signature goes, the entry stays, and
+-- the row falls back to the author column it already had.
+ALTER TABLE entries     ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE task_events ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
 -- Linking the same file to the same task twice was allowed, and \`link_files\`
 -- is described to agents as safe to call again. Every repeat added a row: the

@@ -1,4 +1,4 @@
-import type { ContextKind, EntryKind, Status } from "./constants";
+import type { ContextKind, EntryKind, NotificationKind, Status } from "./constants";
 
 /**
  * Row shapes, in one place so repositories can depend on the data contract
@@ -64,6 +64,8 @@ export type Project = {
   share_log: number;
   /** The caller's relationship to this project, when loaded privately. */
   access_role?: "owner" | "member";
+  /** Who it belongs to. Only selected on the private reads that join users. */
+  owner_name?: string;
 };
 
 export type ProjectMembership = {
@@ -108,8 +110,14 @@ export type Entry = {
   body: string;
   author: string;
   model: string | null;
+  /** Null on everything written before the column existed, and on rows whose
+   *  author has since deleted their account. `author` still answers. */
+  user_id: number | null;
   created_at: string;
 };
+
+/** An entry with its author resolved, from the reads that join `users`. */
+export type EntryView = Entry & { author_name: string | null };
 
 export type Context = {
   id: number;
@@ -145,6 +153,25 @@ export type TaskEvent = {
   at: string;
   actor: string;
   model: string | null;
+  user_id: number | null;
+};
+
+export type Notification = {
+  id: number;
+  user_id: number;
+  kind: NotificationKind;
+  project_id: number | null;
+  actor_id: number | null;
+  detail: string | null;
+  created_at: string;
+  read_at: string | null;
+};
+
+/** What the bell renders: the row, plus the two names it refers to. */
+export type NotificationView = Notification & {
+  project_name: string | null;
+  project_slug: string | null;
+  actor_name: string | null;
 };
 
 export type RefStatus = "fresh" | "changed" | "missing" | "unknown";

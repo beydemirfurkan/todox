@@ -16,6 +16,8 @@ export async function create(
   input: tasks.NewTask & {
     actor?: string;
     model?: string | null;
+    /** Who is doing this. Resolved from the session or the token, never sent. */
+    user_id?: number | null;
     /** Hashes come from the caller: this process cannot see the files. */
     files?: { path: string; hash?: string | null }[];
   },
@@ -52,7 +54,7 @@ function closedAtFor(patch: tasks.TaskPatch, before: Task): tasks.TaskPatch {
 export async function update(
   id: number,
   patch: tasks.TaskPatch,
-  meta: { actor?: string; model?: string | null } = {},
+  meta: { actor?: string; model?: string | null; user_id?: number | null } = {},
 ): Promise<Task | undefined> {
   const before = await tasks.byId(id);
   if (!before) return undefined;
@@ -78,6 +80,7 @@ export async function update(
       to_status: patch.status!,
       actor: meta.actor,
       model: meta.model,
+      user_id: meta.user_id,
     }),
   ]);
   return rows[0];

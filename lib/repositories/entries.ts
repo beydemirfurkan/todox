@@ -1,6 +1,6 @@
 import type { EntryKind } from "../constants";
 import { all, groupBy, one, run } from "../db/client";
-import type { Entry } from "../types";
+import type { Entry, EntryView } from "../types";
 import { now } from "../util/time";
 
 export type NewEntry = {
@@ -9,20 +9,34 @@ export type NewEntry = {
   body: string;
   author?: string;
   model?: string | null;
+  /** Resolved from the session or the token, never from the caller. */
+  user_id?: number | null;
 };
 
+/**
+ * The author's name comes back with the row.
+ *
+ * A join on a primary key, not a second query: the alternative is one lookup
+ * per distinct writer on a page that already has the rows in hand. Null when
+ * the entry predates the column or its author deleted their account, and the
+ * `author` column ('human' / 'agent') still answers in that case.
+ */
+const WITH_AUTHOR = `SELECT e.*, u.name AS author_name
+                       FROM entries e
+                       LEFT JOIN users u ON u.id = e.user_id`;
+
 export const listByTask = (taskId: number) =>
-  all<Entry>("SELECT * FROM entries WHERE task_id = ? ORDER BY id", [taskId]);
+  all<EntryView>(`${WITH_AUTHOR} WHERE e.task_id = ? ORDER BY e.id`, [taskId]);
 
 /**
  * Batch load for a set of tasks. Over HTTP a per-task query is a per-task round
  * trip, so anything rendering a list uses this instead.
  */
-export async function listByTasks(taskIds: number[]): Promise<Map<number, Entry[]>> {
+export async function listByTasks(taskIds: number[]): Promise<Map<number, EntryView[]>> {
   if (!taskIds.length) return new Map();
-  const rows = await all<Entry>(
-    `SELECT * FROM entries WHERE task_id IN (${taskIds.map(() => "?").join(",")})
-     ORDER BY task_id, id`,
+  const rows = await all<EntryView>(
+    `${WITH_AUTHOR} WHERE e.task_id IN (${taskIds.map(() => "?").join(",")})
+     ORDER BY e.task_id, e.id`,
     taskIds,
   );
   return groupBy(rows, (r) => r.task_id);
@@ -94,14 +108,15 @@ export const byId = (id: number) =>
 
 export async function create(input: NewEntry): Promise<Entry> {
   const row = await one<Entry>(
-    `INSERT INTO entries (task_id, kind, body, author, model, created_at)
-     VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+    `INSERT INTO entries (task_id, kind, body, author, model, user_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     [
       input.task_id,
       input.kind,
       input.body,
       input.author ?? "agent",
       input.model ?? null,
+      input.user_id ?? null,
       now(),
     ],
   );

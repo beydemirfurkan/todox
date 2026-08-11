@@ -36,6 +36,23 @@ export const listByProject = (projectId: number) =>
     [projectId],
   );
 
+/**
+ * How many people share each of these projects, counted in the database.
+ *
+ * The dashboard renders a card per project; a count per card would be a round
+ * trip per card. Projects with no members are simply absent from the map.
+ */
+export async function countsByProjects(projectIds: number[]): Promise<Map<number, number>> {
+  if (!projectIds.length) return new Map();
+  const rows = await all<{ project_id: number; n: string }>(
+    `SELECT project_id, COUNT(*) AS n FROM project_memberships
+      WHERE project_id IN (${projectIds.map(() => "?").join(",")})
+      GROUP BY project_id`,
+    projectIds,
+  );
+  return new Map(rows.map((r) => [r.project_id, Number(r.n)]));
+}
+
 export const byProjectAndEmail = (projectId: number, email: string) =>
   one<ProjectMembership>(
     `SELECT pm.* FROM project_memberships pm
@@ -67,6 +84,21 @@ export const createForAcceptedInvitationStmt = (input: {
     input.acceptedAt,
   ],
 });
+
+/**
+ * The row, but only if the caller owns the project it is in.
+ *
+ * Removing somebody has to tell them so, and the only place their user id
+ * exists is the row about to be deleted. Reading it first is the whole reason
+ * this is a two-step in a service rather than one call from the action.
+ */
+export const ownedById = (ownerId: number, membershipId: number) =>
+  one<ProjectMembership>(
+    `SELECT pm.* FROM project_memberships pm
+       JOIN projects p ON p.id = pm.project_id
+      WHERE pm.id = ? AND p.user_id = ?`,
+    [membershipId, ownerId],
+  );
 
 export const removeOwned = (ownerId: number, membershipId: number) =>
   run(

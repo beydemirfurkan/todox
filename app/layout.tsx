@@ -7,6 +7,7 @@ import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import { Blob } from "./components";
 import { LangSwitcher } from "./features/lang-switcher";
+import { Notifications } from "./features/notifications";
 import { SearchBox } from "./features/search-box";
 import { TzProbe } from "./features/tz-probe";
 import { UserMenu } from "./features/user-menu";
@@ -76,6 +77,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   </Suspense>
                 </div>
                 <LangSwitcher lang={lang} t={t} />
+                {/* Its own boundary: the feed can only be fetched once the
+                    session is known, so awaiting it here would put a second
+                    sequential query in front of every page. */}
+                <Suspense>
+                  <Notifications userId={user.id} />
+                </Suspense>
               </div>
 
               <UserMenu

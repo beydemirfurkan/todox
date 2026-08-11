@@ -11,7 +11,8 @@ import * as contexts from "@/lib/repositories/contexts";
 import * as entries from "@/lib/repositories/entries";
 import * as projects from "@/lib/repositories/projects";
 import * as invitations from "@/lib/repositories/project-invitations";
-import * as memberships from "@/lib/repositories/project-memberships";
+import * as collaboration from "@/lib/services/collaboration";
+import * as notificationService from "@/lib/services/notifications";
 import * as refs from "@/lib/repositories/refs";
 import {
   assertContext,
@@ -49,6 +50,19 @@ export async function setLangAction(fd: FormData) {
     secure: process.env.NODE_ENV === "production",
   });
   revalidatePath("/", "layout");
+}
+
+/* --------------------------------------------------------- notifications */
+
+/**
+ * Called when the bell is opened, not submitted from a form.
+ *
+ * No `revalidatePath`: the panel has already dropped its own badge, and
+ * re-rendering the layout underneath an open menu would close it.
+ */
+export async function markNotificationsReadAction() {
+  const user = await requireUser();
+  await notificationService.markAllRead(user.id);
 }
 
 /* --------------------------------------------------------------- sharing */
@@ -152,7 +166,9 @@ export async function revokeProjectInviteAction(fd: FormData) {
 
 export async function removeProjectMemberAction(fd: FormData) {
   const user = await requireUser();
-  await memberships.removeOwned(user.id, num(fd, "membership_id"));
+  // Through the service: the person being removed has to be told, and their
+  // id only exists on the row that is about to disappear.
+  await collaboration.removeMember(user.id, num(fd, "membership_id"));
   revalidatePath("/account");
   revalidatePath("/", "layout");
 }
@@ -167,6 +183,7 @@ export async function acceptProjectInviteAction(fd: FormData) {
     emailVerified: Boolean(user.email_verified_at),
     token: str(fd, "token") || undefined,
     invitationId: num(fd, "invitation_id") || undefined,
+    lang: await getLang(),
   });
   if (!slug) redirect("/account?tab=invites&invite=failed");
   revalidatePath("/", "layout");
@@ -175,7 +192,7 @@ export async function acceptProjectInviteAction(fd: FormData) {
 
 export async function acceptNewAccountInviteAction(fd: FormData) {
   const token = str(fd, "token");
-  const result = token ? await acceptWithNewAccount(token) : null;
+  const result = token ? await acceptWithNewAccount(token, await getLang()) : null;
   if (!result) redirect("/invite?state=failed");
   await setSessionCookie(await auth.issueSession(result.user_id));
   revalidatePath("/", "layout");
@@ -196,6 +213,7 @@ export async function createTaskAction(fd: FormData) {
     body: str(fd, "body") || null,
     priority: num(fd, "priority") || 2,
     actor: "human",
+    user_id: user.id,
   });
   revalidatePath(`/p/${slug}`);
 }
@@ -204,7 +222,11 @@ export async function setStatusAction(fd: FormData) {
   const user = await requireUser();
   const id = num(fd, "task_id");
   await assertTask(user.id, id);
-  await taskService.update(id, { status: str(fd, "status") as Status }, { actor: "human" });
+  await taskService.update(
+    id,
+    { status: str(fd, "status") as Status },
+    { actor: "human", user_id: user.id },
+  );
   revalidatePath("/", "layout");
 }
 
@@ -219,7 +241,7 @@ export async function updateTaskAction(fd: FormData) {
       body: str(fd, "body") || null,
       priority: num(fd, "priority") || 2,
     },
-    { actor: "human" },
+    { actor: "human", user_id: user.id },
   );
   revalidatePath("/", "layout");
 }
@@ -237,6 +259,7 @@ export async function addEntryAction(fd: FormData) {
     kind: str(fd, "kind") as EntryKind,
     body,
     author: "human",
+    user_id: user.id,
   });
   revalidatePath("/", "layout");
 }

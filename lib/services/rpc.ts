@@ -196,6 +196,9 @@ export const methods = {
       priority: p.priority,
       files: p.files,
       model: p.model,
+      // From the resolved token, never from the payload -- see the note at the
+      // top of this file. `rpc-schemas.ts` has no field for it and must not.
+      user_id: userId,
     });
 
     return {
@@ -223,7 +226,7 @@ export const methods = {
   ) => {
     await assertTask(userId, p.task_id);
     const { task_id, model, ...patch } = p;
-    return taskService.update(task_id, patch, { model });
+    return taskService.update(task_id, patch, { model, user_id: userId });
   },
 
   logEntry: async (
@@ -231,7 +234,7 @@ export const methods = {
     p: { task_id: number; kind: EntryKind; body: string; author?: string; model?: string },
   ) => {
     await assertTask(userId, p.task_id);
-    return taskService.addEntry(p);
+    return taskService.addEntry({ ...p, user_id: userId });
   },
 
   linkFiles: async (

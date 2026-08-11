@@ -76,7 +76,13 @@ export default async function ProjectPage({
     tasksRepo.listByProject(project.id, "all"),
     contexts.listByProject(user.id, project.id),
     staleRefs(user.id, project),
-    owner ? membershipsRepo.listByProject(project.id) : Promise.resolve([]),
+    // Everyone with access sees who else has it. This used to be owner-only,
+    // which meant the person who had just been invited into a project could
+    // not see that anybody else was in it -- including, from their side, that
+    // the collaboration existed at all.
+    membershipsRepo.listByProject(project.id),
+    // Pending invitations stay with the owner: an address that has not
+    // accepted yet is not the team's business.
     owner ? invitationsRepo.listByProject(project.id) : Promise.resolve([]),
   ]);
 
@@ -140,6 +146,13 @@ export default async function ProjectPage({
           <h1 className="display text-[26px] leading-[1.1] font-bold sm:text-[33px]">
             {project.name}
           </h1>
+          {/* Whose project this is, said once and up front. A joined project
+              used to be indistinguishable from your own. */}
+          {!owner && project.owner_name && (
+            <Chip color="var(--k-handoff)" tilt={-2}>
+              {t("sharedBy", { name: project.owner_name })}
+            </Chip>
+          )}
           {repo && (
             <a
               href={repo}
@@ -350,6 +363,104 @@ export default async function ProjectPage({
         {/* Sticky, and bounded by the viewport with its own scroll: pinned
             content taller than the screen has a bottom nobody can reach. */}
         <aside className="min-w-0 mt-9 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+          {/* Who is in this, above the notes, because it is the fact the rest
+              of the page reads differently in light of. The owner keeps the
+              controls; everybody else gets the roster, which is the part that
+              answers "am I working with somebody here". */}
+          <Panel
+            delay={120}
+            className="border-none shadow-none dropshadow-none"
+            title={t("team")}
+            right={<Counter n={members.length + 1} label={t("team")} />}
+          >
+            <ul className="space-y-1.5">
+              <li className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5">
+                <span className="display min-w-0 flex-1 text-[14px] font-bold break-words">
+                  {project.owner_name ?? "—"}
+                </span>
+                <Chip color="var(--k-decision)">{t("teamOwner")}</Chip>
+                {owner && <Chip>{t("teamYou")}</Chip>}
+              </li>
+
+              {members.map((member) => (
+                <li
+                  key={member.id}
+                  className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="display block text-[14px] font-bold break-words">
+                      {member.name}
+                    </span>
+                    {/* The owner sees addresses because the owner invited
+                        them. Between collaborators a name and a handle answer
+                        "who am I working with"; an inbox is not that. */}
+                    <span className="mono block text-[11.5px] break-all text-faint">
+                      {owner ? member.email : `@${member.username}`}
+                    </span>
+                  </span>
+                  {member.user_id === user.id && <Chip>{t("teamYou")}</Chip>}
+                  {owner && (
+                    <form action={removeProjectMemberAction}>
+                      <input type="hidden" name="membership_id" value={member.id} />
+                      <SubmitButton
+                        className="link-more row-action text-meta"
+                        pendingLabel={t("working")}
+                      >
+                        {t("removeCollaborator")}
+                        <span className="sr-only"> — {member.name}</span>
+                      </SubmitButton>
+                    </form>
+                  )}
+                </li>
+              ))}
+
+              {invitations.map((invitation) => (
+                <li
+                  key={invitation.id}
+                  className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="mono block text-[12.5px] break-all">
+                      {invitation.email}
+                    </span>
+                    <span className="block text-[11.5px] text-faint">
+                      {t("teamPending")}
+                    </span>
+                  </span>
+                  <form action={revokeProjectInviteAction}>
+                    <input type="hidden" name="invitation_id" value={invitation.id} />
+                    <SubmitButton
+                      className="link-more row-action text-meta"
+                      pendingLabel={t("working")}
+                    >
+                      {t("revoke")}
+                      <span className="sr-only"> — {invitation.email}</span>
+                    </SubmitButton>
+                  </form>
+                </li>
+              ))}
+            </ul>
+
+            {owner && (
+              <details className="mt-3 border-t border-dashed border-rule pt-3">
+                <summary className="link-more">{t("invitePeople")}</summary>
+                <form action={inviteProjectAction} className="mt-3 space-y-2">
+                  <input type="hidden" name="project_id" value={project.id} />
+                  <Field label={t("inviteEmail")}>
+                    <input name="email" type="email" autoComplete="email" required />
+                  </Field>
+                  <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+                    {t("inviteSend")}
+                  </SubmitButton>
+                </form>
+              </details>
+            )}
+
+            {members.length === 0 && invitations.length === 0 && owner && (
+              <p className="mt-3 text-[13px] text-muted">{t("teamAlone")}</p>
+            )}
+          </Panel>
+
           <Panel
             delay={140}
             className={"border-none shadow-none dropshadow-none"}
@@ -419,51 +530,6 @@ export default async function ProjectPage({
       {owner && (
         <ProjectSettingsDrawer title={t("projectSettings")} closeLabel={t("close")}>
           <div className="space-y-5">
-          <section>
-            <h3 className="display mb-2 text-[15px] font-bold">{t("invitePeople")}</h3>
-            <form action={inviteProjectAction} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="project_id" value={project.id} />
-              <Field label={t("inviteEmail")} className="min-w-[15rem] flex-1">
-                <input name="email" type="email" autoComplete="email" required />
-              </Field>
-              <SubmitButton className="btn" pendingLabel={t("working")}>
-                {t("inviteSend")}
-              </SubmitButton>
-            </form>
-            {(members.length > 0 || invitations.length > 0) && (
-              <div className="mt-4 space-y-2">
-                {members.map((member) => (
-                  <div key={member.id} className="sticker-flat flex flex-wrap items-center gap-3 p-3">
-                    <div className="min-w-[12rem] flex-1">
-                      <p className="display font-bold">{member.name}</p>
-                      <p className="break-all text-[12.5px] text-muted">{member.email}</p>
-                    </div>
-                    <form action={removeProjectMemberAction}>
-                      <input type="hidden" name="membership_id" value={member.id} />
-                      <SubmitButton className="link-more" pendingLabel={t("working")}>
-                        {t("removeCollaborator")}
-                      </SubmitButton>
-                    </form>
-                  </div>
-                ))}
-                {invitations.map((invitation) => (
-                  <div key={invitation.id} className="sticker-flat flex flex-wrap items-center gap-3 p-3">
-                    <div className="min-w-[12rem] flex-1">
-                      <p className="break-all font-medium">{invitation.email}</p>
-                      <p className="text-[12.5px] text-muted">{t("pending")}</p>
-                    </div>
-                    <form action={revokeProjectInviteAction}>
-                      <input type="hidden" name="invitation_id" value={invitation.id} />
-                      <SubmitButton className="link-more" pendingLabel={t("working")}>
-                        {t("revoke")}
-                      </SubmitButton>
-                    </form>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
           <section>
             <h3 className="display mb-2 text-[15px] font-bold">{t("sharing")}</h3>
             <SharePanel

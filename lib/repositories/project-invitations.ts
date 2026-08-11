@@ -6,6 +6,8 @@ export type InvitationView = ProjectInvitation & {
   project_name: string;
   project_slug: string;
   inviter_name: string | null;
+  /** Who to tell when this is accepted. The project owner, not the inviter. */
+  owner_id: number | null;
 };
 
 const ACTIVE = "accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?";
@@ -45,7 +47,7 @@ export async function replacePending(input: {
 
 export const byToken = (token: string, at: string) =>
   one<InvitationView>(
-    `SELECT i.*, p.name AS project_name, p.slug AS project_slug,
+    `SELECT i.*, p.name AS project_name, p.slug AS project_slug, p.user_id AS owner_id,
             inviter.name AS inviter_name
        FROM project_invitations i
        JOIN projects p ON p.id = i.project_id
@@ -56,7 +58,7 @@ export const byToken = (token: string, at: string) =>
 
 export const byIdForEmail = (id: number, email: string, at: string) =>
   one<InvitationView>(
-    `SELECT i.*, p.name AS project_name, p.slug AS project_slug,
+    `SELECT i.*, p.name AS project_name, p.slug AS project_slug, p.user_id AS owner_id,
             inviter.name AS inviter_name
        FROM project_invitations i
        JOIN projects p ON p.id = i.project_id
@@ -67,7 +69,7 @@ export const byIdForEmail = (id: number, email: string, at: string) =>
 
 export const listPendingForEmail = (email: string, at: string) =>
   all<InvitationView>(
-    `SELECT i.*, p.name AS project_name, p.slug AS project_slug,
+    `SELECT i.*, p.name AS project_name, p.slug AS project_slug, p.user_id AS owner_id,
             inviter.name AS inviter_name
        FROM project_invitations i
        JOIN projects p ON p.id = i.project_id
@@ -79,7 +81,7 @@ export const listPendingForEmail = (email: string, at: string) =>
 
 export const listByProject = (projectId: number) =>
   all<InvitationView>(
-    `SELECT i.*, p.name AS project_name, p.slug AS project_slug,
+    `SELECT i.*, p.name AS project_name, p.slug AS project_slug, p.user_id AS owner_id,
             inviter.name AS inviter_name
        FROM project_invitations i
        JOIN projects p ON p.id = i.project_id

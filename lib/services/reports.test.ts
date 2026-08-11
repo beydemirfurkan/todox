@@ -28,6 +28,7 @@ const event = (to: Status, at: string, over: Partial<TaskEvent> = {}): TaskEvent
   at,
   actor: "agent",
   model: null,
+  user_id: null,
   ...over,
 });
 

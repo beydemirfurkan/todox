@@ -71,7 +71,7 @@ export const activeBetween = (userId: number, from: string, to: string) =>
  * every duration in every report. A CTE is the only way to make it atomic.
  */
 export async function create(
-  input: NewTask & { actor?: string; model?: string | null },
+  input: NewTask & { actor?: string; model?: string | null; user_id?: number | null },
 ): Promise<Task> {
   const ts = now();
   const row = await one<Task>(
@@ -80,8 +80,8 @@ export async function create(
        VALUES (?, ?, ?, ?, ?, ?, ?)
        RETURNING *
      ), e AS (
-       INSERT INTO task_events (task_id, from_status, to_status, at, actor, model)
-       SELECT t.id, NULL, t.status, ?, ?, ? FROM t
+       INSERT INTO task_events (task_id, from_status, to_status, at, actor, model, user_id)
+       SELECT t.id, NULL, t.status, ?, ?, ?, ? FROM t
      )
      SELECT * FROM t`,
     [
@@ -95,6 +95,7 @@ export async function create(
       ts,
       input.actor ?? "agent",
       input.model ?? null,
+      input.user_id ?? null,
     ],
   );
   return row!;

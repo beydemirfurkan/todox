@@ -93,6 +93,13 @@ jobs:
         if: env.DATABASE_URL != ''
         run: pnpm smoke:report
 
+      # Invite, accept, attribution, removal, and the notice each one owes
+      # somebody. Every assertion here is about a row two accounts share, which
+      # is the part no unit test can stand in for.
+      - name: Collaboration guarantees
+        if: env.DATABASE_URL != ''
+        run: pnpm smoke:collab
+
       # The suite that keeps mcp/tools.ts honest as one definition: it runs the
       # same assertions through the hosted endpoint and the stdio process, and
       # a tool that only works one way in fails here. It needs the app running,
