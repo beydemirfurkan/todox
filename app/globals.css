@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-* {
-  scroll-behavior: smooth;
-  scrollbar-width: none !important;
-}
-
 /*
   todox — "lab notebook, drawn by hand", at night.
   Cut-paper stickers on dark stock: 2px light outlines, hard offset shadows,
@@ -98,7 +93,17 @@ body {
 /* No `scroll-behavior: smooth` here. The router resets and restores scroll on
    every navigation, and smoothing those turns them into a visible drift the
    reader did not ask for -- which is what "the page keeps scrolling" was. The
-   skip link jumping instantly is the better behaviour anyway. */
+   skip link jumping instantly is the better behaviour anyway.
+
+   This came back once, as `* { scroll-behavior: smooth }` at the top of the
+   file, ninety lines above the paragraph explaining why it was removed. If it
+   is ever wanted again, it belongs on a specific element with a reason, not on
+   every element in the document.
+
+   `* { scrollbar-width: none !important }` arrived with it and went the same
+   way: `html` sets `thin` deliberately a few lines up, there are
+   `::-webkit-scrollbar` rules further down, and hiding every scrollbar takes
+   away the only signal that a pinned side rail scrolls at all. */
 
 /* ------------------------------------------------------------- selection */
 
