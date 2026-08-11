@@ -504,113 +504,6 @@ select.control-sm {
   background-position: right 7px center;
 }
 
-/* The navbar language switcher. The chrome pill (search/report/Etc) is a hard
-   sticker; the select wraps its native widget in a softer shell so the menus
-   that open *down* from it do not look like the in-row status picker. No
-   offset shadow here -- a soft drop, and the same accent ring on focus that
-   the search box uses, so the two upper-row controls answer in the same
-   voice. */
-.lang-select {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: 36px;
-  box-sizing: border-box;
-  background: rgba(34, 37, 46, 0.62);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(12px) saturate(130%);
-  -webkit-backdrop-filter: blur(12px) saturate(130%);
-  transition:
-    border-color 0.14s ease,
-    box-shadow 0.14s ease,
-    background 0.14s ease;
-}
-.lang-select:hover {
-  border-color: var(--line-strong);
-  background: rgba(34, 37, 46, 0.78);
-}
-.lang-select:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-.lang-select select {
-  all: unset;
-  appearance: none;
-  background: transparent;
-  font-family: var(--font-instrument), sans-serif;
-  font-size: 13.5px;
-  font-weight: 500;
-  line-height: 34px;
-  color: var(--ink);
-  height: 100%;
-  padding: 0 30px;
-  text-align: center;
-  text-align-last: center;
-  cursor: pointer;
-  /* width: max-content keeps the pill as narrow as the longest label and
-     stops the navbar from giving the select a row of its own. */
-  width: max-content;
-  min-width: 5.5rem;
-  box-sizing: border-box;
-  /* the picker uses the sys palette directly so the OS menu does not flash
-     a white sheet between the click and the new page */
-}
-.lang-select select option {
-  background: var(--card);
-  color: var(--ink);
-}
-.lang-select select:disabled {
-  cursor: default;
-}
-.lang-select .chev {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--muted);
-  transition: transform 0.18s ease, color 0.14s ease;
-  display: inline-flex;
-}
-.lang-select:focus-within .chev {
-  color: var(--accent);
-  transform: translateY(-50%) rotate(180deg);
-}
-.lang-select[aria-busy="true"] {
-  opacity: 0.6;
-  pointer-events: none;
-}
-/* native controls follow the dark scheme rather than rendering white */
-input[type="checkbox"] {
-  accent-color: var(--accent);
-}
-
-/* A field that cannot be used should look like one. There was nothing here, so
-   a disabled input was pixel-identical to a live one. */
-input:disabled,
-textarea:disabled,
-select:disabled {
-  opacity: 0.55;
-}
-select:disabled {
-  background-image: none;
-}
-
-/* Inline controls: the status select on a task row, a form in a panel header.
-   Its absence is what produced `!w-[108px] !px-2 !py-1 !text-[12.5px]` in one
-   place and `!w-[116px] … !text-[13px]` in another for the same control. */
-.control-sm {
-  font-size: var(--text-small);
-  padding: 4px 9px;
-  border-radius: 8px;
-  width: auto;
-}
-select.control-sm {
-  padding-right: 22px;
-  background-position: right 7px center;
-}
 
 button {
   cursor: pointer;
@@ -709,6 +602,25 @@ pre {
    of the dark stock, with a soft drop and the same accent focus ring the
    search box uses. The menu panel is the same idea on a heavier blur, with
    the same animation language as the rest of the pop-in elements. */
+/* The language popup is the account menu with a flag in the trigger. The name
+   stays beside it: a flag is a country, and English is not one country's --
+   alone it would be a guess. Below 400px the trigger keeps just the flag and
+   the panel still says both. */
+.lang-menu .user-menu-trigger {
+  gap: 6px;
+  padding-inline: 10px;
+}
+.lang-menu .user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 400px) {
+  .lang-menu-name {
+    display: none;
+  }
+}
+
 .user-menu {
   position: relative;
   display: inline-block;
@@ -1252,13 +1164,9 @@ pre {
     min-height: 44px;
   }
   .searchbox,
-  .lang-select,
   .user-menu-trigger {
     height: 44px;
     min-height: 44px;
-  }
-  .lang-select select {
-    line-height: 42px;
   }
   .account-tab {
     min-height: 44px;
@@ -1271,16 +1179,14 @@ pre {
   /* Under 16px, iOS Safari zooms the page when a field takes focus and never
      zooms back out -- which reads as the page drifting on its own.
      This rule was written and then defeated in seven places: five `!text-[…]`
-     call sites, `.searchbox input`, and `.lang-select select`, all three of
-     which sit in the header of every page. A bare `input, textarea, select`
-     loses to any class, so every class that restyles a field is named here.
-     Add one and it belongs in this list. */
+     call sites and `.searchbox input`, which is in the header of every page.
+     A bare `input, textarea, select` loses to any class, so every class that
+     restyles a field is named here. Add one and it belongs in this list. */
   input,
   textarea,
   select,
   .control-sm,
-  .searchbox input,
-  .lang-select select {
+  .searchbox input {
     font-size: 16px;
   }
 

@@ -1,33 +1,18 @@
 import { type Lang, type T } from "@/lib/i18n";
-import { setLangAction } from "../actions";
-import { LangSelect } from "./lang-select";
+import { LangMenu } from "./lang-menu";
 
 /**
- * A native <select> in place of the two-pill toggle.
+ * A popup in the same shape as the account menu beside it.
  *
- * The form stays a plain `<form action>` so it works without JavaScript; the
- * inner select auto-submits on change when JS is on, and a small submit button
- * is rendered for the no-JS case. Submitting the language already in use is a
- * no-op that costs a cookie write — disabling the active option would take it
- * out of the tab order, which is how "the language does not change" started.
+ * It was a native `<select>` before this, which was a fair call — it scales
+ * past two languages and costs nothing. What it could not do is look like the
+ * other dropdown in the same row: the OS draws the open list, so one of the two
+ * controls in the navbar opened into system chrome and the other into the app.
+ * The choice itself is still a plain form post, and there is still a
+ * `<noscript>` path.
  */
 export function LangSwitcher({ lang, t }: { lang: Lang; t: T }) {
   return (
-    <form action={setLangAction} className="flex items-center gap-2">
-      <label htmlFor="lang-select" className="sr-only">
-        {t("languageLabel")}
-      </label>
-      <LangSelect
-        id="lang-select"
-        name="lang"
-        current={lang}
-        switchingLabel={t("langSwitching")}
-      />
-      <noscript>
-        <button type="submit" className="pill">
-          {t("apply")}
-        </button>
-      </noscript>
-    </form>
+    <LangMenu lang={lang} label={t("languageLabel")} switchingLabel={t("langSwitching")} />
   );
 }
