@@ -219,8 +219,20 @@ async function runSuite(mode: Mode, token: string) {
     model: MODEL,
     ...(mode.local ? {} : { repo_root: OTHER }),
   });
+
+  // A task that is still open, because a briefing carries open work: the
+  // dead end above went on a task this suite had already closed, so the
+  // assertion failed for a reason that had nothing to do with isolation.
+  const openA = JSON.parse(
+    await text("create_task", {
+      cwd: SCRATCH,
+      title: "SMOKE: still open in the first repo",
+      model: MODEL,
+      ...(mode.local ? {} : { repo_root: SCRATCH }),
+    }),
+  ).task.id;
   await text("log_entry", {
-    task_id: taskId,
+    task_id: openA,
     kind: "dead_end",
     body: "SMOKE-A-ONLY: this belongs to the first repo and must not surface in the second.",
     model: MODEL,
