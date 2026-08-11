@@ -621,6 +621,44 @@ pre {
   }
 }
 
+/* The in-form dropdown. It is the navbar menu at control size: same trigger,
+   panel and item, so the app has one dropdown rather than one per context. */
+.picker {
+  display: inline-flex;
+}
+.picker-trigger {
+  gap: 6px;
+  min-height: 0;
+  height: auto;
+  padding: 4px 9px;
+  font-size: var(--text-small);
+  border-radius: 8px;
+}
+.picker-panel {
+  min-width: 100%;
+}
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.picker-item[data-active="true"] {
+  background: rgba(241, 238, 229, 0.06);
+  color: var(--ink);
+}
+.picker-item[aria-selected="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.picker-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1.5px solid;
+}
+
 .user-menu {
   position: relative;
   display: inline-block;
@@ -1164,7 +1202,8 @@ pre {
     min-height: 44px;
   }
   .searchbox,
-  .user-menu-trigger {
+  .user-menu-trigger,
+  .picker-trigger {
     height: 44px;
     min-height: 44px;
   }
@@ -1186,7 +1225,8 @@ pre {
   textarea,
   select,
   .control-sm,
-  .searchbox input {
+  .searchbox input,
+  .picker-trigger {
     font-size: 16px;
   }
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ENTRY_KINDS, STATUSES } from "@/lib/constants";
+import { ENTRY_KINDS } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
@@ -23,9 +23,11 @@ import {
   kindHint,
   kindLabel,
   kindPlaceholder,
-  statusLabel,
+  priorityOptions,
+  statusOptions,
 } from "../../../../kinds";
 import { LogComposer, type KindStrings } from "../../../../features/log-composer";
+import { Picker } from "../../../../features/picker";
 import { SubmitButton } from "../../../../features/submit";
 import {
   Blob,
@@ -111,27 +113,14 @@ export default async function TaskPage({
             right={
               <form action={setStatusAction} className="flex flex-wrap items-center gap-1.5">
                 <input type="hidden" name="task_id" value={task.id} />
-                <label className="sr-only" htmlFor="task-status">
-                  {t("statusLabel")}
-                </label>
-                <select
-                  id="task-status"
+                <Picker
                   name="status"
-                  defaultValue={task.status}
-                  className="control-sm w-28 shrink-0"
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel(t, s)}
-                    </option>
-                  ))}
-                </select>
-                <SubmitButton
-                  className="btn btn-quiet control-sm"
-                  pendingLabel={t("working")}
-                >
-                  {t("apply")}
-                </SubmitButton>
+                  value={task.status}
+                  options={statusOptions(t)}
+                  label={t("statusLabel")}
+                  applyLabel={t("apply")}
+                  submitOnPick
+                />
               </form>
             }
           >
@@ -152,11 +141,12 @@ export default async function TaskPage({
               </Field>
               <div className="flex flex-wrap items-end gap-2">
                 <Field label={t("priorityLabel")} className="w-40">
-                  <select name="priority" defaultValue={String(task.priority)}>
-                    <option value="1">{t("p1")}</option>
-                    <option value="2">{t("p2")}</option>
-                    <option value="3">{t("p3")}</option>
-                  </select>
+                  <Picker
+                    name="priority"
+                    value={String(task.priority)}
+                    options={priorityOptions(t)}
+                    label={t("priorityLabel")}
+                  />
                 </Field>
                 <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
                   {t("save")}

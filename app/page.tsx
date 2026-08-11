@@ -10,8 +10,9 @@ import * as tasks from "@/lib/repositories/tasks";
 import { addContextAction, createProjectAction, deleteContextAction } from "./actions";
 import { Explainer, FirstRun } from "./features/explainer";
 import { Landing } from "./features/landing";
+import { Picker } from "./features/picker";
 import { SubmitButton } from "./features/submit";
-import { contextKindLabel } from "./kinds";
+import { contextKindLabel, kindOptions } from "./kinds";
 import { Blob, Chip, Counter, Empty, Field, Panel } from "./components";
 
 export const dynamic = "force-dynamic";
@@ -159,13 +160,12 @@ export default async function Home() {
             <form action={addContextAction} className="mt-3 space-y-2">
               <div className="flex flex-wrap gap-2">
                 <Field label={t("globalContext")} className="w-40">
-                  <select name="kind">
-                    {CONTEXT_KINDS.map((k) => (
-                      <option key={k} value={k}>
-                        {contextKindLabel(t, k)}
-                      </option>
-                    ))}
-                  </select>
+                  <Picker
+                    name="kind"
+                    value={CONTEXT_KINDS[0]}
+                    options={kindOptions(t)}
+                    label={t("globalContext")}
+                  />
                 </Field>
                 <Field label={t("title")} className="min-w-40 flex-1">
                   <input name="title" required />

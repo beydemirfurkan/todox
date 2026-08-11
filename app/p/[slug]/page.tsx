@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { CONTEXT_KINDS, STATUSES, type Status } from "@/lib/constants";
+import { CONTEXT_KINDS, type Status } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
@@ -26,9 +26,15 @@ import {
   revokeProjectInviteAction,
 } from "../../actions";
 import { authMessages } from "../../auth-messages";
-import { contextKindLabel, statusLabel } from "../../kinds";
+import {
+  contextKindLabel,
+  kindOptions,
+  priorityOptions,
+  statusOptions,
+} from "../../kinds";
 import { AuthForm } from "../../features/auth-form";
 import { SharePanel } from "../../features/share-panel";
+import { Picker } from "../../features/picker";
 import { SubmitButton } from "../../features/submit";
 import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
 import { Blob, Chip, Counter, Empty, Field, Panel, StatusDot } from "../../components";
@@ -290,27 +296,19 @@ export default async function ProjectPage({
                       className="ml-auto flex shrink-0 items-center gap-1.5"
                     >
                       <input type="hidden" name="task_id" value={task.id} />
-                      <label className="sr-only" htmlFor={`st-${task.id}`}>
-                        {t("statusLabel")} — {task.title}
-                      </label>
-                      <select
-                        id={`st-${task.id}`}
+                      {/* Choosing applies it. The apply button next to this was
+                          a second click for the thing people do most, and it
+                          only ever existed because a native select cannot post
+                          a form on its own without script. It still appears
+                          when there is none. */}
+                      <Picker
                         name="status"
-                        defaultValue={task.status}
-                        className="control-sm w-28"
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {statusLabel(t, s)}
-                          </option>
-                        ))}
-                      </select>
-                      <SubmitButton
-                        className="btn btn-quiet control-sm"
-                        pendingLabel={t("working")}
-                      >
-                        {t("apply")}
-                      </SubmitButton>
+                        value={task.status}
+                        options={statusOptions(t)}
+                        label={`${t("statusLabel")} — ${task.title}`}
+                        applyLabel={t("apply")}
+                        submitOnPick
+                      />
                     </form>
                   </li>
                 );
@@ -335,11 +333,12 @@ export default async function ProjectPage({
                 </Field>
                 <div className="flex flex-wrap items-end gap-2">
                   <Field label={t("priorityLabel")} className="w-40">
-                    <select name="priority" defaultValue="2">
-                      <option value="1">{t("p1")}</option>
-                      <option value="2">{t("p2")}</option>
-                      <option value="3">{t("p3")}</option>
-                    </select>
+                    <Picker
+                      name="priority"
+                      value="2"
+                      options={priorityOptions(t)}
+                      label={t("priorityLabel")}
+                    />
                   </Field>
                   <SubmitButton pendingLabel={t("working")}>{t("add")}</SubmitButton>
                 </div>
@@ -391,13 +390,12 @@ export default async function ProjectPage({
                 <form action={addContextAction} className="mt-3 space-y-2">
                   <input type="hidden" name="slug" value={slug} />
                   <Field label={t("projectContext")}>
-                    <select name="kind">
-                      {CONTEXT_KINDS.map((k) => (
-                        <option key={k} value={k}>
-                          {contextKindLabel(t, k)}
-                        </option>
-                      ))}
-                    </select>
+                    <Picker
+                      name="kind"
+                      value={CONTEXT_KINDS[0]}
+                      options={kindOptions(t)}
+                      label={t("projectContext")}
+                    />
                   </Field>
                   <Field label={t("title")}>
                     <input name="title" required />
