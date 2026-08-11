@@ -1,5 +1,11 @@
 # Contributing
 
+> **Two-source rule.** The "rules the codebase actually follows" section
+> below is mirrored verbatim in `AGENTS.md` under "Domain rules". A change
+> to one is a change to the other; the duplication is intentional because
+> Codex/Cursor will not follow a cross-file reference. The PR template has a
+> checkbox to keep them in sync.
+
 ## Getting it running
 
 ```bash
