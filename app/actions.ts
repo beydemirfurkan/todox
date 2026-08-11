@@ -10,6 +10,8 @@ import { LANG_COOKIE } from "@/lib/lang";
 import * as contexts from "@/lib/repositories/contexts";
 import * as entries from "@/lib/repositories/entries";
 import * as projects from "@/lib/repositories/projects";
+import * as invitations from "@/lib/repositories/project-invitations";
+import * as memberships from "@/lib/repositories/project-memberships";
 import * as refs from "@/lib/repositories/refs";
 import {
   assertContext,
@@ -20,6 +22,10 @@ import {
 } from "@/lib/services/ownership";
 import * as sharing from "@/lib/services/sharing";
 import * as taskService from "@/lib/services/task-service";
+import { accept, acceptWithNewAccount, invite } from "@/lib/services/project-invitations";
+import { getLang } from "@/lib/lang";
+import * as auth from "@/lib/services/auth";
+import { setSessionCookie } from "@/lib/session";
 import { requireUser } from "@/lib/session";
 import type { AuthState } from "./auth-actions";
 
@@ -123,6 +129,57 @@ export async function deleteProjectAction(
   await projects.remove(user.id, id);
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+export async function inviteProjectAction(fd: FormData) {
+  const user = await requireUser();
+  await invite({
+    userId: user.id,
+    projectId: num(fd, "project_id"),
+    email: str(fd, "email"),
+    lang: await getLang(),
+  });
+  revalidatePath("/account");
+  revalidatePath("/", "layout");
+}
+
+export async function revokeProjectInviteAction(fd: FormData) {
+  const user = await requireUser();
+  await invitations.revokeOwned(user.id, num(fd, "invitation_id"), new Date().toISOString());
+  revalidatePath("/account");
+  revalidatePath("/", "layout");
+}
+
+export async function removeProjectMemberAction(fd: FormData) {
+  const user = await requireUser();
+  await memberships.removeOwned(user.id, num(fd, "membership_id"));
+  revalidatePath("/account");
+  revalidatePath("/", "layout");
+}
+
+export async function acceptProjectInviteAction(fd: FormData) {
+  const user = await requireUser();
+  // The token when the link supplied one, the id when it came from the list on
+  // the account page. `accept` decides what each is worth.
+  const slug = await accept({
+    userId: user.id,
+    email: user.email,
+    emailVerified: Boolean(user.email_verified_at),
+    token: str(fd, "token") || undefined,
+    invitationId: num(fd, "invitation_id") || undefined,
+  });
+  if (!slug) redirect("/account?tab=invites&invite=failed");
+  revalidatePath("/", "layout");
+  redirect(`/p/${slug}`);
+}
+
+export async function acceptNewAccountInviteAction(fd: FormData) {
+  const token = str(fd, "token");
+  const result = token ? await acceptWithNewAccount(token) : null;
+  if (!result) redirect("/invite?state=failed");
+  await setSessionCookie(await auth.issueSession(result.user_id));
+  revalidatePath("/", "layout");
+  redirect(`/p/${result.access_slug}`);
 }
 
 /* ----------------------------------------------------------------- tasks */

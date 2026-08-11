@@ -21,6 +21,11 @@ const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ??
 /** Passwords keep their whitespace; trimming them silently changes the secret. */
 const raw = (fd: FormData, k: string) => (fd.get(k) as string | null) ?? "";
 
+const inviteNext = (fd: FormData) => {
+  const value = str(fd, "next");
+  return /^\/invite\?token=[A-Za-z0-9_-]{32,}$/.test(value) ? value : "/";
+};
+
 export type AuthState = { errors: auth.FieldError[] } | null;
 
 /**
@@ -76,7 +81,7 @@ export async function registerAction(
 
   await sendVerification(result.value.user, await getLang());
   await startSession(result.value.user.id);
-  redirect("/");
+  redirect(inviteNext(fd));
 }
 
 /* ----------------------------------------------------------------- login */
@@ -104,7 +109,7 @@ export async function loginAction(_prev: AuthState, fd: FormData): Promise<AuthS
 
   await limit.forgive("loginPerIdentity", identifier);
   await startSession(result.value.id);
-  redirect("/");
+  redirect(inviteNext(fd));
 }
 
 export async function logoutAction() {

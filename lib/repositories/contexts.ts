@@ -21,9 +21,12 @@ export const listByProject = (userId: number, projectId: number | null) =>
         [userId],
       )
     : all<Context>(
-        `SELECT * FROM contexts WHERE user_id = ? AND project_id = ?
+        `SELECT c.* FROM contexts c
+          JOIN projects p ON p.id = c.project_id
+          LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+         WHERE c.project_id = ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)
          ORDER BY kind, updated_at DESC`,
-        [userId, projectId],
+        [userId, projectId, userId],
       );
 
 export const byId = (id: number) =>

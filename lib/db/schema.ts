@@ -83,6 +83,45 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects (user_id);
 
+-- Collaborators keep a user-local route slug. A person can therefore join two
+-- projects whose owners both called them "website" without making /p/website
+-- ambiguous in that person's account.
+CREATE TABLE IF NOT EXISTS project_memberships (
+  id            SERIAL PRIMARY KEY,
+  project_id    INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  access_slug   TEXT NOT NULL,
+  root_path     TEXT,
+  invited_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at    TEXT NOT NULL,
+  UNIQUE (project_id, user_id),
+  UNIQUE (user_id, access_slug)
+);
+CREATE INDEX IF NOT EXISTS idx_project_memberships_user
+  ON project_memberships (user_id, project_id);
+
+-- Invitation links contain a random secret and only its hash reaches the
+-- database. Accepted and revoked rows remain as a small audit trail.
+CREATE TABLE IF NOT EXISTS project_invitations (
+  id           SERIAL PRIMARY KEY,
+  project_id   INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  email        TEXT NOT NULL,
+  token_hash   TEXT NOT NULL UNIQUE,
+  invited_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TEXT NOT NULL,
+  expires_at   TEXT NOT NULL,
+  accepted_at  TEXT,
+  accepted_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  revoked_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_project_invitations_email
+  ON project_invitations (lower(email), expires_at);
+CREATE INDEX IF NOT EXISTS idx_project_invitations_project
+  ON project_invitations (project_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_project_invitations_pending
+  ON project_invitations (project_id, lower(email))
+  WHERE accepted_at IS NULL AND revoked_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS tasks (
   id         SERIAL PRIMARY KEY,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
