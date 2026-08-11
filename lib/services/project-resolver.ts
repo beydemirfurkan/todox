@@ -76,7 +76,15 @@ export async function resolveOrCreate(
   if (!isAbsolutePath(ref))
     return { project: await mustResolve(userId, ref), created: false };
 
-  const root = repoRoot && isAbsolutePath(repoRoot) ? normalisePath(repoRoot) : ref;
+  // Normalised whichever branch it came from. Only the `repoRoot` one was, so
+  // an agent that passed `cwd` alone -- which the tools explicitly allow --
+  // stored `C:\Users\me\repo` while its neighbour stored `C:/Users/me/repo`.
+  // Resolution survives that, because `isInside` folds both sides before
+  // comparing. Anything that compares the stored string to a path it built
+  // itself does not, and that has already cost a smoke suite once.
+  const root = normalisePath(
+    repoRoot && isAbsolutePath(repoRoot) ? repoRoot : ref,
+  );
   // Not `node:path`'s basename: this process runs on Linux, where a backslash
   // is an ordinary character, so a Windows path would come back whole and the
   // project would be named "C:\Users\me\repo".

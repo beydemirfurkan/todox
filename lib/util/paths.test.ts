@@ -4,6 +4,7 @@ import {
   isAbsolutePath,
   isInside,
   lastSegment,
+  normalisePath,
   shareToken,
   slugify,
   slugifyOr,
@@ -125,5 +126,23 @@ describe("shareToken", () => {
     // 32 bytes base64url. It used to be 12, the weakest secret in the app.
     expect(shareToken()).toHaveLength(43);
     expect(shareToken()).not.toBe(shareToken());
+  });
+});
+
+describe("normalisePath", () => {
+  /**
+   * Both branches of `resolveOrCreate` have to agree. Only one of them folded
+   * separators, so a project registered from `cwd` alone was stored with
+   * backslashes while its neighbour was stored with forward slashes.
+   */
+  it("folds separators whichever way the caller wrote them", () => {
+    expect(normalisePath("C:\\Users\\me\\repo")).toBe("C:/Users/me/repo");
+    expect(normalisePath("C:/Users/me/repo")).toBe("C:/Users/me/repo");
+    expect(normalisePath("/src/todox")).toBe("/src/todox");
+  });
+
+  it("drops a trailing separator, either kind", () => {
+    expect(normalisePath("C:\\Users\\me\\repo\\")).toBe("C:/Users/me/repo");
+    expect(normalisePath("/src/todox/")).toBe("/src/todox");
   });
 });
