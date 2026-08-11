@@ -362,7 +362,11 @@ export default async function ProjectPage({
 
         {/* Sticky, and bounded by the viewport with its own scroll: pinned
             content taller than the screen has a bottom nobody can reach. */}
-        <aside className="min-w-0 mt-9 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        {/* `space-y` because the rail holds two panels now. It held one for as
+            long as it existed, so nothing here had ever needed a gap -- and
+            the two arrived stacked edge to edge, reading as one broken card.
+            Same 1.25rem the grid puts between the rail and the work. */}
+        <aside className="min-w-0 mt-9 space-y-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           {/* Who is in this, above the notes, because it is the fact the rest
               of the page reads differently in light of. The owner keeps the
               controls; everybody else gets the roster, which is the part that
