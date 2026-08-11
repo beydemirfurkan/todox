@@ -100,8 +100,12 @@ export default async function Home() {
             <Field label={t("projectNamePh")}>
               <input name="name" required />
             </Field>
-            <Field label={t("projectPathPh")}>
-              <input name="root_path" className="mono text-small" />
+            <Field label={t("projectPathLabel")}>
+              <input
+                name="root_path"
+                placeholder={t("projectPathPh")}
+                className="mono text-small"
+              />
             </Field>
             <Field label={t("projectSummaryPh")}>
               <textarea name="summary" />

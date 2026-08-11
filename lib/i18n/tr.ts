@@ -227,6 +227,8 @@ export const tr: Record<Key, string> = {
   tabFiles: "Dosyalar",
   accountSections: "Hesap bölümleri",
   taskSections: "Görev bölümleri",
+  filePathLabel: "dosya yolu",
+  projectPathLabel: "bu makinedeki repo yolu",
   allClear: "Her şey temiz.",
   tasks: "görev",
   taskFilterLabel: "Duruma göre filtrele",

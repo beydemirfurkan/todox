@@ -234,6 +234,8 @@ export const en = {
   tabFiles: "Files",
   accountSections: "Account sections",
   taskSections: "Task sections",
+  filePathLabel: "file path",
+  projectPathLabel: "repo path on this machine",
   allClear: "All clear.",
   tasks: "tasks",
   taskFilterLabel: "Filter by status",

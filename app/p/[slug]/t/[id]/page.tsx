@@ -273,10 +273,17 @@ export default async function TaskPage({
               ))}
               <form action={linkFileAction} className="space-y-2 pt-1">
                 <input type="hidden" name="task_id" value={task.id} />
-                <Field label={t("filePathPh")}>
+                {/* The example is a path inside this project, not the
+                    project's root with "/mutlak/yol/..." glued to the end of
+                    it -- that read as a real location and pointed nowhere. */}
+                <Field label={t("filePathLabel")}>
                   <input
                     name="path"
-                    placeholder={`${project.root_path ?? ""}${t("filePathPh")}`}
+                    placeholder={
+                      project.root_path
+                        ? `${project.root_path}/src/index.ts`
+                        : t("filePathPh")
+                    }
                     className="mono text-small"
                     required
                   />
