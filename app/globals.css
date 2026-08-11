@@ -872,6 +872,127 @@ pre {
   background: transparent;
 }
 
+/* ------------------------------------------------------------ the doorman */
+
+/* Todd holds the sign-in card: head over the top edge, hands on it, feet
+   underneath. Three stacking levels do the whole illusion -- feet and body
+   behind the card, hands in front of it -- so nothing needs clipping or a
+   mask, and the card keeps its own border all the way round.
+
+   The numbers below are not taste. He is drawn at 116px from a 68x66 viewBox
+   whose eyes sit at (26,31) and (43,29), which puts them 14px left and 15px
+   right of his centre and 24px above the card's top edge. That is where the
+   hands have to land, and everything here is measured from it. */
+.auth-stage {
+  position: relative;
+  /* Headroom for the head, and for the bubble above it. */
+  margin-top: 96px;
+}
+.auth-card {
+  position: relative;
+  z-index: 1;
+  padding: 20px;
+}
+.auth-mascot {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  z-index: 0;
+  /* Sunk into the card by a third of his height: enough of him is hidden that
+     he reads as standing behind it rather than balanced on it. */
+  transform: translate(-50%, 32%);
+  pointer-events: none;
+}
+.auth-blob {
+  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.auth-stage[data-state="typing"] .auth-blob {
+  transform: translateY(-4px);
+}
+/* Nothing vertical here on purpose: the hands are aiming at his eyes, and
+   moving them at the same time is how you get a cover that misses. */
+.auth-stage[data-state="shy"] .auth-blob {
+  transform: scale(0.98);
+}
+
+.auth-hand,
+.auth-foot {
+  position: absolute;
+  pointer-events: none;
+}
+/* Percentages, so the grip stays on the corners at every card width -- the
+   card is 26rem on a laptop and the width of a phone minus its padding on a
+   phone, and a fixed offset put the hands outside it at the small end. */
+.auth-hand {
+  top: -13px;
+  z-index: 2;
+  transition:
+    left 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.auth-hand--l {
+  left: 17%;
+  transform: translateX(-50%);
+}
+.auth-hand--r {
+  left: 83%;
+  transform: translateX(-50%);
+}
+.auth-stage[data-state="shy"] .auth-hand--l {
+  left: 50%;
+  transform: translate(calc(-50% - 16px), -24px) rotate(-7deg);
+}
+.auth-stage[data-state="shy"] .auth-hand--r {
+  left: 50%;
+  transform: translate(calc(-50% + 15px), -24px) rotate(7deg);
+}
+
+/* Under the body rather than the card, because that is what they belong to. */
+.auth-foot {
+  bottom: -15px;
+  left: 50%;
+  z-index: 0;
+}
+.auth-foot--l {
+  transform: translateX(calc(-50% - 38px));
+}
+.auth-foot--r {
+  transform: translateX(calc(-50% + 38px));
+}
+
+.auth-bubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  translate: -50% -8px;
+  padding: 5px 11px;
+  white-space: nowrap;
+  font-family: var(--font-instrument), sans-serif;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1.5px solid var(--edge-dark);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  scale: 0.9;
+  transition:
+    opacity 0.18s ease,
+    scale 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.auth-stage[data-state="shy"] .auth-bubble {
+  opacity: 1;
+  scale: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-blob,
+  .auth-hand,
+  .auth-bubble {
+    transition: none;
+  }
+}
+
 /* ------------------------------------------------------------ account tabs */
 
 .account-tabs {

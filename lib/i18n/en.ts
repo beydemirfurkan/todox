@@ -26,6 +26,7 @@ export const en = {
 
   /* auth */
   loginTitle: "Welcome back",
+  mascotShy: "not looking",
   loginIntro: "Sign in to reach your projects and the log behind them.",
   registerTitle: "Create your account",
   registerIntro: "Your projects, your log, your agents. Nobody else can see any of it.",

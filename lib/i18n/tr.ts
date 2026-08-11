@@ -25,6 +25,7 @@ export const tr: Record<Key, string> = {
   signOut: "Çıkış yap",
 
   loginTitle: "Tekrar hoş geldin",
+  mascotShy: "bakmıyorum",
   loginIntro: "Projelerine ve arkalarındaki kayda ulaşmak için giriş yap.",
   registerTitle: "Hesabını oluştur",
   registerIntro: "Projelerin, kaydın, ajanların. Hiçbirini başkası göremez.",

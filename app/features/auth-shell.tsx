@@ -1,20 +1,24 @@
 import type { Mood } from "../components";
-import { Blob } from "../components";
+import { AuthMascot } from "./auth-mascot";
 
 /**
  * Auth pages are one small card on a very wide page. Left in the normal flow
  * they sit against the top edge with a screen of nothing underneath, which
  * reads as unfinished rather than as focused.
  *
- * So: centre the card in the viewport, give it a mascot at a size that can
- * carry the space, and let a soft glow behind it anchor the composition
- * instead of leaving the card floating on flat dark.
+ * So: centre the card in the viewport, let a soft glow behind it anchor the
+ * composition instead of leaving it floating on flat dark, and give it Todd.
+ *
+ * He used to be a small decoration above the heading. Standing behind the card
+ * with his hands on it he does the same job better, and the heading moves
+ * inside the card because it is his hands that hold the top edge now.
  */
 export function AuthShell({
   mood = "happy",
   fill = "var(--accent)",
   title,
   intro,
+  shyLabel,
   children,
   footer,
 }: {
@@ -22,6 +26,9 @@ export function AuthShell({
   fill?: string;
   title: string;
   intro?: string;
+  /** What Todd says while a password field has focus; only the pages that
+   *  have one pass it. */
+  shyLabel?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
@@ -36,16 +43,16 @@ export function AuthShell({
         style={{ background: fill }}
       />
 
-      <div className="w-full max-w-[26rem]">
-        <div className="pop mb-5 flex flex-col items-center gap-2 text-center">
-          <Blob mood={mood} size={64} fill={fill} className="bob" />
-          <h1 className="display text-[30px] leading-tight font-bold">{title}</h1>
-          {intro && <p className="text-[14.5px] leading-snug text-muted">{intro}</p>}
-        </div>
-
-        <div className="sticker pop p-5" style={{ animationDelay: "60ms" }}>
+      <div className="pop w-full max-w-[26rem]">
+        <AuthMascot mood={mood} fill={fill} shyLabel={shyLabel}>
+          <div className="mb-4 text-center">
+            <h1 className="display text-[26px] leading-tight font-bold">{title}</h1>
+            {intro && (
+              <p className="mt-1.5 text-[14px] leading-snug text-muted">{intro}</p>
+            )}
+          </div>
           {children}
-        </div>
+        </AuthMascot>
 
         {footer && (
           <div
