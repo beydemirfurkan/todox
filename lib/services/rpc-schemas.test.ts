@@ -122,6 +122,7 @@ describe("model field round-trips through parseParams on every method", () => {
     addContext: { kind: "convention", title: "x", body: "x" },
     search: { query: "x" },
     activityReport: { period: "today" },
+    recordClientInfo: { name: "claude-code" },
   };
 
   for (const [method, base] of Object.entries(fixtures) as [MethodName, Record<string, unknown>][]) {

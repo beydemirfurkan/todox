@@ -109,7 +109,7 @@ export async function POST(req: Request) {
   // and nothing would reach the log.
   const safeInvoke = async (method: MethodName, params: Record<string, unknown>) => {
     try {
-      return await invoke({ userId: user.id }, method, params);
+      return await invoke({ userId: user.id, token }, method, params);
     } catch (e) {
       // Things the agent can act on keep their real message. Ownership
       // failures must not say whether the id exists for somebody else, and

@@ -304,6 +304,29 @@ export const SHAPES = {
       ),
     model,
   },
+
+  /**
+   * Records the MCP client that just used this token. Server-side, not
+   * agent-facing: the stdio server fires it once at startup with
+   * TODOX_CLIENT_NAME, the HTTP route fires it on the first `initialize`
+   * message, and `get_context` reads the result back so it can hand the
+   * agent client-specific advice. There is no tool registration — calling
+   * it as an agent would not help, because the agent is the thing it is
+   * about to record.
+   */
+  recordClientInfo: {
+    name: z
+      .string()
+      .min(1)
+      .max(MAX.line)
+      .describe("Client name from the MCP initialize message, e.g. 'claude-code'"),
+    version: z
+      .string()
+      .max(MAX.line)
+      .optional()
+      .describe("Client version; defaults to 'unknown'"),
+    model,
+  },
 } satisfies Record<string, z.ZodRawShape>;
 
 export type MethodName = keyof typeof SHAPES;
