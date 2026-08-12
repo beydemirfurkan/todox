@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   if (typeof payload.method !== "string") return fail(400, "method must be a string");
 
   try {
-    const result = await invoke({ userId: user.id }, payload.method, payload.params);
+    const result = await invoke({ userId: user.id, token }, payload.method, payload.params);
     return NextResponse.json({ ok: true, result });
   } catch (e) {
     // Ownership failures are the caller's problem, not a server fault, and

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseParams } from "./rpc-schemas";
+import type { MethodName } from "./rpc-schemas";
 
 /**
  * Adding a field to a shape whose refinement lists the others by hand is a
@@ -93,4 +94,46 @@ describe("parseParams", () => {
     // @ts-expect-error -- the point is the runtime guard, not the type
     expect(() => parseParams("dropEverything", {})).toThrow();
   });
+});
+
+/**
+ * Behaviour, not presence: `parseParams` runs both the SHAPES layer and the
+ * per-method `.strict()` wrapper in lib/services/rpc-schemas.ts, so an
+ * `expect("model" in SHAPES.x])` test would silently pass even if a future
+ * regression tightened `.strict()` and the method kept the field. Parsing
+ * with `model` in the input exercises both layers in one call.
+ */
+describe("model field round-trips through parseParams on every method", () => {
+  // Minimal payload per method -- enough to satisfy required fields without
+  // pulling in fakes for ref shapes.
+  const fixtures: Record<string, Record<string, unknown>> = {
+    listProjects: {},
+    listTasks: { project: "x" },
+    getContext: { cwd: "/tmp" },
+    getTask: { task_id: 1 },
+    createProject: { name: "x" },
+    updateProject: { project: "x", summary: "y" },
+    deleteProject: { project: "x", confirm: "x" },
+    createTask: { title: "x" },
+    updateTask: { task_id: 1, status: "doing" },
+    logEntry: { task_id: 1, kind: "note", body: "x" },
+    linkFiles: { task_id: 1, paths: [{ path: "/tmp/x" }] },
+    reportRefs: { refs: [{ id: 1, hash: "a".repeat(64) }] },
+    addContext: { kind: "convention", title: "x", body: "x" },
+    search: { query: "x" },
+    activityReport: { period: "today" },
+    recordClientInfo: { name: "claude-code" },
+  };
+
+  for (const [method, base] of Object.entries(fixtures) as [MethodName, Record<string, unknown>][]) {
+    it(`${method} accepts { ...base, model: "test" }`, () => {
+      const out = parseParams(method, { ...base, model: "test-model" });
+      expect(out.model).toBe("test-model");
+    });
+
+    it(`${method} still rejects an unknown key`, () => {
+      // The shape gained a field; .strict() must not have been relaxed.
+      expect(() => parseParams(method, { ...base, bogus_key: 1 })).toThrow();
+    });
+  }
 });

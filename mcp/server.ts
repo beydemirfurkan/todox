@@ -28,6 +28,10 @@ const localWorkspace: Workspace = {
   repoRoot: (path) => (isAbsolutePath(path) ? findProjectRoot(path) : undefined),
   hash: hashFile,
   checkRefs,
+  // Filled in by `main` once `readConfig` has resolved the token. The workspace
+  // object is captured by `registerTools` at registration time, but it points
+  // at the `currentToken` slot, so updating the slot updates every call.
+  bearerToken: () => currentToken,
 };
 
 /**
@@ -38,7 +42,25 @@ const localWorkspace: Workspace = {
  */
 async function main() {
   const { token, url } = readConfig();
+  currentToken = token;
   const call = createClient(url, token);
+
+  // The MCP SDK consumes `initialize` before any tool callback runs, so we
+  // cannot capture clientInfo from there. Instead, the parent process sets
+  // TODOX_CLIENT_NAME / TODOX_CLIENT_VERSION when it launches us, and we
+  // record once on startup. Best-effort: a failed record must not break the
+  // connection, because the agent has not asked for anything yet.
+  const clientName = process.env.TODOX_CLIENT_NAME;
+  if (clientName) {
+    try {
+      await call("recordClientInfo", {
+        name: clientName,
+        version: process.env.TODOX_CLIENT_VERSION ?? "unknown",
+      });
+    } catch (e) {
+      console.error("mcp clientInfo", e instanceof Error ? e.message : e);
+    }
+  }
 
   const server = new McpServer(
     { name: "todox", version: "1.0.0" },
@@ -54,3 +76,6 @@ main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });
+
+/** Read by `localWorkspace.bearerToken`. Set inside `main`; undefined at import. */
+let currentToken: string | undefined;

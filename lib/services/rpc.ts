@@ -1,4 +1,5 @@
 import type { ContextKind, EntryKind, Status } from "../constants";
+import * as apiTokensRepo from "../repositories/api-tokens";
 import * as contextsRepo from "../repositories/contexts";
 import * as entriesRepo from "../repositories/entries";
 import * as projectsRepo from "../repositories/projects";
@@ -14,6 +15,7 @@ import { search } from "./search";
 import * as taskService from "./task-service";
 import { isAbsolutePath } from "../util/paths";
 import { resolvePeriod, type PeriodName } from "../util/time";
+import { hashToken } from "../util/tokens";
 
 /**
  * The agent-facing surface, in one place.
@@ -24,9 +26,11 @@ import { resolvePeriod, type PeriodName } from "../util/time";
  * HTTP with a per-user token. One code path, no local/remote drift.
  *
  * Every handler receives the resolved `userId`; none of them accept one from
- * the caller.
+ * the caller. `token` is only set on transports that already authenticated
+ * one (the MCP route) and is consumed by `recordClientInfo` to identify the
+ * caller without re-reading the row.
  */
-export type RpcContext = { userId: number };
+export type RpcContext = { userId: number; token?: string };
 
 type Handler = (ctx: RpcContext, params: Record<string, never>) => Promise<unknown>;
 
@@ -286,6 +290,22 @@ export const methods = {
     });
     const projectId = p.project ? (await mustResolve(userId, p.project)).id : undefined;
     return activityReport(userId, window, { projectId });
+  },
+
+  recordClientInfo: async (
+    { token },
+    p: { name: string; version?: string; model?: string },
+  ) => {
+    // The HTTP RPC route can hit this with `token` undefined; the capture
+    // side already authenticated, so refuse here rather than recording a
+    // useless empty row.
+    if (!token) throw new BadRequest("missing token");
+    await apiTokensRepo.recordClientUse(hashToken(token), {
+      name: p.name,
+      version: p.version ?? "unknown",
+      seenAt: new Date().toISOString(),
+    });
+    return { ok: true };
   },
   // Keyed by MethodName rather than string, so a handler without a schema in
   // rpc-schemas.ts -- or a schema without a handler -- fails to compile. The

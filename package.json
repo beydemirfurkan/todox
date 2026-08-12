@@ -16,6 +16,8 @@
     "smoke:collab": "tsx scripts/collab-smoke.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:import-sqlite": "tsx scripts/import-sqlite.ts",
+    "install:mcp": "tsx scripts/install-mcp/index.ts",
+    "mcp:doctor": "tsx scripts/install-mcp/doctor.ts",
     "og": "tsx scripts/make-og.tsx"
   },
   "dependencies": {

@@ -87,7 +87,7 @@ const datetime = z
   .describe("ISO datetime; overrides `period`");
 
 export const SHAPES = {
-  listProjects: {},
+  listProjects: { model },
 
   createProject: {
     name: z.string().min(1).max(MAX.line).describe("Human name, e.g. 'Checkout Service'"),
@@ -104,6 +104,7 @@ export const SHAPES = {
       .max(MAX.text)
       .optional()
       .describe("What this project is, in 1-3 sentences, for a cold agent"),
+    model,
   },
 
   updateProject: {
@@ -112,6 +113,7 @@ export const SHAPES = {
     root_path: ref.optional(),
     repo_url: repoUrl,
     summary: z.string().max(MAX.text).optional(),
+    model,
   },
 
   /**
@@ -131,6 +133,7 @@ export const SHAPES = {
       .describe(
         "The project's slug, typed again. Everything under it goes with it: tasks, log entries, notes and file links. Ask the human first.",
       ),
+    model,
   },
 
   getContext: {
@@ -154,6 +157,7 @@ export const SHAPES = {
         "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call.",
       ),
     repo_root: repoRoot,
+    model,
   },
 
   listTasks: {
@@ -165,9 +169,10 @@ export const SHAPES = {
       .enum([...STATUSES, "open", "all"])
       .optional()
       .describe("Default 'open' (todo + doing + blocked)"),
+    model,
   },
 
-  getTask: { task_id: z.number().int() },
+  getTask: { task_id: z.number().int(), model },
 
   createTask: {
     cwd: ref
@@ -242,6 +247,7 @@ export const SHAPES = {
       )
       .min(1)
       .max(MAX.files),
+    model,
   },
 
   /**
@@ -262,6 +268,7 @@ export const SHAPES = {
       )
       .min(1)
       .max(500),
+    model,
   },
 
   addContext: {
@@ -270,12 +277,14 @@ export const SHAPES = {
     kind: z.enum(CONTEXT_KINDS),
     title: z.string().min(1).max(MAX.line),
     body: z.string().min(1).max(MAX.text),
+    model,
   },
 
   search: {
     query: z.string().min(1).max(MAX.query),
     // Unbounded, this is three unindexed ILIKE scans with no ceiling.
     limit: z.number().int().min(1).max(100).optional(),
+    model,
   },
 
   activityReport: {
@@ -293,6 +302,30 @@ export const SHAPES = {
       .describe(
         "IANA timezone the period is measured in, e.g. 'Europe/Istanbul'. Defaults to the account's. Send yours so 'today' means the developer's today.",
       ),
+    model,
+  },
+
+  /**
+   * Records the MCP client that just used this token. Server-side, not
+   * agent-facing: the stdio server fires it once at startup with
+   * TODOX_CLIENT_NAME, the HTTP route fires it on the first `initialize`
+   * message, and `get_context` reads the result back so it can hand the
+   * agent client-specific advice. There is no tool registration — calling
+   * it as an agent would not help, because the agent is the thing it is
+   * about to record.
+   */
+  recordClientInfo: {
+    name: z
+      .string()
+      .min(1)
+      .max(MAX.line)
+      .describe("Client name from the MCP initialize message, e.g. 'claude-code'"),
+    version: z
+      .string()
+      .max(MAX.line)
+      .optional()
+      .describe("Client version; defaults to 'unknown'"),
+    model,
   },
 } satisfies Record<string, z.ZodRawShape>;
 
