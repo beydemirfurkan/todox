@@ -39,7 +39,11 @@ describe("opencode installer", () => {
   it("writes stdio config (type=local) under root key `mcp` by default", async () => {
     const home = await homeFor("stdio");
 
-    const result = await client.install({ transport: "stdio", url: "irrelevant", token: "tk" });
+    const result = await client.install({
+      transport: "stdio",
+      url: "http://localhost:3000/api/mcp",
+      token: "tk",
+    });
 
     expect(result.status).toBe("created");
     const cfg = await readConfig(home);
@@ -49,6 +53,7 @@ describe("opencode installer", () => {
       args: ["-y", "tsx", path.resolve(process.cwd(), "mcp/server.ts")],
     });
     expect(cfg.mcp.todox.env.TODOX_TOKEN).toBe("${TODOX_TOKEN}");
+    expect(cfg.mcp.todox.env.TODOX_URL).toBe("http://localhost:3000");
     await expect(client.verify()).resolves.toEqual({
       ok: true,
       detail: path.join(home, ".config", "opencode", "opencode.json"),
@@ -61,13 +66,35 @@ describe("opencode installer", () => {
 
     const cfg = await readConfig(home);
     expect(cfg.mcp.todox.type).toBe("remote");
-    expect(cfg.mcp.todox.url).toContain("/api/mcp");
+    // Exact match, not "contains": the installer used to hardcode the production
+    // URL and ignore --url, which made --url http://localhost:3000/api/mcp
+    // still hit production.
+    expect(cfg.mcp.todox.url).toBe("https://override/mcp");
     expect(cfg.mcp.todox.headers.Authorization).toBe("Bearer tk");
+  });
+
+  it("passes --url through to the stdio child as TODOX_URL (origin only)", async () => {
+    const home = await homeFor("stdio-url");
+    await client.install({
+      transport: "stdio",
+      url: "http://localhost:3000/api/mcp",
+      token: "tk",
+    });
+
+    const cfg = await readConfig(home);
+    // The stdio server calls its parent origin; passing it through `/api/mcp`
+    // would make the child re-derive it from a non-base path. Origin is the
+    // shape the rest of the app expects.
+    expect(cfg.mcp.todox.env.TODOX_URL).toBe("http://localhost:3000");
   });
 
   it("records the client name and version in the stdio env (Task 7 reads these)", async () => {
     const home = await homeFor("stdio-client");
-    await client.install({ transport: "stdio", url: "irrelevant", token: "tk" });
+    await client.install({
+      transport: "stdio",
+      url: "http://localhost:3000/api/mcp",
+      token: "tk",
+    });
 
     const cfg = await readConfig(home);
     expect(cfg.mcp.todox.env.TODOX_CLIENT_NAME).toBe("opencode");
