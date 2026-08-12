@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
 import { instructions, registerTools, type Workspace } from "@/mcp/tools";
+import { normalise, record } from "@/lib/server/client-info";
 import { userForApiToken } from "@/lib/services/auth";
 import { BadRequest } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
@@ -15,27 +16,53 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 /**
- * The agent surface, hosted. Point any MCP client at this URL with an agent
- * token and it works — no clone, no local process, nothing to install.
- *
- * The tools are the same objects the stdio server registers (`mcp/tools.ts`).
- * What is missing here is a filesystem, and that is stated rather than faked:
- * a note whose file cannot be hashed is recorded as never checked, never as
- * fresh. A wrong "this is still accurate" is worse than no claim at all.
+ * The half of todox that has no filesystem -- so it answers every Workspace
+ * probe that needs a disk with "unknown" rather than guessing. Built per
+ * request so the bearer token is scoped to the call that authenticated it:
+ * a Vercel function can serve several requests in one process, and a module-
+ * level token slot would race between them.
  */
-const remoteWorkspace: Workspace = {
-  // Only the agent knows these, and the instructions ask it for them.
-  tz: () => undefined,
-  repoRoot: () => undefined,
-  hash: () => null,
-  checkRefs: () => null,
-};
+function buildRemoteWorkspace(token: string): Workspace {
+  return {
+    tz: () => undefined,
+    repoRoot: () => undefined,
+    hash: () => null,
+    checkRefs: () => null,
+    bearerToken: () => token,
+  };
+}
 
 function json(body: unknown, status: number, headers?: HeadersInit) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json", ...headers },
   });
+}
+
+/**
+ * Records the MCP client identity announced in the `initialize` JSON-RPC
+ * message. The SDK handles `initialize` before any tool callback runs, so
+ * the captured `clientInfo` only lives in the body we are about to discard.
+ *
+ * Best-effort: a missing name, a malformed body, or a database failure must
+ * not break the request. The worst case is the briefing coming back without
+ * the client-specific note, which is acceptable.
+ */
+async function captureClientInfo(token: string, body: unknown): Promise<void> {
+  if (!body || typeof body !== "object") return;
+  const method = (body as { method?: unknown }).method;
+  if (method !== "initialize") return;
+  const params = (body as { params?: unknown }).params;
+  if (!params || typeof params !== "object") return;
+  const info = normalise(
+    (params as { clientInfo?: { name?: unknown; version?: unknown } }).clientInfo ?? {},
+  );
+  if (!info) return;
+  try {
+    await record(token, info);
+  } catch (e) {
+    console.error("mcp clientInfo", e);
+  }
 }
 
 /**
@@ -92,6 +119,12 @@ export async function POST(req: Request) {
     );
   }
 
+  // Fires-and-forgets the clientInfo capture, then awaits it before the MCP
+  // server processes the body. Awaiting (not just calling) keeps the request
+  // bound to the record attempt, which is what a `console.error` from the
+  // helper then belongs to.
+  await captureClientInfo(token, body);
+
   const server = new McpServer(
     { name: "todox", version: "1.0.0" },
     { instructions: instructions({ local: false }) },
@@ -120,7 +153,7 @@ export async function POST(req: Request) {
     }
   };
 
-  registerTools(server, safeInvoke, remoteWorkspace);
+  registerTools(server, safeInvoke, buildRemoteWorkspace(token));
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     // Stateless: consecutive requests land on different instances, so there is

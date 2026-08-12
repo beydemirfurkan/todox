@@ -18,9 +18,11 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import { translator, type Lang } from "../lib/i18n";
+import { clientFamily, lookup } from "../lib/server/client-info";
 import { renderMarkdown } from "../lib/services/report-markdown";
 import type { ActivityReport } from "../lib/services/reports";
 import { SHAPES, type MethodName } from "../lib/services/rpc-schemas";
+import { notesFor } from "./client-notes";
 import type { Checked, RefLike } from "./workspace";
 
 /** Whatever this side knows about the machine the developer is sitting at. */
@@ -33,6 +35,10 @@ export type Workspace = {
   hash(path: string): string | null;
   /** null means this side has no filesystem, so staleness cannot be judged here. */
   checkRefs(refs: RefLike[]): { checked: Checked[]; seen: { id: number; hash: string | null }[] } | null;
+  /** Bearer token of the request that triggered this tool call; used to look up
+   *  which MCP client opened the session so the briefing can give client-
+   *  specific advice. undefined when the call did not carry one. */
+  bearerToken(): string | undefined;
 };
 
 /** Calls a todox RPC method: over HTTP from the laptop, in-process on the server. */
@@ -175,6 +181,34 @@ type RegisterTool = (
  * is exactly the friction that gets a habit dropped.
  */
 const READ_ONLY = { readOnlyHint: true, idempotentHint: true } as const;
+
+/**
+ * Adds the captured MCP client and a short list of client-specific notes to
+ * a `get_context` result. The DB lookup is one extra round trip on the one
+ * tool the agent is told to call first, which is the right place to pay it.
+ *
+ * Every step is best-effort: a failed lookup, an anonymous call, or any
+ * exception must not cost the agent its briefing. The worst case is the
+ * notes field not appearing.
+ */
+async function appendClientNotes(ws: Workspace, result: unknown): Promise<unknown> {
+  if (!result || typeof result !== "object") return result;
+  const token = ws.bearerToken();
+  if (!token) return result;
+  let info;
+  try {
+    info = await lookup(token);
+  } catch (e) {
+    console.error("mcp clientInfo lookup", e);
+    return result;
+  }
+  if (!info) return result;
+  return {
+    ...(result as Record<string, unknown>),
+    client: info.name,
+    notes: notesFor(clientFamily(info.name)),
+  };
+}
 
 /**
  * Parameters a local process fills in from its own environment rather than
@@ -473,7 +507,10 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
         "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`.",
       annotations: READ_ONLY,
     },
-    { after: checkLinkedFiles },
+    {
+      after: checkLinkedFiles,
+      transform: async (result, _args) => appendClientNotes(ws, result),
+    },
   );
 
   /* --------------------------------------------------------------- tasks */

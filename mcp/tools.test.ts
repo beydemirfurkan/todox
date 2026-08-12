@@ -41,6 +41,7 @@ const localWs: Workspace = {
     checked: refs.map((r) => ({ ...r, status: "fresh" as const })),
     seen: refs.map((r) => ({ id: r.id, hash: r.hash })),
   }),
+  bearerToken: () => undefined,
 };
 
 const remoteWs: Workspace = {
@@ -48,6 +49,7 @@ const remoteWs: Workspace = {
   repoRoot: () => undefined,
   hash: () => null,
   checkRefs: () => null,
+  bearerToken: () => undefined,
 };
 
 describe("argument filtering", () => {
