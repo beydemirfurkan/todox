@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# superpowers skill scratch (briefs, reports, review packages, progress ledger)
+.superpowers/sdd/
+.superpowers/plans/*.brief.md
+.superpowers/plans/*.report.md
+.superpowers/plans/review-*.diff
