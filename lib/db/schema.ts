@@ -241,6 +241,19 @@ ALTER TABLE refs ADD COLUMN IF NOT EXISTS checked_at TEXT;
 ALTER TABLE entries     ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE task_events ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
+-- Last MCP client to use this token. The stdio path reads the parent's
+-- TODOX_CLIENT_NAME at startup, the HTTP path catches the initialize message
+-- from the JSON-RPC body, and both write through recordClientInfo. The
+-- get_context tool then surfaces it so the agent hears client-specific
+-- advice (edit ~/.claude/CLAUDE.md on Claude Code, edit AGENTS.md on
+-- OpenCode, and so on). Last-write-wins: one token shared across a laptop
+-- and CI sees the most recent user's client, which is the right trade-off
+-- because the wrong note is louder than the right note, and the user can
+-- read the mismatch themselves.
+ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS last_client_name    TEXT;
+ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS last_client_version TEXT;
+ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS last_client_seen_at TEXT;
+
 -- Linking the same file to the same task twice was allowed, and \`link_files\`
 -- is described to agents as safe to call again. Every repeat added a row: the
 -- briefing listed the file N times, the agent re-hashed it N times, and once a

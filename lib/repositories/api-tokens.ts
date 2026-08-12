@@ -47,3 +47,24 @@ export const destroyAllForStmt = (userId: number): Statement => ({
 });
 
 export const destroyAllFor = (userId: number) => runStmt(destroyAllForStmt(userId));
+
+export type ClientUse = { name: string; version: string; seenAt: string };
+
+export const recordClientUse = (tokenHash: string, use: ClientUse): Promise<void> =>
+  run(
+    `UPDATE api_tokens
+        SET last_client_name = ?, last_client_version = ?, last_client_seen_at = ?
+      WHERE token_hash = ?`,
+    [use.name, use.version, use.seenAt, tokenHash],
+  );
+
+export const lastClientUse = (tokenHash: string): Promise<ClientUse | null> =>
+  one<ClientUse>(
+    `SELECT last_client_name    AS name,
+            last_client_version AS version,
+            last_client_seen_at AS "seenAt"
+       FROM api_tokens
+      WHERE token_hash = ?
+        AND last_client_seen_at IS NOT NULL`,
+    [tokenHash],
+  ).then((row) => row ?? null);
