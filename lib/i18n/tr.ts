@@ -2,6 +2,78 @@ import type { Key } from "./en";
 
 export const tr: Record<Key, string> = {
   tagline: "o hatırlar, sen uğraşma",
+  siteName: "todox",
+  metaTitleHome: "todox — geliştiriciler ve ajanları için çalışma belleği",
+  metaTitleLogin: "todox hesabına giriş yap — projeler ve günlük",
+  metaTitleRegister: "todox hesabı oluştur — ücretsiz çalışma belleği",
+  metaTitleForgot: "todox şifre sıfırlama — e-postana gelen bağlantı",
+  metaTitleAbout: "todox hakkında — geliştiriciler ve ajanları için çalışma belleği",
+  metaTitlePrivacy: "todox gizlilik politikası — toplanan veriler ve hakların",
+  metaTitleContact: "todox ile iletişim — hata bildirimi ve GitHub deposu",
+  metaDescription:
+    "todox, geliştiricilerin ve kodlama ajanlarının kullandığı bir çalışma belleğidir: projeler, görevler ve her oturumdan sağ çıkan günlük.",
+  metaDescriptionLogin:
+    "Projelerine, görevlerine ve her kodlama oturumundan sağ çıkan günlüğe ulaşmak için todox'a giriş yap; ajanınla aynı belleği paylaş.",
+  metaDescriptionRegister:
+    "Ücretsiz bir todox hesabı aç; projelerini, görev günlüğünü ve kodlama ajanının bağlamını tek bir yerde topla. Başka kimse bunların hiçbirini göremez.",
+  metaDescriptionForgot:
+    "todox hesabının şifresini tek adımda sıfırla. Bir kez kullanılabilen ve bir saat içinde geçersiz olan bir bağlantıyı e-postana göndeririz; giriş yapmana gerek kalmaz.",
+  metaDescriptionAbout:
+    "todox, geliştirici ve kodlama ajanı için küçük ve açık kaynaklı bir çalışma alanıdır: projeler, görevler ve her devir tesliminde yaşayan oturum günlüğü.",
+  metaDescriptionPrivacy:
+    "todox gizlilik politikasını oku: neleri topluyoruz, neden, ne kadar süre saklıyoruz ve verilerini nasıl silebilirsin.",
+  metaDescriptionContact:
+    "todox ekibiyle iletişime geç — hata ve fikirler için GitHub issues, güvenlik bildirimleri ve projenin kaynak kod deposu.",
+  footerAbout: "Hakkında",
+  footerPrivacy: "Gizlilik",
+  footerContact: "İletişim",
+  whatItIs: "Nedir",
+  whatItIs1: "Depo başına bir proje; üzerinde çalıştığın görevler ve her birinin başına gelenleri anlatan günlük girdileri.",
+  whatItIs2: "Görev başına canlı bir günlük: yapılıyor, takıldı, bitti. Her değişiklik bir satır, düzenleme değil; tarihçe tek doğru kaynak.",
+  whatItIs3: "Günlük ve haftalık etkinlik raporu — günü başlatan kişi için: geliştirici ya da devralacağı ajan.",
+  whatItIs4: "Aynı yüzeyi kodlama ajanlarına açan bir MCP sunucusu (/api/mcp). Barındırılan uç ile stdio süreci aynı araç listesini paylaşır.",
+  whatItIsNot: "Nedir değil",
+  whatItIsNot1: "Bir Kanban panosu değil. Swimlane, sprint, Gantt yok.",
+  whatItIsNot2: "Takım sohbeti değil. Yorumlar anlattıkları değişikliğin yanında durur.",
+  whatItIsNot3: "Bir wiki değil. Notlar kısa ve tarihlidir.",
+  builtBy: "Yapan",
+  builtByBody:
+    "todox, Furkan Beydemir tarafından geliştirilmiş ve sürdürülmektedir. Depo MIT lisansıyla açık kaynaktır; katkılar GitHub'da kabul edilir.",
+  forAgents: "Ajan mısın? /llms.txt dosyasını oku.",
+  privacyLastUpdated: "Son güncelleme: 12 Ağustos 2026.",
+  privacyWhatWeStore: "Neleri saklıyoruz",
+  privacyStore1: "Hesabın: e-posta, kullanıcı adı, görünür ad ve şifrenin hash'i. Hash bcrypt'tir; şifreni okuyamayız.",
+  privacyStore2: "Projelerin, görevlerin, günlük girdilerin, bağlam notların ve proje üyeliklerin — todox'a sen koyarsın.",
+  privacyStore3: "Oturumunu açık tutan çerezler. HTTP-only, imzalı; çıkış yaptığında ya da 30 gün hareketsizlikten sonra süreleri dolar.",
+  privacyStore4: "IP adresini ve istek yolunu içeren sunucu logları; kötüye kullanım tespiti ve hata ayıklama için 30 gün saklanır.",
+  privacyWhatWeDoNot: "Neleri yapmıyoruz",
+  privacyDoNot1: "Uygulamada üçüncü taraf analitik, reklam ağı ya da izleme pikseli çalıştırmıyoruz.",
+  privacyDoNot2: "Verilerini pazarlamacılara, veri komisyoncularına ya da sosyal ağlara satmıyor ya da paylaşmıyoruz.",
+  privacyDoNot3: "Projelerini, görevlerini ya da notlarını yapay zeka modellerini eğitmek için kullanmıyoruz.",
+  privacySubprocessors: "Alt işlemciler",
+  privacySubprocessorsBody:
+    "Verilerinin tek işlemcisi todox'un kendisidir. Hizmeti çalıştırmak için küçük bir altyapı alt işlemci listesi kullanıyoruz:",
+  privacySub1: "Neon — yönetilen PostgreSQL barındırma. Veri saklama bölgesi, kayıt olurken seçtiğin bölgedir.",
+  privacySub2: "Vercel — uygulama barındırma ve uç ağı. İsteklerin en yakın bölgeden sunulur.",
+  privacySub3: "Resend ya da kendi SMTP sağlayıcın — doğrulama ve şifre sıfırlama e-postaları için; yalnızca SMTP yapılandırıldığında.",
+  privacyRetention: "Verileri ne kadar süre saklıyoruz",
+  privacyRetentionBody:
+    "Hesabın ve projelerin, hesap var olduğu sürece saklanır. Hesabı silmek projeleri, görevleri, günlük girdilerini ve notları siler; oturum kayıtları 30 gün içinde temizlenir. Sunucu logları 30 gün sonra silinir.",
+  privacyYourRights: "Hakların",
+  privacyYourRightsBody:
+    "Verilerini Hesap sayfasından dışa aktarabilir ve hesabını silebilirsin. Arayüzün kapsamadığı hakları — örneğin başka biri adına veri erişim talebi — kullanmak için GitHub'da bir issue aç.",
+  privacyChanges: "Politikadaki değişiklikler",
+  privacyChangesBody:
+    "Topladıklarımızı ya da kullanım şeklimizi etkileyen bir değişiklik olduğunda, yürürlüğe girmeden önce GitHub sürüm notlarında duyurulur.",
+  contactIntro:
+    "todox etrafındaki konuşmaların çoğu GitHub'da, herkese açık. İhtiyacına uygun kanalı seç.",
+  contactBugs: "Hatalar ve fikirler",
+  contactBugsBody: "GitHub'da bir issue aç:",
+  contactSecurity: "Güvenlik bildirimleri",
+  contactSecurityBody:
+    "Lütfen depodaki SECURITY.md dosyasına bak. Henüz bildirmediğin bir açık için herkese açık issue açma.",
+  contactCode: "Kaynak kod",
+  contactCodeBody: "todox açık kaynak olarak burada:",
   skipToContent: "İçeriğe atla",
   searchPlaceholder: "her şeyde ara",
   searchLabel: "Görevlerde, kayıt girdilerinde ve notlarda ara",

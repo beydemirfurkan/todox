@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { CONTEXT_KINDS } from "@/lib/constants";
@@ -15,8 +16,19 @@ import { Picker } from "./features/picker";
 import { SubmitButton } from "./features/submit";
 import { contextKindLabel, kindOptions } from "./kinds";
 import { Blob, Chip, Counter, Empty, Field, Panel } from "./components";
+import { pageOpenGraph } from "./metadata-shared";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return {
+    title: t("metaTitleHome"),
+    description: t("metaDescription"),
+    alternates: { canonical: "/" },
+    openGraph: pageOpenGraph("/"),
+  };
+}
 
 const TILTS = [-0.6, 0.5, -0.4, 0.7];
 

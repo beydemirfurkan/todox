@@ -1,6 +1,78 @@
 export const en = {
   /* chrome */
   tagline: "it remembers, so you don't",
+  siteName: "todox",
+  metaTitleHome: "todox — working memory for developers and their agents",
+  metaTitleLogin: "Sign in — todox",
+  metaTitleRegister: "Create your account — todox",
+  metaTitleForgot: "Reset your password — todox",
+  metaTitleAbout: "About todox — working memory for developers and their agents",
+  metaTitlePrivacy: "Privacy policy — todox",
+  metaTitleContact: "Contact todox",
+  metaDescription:
+    "todox is a working memory for developers and their coding agents: projects, tasks, and the log that survives every session.",
+  metaDescriptionLogin:
+    "Sign in to todox to reach your projects, tasks and the log that survives every coding session.",
+  metaDescriptionRegister:
+    "Create a free todox account to keep your projects, task log and coding-agent context in one place. Nobody else can see any of it.",
+  metaDescriptionForgot:
+    "Reset your todox account password in one step. We email a link that works once and expires in an hour, with no login required.",
+  metaDescriptionAbout:
+    "todox is a small open-source workspace for a developer and their coding agents: projects, tasks, and a session log that survives every handoff.",
+  metaDescriptionPrivacy:
+    "Read the todox privacy policy: what we collect, why, how long we keep it, and how to ask for your data to be deleted.",
+  metaDescriptionContact:
+    "Get in touch with the todox team — GitHub issues for bugs and ideas, security disclosures, and the repo behind the project.",
+  footerAbout: "About",
+  footerPrivacy: "Privacy",
+  footerContact: "Contact",
+  whatItIs: "What it is",
+  whatItIs1: "A project per repository, with the tasks you are working on and the log entries that explain what happened to them.",
+  whatItIs2: "A live log per task: doing, blocked, done. Each change is a row, not an edit, so the history is the source of truth.",
+  whatItIs3: "A daily and weekly activity report written for whoever is starting their day — the developer or the agent they are about to hand off to.",
+  whatItIs4: "An MCP server (/api/mcp) that exposes the same surface to coding agents. The hosted endpoint and the stdio process share one tool list.",
+  whatItIsNot: "What it is not",
+  whatItIsNot1: "A kanban board. There is no swimlane, no sprint, no Gantt.",
+  whatItIsNot2: "A team chat. Comments live next to the change they describe.",
+  whatItIsNot3: "A wiki. Notes are short and dated.",
+  builtBy: "Built by",
+  builtByBody:
+    "todox is built and maintained by Furkan Beydemir. The repository is open source under the MIT license, and contributions are welcome on GitHub.",
+  forAgents: "Are you an agent? Read /llms.txt.",
+  privacyLastUpdated: "Last updated: 12 August 2026.",
+  privacyWhatWeStore: "What we store",
+  privacyStore1: "Your account: email, username, display name, and a password hash. The hash is bcrypt and we cannot read your password.",
+  privacyStore2: "Your projects, tasks, log entries, context notes, and project memberships — the data you put into todox.",
+  privacyStore3: "Session cookies that keep you signed in. They are HTTP-only, signed, and expire when you sign out or after 30 days of inactivity.",
+  privacyStore4: "Server logs with your IP address and request path, kept for 30 days for abuse detection and debugging.",
+  privacyWhatWeDoNot: "What we do not do",
+  privacyDoNot1: "We do not run third-party analytics, ad networks, or tracking pixels in the app.",
+  privacyDoNot2: "We do not sell or share your data with marketers, data brokers, or social networks.",
+  privacyDoNot3: "We do not train AI models on your projects, tasks or notes.",
+  privacySubprocessors: "Sub-processors",
+  privacySubprocessorsBody:
+    "todox itself is the only processor of your data. We use a small set of infrastructure sub-processors to run the service:",
+  privacySub1: "Neon — managed PostgreSQL hosting. Data residency is the region you pick at signup.",
+  privacySub2: "Vercel — application hosting and edge network. Your requests are served from the nearest region.",
+  privacySub3: "Resend or your own SMTP provider — transactional email for verification and password reset, only when SMTP is configured.",
+  privacyRetention: "How long we keep your data",
+  privacyRetentionBody:
+    "We keep your account and your projects for as long as the account exists. Deleting your account deletes your projects, tasks, log entries, and notes; session records are removed within 30 days. Server logs are deleted after 30 days.",
+  privacyYourRights: "Your rights",
+  privacyYourRightsBody:
+    "You can export your data and delete your account from the Account page. To exercise rights that are not covered by the UI — for example, a data access request on behalf of someone else — open a GitHub issue.",
+  privacyChanges: "Changes to this policy",
+  privacyChangesBody:
+    "When this policy changes in a way that affects what we collect or how we use it, the change is announced in the GitHub release notes before it takes effect.",
+  contactIntro:
+    "Most of the conversation around todox happens in public, on GitHub. Pick the channel that matches what you need.",
+  contactBugs: "Bugs and feature ideas",
+  contactBugsBody: "Open an issue on GitHub:",
+  contactSecurity: "Security disclosures",
+  contactSecurityBody:
+    "Please see SECURITY.md in the repository for the disclosure process. Do not open a public issue for a vulnerability you have not reported yet.",
+  contactCode: "The code",
+  contactCodeBody: "todox is open source at",
   skipToContent: "Skip to content",
   searchPlaceholder: "search everything",
   searchLabel: "Search tasks, log entries and notes",
