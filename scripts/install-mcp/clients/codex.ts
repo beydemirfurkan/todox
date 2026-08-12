@@ -1,12 +1,10 @@
 import { promises as fs } from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
 import { writeTextFile } from "./atomic-write";
+import { codexConfigFile, ENTRY_NAME as NAME } from "./contract";
 import { upsertTomlServerSection } from "./toml";
 import type { ClientInstaller } from "./types";
-
-const NAME = "todox";
 
 /**
  * Resolved per call, not once at import. `os.homedir()` is read from the
@@ -14,9 +12,7 @@ const NAME = "todox";
  * be set when the module was first loaded -- which is before any test can
  * point it somewhere safe, and wrong for any caller that changes it.
  */
-function configPath(): string {
-  return path.join(os.homedir(), ".codex", "config.toml");
-}
+const configPath = codexConfigFile;
 
 async function read(p: string): Promise<string> {
   try {
@@ -62,5 +58,12 @@ export const client: ClientInstaller = {
       return { ok: false, detail: `Authorization header missing in ${target}` };
     }
     return { ok: true, detail: target };
+  },
+  /**
+   * Codex has read `~/.codex/config.toml` on every platform for as long as
+   * todox has written it, so there is no wrong location to have left behind.
+   */
+  async staleInstalls() {
+    return [];
   },
 };

@@ -52,7 +52,11 @@ describe("cursor installer", () => {
     const result = await client.install(HTTP);
 
     expect(result.status).toBe("created");
+    // `type` is spelled out: a client that finds a `url` without one tends to
+    // assume a local command and fail with something unhelpful. The entry used
+    // to omit it, against this repo's own README.
     expect((await readConfig(home)).mcpServers.todox).toEqual({
+      type: "http",
       url: HTTP.url,
       headers: { Authorization: `Bearer ${HTTP.token}` },
     });

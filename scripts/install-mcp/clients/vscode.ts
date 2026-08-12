@@ -1,38 +1,41 @@
-import * as path from "node:path";
-
-import { detectJsonHttp, installJsonHttp, verifyJsonHttp } from "./json-http";
-import { vsCodeConfigDir } from "./paths";
+import { ENTRY_NAME, vsCodeContract } from "./contract";
+import {
+  detectJsonHttp,
+  findStaleEntries,
+  installJsonHttp,
+  verifyJsonHttp,
+} from "./json-http";
 import type { ClientInstaller } from "./types";
 
-const NAME = "todox";
-
 /**
- * Resolved per call: `vsCodeConfigDir()` reads `process.platform` and
- * `APPDATA` at call time, and caching would freeze both to whatever they
- * were when the module first loaded.
+ * The path and the root key come from `vsCodeContract()`, resolved per call
+ * because it reads `process.platform` and `APPDATA` at call time. Nothing in
+ * this file names either one: this is the installer that wrote a macOS config
+ * to the Linux path for a release and confirmed it by reading the same wrong
+ * path back.
  */
-function configPath(): string {
-  return path.join(vsCodeConfigDir(), "mcp.json");
-}
+const target = () => ({ ...vsCodeContract().current, name: ENTRY_NAME });
 
 export const client: ClientInstaller = {
   name: "vscode",
   async detect() {
-    return detectJsonHttp(configPath());
+    return detectJsonHttp(vsCodeContract().current.file);
   },
   async install({ transport, url, token }) {
     if (transport !== "http") {
       throw new Error("vscode currently supports the http transport only");
     }
-    // VS Code uses root key `servers`, not `mcpServers`. Mixing them up is
-    // the single most common install bug for this client.
+    const contract = vsCodeContract();
     const result = await installJsonHttp(
-      { configPath: configPath(), rootKey: "servers", name: NAME },
-      { type: "http", url, headers: { Authorization: `Bearer ${token}` } },
+      { ...contract.current, name: ENTRY_NAME },
+      { type: contract.httpType, url, headers: { Authorization: `Bearer ${token}` } },
     );
-    return { ...result, entryId: NAME };
+    return { ...result, entryId: ENTRY_NAME };
   },
   async verify() {
-    return verifyJsonHttp({ configPath: configPath(), rootKey: "servers", name: NAME });
+    return verifyJsonHttp(target(), "Bearer ");
+  },
+  async staleInstalls() {
+    return findStaleEntries(vsCodeContract().stale, ENTRY_NAME);
   },
 };
