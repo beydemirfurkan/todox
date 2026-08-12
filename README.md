@@ -109,10 +109,23 @@ http_headers = { Authorization = "Bearer todox_…" }
 
 ```json
 // Cursor — ~/.cursor/mcp.json, the one in your home directory.
-// VS Code — the user-level mcp.json ("MCP: Open User Configuration"),
-// where the root key is "servers" rather than "mcpServers".
 {
   "mcpServers": {
+    "todox": {
+      "type": "http",
+      "url": "https://www.todox.dev/api/mcp",
+      "headers": { "Authorization": "Bearer todox_…" }
+    }
+  }
+}
+```
+
+```json
+// VS Code — the user-level mcp.json ("MCP: Open User Configuration").
+// The root key is "servers", NOT "mcpServers". This is the one client
+// that differs, and getting it wrong is silent.
+{
+  "servers": {
     "todox": {
       "type": "http",
       "url": "https://www.todox.dev/api/mcp",
@@ -132,8 +145,19 @@ http_headers = { Authorization = "Bearer todox_…" }
 > | OpenCode v1 | `mcp.NAME` | `"remote"` |
 > | OpenCode v2 | `mcp.servers.NAME` | `"remote"` |
 > | Cursor | `mcpServers.NAME` | `"http"` |
-> | VS Code (Copilot Chat) | `mcpServers.NAME` | `"http"` |
+> | VS Code (Copilot Chat) | `servers.NAME` | `"http"` |
 > | Codex | TOML `[mcp_servers.NAME]` | n/a |
+
+Where those files live differs by platform, and VS Code is the one that is
+not where a Linux habit puts it:
+
+| agent | macOS | Linux | Windows |
+| --- | --- | --- | --- |
+| Claude Code | `~/.claude.json` | same | same |
+| Cursor | `~/.cursor/mcp.json` | same | same |
+| Codex | `~/.codex/config.toml` | same | same |
+| OpenCode | `~/.config/opencode/opencode.json` | same | same |
+| VS Code | `~/Library/Application Support/Code/User/mcp.json` | `~/.config/Code/User/mcp.json` | `%APPDATA%\Code\User\mcp.json` |
 
 **Install it globally, not per project.** Every one of these tools defaults to
 the directory you are standing in — `claude mcp add` without a scope,
