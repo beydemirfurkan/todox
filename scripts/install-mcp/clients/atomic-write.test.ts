@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, promises as fs, rmSync } from "node:fs";
 import * as path from "node:path";
 import { tmpdir } from "node:os";
@@ -63,5 +63,34 @@ describe("readJsonFile / writeJsonFile", () => {
     // Only ENOENT means "not configured". Swallowing a parse error here would
     // silently overwrite a config the user had hand-edited.
     await expect(readJsonFile(file)).rejects.toThrow();
+  });
+
+  it("retries the rename when Windows hands back a sharing violation", async () => {
+    // EPERM/EACCES/EBUSY are what an antivirus scanner or a mid-replace writer
+    // hands the rename on Windows; the file is there the next millisecond, so
+    // a single retry is enough to clear the window. The old codex installer
+    // used raw fs.rename and tripped this; the shared helper now retries up to
+    // 5 times with exponential back-off before giving up.
+    const dir = await caseDir("eperm-retry");
+    const file = path.join(dir, "cfg.json");
+    const originalRename = fs.rename;
+    const renameSpy = vi.spyOn(fs, "rename");
+    let calls = 0;
+    renameSpy.mockImplementation(async (from, to) => {
+      calls++;
+      if (calls === 1) {
+        const err: NodeJS.ErrnoException = new Error("busy");
+        err.code = "EPERM";
+        throw err;
+      }
+      return originalRename(from, to);
+    });
+    try {
+      await writeJsonFile(file, { ok: true });
+      expect(calls).toBeGreaterThanOrEqual(2);
+      expect(await readJsonFile(file)).toEqual({ ok: true });
+    } finally {
+      renameSpy.mockRestore();
+    }
   });
 });

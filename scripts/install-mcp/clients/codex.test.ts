@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { promises as fs } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -51,5 +51,37 @@ describe("codex installer", () => {
     expect(text).toContain("[mcp_servers.unrelated]");
     expect(text).toContain("[mcp_servers.todox]");
     expect(text).toContain("https://y/mcp");
+  });
+
+  it("survives a Windows sharing-violation on the rename", async () => {
+    // The installer used to call fs.rename directly with a deterministic
+    // pid.tmp suffix; on Windows an antivirus scan mid-install returned
+    // EPERM and the whole install failed. The shared writeTextFile helper
+    // retries the rename, so a one-shot EPERM is now invisible to callers.
+    const originalRename = fs.rename;
+    const renameSpy = vi.spyOn(fs, "rename");
+    let calls = 0;
+    renameSpy.mockImplementation(async (from, to) => {
+      calls++;
+      if (calls === 1) {
+        const err: NodeJS.ErrnoException = new Error("busy");
+        err.code = "EPERM";
+        throw err;
+      }
+      return originalRename(from, to);
+    });
+    try {
+      const result = await client.install({
+        transport: "http",
+        url: "https://www.todox.dev/api/mcp",
+        token: "tk",
+      });
+      expect(result.status).toBe("created");
+      expect(calls).toBeGreaterThanOrEqual(2);
+      const text = await fs.readFile(CONFIG, "utf8");
+      expect(text).toContain("[mcp_servers.todox]");
+    } finally {
+      renameSpy.mockRestore();
+    }
   });
 });

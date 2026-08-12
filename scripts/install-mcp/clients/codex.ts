@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { writeTextFile } from "./atomic-write";
 import { upsertTomlServerSection } from "./toml";
 import type { ClientInstaller } from "./types";
 
@@ -48,9 +49,7 @@ export const client: ClientInstaller = {
       headerValue: `Bearer ${token}`,
     });
     await fs.mkdir(path.dirname(target), { recursive: true });
-    const tmp = `${target}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, text, "utf8");
-    await fs.rename(tmp, target);
+    await writeTextFile(target, text);
     return { path: target, status, entryId: NAME };
   },
   async verify() {

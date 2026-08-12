@@ -21,13 +21,12 @@ export async function readJsonFile<T>(p: string): Promise<T | null> {
 }
 
 /**
- * Write to `<file>.tmp` then rename. Two installers racing still produce a
- * whole file -- one rename wins, the other retries. A true
- * read-modify-write lock is out of scope: installations are user-initiated
- * and serial in practice, and the alternative (a `proper-lockfile` dep) is
- * not worth its weight for a CLI.
+ * Write a string to `<file>` with the same rename-retry the JSON helper uses.
+ * Codex emits TOML, which is hand-rolled and would otherwise re-implement
+ * the rename dance; doing it once here keeps Windows sharing-violation
+ * behaviour uniform across every installer.
  */
-export async function writeJsonFile(p: string, value: unknown): Promise<void> {
+export async function writeTextFile(p: string, text: string): Promise<void> {
   const dir = path.dirname(p);
   await fs.mkdir(dir, { recursive: true });
   // Random, not `Date.now()`: two writes from the same process land in the
@@ -35,9 +34,19 @@ export async function writeJsonFile(p: string, value: unknown): Promise<void> {
   // file, and the second rename failed with ENOENT because the first had
   // already moved it away.
   const tmp = `${p}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
-  const data = JSON.stringify(value, null, 2);
-  await fs.writeFile(tmp, data, { encoding: "utf8" });
+  await fs.writeFile(tmp, text, { encoding: "utf8" });
   await renameWhenDestinationIsFree(tmp, p);
+}
+
+/**
+ * Write to `<file>.tmp` then rename. Two installers racing still produce a
+ * whole file -- one rename wins, the other retries. A true
+ * read-modify-write lock is out of scope: installations are user-initiated
+ * and serial in practice, and the alternative (a `proper-lockfile` dep) is
+ * not worth its weight for a CLI.
+ */
+export async function writeJsonFile(p: string, value: unknown): Promise<void> {
+  await writeTextFile(p, JSON.stringify(value, null, 2));
 }
 
 /** Windows sharing violations. POSIX renames do not report these. */
