@@ -3,14 +3,17 @@ import { DM_Mono, Instrument_Sans, Shantell_Sans } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
 import "./globals.css";
-import { getT } from "@/lib/lang";
+import { getLang, getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
+import { publicUrl } from "@/lib/public-url";
 import { Blob } from "./components";
+import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { LangSwitcher } from "./features/lang-switcher";
 import { Notifications } from "./features/notifications";
 import { SearchBox } from "./features/search-box";
 import { TzProbe } from "./features/tz-probe";
 import { UserMenu } from "./features/user-menu";
+import { defaultOpenGraphImage } from "./metadata-shared";
 
 const shantell = Shantell_Sans({ variable: "--font-shantell", subsets: ["latin"] });
 const instrument = Instrument_Sans({ variable: "--font-instrument", subsets: ["latin"] });
@@ -20,10 +23,47 @@ const dmMono = DM_Mono({
   weight: ["400", "500"],
 });
 
-export const metadata: Metadata = {
-  title: "todox",
-  description: "Working memory for developers and their agents",
-};
+/**
+ * The cookie controls the language the page renders in, so the metadata has to
+ * follow it. `getLang()` is async and reads the cookie through `next/headers`,
+ * so this must be `generateMetadata` rather than a static `metadata` object.
+ *
+ * The base URL is whatever the deployment reports, not the audit's preferred
+ * host, so a future move to another domain only needs `TODOX_PUBLIC_URL`.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const lang = await getLang();
+  const { t } = await getT();
+  const base = publicUrl();
+  return {
+    metadataBase: new URL(base),
+    title: {
+      default: t("metaTitleHome"),
+      template: `%s — ${t("siteName")}`,
+    },
+    description: t("metaDescription"),
+    alternates: {
+      canonical: "/",
+      languages: {
+        en: "/",
+        tr: "/",
+        "x-default": "/",
+      },
+    },
+    openGraph: {
+      siteName: t("siteName"),
+      locale: lang === "tr" ? "tr_TR" : "en_US",
+      type: "website",
+      url: base,
+      // Per-page metadata should use `pageOpenGraph(path)` from
+      // `metadata-shared.ts` so the card survives the shallow merge.
+      images: [defaultOpenGraphImage],
+    },
+    twitter: {
+      card: "summary_large_image",
+    },
+  };
+}
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { lang, t } = await getT();
@@ -35,6 +75,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${shantell.variable} ${instrument.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <OrganizationJsonLd />
         <TzProbe />
 
         <a href="#main" className="skip-link display">
@@ -112,6 +153,27 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         >
           {children}
         </main>
+
+        <footer className="mx-auto w-full max-w-5xl px-5 pb-8 text-[13px] text-faint">
+          <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <Link href="/about" className="link-more">
+              {t("footerAbout")}
+            </Link>
+            <Link href="/privacy" className="link-more">
+              {t("footerPrivacy")}
+            </Link>
+            <Link href="/contact" className="link-more">
+              {t("footerContact")}
+            </Link>
+            <a
+              href="https://github.com/beydemirfurkan/todox"
+              className="link-more"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
+          </nav>
+        </footer>
       </body>
     </html>
   );

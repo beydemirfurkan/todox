@@ -29,6 +29,7 @@ const PUBLIC = [
   "/opengraph-image.png",
   "/robots.txt",
   "/sitemap.xml",
+  "/llms.txt",
 ];
 
 /**
@@ -39,10 +40,48 @@ const PUBLIC = [
  * landing page lives at "/" and the dashboard lives behind it at the same
  * address, which is why this distinction has to exist at all.
  */
-const PUBLIC_EXACT = ["/"];
+const PUBLIC_EXACT = ["/", "/about", "/contact", "/privacy"];
+
+/**
+ * Pages where the response body depends on the viewer. A `Last-Modified`
+ * header would either lie (the page is per-user) or force us to render before
+ * we can answer, so these stay uncacheable.
+ */
+const NO_STORE = new Set([
+  "/",
+  "/login",
+  "/register",
+  "/forgot",
+  "/reset",
+  "/verify",
+  "/account",
+  "/report",
+  "/search",
+]);
+
+/**
+ * Static metadata routes we generate ourselves. They are safe to share between
+ * crawlers for a short window, and a `Last-Modified` lets a 304 save the
+ * round trip on the second crawl.
+ */
+const SHORT_CACHE = new Set(["/sitemap.xml", "/robots.txt", "/llms.txt"]);
 
 export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (NO_STORE.has(pathname)) {
+    const res = NextResponse.next();
+    res.headers.set("Cache-Control", "private, no-store");
+    return res;
+  }
+
+  if (SHORT_CACHE.has(pathname)) {
+    const res = NextResponse.next();
+    res.headers.set("Cache-Control", "public, max-age=300, must-revalidate");
+    res.headers.set("Last-Modified", new Date().toUTCString());
+    return res;
+  }
+
   if (PUBLIC_EXACT.includes(pathname)) return NextResponse.next();
   if (PUBLIC.some((p) => pathname === p || pathname.startsWith(p)))
     return NextResponse.next();

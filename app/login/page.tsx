@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -7,8 +8,20 @@ import { loginAction } from "../auth-actions";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
 import { AuthShell } from "../features/auth-shell";
+import { pageOpenGraph } from "../metadata-shared";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return {
+    title: { absolute: t("metaTitleLogin") },
+    description: t("metaDescriptionLogin"),
+    alternates: { canonical: "/login" },
+    robots: { index: false, follow: false },
+    openGraph: pageOpenGraph("/login"),
+  };
+}
 
 const first = (value: string | string[] | undefined) =>
   (Array.isArray(value) ? value[0] : value) ?? "";
@@ -51,12 +64,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             label: t("identifier"),
             autoComplete: "username",
             autoFocus: true,
+            enterKeyHint: "next",
           },
           {
             name: "password",
             label: t("password"),
             type: "password",
             autoComplete: "current-password",
+            enterKeyHint: "done",
           },
         ]}
       />

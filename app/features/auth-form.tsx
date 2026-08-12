@@ -11,6 +11,12 @@ export type AuthFieldSpec = {
   type?: string;
   autoComplete?: string;
   autoFocus?: boolean;
+  /**
+   * Hint for the on-screen keyboard's Enter key. The last field in a form is
+   * usually `done`/`go`; the field before a password is `next` so the user can
+   * jump straight to the password.
+   */
+  enterKeyHint?: "enter" | "done" | "go" | "next" | "previous" | "search" | "send";
   /** Prefill, for forms that edit something that already has a value. */
   defaultValue?: string;
   /** For fields that must be typed verbatim — a phone helpfully capitalises. */
@@ -96,6 +102,7 @@ export function AuthForm({
                 defaultValue={f.defaultValue}
                 autoComplete={f.autoComplete}
                 autoFocus={f.autoFocus}
+                enterKeyHint={f.enterKeyHint}
                 autoCapitalize={f.exact ? "none" : undefined}
                 autoCorrect={f.exact ? "off" : undefined}
                 spellCheck={f.exact ? false : undefined}

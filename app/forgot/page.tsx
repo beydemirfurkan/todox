@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -7,8 +8,20 @@ import { requestResetAction } from "../auth-actions";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
 import { AuthShell } from "../features/auth-shell";
+import { pageOpenGraph } from "../metadata-shared";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return {
+    title: { absolute: t("metaTitleForgot") },
+    description: t("metaDescriptionForgot"),
+    alternates: { canonical: "/forgot" },
+    robots: { index: false, follow: false },
+    openGraph: pageOpenGraph("/forgot"),
+  };
+}
 
 export default async function ForgotPage({ searchParams }: PageProps<"/forgot">) {
   if (await currentUser()) redirect("/");
@@ -48,6 +61,7 @@ export default async function ForgotPage({ searchParams }: PageProps<"/forgot">)
               type: "email",
               autoComplete: "email",
               autoFocus: true,
+              enterKeyHint: "done",
             },
           ]}
         />

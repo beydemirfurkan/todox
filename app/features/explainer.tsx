@@ -29,7 +29,7 @@ export function Explainer({ t }: { t: T }) {
               >
                 {s.n}
               </span>
-              <h3 className="display text-[16px] font-bold">{s.title}</h3>
+              <h2 className="display text-[16px] font-bold">{s.title}</h2>
             </div>
             <p className="mt-1.5 text-[14px] leading-snug text-muted">{s.body}</p>
           </li>
