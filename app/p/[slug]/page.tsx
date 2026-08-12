@@ -1,10 +1,10 @@
-import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CONTEXT_KINDS, type Status } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
+import { publicUrl } from "@/lib/public-url";
 import { requireUser } from "@/lib/session";
 import * as contexts from "@/lib/repositories/contexts";
 import * as entriesRepo from "@/lib/repositories/entries";
@@ -125,8 +125,7 @@ export default async function ProjectPage({
     );
   const shown = selected.slice(0, PAGE);
 
-  const h = await headers();
-  const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost"}`;
+  const origin = publicUrl();
   const repo = repoLink(project.repo_url);
 
   return (
