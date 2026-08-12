@@ -1,0 +1,133 @@
+import { pathToFileURL } from "node:url";
+
+/**
+ * Standalone MCP doctor — initialize + tools/list + a get_context call
+ * against a known repo. Used by the install CLI as a post-install smoke,
+ * and runnable on its own for "is this server reachable from my machine?"
+ * debugging. The get_context call exercises the full request/response cycle
+ * (auth, schema, repository resolution) so a broken deploy fails here rather
+ * than at the agent's first session.
+ */
+export type DoctorReport = { ok: boolean; detail: string };
+
+const PROTOCOL = "2025-06-18";
+
+async function rpc(
+  url: string,
+  token: string,
+  body: Record<string, unknown>,
+): Promise<{ status: number; json: unknown }> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", ...body }),
+  });
+  return { status: res.status, json: await res.json().catch(() => null) };
+}
+
+export async function runDoctor(opts: {
+  url: string;
+  token: string;
+  cwd?: string;
+}): Promise<DoctorReport> {
+  const cwd = opts.cwd ?? process.cwd();
+
+  // 1. initialize
+  const init = await rpc(opts.url, opts.token, {
+    id: 1,
+    method: "initialize",
+    params: {
+      protocolVersion: PROTOCOL,
+      capabilities: {},
+      clientInfo: { name: "todox-install-doctor", version: "0" },
+    },
+  });
+  if (init.status !== 200) {
+    return { ok: false, detail: `initialize HTTP ${init.status}` };
+  }
+
+  // 2. tools/list
+  const tools = await rpc(opts.url, opts.token, {
+    id: 2,
+    method: "tools/list",
+  });
+  if (tools.status !== 200) {
+    return { ok: false, detail: `tools/list HTTP ${tools.status}` };
+  }
+  const names = (((tools.json as { result?: { tools?: Array<{ name: string }> } })?.result?.tools) ?? [])
+    .map((t) => t.name);
+  const required = ["get_context", "create_task", "log_entry"];
+  const missing = required.filter((r) => !names.includes(r));
+  if (missing.length) {
+    return { ok: false, detail: `tools missing: ${missing.join(", ")}` };
+  }
+
+  // 3. get_context against the cwd. Exercises auth + schema + project lookup.
+  const ctx = await rpc(opts.url, opts.token, {
+    id: 3,
+    method: "tools/call",
+    params: { name: "get_context", arguments: { cwd, create_if_missing: false } },
+  });
+  if (ctx.status !== 200) {
+    return { ok: false, detail: `get_context HTTP ${ctx.status}` };
+  }
+  const ctxBody = ctx.json as {
+    result?: { content?: Array<{ type: string; text?: string }> };
+    error?: { message?: string };
+  };
+  if (ctxBody.error) {
+    return { ok: false, detail: `get_context error: ${ctxBody.error.message ?? "unknown"}` };
+  }
+  const text = ctxBody.result?.content?.[0]?.text ?? "";
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, detail: "get_context returned non-JSON" };
+  }
+  if (!parsed || typeof parsed !== "object") {
+    return { ok: false, detail: "get_context returned no body" };
+  }
+
+  return {
+    ok: true,
+    detail: `protocol=${PROTOCOL} tools=${names.length} briefing-ok`,
+  };
+}
+
+// CLI shim: only run when this file is the script entry, not when imported
+// from `index.ts`. `import.meta.url === pathToFileURL(process.argv[1]).href`
+// is the standard tsx/Node ESM "is this the main module" check.
+async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+  const url = argv[0] ?? process.env.TODOX_URL ?? "https://www.todox.dev/api/mcp";
+  const token = argv[1] ?? process.env.TODOX_TOKEN ?? "";
+  const cwd = argv[2] ?? process.cwd();
+  if (!token) {
+    console.error(
+      "[todox doctor] usage: pnpm mcp:doctor <url> <token> [cwd] (token may also come from $TODOX_TOKEN)",
+    );
+    process.exit(2);
+  }
+  const report = await runDoctor({ url, token, cwd });
+  console.error(`[todox doctor] ${report.ok ? "ok" : "FAIL"} — ${report.detail}`);
+  process.exit(report.ok ? 0 : 1);
+}
+
+const argv1 = process.argv[1];
+if (argv1) {
+  try {
+    if (import.meta.url === pathToFileURL(argv1).href) {
+      main().catch((e: unknown) => {
+        console.error("[todox doctor]", e instanceof Error ? e.message : e);
+        process.exit(1);
+      });
+    }
+  } catch {
+    // process.argv[1] may not be a file URL on every platform; skip the shim.
+  }
+}
