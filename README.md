@@ -69,6 +69,37 @@ claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp
   --header "Authorization: Bearer todox_…"
 ```
 
+```json
+// OpenCode v1 — ~/.config/opencode/opencode.json.
+// MCP key is `mcp` (server name is a direct key under it), NOT `mcpServers`.
+// `type` is `"remote"`, NOT `"http"` — the Claude/Cursor/VS Code value is
+// silently ignored on OpenCode.
+{
+  "mcp": {
+    "todox": {
+      "type": "remote",
+      "url": "https://www.todox.dev/api/mcp",
+      "headers": { "Authorization": "Bearer todox_…" }
+    }
+  }
+}
+```
+
+```jsonc
+// OpenCode v2 — same key, server now nested under `mcp.servers`.
+{
+  "mcp": {
+    "servers": {
+      "todox": {
+        "type": "remote",
+        "url": "https://www.todox.dev/api/mcp",
+        "headers": { "Authorization": "Bearer todox_…" }
+      }
+    }
+  }
+}
+```
+
 ```toml
 # Codex — ~/.codex/config.toml
 [mcp_servers.todox]
@@ -90,6 +121,19 @@ http_headers = { Authorization = "Bearer todox_…" }
   }
 }
 ```
+
+> **The MCP config key and the `type` value differ per agent, and the
+> wrong combination is silently ignored — no error, no warning, the tool
+> just does not show up:**
+>
+> | agent | key | `type` |
+> | --- | --- | --- |
+> | Claude Code | `mcpServers.NAME` | `"http"` |
+> | OpenCode v1 | `mcp.NAME` | `"remote"` |
+> | OpenCode v2 | `mcp.servers.NAME` | `"remote"` |
+> | Cursor | `mcpServers.NAME` | `"http"` |
+> | VS Code (Copilot Chat) | `mcpServers.NAME` | `"http"` |
+> | Codex | TOML `[mcp_servers.NAME]` | n/a |
 
 **Install it globally, not per project.** Every one of these tools defaults to
 the directory you are standing in — `claude mcp add` without a scope,
