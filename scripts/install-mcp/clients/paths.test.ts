@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { expandHome, vsCodeConfigDir } from "./paths";
+import { expandHome, vsCodeConfigDir, vsCodeStaleConfigDirs } from "./paths";
 
 /**
  * `process.platform` is read inside the function, so overriding the property
@@ -73,5 +73,31 @@ describe("vsCodeConfigDir", () => {
     withPlatform("linux", () => {
       expect(vsCodeConfigDir()).toBe(path.join(os.homedir(), ".config", "Code", "User"));
     });
+  });
+
+  it("uses Application Support on darwin", () => {
+    // Not the Linux path: VS Code is an Electron app and follows Apple's
+    // convention. The absent case was this one, and it was the one the
+    // developers were running on.
+    withPlatform("darwin", () => {
+      expect(vsCodeConfigDir()).toBe(
+        path.join(os.homedir(), "Library", "Application Support", "Code", "User"),
+      );
+    });
+  });
+});
+
+describe("vsCodeStaleConfigDirs", () => {
+  it("names the Linux path on darwin, where todox used to write", () => {
+    withPlatform("darwin", () => {
+      expect(vsCodeStaleConfigDirs()).toEqual([
+        path.join(os.homedir(), ".config", "Code", "User"),
+      ]);
+    });
+  });
+
+  it("is empty on the platforms that were never wrong", () => {
+    withPlatform("linux", () => expect(vsCodeStaleConfigDirs()).toEqual([]));
+    withPlatform("win32", () => expect(vsCodeStaleConfigDirs()).toEqual([]));
   });
 });

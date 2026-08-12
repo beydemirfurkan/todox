@@ -22,6 +22,31 @@ describe("parseArgs", () => {
     expect(() => parseArgs(["wat"])).toThrow(/client must be one of/);
   });
 
+  it("leaves --opencode-layout undefined so the installer detects one", () => {
+    // Undefined is not the same as a default here: it means "read the existing
+    // config", which is right almost every time. A default would overrule it.
+    expect(parseArgs(["opencode"]).openCodeLayout).toBeUndefined();
+  });
+
+  it("accepts both OpenCode layouts", () => {
+    expect(parseArgs(["opencode", "--opencode-layout", "v1"]).openCodeLayout).toBe("v1");
+    expect(parseArgs(["opencode", "--opencode-layout", "v2"]).openCodeLayout).toBe("v2");
+  });
+
+  it("rejects an unrecognised layout rather than silently detecting", () => {
+    // Falling back to detection would leave the user believing their flag had
+    // been honoured, which is the failure mode this whole area is about.
+    expect(() => parseArgs(["opencode", "--opencode-layout", "v3"])).toThrow(
+      /--opencode-layout must be 'v1' or 'v2'/,
+    );
+  });
+
+  it("rejects a bare --opencode-layout", () => {
+    expect(() => parseArgs(["opencode", "--opencode-layout"])).toThrow(
+      /--opencode-layout must be 'v1' or 'v2'/,
+    );
+  });
+
   it("accepts a known client and defaults", () => {
     expect(parseArgs(["claude-code"])).toEqual({
       client: "claude-code",

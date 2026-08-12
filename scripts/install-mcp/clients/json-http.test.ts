@@ -3,7 +3,12 @@ import { mkdtempSync, promises as fs, rmSync } from "node:fs";
 import * as path from "node:path";
 import { tmpdir } from "node:os";
 
-import { detectJsonHttp, installJsonHttp, verifyJsonHttp } from "./json-http";
+import {
+  detectJsonHttp,
+  findStaleEntries,
+  installJsonHttp,
+  verifyJsonHttp,
+} from "./json-http";
 
 const root = mkdtempSync(path.join(tmpdir(), "todox-json-http-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -16,8 +21,15 @@ const caseDir = async (name: string) => {
 };
 
 const TARGET = (file: string) => ({
-  configPath: file,
-  rootKey: "mcpServers" as const,
+  file,
+  rootKeys: ["mcpServers"] as const,
+  name: "todox",
+});
+
+/** OpenCode v2's shape: the entry map is two levels down. */
+const NESTED = (file: string) => ({
+  file,
+  rootKeys: ["mcp", "servers"] as const,
   name: "todox",
 });
 
@@ -71,6 +83,50 @@ describe("installJsonHttp", () => {
     const cfg = JSON.parse(await fs.readFile(file, "utf8"));
     expect(cfg.mcpServers.todox.url).toBe("https://x/mcp");
   });
+
+  it("creates the intermediate objects for a nested key path", async () => {
+    const dir = await caseDir("nested-create");
+    const file = path.join(dir, "opencode.json");
+
+    await installJsonHttp(NESTED(file), { type: "remote", url: "https://x/mcp" });
+
+    const cfg = JSON.parse(await fs.readFile(file, "utf8"));
+    expect(cfg.mcp.servers.todox).toEqual({ type: "remote", url: "https://x/mcp" });
+  });
+
+  it("keeps siblings at every level of a nested key path", async () => {
+    const dir = await caseDir("nested-preserve");
+    const file = path.join(dir, "opencode.json");
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        theme: "dark",
+        mcp: { servers: { other: { type: "remote" } } },
+      }),
+      "utf8",
+    );
+
+    await installJsonHttp(NESTED(file), { type: "remote", url: "https://x/mcp" });
+
+    const cfg = JSON.parse(await fs.readFile(file, "utf8"));
+    expect(cfg.theme).toBe("dark");
+    expect(Object.keys(cfg.mcp.servers).sort()).toEqual(["other", "todox"]);
+    expect(cfg.mcp.servers.other).toEqual({ type: "remote" });
+  });
+
+  it("refuses to overwrite a key that holds something other than an object", async () => {
+    const dir = await caseDir("nested-collision");
+    const file = path.join(dir, "opencode.json");
+    // A user who set `mcp` to a string has a broken config, but it is theirs.
+    // Replacing it silently is the failure this module exists to stop making.
+    await fs.writeFile(file, JSON.stringify({ mcp: "off" }), "utf8");
+
+    await expect(installJsonHttp(NESTED(file), { url: "https://x/mcp" })).rejects.toThrow(
+      /'mcp' is already set to a non-object/,
+    );
+    // And the file it refused to write is exactly as it was.
+    expect(JSON.parse(await fs.readFile(file, "utf8"))).toEqual({ mcp: "off" });
+  });
 });
 
 describe("verifyJsonHttp", () => {
@@ -122,6 +178,69 @@ describe("verifyJsonHttp", () => {
       ok: true,
       detail: file,
     });
+  });
+});
+
+describe("verifyJsonHttp on a nested key path", () => {
+  it("does not accept a v1 entry as a v2 one", async () => {
+    const dir = await caseDir("verify-nested-mismatch");
+    const file = path.join(dir, "opencode.json");
+    // Written where OpenCode v1 reads; asked for where v2 reads. This is the
+    // pair that used to pass, because verify re-read whatever install wrote.
+    await installJsonHttp({ file, rootKeys: ["mcp"], name: "todox" }, { url: "https://x" });
+
+    await expect(verifyJsonHttp(NESTED(file))).resolves.toEqual({
+      ok: false,
+      detail: `no mcp.servers.todox in ${file}`,
+    });
+  });
+
+  it("accepts the entry once it is at the nested path", async () => {
+    const dir = await caseDir("verify-nested-ok");
+    const file = path.join(dir, "opencode.json");
+    await installJsonHttp(NESTED(file), { url: "https://x" });
+
+    await expect(verifyJsonHttp(NESTED(file))).resolves.toEqual({ ok: true, detail: file });
+  });
+});
+
+describe("findStaleEntries", () => {
+  it("finds an entry sitting at a layout the client does not read", async () => {
+    const dir = await caseDir("stale-found");
+    const file = path.join(dir, "opencode.json");
+    await installJsonHttp({ file, rootKeys: ["mcp"], name: "todox" }, { url: "https://old" });
+
+    await expect(
+      findStaleEntries([{ file, rootKeys: ["mcp"] }], "todox"),
+    ).resolves.toEqual([`mcp.todox in ${file}`]);
+  });
+
+  it("says nothing when the stale layout is empty", async () => {
+    const dir = await caseDir("stale-clean");
+    const file = path.join(dir, "opencode.json");
+    await installJsonHttp(NESTED(file), { url: "https://new" });
+
+    await expect(findStaleEntries([{ file, rootKeys: ["mcp"] }], "todox")).resolves.toEqual(
+      [],
+    );
+  });
+
+  it("says nothing when the stale file does not exist", async () => {
+    const dir = await caseDir("stale-absent");
+    await expect(
+      findStaleEntries([{ file: path.join(dir, "nope.json"), rootKeys: ["servers"] }], "todox"),
+    ).resolves.toEqual([]);
+  });
+
+  it("survives an unparseable file at the stale location", async () => {
+    const dir = await caseDir("stale-broken");
+    const file = path.join(dir, "broken.json");
+    // A guess about the past must not fail an install that is otherwise fine.
+    await fs.writeFile(file, "{ not json", "utf8");
+
+    await expect(findStaleEntries([{ file, rootKeys: ["servers"] }], "todox")).resolves.toEqual(
+      [],
+    );
   });
 });
 

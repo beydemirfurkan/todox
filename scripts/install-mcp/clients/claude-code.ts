@@ -1,23 +1,18 @@
 import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 
 import { readJsonFile } from "./atomic-write";
-import { installJsonHttp, verifyJsonHttp } from "./json-http";
+import { claudeCodeContract, ENTRY_NAME } from "./contract";
+import { findStaleEntries, installJsonHttp, verifyJsonHttp } from "./json-http";
 import type { ClientInstaller } from "./types";
 
-const NAME = "todox";
-
 /**
- * Resolved per call, not once at import. `os.homedir()` is read from the
- * environment, so a module-level constant freezes whatever HOME happened to
- * be set when the module was first loaded -- which is before any test can
- * point it somewhere safe, and wrong for any caller that changes it.
+ * Path and root key come from `claudeCodeContract()`, resolved per call:
+ * `os.homedir()` is read from the environment, so a module-level constant
+ * freezes whatever HOME happened to be set when the module was first loaded --
+ * which is before any test can point it somewhere safe.
  */
-function configPath(): string {
-  return path.join(os.homedir(), ".claude.json");
-}
+const target = () => ({ ...claudeCodeContract().current, name: ENTRY_NAME });
 
 /** Resolves the process's exit code, or null when it could not be spawned. */
 function exitCodeOf(command: string, args: readonly string[]): Promise<number | null> {
@@ -41,7 +36,7 @@ async function installViaNativeCli(url: string, token: string): Promise<boolean>
   const args = [
     "mcp",
     "add",
-    NAME,
+    ENTRY_NAME,
     "--transport",
     "http",
     url,
@@ -53,11 +48,11 @@ async function installViaNativeCli(url: string, token: string): Promise<boolean>
 }
 
 async function hasEntry(): Promise<boolean> {
-  const config = await readJsonFile<{ mcpServers?: Record<string, unknown> }>(configPath());
-  return Boolean(config?.mcpServers && NAME in config.mcpServers);
+  const config = await readJsonFile<{ mcpServers?: Record<string, unknown> }>(
+    claudeCodeContract().current.file,
+  );
+  return Boolean(config?.mcpServers && ENTRY_NAME in config.mcpServers);
 }
-
-const TARGET = () => ({ configPath: configPath(), rootKey: "mcpServers" as const, name: NAME });
 
 export const client: ClientInstaller = {
   name: "claude-code",
@@ -65,7 +60,7 @@ export const client: ClientInstaller = {
   async detect() {
     if (await isClaudeOnPath()) return true;
     try {
-      await fs.access(configPath());
+      await fs.access(claudeCodeContract().current.file);
       return true;
     } catch {
       return false;
@@ -78,6 +73,7 @@ export const client: ClientInstaller = {
         "claude-code currently supports the http transport only; pass --transport http",
       );
     }
+    const contract = claudeCodeContract();
     // Read before writing so the reported status is the truth either way --
     // the native CLI does not tell us whether it replaced an entry.
     const existed = await hasEntry();
@@ -86,17 +82,24 @@ export const client: ClientInstaller = {
     // entry, and writing it again over the top would clobber any extra
     // fields that version of the CLI set for itself.
     if (await installViaNativeCli(url, token)) {
-      return { path: configPath(), status: existed ? "updated" : "created", entryId: "native" };
+      return {
+        path: contract.current.file,
+        status: existed ? "updated" : "created",
+        entryId: "native",
+      };
     }
-    const result = await installJsonHttp(TARGET(), {
-      type: "http",
-      url,
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const result = await installJsonHttp(
+      { ...contract.current, name: ENTRY_NAME },
+      { type: contract.httpType, url, headers: { Authorization: `Bearer ${token}` } },
+    );
     return { ...result, entryId: "json" };
   },
 
   async verify() {
-    return verifyJsonHttp(TARGET(), "Bearer ");
+    return verifyJsonHttp(target(), "Bearer ");
+  },
+
+  async staleInstalls() {
+    return findStaleEntries(claudeCodeContract().stale, ENTRY_NAME);
   },
 };

@@ -13,6 +13,12 @@ export type ParsedArgs = {
   transport: "http" | "stdio";
   dryRun: boolean;
   verbose: boolean;
+  /**
+   * OpenCode only. Undefined means "work it out from the existing config",
+   * which is what almost every run does; the flag is for the case where there
+   * is no config to read yet and the user knows which major they run.
+   */
+  openCodeLayout?: "v1" | "v2";
 };
 
 const KNOWN_CLIENTS = ["claude-code", "codex", "cursor", "vscode", "opencode"] as const;
@@ -70,7 +76,16 @@ export function parseArgs(argv: string[]): ParsedArgs {
     throw new Error("--token requires a value");
   }
 
+  // Same reasoning as --transport: a value we do not recognise has to fail
+  // here, because the installer would otherwise fall back to detection and the
+  // user would never learn their flag was ignored.
+  const layoutFlag = flags["opencode-layout"];
+  if (layoutFlag !== undefined && layoutFlag !== "v1" && layoutFlag !== "v2") {
+    throw new Error(`--opencode-layout must be 'v1' or 'v2' (got '${String(layoutFlag)}')`);
+  }
+
   return {
+    openCodeLayout: layoutFlag,
     client: clientName,
     url: typeof flags.url === "string" ? flags.url : "https://www.todox.dev/api/mcp",
     token: typeof flagToken === "string" ? flagToken : process.env.TODOX_TOKEN ?? "",
