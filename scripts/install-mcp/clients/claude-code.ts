@@ -3,7 +3,8 @@ import { promises as fs } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { readJsonFile, writeJsonFile } from "./atomic-write";
+import { readJsonFile } from "./atomic-write";
+import { installJsonHttp, verifyJsonHttp } from "./json-http";
 import type { ClientInstaller } from "./types";
 
 const NAME = "todox";
@@ -51,23 +52,12 @@ async function installViaNativeCli(url: string, token: string): Promise<boolean>
   return (await exitCodeOf("claude", args)) === 0;
 }
 
-async function installViaJson(url: string, token: string): Promise<void> {
-  const target = configPath();
-  const current = (await readJsonFile<Record<string, unknown>>(target)) ?? {};
-  const servers = (current.mcpServers as Record<string, unknown> | undefined) ?? {};
-  servers[NAME] = {
-    type: "http",
-    url,
-    headers: { Authorization: `Bearer ${token}` },
-  };
-  current.mcpServers = servers;
-  await writeJsonFile(target, current);
-}
-
 async function hasEntry(): Promise<boolean> {
   const config = await readJsonFile<{ mcpServers?: Record<string, unknown> }>(configPath());
   return Boolean(config?.mcpServers && NAME in config.mcpServers);
 }
+
+const TARGET = () => ({ configPath: configPath(), rootKey: "mcpServers" as const, name: NAME });
 
 export const client: ClientInstaller = {
   name: "claude-code",
@@ -91,27 +81,22 @@ export const client: ClientInstaller = {
     // Read before writing so the reported status is the truth either way --
     // the native CLI does not tell us whether it replaced an entry.
     const existed = await hasEntry();
-    const status = existed ? "updated" : "created";
 
     // The native CLI first. When it succeeds it has already written this
     // entry, and writing it again over the top would clobber any extra
     // fields that version of the CLI set for itself.
     if (await installViaNativeCli(url, token)) {
-      return { path: configPath(), status, entryId: "native" };
+      return { path: configPath(), status: existed ? "updated" : "created", entryId: "native" };
     }
-    await installViaJson(url, token);
-    return { path: configPath(), status, entryId: "json" };
+    const result = await installJsonHttp(TARGET(), {
+      type: "http",
+      url,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return { ...result, entryId: "json" };
   },
 
   async verify() {
-    const target = configPath();
-    const config = await readJsonFile<{ mcpServers?: Record<string, unknown> }>(target);
-    const entry = config?.mcpServers?.[NAME];
-    if (!entry) return { ok: false, detail: `no mcpServers.${NAME} in ${target}` };
-    const { headers } = entry as { headers?: Record<string, string> };
-    if (!String(headers?.Authorization ?? "").startsWith("Bearer ")) {
-      return { ok: false, detail: `Authorization header missing or not Bearer in ${target}` };
-    }
-    return { ok: true, detail: target };
+    return verifyJsonHttp(TARGET(), "Bearer ");
   },
 };
