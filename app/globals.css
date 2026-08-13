@@ -1388,6 +1388,12 @@ pre {
   .pill {
     min-height: 44px;
   }
+  /* The header's home link. It is a real target -- 121x35 measured on a phone
+     -- and it reached none of the classes above, because it is a link wearing
+     a wordmark rather than a control. */
+  .brand {
+    min-height: 44px;
+  }
   .searchbox,
   .user-menu-trigger,
   .picker-trigger {
