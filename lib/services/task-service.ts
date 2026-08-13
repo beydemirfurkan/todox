@@ -87,9 +87,17 @@ export async function update(
 }
 
 export async function addEntry(input: entries.NewEntry): Promise<Entry> {
-  const entry = await entries.create(input);
-  await tasks.touch(input.task_id);
-  return entry;
+  // Both writes must succeed or neither must. A persisted entry without the
+  // task's `updated_at` reflecting it puts the row out of every recent sort and
+  // the briefing's "last touched" time would lie; a touch without an entry
+  // pretends nothing happened on a task that did just change. Either one alone
+  // is a permanent inconsistency the next retry cannot repair, and the second
+  // statement failing used to be a real way to leave one.
+  const results = await tx<Entry | undefined>([
+    entries.createStmt(input),
+    tasks.touchStmt(input.task_id),
+  ]);
+  return (results[0] as Entry[])[0]!;
 }
 
 export const remove = (id: number) => tasks.remove(id);

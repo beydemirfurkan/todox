@@ -1,5 +1,5 @@
 import type { EntryKind } from "../constants";
-import { all, groupBy, one, run } from "../db/client";
+import { all, groupBy, one, run, type Statement } from "../db/client";
 import type { Entry, EntryView } from "../types";
 import { now } from "../util/time";
 
@@ -45,6 +45,11 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, EntryV
 /**
  * The window's entries, narrowed to the tasks a report is already about.
  *
+ * `resolvePeriod` returns a half-open `[from, to)` window: the upper bound
+ * belongs to the next period, not this one. A `BETWEEN` that includes `to`
+ * would carry every entry written at the exact second the period rolled into
+ * the next one, which would then double-count them in two reports.
+ *
  * This replaced a `WHERE created_at BETWEEN ? AND ?` with no owner in it. The
  * report scoped the rows afterwards, in JavaScript, which was correct but meant
  * one account's monthly report pulled every account's log across the network
@@ -59,7 +64,7 @@ export async function listByTasksBetween(
   return all<Entry>(
     `SELECT * FROM entries
      WHERE task_id IN (${taskIds.map(() => "?").join(",")})
-       AND created_at BETWEEN ? AND ?
+       AND created_at >= ? AND created_at < ?
      ORDER BY id`,
     [...taskIds, from, to],
   );
@@ -121,6 +126,26 @@ export async function create(input: NewEntry): Promise<Entry> {
     ],
   );
   return row!;
+}
+
+/**
+ * The same write, exposed as a statement so it can sit inside one transaction
+ * with the `tasks.touch` that must accompany it.
+ */
+export function createStmt(input: NewEntry): Statement {
+  return {
+    text: `INSERT INTO entries (task_id, kind, body, author, model, user_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+    params: [
+      input.task_id,
+      input.kind,
+      input.body,
+      input.author ?? "agent",
+      input.model ?? null,
+      input.user_id ?? null,
+      now(),
+    ],
+  };
 }
 
 export const remove = (id: number) => run("DELETE FROM entries WHERE id = ?", [id]);

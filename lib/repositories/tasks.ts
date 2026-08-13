@@ -1,5 +1,5 @@
 import { OPEN_STATUSES, type Status } from "../constants";
-import { all, one, run, setClause } from "../db/client";
+import { all, one, run, setClause, type Statement } from "../db/client";
 import type { Task } from "../types";
 import { now } from "../util/time";
 
@@ -50,10 +50,10 @@ export const activeBetween = (userId: number, from: string, to: string) =>
     `SELECT DISTINCT t.* FROM tasks t
      JOIN projects p ON p.id = t.project_id
      LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
-     LEFT JOIN entries e     ON e.task_id = t.id AND e.created_at BETWEEN ? AND ?
-     LEFT JOIN task_events v ON v.task_id = t.id AND v.at         BETWEEN ? AND ?
-      WHERE (p.user_id = ? OR pm.user_id IS NOT NULL) AND ((t.created_at BETWEEN ? AND ?)
-         OR (t.closed_at  BETWEEN ? AND ?)
+     LEFT JOIN entries e     ON e.task_id = t.id AND e.created_at >= ? AND e.created_at < ?
+     LEFT JOIN task_events v ON v.task_id = t.id AND v.at         >= ? AND v.at         < ?
+      WHERE (p.user_id = ? OR pm.user_id IS NOT NULL) AND ((t.created_at >= ? AND t.created_at < ?)
+         OR (t.closed_at  >= ? AND t.closed_at  < ?)
          OR e.id IS NOT NULL
          OR v.id IS NOT NULL)
      ORDER BY t.updated_at DESC`,
@@ -74,10 +74,16 @@ export async function create(
   input: NewTask & { actor?: string; model?: string | null; user_id?: number | null },
 ): Promise<Task> {
   const ts = now();
+  const status = input.status ?? "todo";
+  // A task that opens already closed needs `closed_at` from the first moment:
+  // reports key off that column, and a NULL here would put the task out of
+  // every finished report while every entry's `timingFor` would have to flag
+  // the gap. Setting both at insert is the only way to keep that promise.
+  const closedAt = status === "done" || status === "dropped" ? ts : null;
   const row = await one<Task>(
     `WITH t AS (
-       INSERT INTO tasks (project_id, title, body, status, priority, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+       INSERT INTO tasks (project_id, title, body, status, priority, created_at, updated_at, closed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *
      ), e AS (
        INSERT INTO task_events (task_id, from_status, to_status, at, actor, model, user_id)
@@ -88,10 +94,11 @@ export async function create(
       input.project_id,
       input.title,
       input.body ?? null,
-      input.status ?? "todo",
+      status,
       input.priority ?? 2,
       ts,
       ts,
+      closedAt,
       ts,
       input.actor ?? "agent",
       input.model ?? null,
@@ -130,6 +137,15 @@ export async function update(id: number, patch: TaskPatch): Promise<Task | undef
 
 export const touch = (id: number) =>
   run("UPDATE tasks SET updated_at = ? WHERE id = ?", [now(), id]);
+
+/**
+ * The same touch, as a statement, so it can sit inside a transaction with the
+ * entry insert whose side effect it must record.
+ */
+export const touchStmt = (id: number): Statement => ({
+  text: "UPDATE tasks SET updated_at = ? WHERE id = ?",
+  params: [now(), id],
+});
 
 export const remove = (id: number) => run("DELETE FROM tasks WHERE id = ?", [id]);
 

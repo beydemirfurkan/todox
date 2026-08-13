@@ -101,11 +101,16 @@ export function setClause(
  * answer is one statement with a CTE, not this.
  */
 export async function tx<T = unknown>(
-  statements: { text: string; params?: Params }[],
+  statements: readonly (Statement | { text: string; params?: readonly unknown[] } | undefined)[],
 ): Promise<T[][]> {
   const s = sql();
+  const queries = statements.filter(
+    (q): q is Statement | { text: string; params?: readonly unknown[] } => Boolean(q),
+  );
   const results = await s.transaction(
-    statements.map((q) => s.query(positional(q.text), (q.params ?? []) as unknown[])),
+    queries.map((q) =>
+      s.query(positional(q.text), (q.params ?? []) as unknown[]),
+    ),
   );
   return results as T[][];
 }
