@@ -111,7 +111,10 @@ export function SharePanel({
       <form action={setSharingAction} className="flex flex-wrap items-center gap-2">
         <input type="hidden" name="project_id" value={projectId} />
         <input type="hidden" name="enabled" value="1" />
-        <label className="flex flex-1 items-start gap-2 text-[13.5px] text-muted">
+        {/* `min-w-0` beside `flex-1`: the basis is zero, so without it this
+            label squeezes to one word per line instead of letting the row
+            wrap. */}
+        <label className="flex min-w-0 flex-1 items-start gap-2 text-[13.5px] text-muted">
           <input
             type="checkbox"
             name="include_log"
