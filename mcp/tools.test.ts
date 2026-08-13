@@ -99,6 +99,56 @@ describe("what each side fills in for itself", () => {
 });
 
 /**
+ * What the agent is actually handed back.
+ *
+ * Every test above asserts what went out — the schema, the params — and none
+ * asserted what came back, which is how `get_context` shipped returning `{}`
+ * to every agent on both transports. Its `transform` is async and the call
+ * site did not await it, so the briefing was serialised as a pending promise.
+ * A tool that answers `{}` still looks connected: it lists, it responds, it
+ * reports no error.
+ */
+describe("the payload the agent receives", () => {
+  /** The single text block a tool answers with, parsed. */
+  const payloadOf = (result: unknown) =>
+    JSON.parse(
+      (result as { content: { text: string }[] }).content[0].text,
+    ) as Record<string, unknown>;
+
+  it("returns the server's briefing, not an empty object", async () => {
+    const { tools } = harness(localWs);
+
+    const result = await tools.get("get_context")!.handler({ cwd: "/repo" });
+
+    // The harness's invoker answers `{ ok: true }`; anything that loses it —
+    // an unawaited promise most of all — shows up here as `{}`.
+    expect(payloadOf(result)).toMatchObject({ ok: true });
+  });
+
+  it("returns a briefing on the hosted transport too", async () => {
+    // The hosted workspace has no filesystem, so it takes the other branch of
+    // every `after`/`transform` hook. Both transports, one assertion each.
+    const { tools } = harness(remoteWs);
+
+    const result = await tools.get("get_context")!.handler({ cwd: "/repo" });
+
+    expect(payloadOf(result)).toMatchObject({ ok: true });
+  });
+
+  it("never answers with a serialised promise", async () => {
+    const { tools } = harness(localWs);
+
+    for (const name of ["get_context", "list_tasks", "list_projects"]) {
+      const result = await tools.get(name)!.handler({ cwd: "/repo" });
+      const text = (result as { content: { text: string }[] }).content[0].text;
+      // `JSON.stringify(Promise.resolve(x))` is exactly "{}", and that is the
+      // shape this whole block exists to keep out.
+      expect(text, name).not.toBe("{}");
+    }
+  });
+});
+
+/**
  * The feature the product leads with, and the one that was dead on the hosted
  * transport: `hash` was stripped from the schema whichever side was asking, so
  * a remote agent had no way to send one and every ref read "not checked".
