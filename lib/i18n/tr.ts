@@ -10,6 +10,9 @@ export const tr: Record<Key, string> = {
   metaTitleAbout: "todox hakkında — geliştiriciler ve ajanları için çalışma belleği",
   metaTitlePrivacy: "todox gizlilik politikası — toplanan veriler ve hakların",
   metaTitleContact: "todox ile iletişim — hata bildirimi ve GitHub deposu",
+  metaTitleAccount: "Hesap — todox",
+  metaTitleReport: "Etkinlik raporu — todox",
+  metaTitleSearch: "Arama — todox",
   metaDescription:
     "todox, geliştiricilerin ve kodlama ajanlarının kullandığı bir çalışma belleğidir: projeler, görevler ve her oturumdan sağ çıkan günlük.",
   metaDescriptionLogin:

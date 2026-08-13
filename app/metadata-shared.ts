@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 /**
  * OpenGraph defaults shared across pages. The root layout sets these; per-page
  * `generateMetadata` overrides `url` so the social preview links to the right
@@ -17,5 +19,27 @@ export function pageOpenGraph(path: string) {
   return {
     url: path,
     images: [defaultOpenGraphImage],
+  };
+}
+
+/**
+ * A page you have to be signed in to see.
+ *
+ * The `noindex` is what `NOINDEX_PREFIXES` in `organization-json-ld.tsx`
+ * already assumed these pages sent — it suppresses the JSON-LD for them on the
+ * grounds that they set it, and until now none of them did.
+ *
+ * The title matters more than it looks. Every signed-in page inherited the
+ * landing page's tagline, so a row of open tabs — three projects, a report and
+ * the account page — all read "todox — working memory for developers and their
+ * agents" and none could be told from another.
+ *
+ * No description: a page search engines are told to skip has nobody to
+ * describe it to.
+ */
+export function privatePageMetadata(title: string): Metadata {
+  return {
+    title: { absolute: title },
+    robots: { index: false, follow: false },
   };
 }

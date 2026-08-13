@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -9,8 +10,15 @@ import { periodLabel, renderMarkdown } from "@/lib/services/report-markdown";
 import { activityReport, type TaskReport } from "@/lib/services/reports";
 import { resolvePeriod, type PeriodName } from "@/lib/util/time";
 import { Blob, Chip, Counter, Empty, MarkdownPreview, Panel } from "../components";
+import { privatePageMetadata } from "../metadata-shared";
 import { CopyMarkdown } from "../features/copy-markdown";
 import { IMPORTANCE_COLOR, KIND_COLOR, statusLabel } from "../kinds";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return privatePageMetadata(t("metaTitleReport"));
+}
+
 
 export const dynamic = "force-dynamic";
 

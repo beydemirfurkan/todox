@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ago, type Key } from "@/lib/i18n";
@@ -5,6 +6,13 @@ import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
 import { search } from "@/lib/services/search";
 import { Chip, Counter, Empty, Panel } from "../components";
+import { privatePageMetadata } from "../metadata-shared";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return privatePageMetadata(t("metaTitleSearch"));
+}
+
 
 export const dynamic = "force-dynamic";
 
