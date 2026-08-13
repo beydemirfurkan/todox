@@ -1,4 +1,4 @@
-import { one, run, runStmt, type Statement } from "../db/client";
+import { one, run, type Statement } from "../db/client";
 import type { AuthTokenPurpose, AuthTokenRow, User } from "../types";
 import { hashToken } from "../util/tokens";
 import { now } from "../util/time";
@@ -34,12 +34,29 @@ export async function resolve(
   return user ? { row: found, user } : undefined;
 }
 
+/**
+ * Atomic single-use mark. The `used_at IS NULL` guard is the whole point: two
+ * transactions racing on the same token must end with exactly one UPDATE
+ * returning a row, so callers use `consumedStmt` (which RETURNs the id) inside
+ * a tx and treat an empty result set as "the link was already burned -- not
+ * us to consume".
+ */
 export const consumeStmt = (id: number): Statement => ({
-  text: "UPDATE auth_tokens SET used_at = ? WHERE id = ?",
+  text: "UPDATE auth_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL",
   params: [now(), id],
 });
 
-export const consume = (id: number) => runStmt(consumeStmt(id));
+/**
+ * Same effect, but returns the affected row so a service can detect the loser
+ * of the race without an extra read. Use this inside a `tx()` when the
+ * "already used" case must abort the surrounding work.
+ */
+export const consumedStmt = (id: number): Statement => ({
+  text: "UPDATE auth_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL RETURNING id",
+  params: [now(), id],
+});
+
+export const consume = (id: number) => run(consumeStmt(id).text, consumeStmt(id).params);
 
 /** Issuing a new one retires the old: two live reset links is one too many. */
 export const invalidateAll = (userId: number, purpose: AuthTokenPurpose) =>

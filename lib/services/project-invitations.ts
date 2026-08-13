@@ -6,7 +6,7 @@ import * as memberships from "../repositories/project-memberships";
 import * as notifications from "../repositories/notifications";
 import * as projects from "../repositories/projects";
 import * as users from "../repositories/users";
-import { send } from "./mailer";
+import { send, transport } from "./mailer";
 import { ownsProject } from "./ownership";
 import * as limit from "./rate-limit";
 import { newSessionToken } from "../util/tokens";
@@ -39,6 +39,15 @@ export async function invite(input: {
 
   const project = await projects.ownedById(input.userId, input.projectId);
   if (!project) return "not-owner";
+  // Refuse to issue an invite token the recipient will never see: production
+  // without SMTP would burn tokens nobody can redeem and write nothing useful.
+  if (transport().name === "refusing") {
+    console.error(
+      `[todox] refusing to issue project-invite token for ${email}: SMTP is not ` +
+        `configured in production.`,
+    );
+    return "invalid";
+  }
   const token = newSessionToken();
   const createdAt = now();
   const expiresAt = new Date(Date.now() + INVITE_DAYS * 86_400_000).toISOString();

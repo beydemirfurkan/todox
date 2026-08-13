@@ -9,7 +9,7 @@ import { newSessionToken } from "../util/tokens";
 import { addDays } from "../util/time";
 import { MIN_PASSWORD, publicUser, type Result } from "./auth";
 import { publicUrl } from "../public-url";
-import { send } from "./mailer";
+import { send, transport } from "./mailer";
 
 const RESET_TTL_MIN = 60;
 const VERIFY_TTL_DAYS = 3;
@@ -31,10 +31,18 @@ async function issue(userId: number, purpose: AuthTokenPurpose, expiresAt: strin
  * Always resolves the same way. Whether the address is registered is not
  * something an unauthenticated caller gets to learn, so there is no branch in
  * the return value -- only in whether an email goes out.
+ *
+ * In production, refuse to issue the token at all when SMTP is misconfigured.
+ * Issuing it without dispatch would leave a reset link lying in the database
+ * that no real user can ever use, and worse: if the refusing transport's
+ * throw ever leaked away, future versions could mistake "token issued, mail
+ * never sent" for a successful dispatch.
  */
 export async function requestPasswordReset(email: string, lang: "tr" | "en") {
   const user = await users.byEmail(email.trim());
   if (!user) return;
+
+  if (!mailReady("reset", user.email)) return;
 
   const token = await issue(user.id, "reset", expiryIn(RESET_TTL_MIN * 60_000));
   const link = `${publicUrl()}/reset?token=${encodeURIComponent(token)}`;
@@ -65,6 +73,22 @@ export async function requestPasswordReset(email: string, lang: "tr" | "en") {
   });
 }
 
+/**
+ * True when a mail to this address can actually leave the process. In
+ * development the console transport absorbs everything, but production refuses
+ * when SMTP is not configured; calling `issue` in that case would burn a token
+ * that no real user could ever redeem.
+ */
+function mailReady(purpose: string, to: string): boolean {
+  const t = transport();
+  if (t.name !== "refusing") return true;
+  console.error(
+    `[todox] refusing to issue ${purpose} token for ${to}: SMTP is not ` +
+      `configured in production.`,
+  );
+  return false;
+}
+
 export type ResetOutcome = Result<PublicUser>;
 
 export async function completePasswordReset(
@@ -82,9 +106,16 @@ export async function completePasswordReset(
   // password without the token consumed leaves a reset link that still works,
   // and the new password without the sessions dropped tells the owner they have
   // recovered the account while the intruder is still signed in.
-  await tx([
-    users.updatePasswordStmt(hit.user.id, await hashPassword(password)),
-    authTokens.consumeStmt(hit.row.id),
+  //
+  // The token UPDATE carries `used_at IS NULL` and a `RETURNING id`: two
+  // transactions racing on the same token end with exactly one returning a
+  // row, so a missing id in the result is the loser and aborts the rest. The
+  // caller has to look at the returned rows -- the HTTP driver does not hand
+  // out an affected-row count.
+  const passwordHash = await hashPassword(password);
+  const results = await tx([
+    users.updatePasswordStmt(hit.user.id, passwordHash),
+    authTokens.consumedStmt(hit.row.id),
     // Whoever knew the old password loses their grip on the account.
     sessions.destroyAllForStmt(hit.user.id),
     // Agent tokens too. This is the recovery path -- you are here because you
@@ -95,6 +126,13 @@ export async function completePasswordReset(
     // Reaching the inbox proves the address, so verification comes for free.
     ...(hit.user.email_verified_at ? [] : [users.markEmailVerifiedStmt(hit.user.id)]),
   ]);
+  // consumedStmt is the second statement (index 1); an empty rows array means
+  // another transaction already won the race and the surrounding writes --
+  // including the new password -- are not ours to keep. Treat the link as
+  // invalid and let the caller show the same error as for an expired token.
+  if ((results[1] as unknown[]).length === 0) {
+    return { ok: false, errors: [{ field: "form", code: "linkInvalid" }] };
+  }
 
   return { ok: true, value: publicUser(hit.user) };
 }
@@ -115,6 +153,8 @@ export async function sessionAfterReset(userId: number, userAgent?: string | nul
 
 export async function sendVerification(user: PublicUser, lang: "tr" | "en") {
   if (user.email_verified_at) return;
+
+  if (!mailReady("verify", user.email)) return;
 
   const token = await issue(user.id, "verify", expiryIn(VERIFY_TTL_DAYS * 86_400_000));
   const link = `${publicUrl()}/verify?token=${encodeURIComponent(token)}`;
@@ -189,6 +229,12 @@ export async function completeVerification(token: string): Promise<boolean> {
   if (!hit) return false;
   // Together: marking the address verified while leaving the link usable, or
   // burning the link without recording the result, are both worse than failing.
-  await tx([users.markEmailVerifiedStmt(hit.user.id), authTokens.consumeStmt(hit.row.id)]);
-  return true;
+  // The token UPDATE includes `RETURNING id` and `used_at IS NULL` -- a missing
+  // row means a concurrent verify already won and we must not flip verification
+  // a second time. The tx rolls back atomically.
+  const results = await tx([
+    users.markEmailVerifiedStmt(hit.user.id),
+    authTokens.consumedStmt(hit.row.id),
+  ]);
+  return (results[1] as unknown[]).length > 0;
 }
