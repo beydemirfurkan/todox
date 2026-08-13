@@ -1,5 +1,7 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { CONTEXT_KINDS, type Status } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
@@ -37,6 +39,7 @@ import { Picker } from "../../features/picker";
 import { SubmitButton } from "../../features/submit";
 import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
 import { Blob, Chip, Counter, Empty, Field, Panel, StatusDot } from "../../components";
+import { privatePageMetadata } from "../../metadata-shared";
 import {
   compareTasks,
   isClosed,
@@ -53,14 +56,39 @@ export const dynamic = "force-dynamic";
  * asserted without standing a page up. What is left here is markup.
  */
 
+/**
+ * `generateMetadata` and the render both need the account and the project, and
+ * the page is force-dynamic, so `cache` is what keeps that one lookup each
+ * rather than two.
+ */
+const currentUser = cache(requireUser);
+const projectBySlug = cache((userId: number, slug: string) => projects.bySlug(userId, slug));
+
+/**
+ * The tab, and only the tab: this page is noindex like every signed-in one.
+ * Without it a row of open projects all read the landing page's tagline and
+ * none could be told from another.
+ */
+export async function generateMetadata({
+  params,
+}: PageProps<"/p/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const { t } = await getT();
+  const user = await currentUser();
+  const project = await projectBySlug(user.id, slug);
+  return privatePageMetadata(
+    project ? `${project.name} — ${t("siteName")}` : t("siteName"),
+  );
+}
+
 export default async function ProjectPage({
   params,
   searchParams,
 }: PageProps<"/p/[slug]">) {
   const { slug } = await params;
-  const user = await requireUser();
+  const user = await currentUser();
   const { t } = await getT();
-  const project = await projects.bySlug(user.id, slug);
+  const project = await projectBySlug(user.id, slug);
   if (!project) notFound();
 
   const owner = project.access_role === "owner";
@@ -218,8 +246,11 @@ export default async function ProjectPage({
           )}
         </div>
 
+        {/* `.prose` is the measure on the paragraph below. It used to carry
+            `min-w-3xl` beside it, which is a 768px *minimum* — wider than the
+            max-width `.prose` sets, and wider than a phone. */}
         {project.summary && (
-          <p className="prose min-w-3xl text-[14.5px] leading-relaxed text-muted">
+          <p className="prose text-[14.5px] leading-relaxed text-muted">
             {project.summary}
           </p>
         )}
