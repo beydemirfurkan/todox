@@ -7,6 +7,7 @@ import { currentUser } from "@/lib/session";
 import * as contexts from "@/lib/repositories/contexts";
 import * as memberships from "@/lib/repositories/project-memberships";
 import * as projects from "@/lib/repositories/projects";
+import type { ProjectWithPath } from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
 import { addContextAction, createProjectAction, deleteContextAction } from "./actions";
 import { Explainer, FirstRun } from "./features/explainer";
@@ -15,6 +16,7 @@ import { Picker } from "./features/picker";
 import { SubmitButton } from "./features/submit";
 import { contextKindLabel, kindOptions } from "./kinds";
 import { Blob, Chip, Counter, Empty, Field, Panel } from "./components";
+import type { T } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -23,17 +25,26 @@ const TILTS = [-0.6, 0.5, -0.4, 0.7];
 export default async function Home() {
   const { t } = await getT();
   const user = await currentUser();
-  // The one page with two audiences. Signed out this is the only description
-  // of the product anyone can reach; signed in it is the dashboard.
   if (!user) return <Landing t={t} />;
-  // One counts query for the whole page instead of one per project card.
+
   const [allProjects, globalContext, counts] = await Promise.all([
-    projects.list(user.id),
+    projects.listWithPaths(user.id),
     contexts.listByProject(user.id, null),
     tasks.countsByProject(user.id),
   ]);
-  // One grouped query for every card, not one per card.
   const teamSizes = await memberships.countsByProjects(allProjects.map((p) => p.id));
+
+  // Group by parent_id so a single tree walk renders every card. A
+  // sub-project is a sibling workspace inside its parent, not a sibling card
+  // at the top level -- so they nest inside the parent's card.
+  const byParent = new Map<number | null, ProjectWithPath[]>();
+  for (const p of allProjects) {
+    const key = p.parent_project_id ?? null;
+    const list = byParent.get(key) ?? [];
+    list.push(p);
+    byParent.set(key, list);
+  }
+  const roots = byParent.get(null) ?? [];
 
   return (
     <div className="space-y-8">
@@ -51,64 +62,19 @@ export default async function Home() {
       {allProjects.length === 0 && <FirstRun t={t} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {allProjects.map((p, i) => {
-          const c = counts.map.get(p.id) ?? counts.empty;
-          return (
-            <Link
-              key={p.id}
-              href={`/p/${p.slug}`}
-              className="sticker lift pop block p-4"
-              style={{
-                animationDelay: `${60 + i * 55}ms`,
-                rotate: `${TILTS[i % TILTS.length]}deg`,
-              }}
-            >
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <h3 className="display text-[20px] font-bold">{p.name}</h3>
-                <span className="mono text-[12px] text-faint">{p.slug}</span>
-                {/* Somebody else's project, or one of yours that is not only
-                    yours. Two cards used to look identical either way. */}
-                {p.access_role === "member" && p.owner_name ? (
-                  <Chip color="var(--k-handoff)">
-                    {t("sharedBy", { name: p.owner_name })}
-                  </Chip>
-                ) : (
-                  (teamSizes.get(p.id) ?? 0) > 0 && (
-                    <Chip color="var(--k-handoff)">
-                      {t("memberCount", { n: (teamSizes.get(p.id) ?? 0) + 1 })}
-                    </Chip>
-                  )
-                )}
-              </div>
-              {p.summary && (
-                <p className="mt-1.5 line-clamp-2 text-[14px] text-muted">{p.summary}</p>
-              )}
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {c.doing > 0 && (
-                  <Chip color="var(--accent)" tilt={-2}>
-                    {c.doing} {t("countInFlight")}
-                  </Chip>
-                )}
-                {c.blocked > 0 && (
-                  <Chip color="var(--k-dead_end)" tilt={2}>
-                    {c.blocked} {t("countStuck")}
-                  </Chip>
-                )}
-                <Chip>
-                  {c.todo} {t("countQueued")}
-                </Chip>
-                {c.done > 0 && (
-                  <Chip color="var(--ok)">
-                    {c.done} {t("countDone")}
-                  </Chip>
-                )}
-              </div>
-              {p.root_path && (
-                <p className="mono mt-3 truncate text-[12px] text-faint">{p.root_path}</p>
-              )}
-            </Link>
-          );
-        })}
+        {roots.map((p, i) => (
+          <ProjectCard
+            key={p.id}
+            project={p}
+            childrenByParent={byParent}
+            counts={counts}
+            teamSizes={teamSizes}
+            tilt={TILTS[i % TILTS.length]}
+            delay={60 + i * 55}
+            depth={0}
+            t={t}
+          />
+        ))}
 
         <details className="pop rounded-[14px] border border-dashed border-line p-4 open:border-solid open:border-line open:bg-card">
           <summary className="link-more">{t("newProject")}</summary>
@@ -221,5 +187,131 @@ export default async function Home() {
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * One project (with its sub-projects nested underneath). The top-level cards
+ * are the grid items; deeper levels shrink in typography and indentation so a
+ * 3-deep tree still reads on a phone. The whole tree walks in one pass, no
+ * recursion over JSX arrays the page already built.
+ */
+function ProjectCard({
+  project,
+  childrenByParent,
+  counts,
+  teamSizes,
+  tilt,
+  delay,
+  depth,
+  t,
+}: {
+  project: ProjectWithPath;
+  childrenByParent: Map<number | null, ProjectWithPath[]>;
+  counts: { map: Map<number, { todo: number; doing: number; blocked: number; done: number; dropped: number }>; empty: { todo: number; doing: number; blocked: number; done: number; dropped: number } };
+  teamSizes: Map<number, number>;
+  tilt: number;
+  delay: number;
+  depth: number;
+  t: T;
+}) {
+  const url = `/p/${project.url_path.join("/")}`;
+  const c = counts.map.get(project.id) ?? counts.empty;
+  const teamCount = teamSizes.get(project.id) ?? 0;
+  const isTop = depth === 0;
+  const isMember = project.access_role === "member";
+  const children = childrenByParent.get(project.id) ?? [];
+
+  return (
+    <article
+      className={
+        isTop
+          ? "sticker lift pop block p-4"
+          : "sticker-flat mt-2 p-3"
+      }
+      style={
+        isTop
+          ? { animationDelay: `${delay}ms`, rotate: `${tilt}deg` }
+          : { animationDelay: `${delay}ms` }
+      }
+    >
+      <Link href={url} className="block">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <h3 className={`display min-w-0 ${isTop ? "text-[20px] font-bold" : "text-[14.5px] font-medium"}`}>
+            {project.name}
+          </h3>
+          <span className="mono text-[12px] text-faint">{project.slug}</span>
+          {isMember && project.owner_name ? (
+            <Chip color="var(--k-handoff)">
+              {t("sharedBy", { name: project.owner_name })}
+            </Chip>
+          ) : (
+            !isMember && teamCount > 0 && (
+              <Chip color="var(--k-handoff)">
+                {t("memberCount", { n: teamCount + 1 })}
+              </Chip>
+            )
+          )}
+          {project.parent_project_id && (
+            <Chip color="var(--k-handoff)" tilt={-3}>
+              {t("subProjectBadge")}
+            </Chip>
+          )}
+        </div>
+        {project.summary && (
+          <p className="mt-1.5 line-clamp-2 text-[14px] text-muted">{project.summary}</p>
+        )}
+        {isTop && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {c.doing > 0 && (
+              <Chip color="var(--accent)" tilt={-2}>
+                {c.doing} {t("countInFlight")}
+              </Chip>
+            )}
+            {c.blocked > 0 && (
+              <Chip color="var(--k-dead_end)" tilt={2}>
+                {c.blocked} {t("countStuck")}
+              </Chip>
+            )}
+            <Chip>
+              {c.todo} {t("countQueued")}
+            </Chip>
+            {c.done > 0 && (
+              <Chip color="var(--ok)">
+                {c.done} {t("countDone")}
+              </Chip>
+            )}
+          </div>
+        )}
+        {isTop && project.root_path && (
+          <p className="mono mt-3 truncate text-[12px] text-faint">{project.root_path}</p>
+        )}
+      </Link>
+
+      {children.length > 0 && (
+        <ul
+          className={
+            isTop
+              ? "mt-3 space-y-2 border-l-2 border-dashed border-rule pl-3"
+              : "mt-2 space-y-1.5 border-l-2 border-dashed border-rule pl-3"
+          }
+        >
+          {children.map((c, i) => (
+            <li key={c.id}>
+              <ProjectCard
+                project={c}
+                childrenByParent={childrenByParent}
+                counts={counts}
+                teamSizes={teamSizes}
+                tilt={0}
+                delay={delay + 30 + i * 25}
+                depth={depth + 1}
+                t={t}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </article>
   );
 }

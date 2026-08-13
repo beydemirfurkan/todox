@@ -1340,9 +1340,96 @@ pre {
   animation: bob 3.4s ease-in-out infinite;
 }
 
+/* Skeletons. A subtle pulse on the inset tone -- the same shade a card uses
+   when it is the active filter, so an empty placeholder reads as "this will
+   be a row" rather than "this is missing". The base is the colour, and the
+   shape is whatever width/height the placeholder needs. */
+@keyframes skel-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.92;
+  }
+}
+.skel {
+  display: block;
+  background: var(--inset);
+  border-radius: 6px;
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+.skel-line {
+  height: 0.75em;
+  border-radius: 4px;
+}
+.skel-block {
+  height: 1.6rem;
+  border-radius: 8px;
+}
+
+/* The flow chart uses CSS borders and pseudo-elements for the connectors, so
+   the lines keep the page's line colour and stay sharp on every DPI. */
+.flow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.flow-parent {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 0.4rem;
+}
+.flow-bus {
+  position: relative;
+  height: 0;
+  border-top: 1.5px solid var(--line);
+  margin-inline: 22%;
+}
+.flow-bus::before,
+.flow-bus::after {
+  content: "";
+  position: absolute;
+  bottom: -1.5px;
+  width: 1.5px;
+  height: 0.7rem;
+  background: var(--line);
+}
+.flow-bus::before {
+  left: 0;
+}
+.flow-bus::after {
+  right: 0;
+}
+.flow-children {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem 0.75rem;
+  padding-top: 0.7rem;
+}
+.flow-child {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+.flow-stem {
+  position: relative;
+  height: 0.7rem;
+  border-left: 1.5px solid var(--line);
+  margin: 0 auto;
+}
+.flow-child-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding-top: 0.25rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pop,
-  .bob {
+  .bob,
+  .skel {
     animation: none;
   }
   .lift:hover {

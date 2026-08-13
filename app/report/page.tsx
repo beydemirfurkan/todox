@@ -225,7 +225,7 @@ function TaskRow({ task, t }: { task: TaskReport; t: T }) {
       <div className="flex flex-wrap items-baseline gap-2">
         <span className="mono text-[12px] text-faint">#{task.id}</span>
         <Link
-          href={`/p/${task.project_slug}/t/${task.id}`}
+          href={`/t/${task.id}?in=${task.project_slug}`}
           className="text-[15px] font-medium underline decoration-dotted underline-offset-2"
         >
           {task.title}

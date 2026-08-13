@@ -6,6 +6,7 @@ import { publicUrl } from "@/lib/public-url";
 import { listApiTokens } from "@/lib/services/auth";
 import * as invitationsRepo from "@/lib/repositories/project-invitations";
 import * as membershipsRepo from "@/lib/repositories/project-memberships";
+import * as projects from "@/lib/repositories/projects";
 import { requireUser } from "@/lib/session";
 import {
   changeEmailAction,
@@ -105,6 +106,14 @@ export default async function AccountPage({
       : Promise.resolve([]),
     membershipsRepo.listByUser(user.id),
   ]);
+  // Resolve the slug chain for every joined project so the link points at
+  // `/p/parent/child` rather than the leaf alone -- the leaf by itself is
+  // enough for `bySlug` (slugs are globally unique) but the breadcrumb and
+  // the flow panel need the whole chain.
+  const joinedPaths =
+    joinedProjects.length === 0
+      ? new Map<number, string[]>()
+      : await projects.pathsByIds(user.id, joinedProjects.map((m) => m.project_id));
   const requestedTab = (await searchParams).tab;
   const tabValue = Array.isArray(requestedTab) ? requestedTab[0] : requestedTab;
   const activeTab: TabId = isTabId(tabValue) ? tabValue : "profile";
@@ -435,10 +444,13 @@ export default async function AccountPage({
           >
             {joinedProjects.length ? (
               <div className="space-y-2">
-                {joinedProjects.map((membership) => (
+                {joinedProjects.map((membership) => {
+                  const path = joinedPaths.get(membership.project_id);
+                  const href = path ? `/p/${path.join("/")}` : `/p/${membership.access_slug}`;
+                  return (
                   <Link
                     key={membership.id}
-                    href={`/p/${membership.access_slug}`}
+                    href={href}
                     className="sticker-flat lift block p-3"
                   >
                     <p className="display font-bold">{membership.project_name}</p>
@@ -446,7 +458,8 @@ export default async function AccountPage({
                       {membership.owner_name} · {membership.owner_email}
                     </p>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <Empty>{t("noJoinedProjects")}</Empty>
