@@ -554,7 +554,7 @@ export default async function ProjectPage({
                   </div>
                   {/* Clamped: these are paragraphs, and the rail is a summary.
                       The full text is one click away on hover/expand. */}
-                  <p className="mt-1.5 line-clamp-4 text-[13.5px] leading-relaxed whitespace-pre-wrap text-muted">
+                  <p className="mt-1.5 line-clamp-4 text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-muted">
                     {c.body}
                   </p>
                 </div>
