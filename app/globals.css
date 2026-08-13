@@ -999,6 +999,12 @@ pre {
   display: flex;
   gap: 6px;
   padding: 5px;
+  /* As wide as the tabs, not as wide as the page. Stretched to the full
+     column the bar read as neither a tab row nor a segmented control: the
+     labels sat centred in their own share of 984px with gutters between
+     them. `max-width` keeps the scroll below working on a narrow screen. */
+  width: fit-content;
+  max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
   background: rgba(28, 31, 39, 0.56);
@@ -1013,7 +1019,9 @@ pre {
 }
 .account-tab {
   display: inline-flex;
-  flex: 1 0 auto;
+  /* No grow: a tab is as wide as its label. `0 0 auto` rather than `1 0 auto`
+     is the whole difference between a tab row and five stretched buttons. */
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: 8px;

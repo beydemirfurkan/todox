@@ -212,44 +212,6 @@ export default async function AccountPage({
               ]}
             />
           </div>
-
-          <details
-            className="sticker-flat mt-6 overflow-hidden"
-            style={{ borderColor: "var(--k-dead_end)" }}
-          >
-            <summary className="display flex cursor-pointer items-center gap-2 px-4 py-3 text-[15px] font-bold">
-              <span
-                aria-hidden="true"
-                className="inline-block size-2.5 shrink-0 rounded-full border-[1.5px]"
-                style={{ background: "var(--k-dead_end)", borderColor: "var(--edge-dark)" }}
-              />
-              {t("deleteAccount")}
-            </summary>
-            <div className="border-t border-dashed border-rule p-4">
-              <p className="mb-3 text-[14px] text-muted">{t("deleteAccountNote")}</p>
-              <AuthForm
-                action={deleteAccountAction}
-                submitLabel={t("deleteAccountSubmit")}
-                pendingLabel={t("working")}
-                submitClassName="btn btn-danger"
-                messages={authMessages(t)}
-                fields={[
-                  {
-                    name: "password",
-                    label: t("currentPassword"),
-                    type: "password",
-                    autoComplete: "current-password",
-                  },
-                  {
-                    name: "confirm",
-                    label: t("deleteAccountConfirm"),
-                    autoComplete: "off",
-                    exact: true,
-                  },
-                ]}
-              />
-            </div>
-          </details>
         </Panel>
       )}
 
@@ -462,6 +424,50 @@ export default async function AccountPage({
           </Panel>
         </div>
       )}
+
+      {/* Outside the tabs, and last.
+
+          It used to sit inside the Profile tab, directly under a form with one
+          field in it — a full-width bar 11 times wider than the Save button
+          beside it, which made destroying the account the largest thing on the
+          page. `w-fit` so the disclosure is as wide as its own label. */}
+      <details
+        className="sticker-flat mt-8 w-fit overflow-hidden"
+        style={{ borderColor: "var(--k-dead_end)" }}
+      >
+        <summary className="display flex cursor-pointer items-center gap-2 px-4 py-3 text-[15px] font-bold">
+          <span
+            aria-hidden="true"
+            className="inline-block size-2.5 shrink-0 rounded-full border-[1.5px]"
+            style={{ background: "var(--k-dead_end)", borderColor: "var(--edge-dark)" }}
+          />
+          {t("deleteAccount")}
+        </summary>
+        <div className="max-w-xl border-t border-dashed border-rule p-4">
+          <p className="mb-3 text-[14px] text-muted">{t("deleteAccountNote")}</p>
+          <AuthForm
+            action={deleteAccountAction}
+            submitLabel={t("deleteAccountSubmit")}
+            pendingLabel={t("working")}
+            submitClassName="btn btn-danger"
+            messages={authMessages(t)}
+            fields={[
+              {
+                name: "password",
+                label: t("currentPassword"),
+                type: "password",
+                autoComplete: "current-password",
+              },
+              {
+                name: "confirm",
+                label: t("deleteAccountConfirm"),
+                autoComplete: "off",
+                exact: true,
+              },
+            ]}
+          />
+        </div>
+      </details>
     </div>
   );
 }
