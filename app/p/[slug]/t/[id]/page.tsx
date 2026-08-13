@@ -1,5 +1,7 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { ENTRY_KINDS } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
@@ -42,6 +44,7 @@ import {
   currentTab,
   type Tab,
 } from "../../../../components";
+import { privatePageMetadata } from "../../../../metadata-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -54,16 +57,43 @@ export const dynamic = "force-dynamic";
  * column beside it. The log gets the full width now and the files get their
  * own tab, which is where the explainer belongs anyway.
  */
+/**
+ * Shared with `generateMetadata` below, which needs the same three rows. The
+ * page is force-dynamic, so without `cache` opening one task would cost each
+ * lookup twice.
+ */
+const currentUser = cache(requireUser);
+const projectBySlug = cache((userId: number, slug: string) => projects.bySlug(userId, slug));
+const taskById = cache((id: number) => tasksRepo.byId(id));
+
+/**
+ * The tab. A task is the thing people leave open while they work on it, and
+ * every one of them read the landing page's tagline before.
+ */
+export async function generateMetadata({
+  params,
+}: PageProps<"/p/[slug]/t/[id]">): Promise<Metadata> {
+  const { slug, id } = await params;
+  const { t } = await getT();
+  const user = await currentUser();
+  const [project, task] = await Promise.all([
+    projectBySlug(user.id, slug),
+    taskById(Number(id)),
+  ]);
+  const owned = project && task && task.project_id === project.id;
+  return privatePageMetadata(owned ? `${task.title} — ${t("siteName")}` : t("siteName"));
+}
+
 export default async function TaskPage({
   params,
   searchParams,
 }: PageProps<"/p/[slug]/t/[id]">) {
   const { slug, id } = await params;
-  const user = await requireUser();
+  const user = await currentUser();
   const { t } = await getT();
   const [project, task] = await Promise.all([
-    projects.bySlug(user.id, slug),
-    tasksRepo.byId(Number(id)),
+    projectBySlug(user.id, slug),
+    taskById(Number(id)),
   ]);
   if (!project || !task || task.project_id !== project.id) notFound();
 
