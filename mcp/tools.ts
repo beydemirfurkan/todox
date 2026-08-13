@@ -363,7 +363,17 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       prepare?: (params: Record<string, unknown>) => Record<string, unknown>;
       /** Runs on the result, and may call back to the server. */
       after?: (result: unknown, invoke: Invoker) => Promise<unknown>;
-      transform?: (result: unknown, args: Record<string, unknown>) => unknown;
+      /**
+       * Shapes the result for the model. May be async — and the return type
+       * says so, because `unknown` alone accepted an async function happily
+       * and the call site did not await it: `get_context`'s transform is
+       * async, so every briefing was serialised as a pending promise and every
+       * agent received `{}`.
+       */
+      transform?: (
+        result: unknown,
+        args: Record<string, unknown>,
+      ) => unknown | Promise<unknown>;
     } = {},
   ) {
     const shape = SHAPES[method];
@@ -403,7 +413,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       try {
         const result = await invoke(method, params);
         const settled = opts.after ? await opts.after(result, invoke) : result;
-        const shaped = opts.transform ? opts.transform(settled, args) : settled;
+        const shaped = opts.transform ? await opts.transform(settled, args) : settled;
         return typeof shaped === "string" ? plain(shaped) : ok(shaped);
       } catch (e) {
         return fail((e as Error).message);
