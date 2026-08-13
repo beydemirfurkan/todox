@@ -425,6 +425,8 @@ export const tr: Record<Key, string> = {
   deleteProject: "Bu projeyi sil",
   deleteProjectNote:
     "Projeyi ve içindeki her şeyi siler: {n} görev, hepsinin kaydı, notlar ve dosya bağlantıları. Geri alma yok, önce dışa aktarma da yok.",
+  deleteProjectDescendants:
+    "Buna ek olarak {p} alt proje ve onların {t} görevi daha silinecek; hepsi bu proje ile birlikte gidiyor.",
   deleteProjectConfirm: "Onaylamak için {slug} yaz",
   deleteProjectSubmit: "Sil, içindekilerle birlikte",
 

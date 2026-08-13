@@ -440,6 +440,8 @@ export const en = {
   deleteProject: "Delete this project",
   deleteProjectNote:
     "Removes the project and everything in it: {n} tasks with their whole log, the notes and the file links. There is no undo, and no export first.",
+  deleteProjectDescendants:
+    "Including {p} sub-projects and {t} of their tasks -- those are deleted along with this one.",
   deleteProjectConfirm: "Type {slug} to confirm",
   deleteProjectSubmit: "Delete it and everything in it",
 

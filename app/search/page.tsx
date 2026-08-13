@@ -39,9 +39,9 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
           {hits.map((h) => {
             const href =
               h.type === "task"
-                ? `/p/${h.project_slug}/t/${h.id}`
+                ? `/t/${h.id}${h.project_slug ? `?in=${encodeURIComponent(h.project_slug)}` : ""}`
                 : h.type === "entry"
-                  ? `/p/${h.project_slug}/t/${h.task_id}`
+                  ? `/t/${h.task_id}${h.project_slug ? `?in=${encodeURIComponent(h.project_slug)}` : ""}`
                   : h.project_slug
                     ? `/p/${h.project_slug}`
                     : "/";
