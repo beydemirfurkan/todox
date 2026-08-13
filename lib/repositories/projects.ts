@@ -85,14 +85,23 @@ export const ownedById = (userId: number, id: number) =>
     userId,
   ]);
 
+/**
+ * Projects this user has a filesystem path for.
+ *
+ * The condition has to be the same expression `ACCESS_SELECT` projects, not a
+ * `COALESCE` over both columns. A member's `root_path` is their own checkout on
+ * their own machine, so the owner's path is not a stand-in for it -- and the
+ * two disagreed exactly when `pm.root_path` was null while `p.root_path` was
+ * set: the coalesce let the row through, the projection returned null, and the
+ * caller sorted on `.length` of it. One shared project without a member path
+ * took out `get_context` for that account entirely, which is every call the
+ * product exists to serve.
+ */
 export const withRootPath = (userId: number) =>
-  all<Project>(`${ACCESS_SELECT} AND COALESCE(pm.root_path, p.root_path) IS NOT NULL`, [
-    userId,
-    userId,
-    userId,
-    userId,
-    userId,
-  ]);
+  all<Project>(
+    `${ACCESS_SELECT} AND (CASE WHEN p.user_id = ? THEN p.root_path ELSE pm.root_path END) IS NOT NULL`,
+    [userId, userId, userId, userId, userId, userId],
+  );
 
 /** Public by design: this is the share-link lookup. */
 export const byShareToken = (token: string) =>

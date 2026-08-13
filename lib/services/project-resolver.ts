@@ -21,9 +21,17 @@ export async function resolve(
   if (byName) return byName;
 
   // Deepest root wins, so a nested repo beats the parent that contains it.
-  return (await projects.withRootPath(userId))
-    .filter((p) => isInside(ref, p.root_path!))
-    .sort((a, b) => b.root_path!.length - a.root_path!.length)[0];
+  //
+  // The rows are re-checked rather than trusted through a `!`. The query is
+  // meant to return only projects that have a path, and when it briefly did
+  // not, the assertion turned a null column into a TypeError inside a filter --
+  // so one bad row failed every lookup for the account instead of being skipped.
+  const rooted = (await projects.withRootPath(userId)).filter(
+    (p): p is typeof p & { root_path: string } => typeof p.root_path === "string",
+  );
+  return rooted
+    .filter((p) => isInside(ref, p.root_path))
+    .sort((a, b) => b.root_path.length - a.root_path.length)[0];
 }
 
 /**
