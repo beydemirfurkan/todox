@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ago } from "@/lib/i18n";
@@ -18,11 +19,18 @@ import {
   updateNameAction,
 } from "../auth-actions";
 import { Blob, Chip, Counter, Empty, Panel } from "../components";
+import { privatePageMetadata } from "../metadata-shared";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
 import { SubmitButton } from "../features/submit";
 import { TokenForm } from "../features/token-form";
 import { acceptProjectInviteAction } from "../actions";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return privatePageMetadata(t("metaTitleAccount"));
+}
+
 
 export const dynamic = "force-dynamic";
 

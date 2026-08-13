@@ -9,6 +9,12 @@ export const en = {
   metaTitleAbout: "About todox — working memory for developers and their agents",
   metaTitlePrivacy: "Privacy policy — todox",
   metaTitleContact: "Contact todox",
+  /* Signed-in pages. Noindex, so there is no description to go with these —
+     the title is for the browser tab, where several projects are usually open
+     at once and every one of them read "todox" before. */
+  metaTitleAccount: "Account — todox",
+  metaTitleReport: "Activity report — todox",
+  metaTitleSearch: "Search — todox",
   metaDescription:
     "todox is a working memory for developers and their coding agents: projects, tasks, and the log that survives every session.",
   metaDescriptionLogin:
