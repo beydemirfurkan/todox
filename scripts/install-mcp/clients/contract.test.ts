@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { MCP_CONFIG_PATHS, MCP_SHAPES } from "../../../lib/mcp-clients";
 import {
   claudeCodeContract,
   codexConfigFile,
@@ -167,6 +168,63 @@ describe("opencode contract", () => {
     // The Claude/Cursor/VS Code value is accepted into the file and ignored.
     expect(openCodeContract("v1").httpType).toBe("remote");
     expect(openCodeContract("v2").httpType).toBe("remote");
+  });
+});
+
+/**
+ * The installer resolves absolute paths; `lib/mcp-clients.ts` carries the same
+ * locations written the way a human reads them, for the README and for the
+ * snippets the Account page hands out. Two spellings of one fact, so this is
+ * the test that stops them becoming two facts.
+ */
+describe("contract agrees with the documented locations", () => {
+  /** `~/a/b` and `%APPDATA%\a\b` resolved the way the installer would. */
+  function absolute(documented: string, platform: NodeJS.Platform): string {
+    if (documented.startsWith("%APPDATA%")) {
+      const appData = process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming");
+      return path.join(appData, ...documented.replace("%APPDATA%\\", "").split("\\"));
+    }
+    void platform;
+    return path.join(os.homedir(), ...documented.replace("~/", "").split("/"));
+  }
+
+  const cases = [
+    { id: "claude-code", contract: claudeCodeContract },
+    { id: "cursor", contract: cursorContract },
+    { id: "vscode", contract: vsCodeContract },
+  ] as const;
+
+  for (const { id, contract } of cases) {
+    it(`${id} resolves to the path the docs print, on every platform`, () => {
+      for (const platform of PLATFORMS) {
+        withPlatform(platform, () => {
+          if (platform === "win32") {
+            process.env.APPDATA = path.join(os.homedir(), "AppData", "Roaming");
+          }
+          const documented = MCP_CONFIG_PATHS[id][platform];
+          expect(contract().current.file, `${id} on ${platform}`).toBe(
+            absolute(documented, platform),
+          );
+        });
+      }
+    });
+  }
+
+  it("opencode resolves to the documented path", () => {
+    expect(openCodeContract("v2").current.file).toBe(
+      absolute(MCP_CONFIG_PATHS.opencode.linux, "linux"),
+    );
+  });
+
+  it("codex resolves to the documented path", () => {
+    expect(codexConfigFile()).toBe(absolute(MCP_CONFIG_PATHS.codex.linux, "linux"));
+  });
+
+  it("uses the shared shapes rather than its own copy of the root keys", () => {
+    expect(vsCodeContract().current.rootKeys).toEqual(MCP_SHAPES.vscode.rootKeys);
+    expect(openCodeContract("v1").current.rootKeys).toEqual(MCP_SHAPES["opencode-v1"].rootKeys);
+    expect(openCodeContract("v2").current.rootKeys).toEqual(MCP_SHAPES["opencode-v2"].rootKeys);
+    expect(openCodeContract("v2").httpType).toBe(MCP_SHAPES["opencode-v2"].remoteType);
   });
 });
 

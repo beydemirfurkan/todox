@@ -1,6 +1,7 @@
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { MCP_SHAPES } from "../../../lib/mcp-clients";
 import { vsCodeConfigDir, vsCodeStaleConfigDirs } from "./paths";
 
 /**
@@ -54,9 +55,12 @@ export const ENTRY_NAME = "todox";
  */
 export function claudeCodeContract(): JsonClientContract {
   return {
-    current: { file: path.join(os.homedir(), ".claude.json"), rootKeys: ["mcpServers"] },
+    current: {
+      file: path.join(os.homedir(), ".claude.json"),
+      rootKeys: MCP_SHAPES["claude-code"].rootKeys,
+    },
     stale: [],
-    httpType: "http",
+    httpType: MCP_SHAPES["claude-code"].remoteType,
   };
 }
 
@@ -64,10 +68,10 @@ export function cursorContract(): JsonClientContract {
   return {
     current: {
       file: path.join(os.homedir(), ".cursor", "mcp.json"),
-      rootKeys: ["mcpServers"],
+      rootKeys: MCP_SHAPES.cursor.rootKeys,
     },
     stale: [],
-    httpType: "http",
+    httpType: MCP_SHAPES.cursor.remoteType,
   };
 }
 
@@ -77,12 +81,15 @@ export function cursorContract(): JsonClientContract {
  */
 export function vsCodeContract(): JsonClientContract {
   return {
-    current: { file: path.join(vsCodeConfigDir(), "mcp.json"), rootKeys: ["servers"] },
+    current: {
+      file: path.join(vsCodeConfigDir(), "mcp.json"),
+      rootKeys: MCP_SHAPES.vscode.rootKeys,
+    },
     stale: vsCodeStaleConfigDirs().map((dir) => ({
       file: path.join(dir, "mcp.json"),
-      rootKeys: ["servers"] as const,
+      rootKeys: MCP_SHAPES.vscode.rootKeys,
     })),
-    httpType: "http",
+    httpType: MCP_SHAPES.vscode.remoteType,
   };
 }
 
@@ -97,12 +104,12 @@ export function vsCodeContract(): JsonClientContract {
  */
 export function openCodeContract(major: OpenCodeMajor): JsonClientContract {
   const file = path.join(os.homedir(), ".config", "opencode", "opencode.json");
-  const v1: ServerLayout = { file, rootKeys: ["mcp"] };
-  const v2: ServerLayout = { file, rootKeys: ["mcp", "servers"] };
+  const v1: ServerLayout = { file, rootKeys: MCP_SHAPES["opencode-v1"].rootKeys };
+  const v2: ServerLayout = { file, rootKeys: MCP_SHAPES["opencode-v2"].rootKeys };
   return {
     current: major === "v2" ? v2 : v1,
     stale: [major === "v2" ? v1 : v2],
-    httpType: "remote",
+    httpType: MCP_SHAPES[`opencode-${major}`].remoteType,
   };
 }
 
