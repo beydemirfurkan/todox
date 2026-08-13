@@ -62,6 +62,22 @@ export async function register(input: {
   return { ok: true, value: { user: publicUser(user) } };
 }
 
+/**
+ * Verified against when no account matches, so that a missing account and a
+ * wrong password cost the same work and answer the same thing.
+ *
+ * Named and exported because it is load-bearing and silent: it has to be a
+ * record `verifyPassword` can read, using the same cost parameters as a real
+ * one, that no password matches. A malformed one would make an unknown account
+ * measurably different from a known one, which is the whole thing this defends
+ * against. `password.test.ts` holds it to that.
+ */
+// 86 base64 characters plus padding decode to 64 bytes, the length a real
+// record carries. Unpadded 88 decode to 66, which made the dummy derive a
+// longer key than any real verification ever does.
+export const NO_SUCH_USER_HASH =
+  "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$" + "A".repeat(86) + "==";
+
 export async function login(input: {
   identifier: string;
   password: string;
@@ -70,9 +86,7 @@ export async function login(input: {
 
   // Always run a verification so a missing account and a wrong password take
   // roughly the same time, and neither is distinguishable in the response.
-  const stored =
-    user?.password_hash ??
-    "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$" + "A".repeat(88);
+  const stored = user?.password_hash ?? NO_SUCH_USER_HASH;
   const good = await verifyPassword(input.password, stored);
 
   if (!user || !good)
