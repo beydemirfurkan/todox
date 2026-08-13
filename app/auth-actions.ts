@@ -305,8 +305,10 @@ export async function createTokenAction(
 export async function revokeTokenAction(fd: FormData) {
   const user = await requireUser();
   const id = Number(fd.get("token_id"));
-  // NaN would reach an integer column and come back as a 500.
-  if (!Number.isInteger(id)) return;
+  // NaN would reach an integer column and come back as a 500. The `> 0` is not
+  // decoration: `Number("")` is 0, which is an integer, so a missing field got
+  // through this guard and spent a delete on an id no row can have.
+  if (!Number.isInteger(id) || id <= 0) return;
   await auth.revokeApiToken(id, user.id);
   revalidatePath("/account");
 }

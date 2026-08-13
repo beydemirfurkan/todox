@@ -29,21 +29,47 @@ export async function hashPassword(password: string): Promise<string> {
   ].join("$");
 }
 
+/**
+ * A record this cannot read is a credential this cannot verify, which is not
+ * the same as a credential that matched -- so every unreadable form answers
+ * false rather than throwing.
+ *
+ * It used to throw. A record missing its salt or hash reached
+ * `Buffer.from(undefined, "base64")`, and a non-numeric cost parameter reached
+ * scrypt, both of which reject. That matters beyond tidiness because `login`
+ * verifies against a fixed dummy record when no account matches, purely so the
+ * two paths take the same time: if that record were ever mistyped, an unknown
+ * account would answer 500 while a wrong password answered 401, and the pair
+ * would be an account-enumeration oracle.
+ */
 export async function verifyPassword(
   password: string,
   stored: string,
 ): Promise<boolean> {
   const [scheme, n, r, p, saltB64, hashB64] = stored.split("$");
   if (scheme !== "scrypt") return false;
+  if (!n || !r || !p || !saltB64 || !hashB64) return false;
+
+  const cost = { N: Number(n), r: Number(r), p: Number(p) };
+  if (!Object.values(cost).every((v) => Number.isInteger(v) && v > 0)) return false;
 
   const salt = Buffer.from(saltB64, "base64");
   const expected = Buffer.from(hashB64, "base64");
-  const derived = await scrypt(password, salt, expected.length, {
-    N: Number(n),
-    r: Number(r),
-    p: Number(p),
-    maxmem: PARAMS.maxmem,
-  });
+  if (expected.length === 0) return false;
+
+  let derived: Buffer;
+  try {
+    derived = await scrypt(password, salt, expected.length, {
+      ...cost,
+      maxmem: PARAMS.maxmem,
+    });
+  } catch (e) {
+    // Cost parameters out of range, or over maxmem. Logged because a stored
+    // record that cannot be derived from is data corruption worth seeing --
+    // never with the password or the record itself.
+    console.error("verifyPassword: unusable stored record", (e as Error).message);
+    return false;
+  }
 
   // constant time: a length mismatch must not short-circuit either
   if (derived.length !== expected.length) return false;

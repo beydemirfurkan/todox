@@ -14,7 +14,6 @@ import * as membershipsRepo from "@/lib/repositories/project-memberships";
 import * as tasksRepo from "@/lib/repositories/tasks";
 import { staleRefs } from "@/lib/services/briefing";
 import { repoLabel, repoLink } from "@/lib/util/paths";
-import type { Task } from "@/lib/types";
 import {
   addContextAction,
   createTaskAction,
@@ -38,28 +37,21 @@ import { Picker } from "../../features/picker";
 import { SubmitButton } from "../../features/submit";
 import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
 import { Blob, Chip, Counter, Empty, Field, Panel, StatusDot } from "../../components";
+import {
+  compareTasks,
+  isClosed,
+  matchesFilter,
+  paginate,
+  resolveFilter,
+  type FilterId,
+} from "./task-list";
 
 export const dynamic = "force-dynamic";
 
 /**
- * How many rows one view will render.
- *
- * Every list on this page used to be unbounded, except the closed one, which
- * was silently cut at twenty -- so a project with more than that quietly
- * looked smaller than it was. A ceiling is fine; not saying so is not.
+ * Filtering, ordering and the ceiling live in `./task-list`, where they can be
+ * asserted without standing a page up. What is left here is markup.
  */
-const PAGE = 60;
-
-/** Work first, and inside that the urgent first. Closed work sorts last. */
-const RANK: Record<Status, number> = {
-  doing: 0,
-  blocked: 1,
-  todo: 2,
-  done: 3,
-  dropped: 4,
-};
-
-type FilterId = "open" | Status | "all";
 
 export default async function ProjectPage({
   params,
@@ -91,8 +83,8 @@ export default async function ProjectPage({
   const counts = await entriesRepo.countsByTasks(all.map((x) => x.id));
 
   const by = (s: Status) => all.filter((x) => x.status === s).length;
-  const open = all.filter((x) => !["done", "dropped"].includes(x.status));
-  const closed = all.filter((x) => ["done", "dropped"].includes(x.status));
+  const open = all.filter((x) => !isClosed(x.status));
+  const closed = all.filter((x) => isClosed(x.status));
 
   const filters: { id: FilterId; label: string; n: number }[] = [
     { id: "open", label: t("filterOpen"), n: open.length },
@@ -102,28 +94,13 @@ export default async function ProjectPage({
     { id: "done", label: t("doneDropped"), n: closed.length },
   ];
 
-  const raw = (await searchParams).s;
-  const asked = Array.isArray(raw) ? raw[0] : raw;
-  const filter: FilterId = filters.some((f) => f.id === asked)
-    ? (asked as FilterId)
-    : "open";
+  const filter = resolveFilter(
+    (await searchParams).s,
+    filters.map((f) => f.id),
+  );
 
-  const matches = (task: Task) =>
-    filter === "open"
-      ? !["done", "dropped"].includes(task.status)
-      : filter === "done"
-        ? ["done", "dropped"].includes(task.status)
-        : task.status === filter;
-
-  const selected = all
-    .filter(matches)
-    .sort(
-      (a, b) =>
-        RANK[a.status] - RANK[b.status] ||
-        a.priority - b.priority ||
-        b.updated_at.localeCompare(a.updated_at),
-    );
-  const shown = selected.slice(0, PAGE);
+  const selected = all.filter((task) => matchesFilter(task, filter)).sort(compareTasks);
+  const { shown } = paginate(selected);
 
   const origin = publicUrl();
   const repo = repoLink(project.repo_url);
