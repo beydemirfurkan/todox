@@ -104,6 +104,11 @@ export const SHAPES = {
       .max(MAX.text)
       .optional()
       .describe("What this project is, in 1-3 sentences, for a cold agent"),
+    parent_project: projectRef
+      .optional()
+      .describe(
+        "Slug or name of an existing project this one hangs under. Same account; sub-projects share the owner and live under a parent path the agent moved into.",
+      ),
   },
 
   updateProject: {
@@ -112,6 +117,21 @@ export const SHAPES = {
     root_path: ref.optional(),
     repo_url: repoUrl,
     summary: z.string().max(MAX.text).optional(),
+    parent_project: projectRef
+      .nullish()
+      .describe(
+        "Re-parent this project under a different one. Pass null to make it a top-level project again.",
+      ),
+    archived: z.boolean().optional(),
+  },
+
+  /**
+   * Lists the direct sub-projects of a project, with task counts. The /p/[slug]
+   * panel renders this as a flow and the agent uses it to know which sibling
+   * workspaces the user has on the same account.
+   */
+  listSubProjects: {
+    project: projectRef,
   },
 
   /**
@@ -331,8 +351,10 @@ const OBJECTS: Record<string, z.ZodType> = {
         p.name !== undefined ||
         p.root_path !== undefined ||
         p.repo_url !== undefined ||
-        p.summary !== undefined,
-      { message: "pass at least one of name, root_path, repo_url or summary" },
+        p.summary !== undefined ||
+        p.parent_project !== undefined ||
+        p.archived !== undefined,
+      { message: "pass at least one of name, root_path, repo_url, summary, parent_project or archived" },
     ),
 
   // Both fields are optional and one of them is required, which the schema is

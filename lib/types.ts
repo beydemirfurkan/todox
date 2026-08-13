@@ -62,10 +62,39 @@ export type Project = {
   created_at: string;
   share_token: string | null;
   share_log: number;
+  /**
+   * When set, this project is a sub-project: a sibling workspace under a
+   * parent. Same owner, own slug, own tasks -- "the agent moved to a different
+   * path".
+   */
+  parent_project_id: number | null;
   /** The caller's relationship to this project, when loaded privately. */
   access_role?: "owner" | "member";
   /** Who it belongs to. Only selected on the private reads that join users. */
   owner_name?: string;
+};
+
+/**
+ * The /p/[slug] page renders a small flow: a parent node, the sub-projects
+ * hanging off it, and a counter for how many tasks each one has open. The
+ * exact shape is enough for the panel and nothing more -- the agent and the
+ * build script do not need to know about it.
+ */
+export type SubProjectFlow = {
+  parent: {
+    id: number;
+    slug: string;
+    name: string;
+    archived: number;
+  };
+  children: Array<{
+    id: number;
+    slug: string;
+    name: string;
+    archived: number;
+    open_tasks: number;
+    total_tasks: number;
+  }>;
 };
 
 export type ProjectMembership = {

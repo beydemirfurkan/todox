@@ -197,8 +197,9 @@ TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
 | `search` | Across all your projects — *have I solved this before?* |
 | `get_task` | One task with its log and linked files. |
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |
-| `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. |
-| `delete_project` | The way back from a mistyped `cwd`. Takes the project and everything under it; `confirm` must be the slug. |
+| `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. `create_project` takes an optional `parent_project` to register a sub-project; `update_project` can re-parent one (`parent_project: null` lifts it back). |
+| `list_sub_projects` | The sub-projects hanging off a project, with their open task counts — what the /p/[slug] flow panel shows. |
+| `delete_project` | The way back from a mistyped `cwd`. Takes the project and every sub-project, task, log entry, note and file link under it; `confirm` must be the slug. |
 
 Every write tool takes a `model`, and the server instructions tell the agent to
 always pass it. That is what makes the per-model breakdown real rather than

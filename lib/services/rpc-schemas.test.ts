@@ -16,6 +16,20 @@ describe("update refinements cover every field they gate", () => {
       ).not.toThrow();
   });
 
+  it("updateProject accepts parent_project and archived on their own", () => {
+    // Without these, a re-parent or archive call would be refused by the
+    // "at least one" refinement that names its siblings by hand.
+    expect(() =>
+      parseParams("updateProject", { project: "todox", parent_project: "site" }),
+    ).not.toThrow();
+    expect(() =>
+      parseParams("updateProject", { project: "todox", parent_project: null }),
+    ).not.toThrow();
+    expect(() =>
+      parseParams("updateProject", { project: "todox", archived: true }),
+    ).not.toThrow();
+  });
+
   it("updateTask accepts each of its fields on its own", () => {
     expect(() => parseParams("updateTask", { task_id: 1, title: "x" })).not.toThrow();
     expect(() => parseParams("updateTask", { task_id: 1, body: "x" })).not.toThrow();
@@ -92,5 +106,16 @@ describe("parseParams", () => {
   it("rejects an unknown method", () => {
     // @ts-expect-error -- the point is the runtime guard, not the type
     expect(() => parseParams("dropEverything", {})).toThrow();
+  });
+
+  it("createProject accepts a parent_project", () => {
+    expect(() =>
+      parseParams("createProject", { name: "API", parent_project: "todox" }),
+    ).not.toThrow();
+  });
+
+  it("listSubProjects requires a project", () => {
+    expect(() => parseParams("listSubProjects", {})).toThrow(/invalid params/);
+    expect(() => parseParams("listSubProjects", { project: "todox" })).not.toThrow();
   });
 });

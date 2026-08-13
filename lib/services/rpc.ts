@@ -5,8 +5,9 @@ import * as projectsRepo from "../repositories/projects";
 import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
+import { subProjectFlow } from "./briefing";
 import { BadRequest } from "./errors";
-import { assertProject, assertRef, assertTask } from "./ownership";
+import { assertNotAncestor, assertProject, assertRef, assertSameOwner, assertTask } from "./ownership";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
@@ -78,12 +79,29 @@ export const methods = {
       root_path?: string;
       repo_url?: string;
       summary?: string;
+      parent_project?: string;
     },
-  ) =>
-    projectsRepo.create(userId, {
-      ...p,
+  ) => {
+    // A sub-project is created all at once: the parent must already exist and
+    // must be owned by the same account. The slug is unique across the account
+    // (nextFreeSlug), so a parent and a child are free to share a name but not
+    // a slug.
+    let parent_project_id: number | null = null;
+    if (p.parent_project) {
+      const parent = await mustResolve(userId, p.parent_project);
+      await assertProject(userId, parent.id);
+      parent_project_id = parent.id;
+    }
+
+    return projectsRepo.create(userId, {
+      name: p.name,
       slug: await projectsRepo.nextFreeSlug(userId, p.slug ?? p.name),
-    }),
+      root_path: p.root_path,
+      repo_url: p.repo_url,
+      summary: p.summary,
+      parent_project_id,
+    });
+  },
 
   updateProject: async (
     { userId },
@@ -93,10 +111,29 @@ export const methods = {
       root_path?: string;
       repo_url?: string;
       summary?: string;
+      parent_project?: string | null;
+      archived?: boolean;
     },
   ) => {
-    const { project, ...patch } = p;
+    const { project, parent_project, archived, ...patch } = p;
     const found = await mustResolve(userId, project);
+
+    // Re-parenting is read-modify-write, so the safeguards go in the handler
+    // rather than the repository. The id pair is checked against the same
+    // account, the resulting chain cannot loop, and `parent_project === null`
+    // is the explicit way to lift a project back to the top level.
+    if (parent_project !== undefined) {
+      if (parent_project === null) {
+        await projectsRepo.setParent(userId, found.id, null);
+      } else {
+        const newParent = await mustResolve(userId, parent_project);
+        await assertSameOwner(userId, found.id, newParent.id);
+        await assertNotAncestor(userId, found.id, newParent.id);
+        await projectsRepo.setParent(userId, found.id, newParent.id);
+      }
+    }
+
+    if (archived !== undefined) (patch as Record<string, unknown>).archived = archived ? 1 : 0;
     await projectsRepo.update(userId, found.id, patch);
     return projectsRepo.byId(userId, found.id);
   },
@@ -112,6 +149,12 @@ export const methods = {
     const counts = await tasksRepo.counts(found.id);
     await projectsRepo.remove(userId, found.id);
     return { deleted: found.slug, tasks_removed: Object.values(counts).reduce((a, b) => a + b, 0) };
+  },
+
+  listSubProjects: async ({ userId }, p: { project: string }) => {
+    const found = await mustResolve(userId, p.project);
+    await assertProject(userId, found.id);
+    return subProjectFlow(userId, found);
   },
 
   getContext: async (

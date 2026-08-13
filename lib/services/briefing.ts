@@ -1,8 +1,9 @@
 import * as contexts from "../repositories/contexts";
 import * as entries from "../repositories/entries";
+import * as projects from "../repositories/projects";
 import * as refs from "../repositories/refs";
 import * as tasks from "../repositories/tasks";
-import type { Project } from "../types";
+import type { Project, SubProjectFlow } from "../types";
 
 /**
  * Everything a cold agent needs to resume work on a project, in one payload.
@@ -28,11 +29,12 @@ export async function briefing(userId: number, project: Project) {
   const open = allOpen.slice(0, BRIEFING_TASKS);
   const ids = open.map((t) => t.id);
 
-  const [globalContext, projectContext, logs, files] = await Promise.all([
+  const [globalContext, projectContext, logs, files, subProjects] = await Promise.all([
     contexts.listByProject(userId, null),
     contexts.listByProject(userId, project.id),
     entries.listByTasks(ids),
     refs.listByTasks(ids),
+    subProjectFlow(userId, project),
   ]);
 
   const openTasks = open.map((t) => {
@@ -85,6 +87,7 @@ export async function briefing(userId: number, project: Project) {
     open_tasks: openTasks,
     open_tasks_omitted: allOpen.length - open.length,
     stale_refs: stale,
+    sub_projects: subProjects,
     hint:
       "Before you finish, call log_entry(kind:'handoff') on any task you touched, " +
       "and record dead ends so the next session does not repeat them.",
@@ -97,6 +100,43 @@ const strip = (c: { id: number; kind: string; title: string; body: string }) => 
   title: c.title,
   body: c.body,
 });
+
+/**
+ * Sub-project flow for the briefing and the /p/[slug] panel.
+ *
+ * If the caller is looking at a sub-project, the flow zooms out to the root
+ * of its tree -- the agent that landed in a child path still needs to see the
+ * siblings. Two queries: the children list, then one batched GROUP BY for
+ * task counts. No N+1.
+ */
+export async function subProjectFlow(userId: number, project: Project): Promise<SubProjectFlow> {
+  const root = project.parent_project_id
+    ? (await projects.parentOf(userId, project.id)) ?? project
+    : project;
+
+  const children = await projects.listChildren(userId, root.id);
+  const counts = await tasks.countsByProject(userId);
+
+  return {
+    parent: {
+      id: root.id,
+      slug: root.slug,
+      name: root.name,
+      archived: root.archived,
+    },
+    children: children.map((c) => {
+      const c_ = counts.map.get(c.id) ?? counts.empty;
+      return {
+        id: c.id,
+        slug: c.slug,
+        name: c.name,
+        archived: c.archived,
+        open_tasks: c_.todo + c_.doing + c_.blocked,
+        total_tasks: c_.todo + c_.doing + c_.blocked + c_.done + c_.dropped,
+      };
+    }),
+  };
+}
 
 /**
  * Just the staleness lines, for the banner on the project page.

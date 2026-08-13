@@ -88,3 +88,34 @@ export async function assertRef(userId: number, id: number) {
 export async function assertContext(userId: number, id: number) {
   if (!(await ownsContext(userId, id))) throw new NotYours("context", id);
 }
+
+/**
+ * Re-parenting a project under another. A sub-project is a sibling workspace
+ * the same person owns, so the check is that both ends belong to the same
+ * account -- nothing else. The 404 message is shared with the rest of the
+ * file so ids do not leak.
+ */
+export async function assertSameOwner(userId: number, childId: number, parentId: number) {
+  if (childId === parentId) throw new NotYours("project", childId);
+  if (!(await ownsProject(userId, childId))) throw new NotYours("project", childId);
+  if (!(await ownsProject(userId, parentId))) throw new NotYours("project", parentId);
+}
+
+/**
+ * Cycle check: a project cannot be its own ancestor. Walks up from the
+ * proposed parent and refuses if `childId` appears on the chain.
+ */
+export async function assertNotAncestor(userId: number, childId: number, parentId: number) {
+  const rows = await one<{ ok: number }>(
+    `WITH RECURSIVE chain AS (
+       SELECT id, parent_project_id FROM projects WHERE id = ? AND user_id = ?
+       UNION ALL
+       SELECT p.id, p.parent_project_id FROM projects p
+         JOIN chain c ON p.id = c.parent_project_id
+         WHERE p.user_id = ?
+     )
+     SELECT 1 AS ok FROM chain WHERE id = ? LIMIT 1`,
+    [parentId, userId, userId, childId],
+  );
+  if (rows) throw new NotYours("project", childId);
+}

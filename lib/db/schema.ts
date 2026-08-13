@@ -229,6 +229,14 @@ CREATE INDEX IF NOT EXISTS idx_refs_context ON refs (context_id);
 -- name it has everywhere.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS repo_url TEXT;
 
+-- A sub-project belongs to a parent project. Same user_id, separate slug and
+-- its own tasks -- a different path on the same machine, another code base
+-- inside the same workspace. Cascade: deleting the parent takes the children
+-- with it, the way removing a repository should remove its branches.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS parent_project_id INTEGER
+  REFERENCES projects(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects (parent_project_id);
+
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS hash_seen  TEXT;
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS checked_at TEXT;
 

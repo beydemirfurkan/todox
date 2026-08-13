@@ -78,6 +78,14 @@ const BASE = [
   "which project: the path decides. Only ask the human if the work clearly",
   "belongs somewhere other than the current repo.",
   "",
+  "SUB-PROJECTS: when the agent moves into a different code base inside the",
+  "same workspace -- a different path, a different repo, a different package",
+  "manager -- it is usually a sibling, not a competing project. Pass",
+  "`parent_project` (slug or name) to create_project to register it as a",
+  "sub-project under the current one. The /p/[slug] page renders a flow of",
+  "the parent and its children, and update_project with `parent_project` can",
+  "move an existing one back or sideways at the human's request.",
+  "",
   "WHILE WORKING: update_task to move status (set it to 'doing' when you",
   "actually start -- that is what makes the time reports real); log_entry to",
   "record decisions ('decision'), approaches that failed ('dead_end'), and",
@@ -444,19 +452,26 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("create_project", "createProject", {
     title: "Create project",
     description:
-      "Register a project explicitly. Usually unnecessary — create_task with `cwd` registers one for you. root_path is what lets any file path inside the repo resolve to this project later.",
+      "Register a project explicitly. Usually unnecessary — create_task with `cwd` registers one for you. root_path is what lets any file path inside the repo resolve to this project later. Pass `parent_project` (slug or name) to register it as a sub-project under an existing one — same account, sibling workspace, different code base.",
   });
 
   tool("update_project", "updateProject", {
     title: "Update project",
     description:
-      "Set the name, root_path, repo_url or summary. Worth calling right after a project is auto-created: a one-paragraph summary and the output of `git remote get-url origin` are what make it legible to a session on another machine, where the local path means nothing.",
+      "Set the name, root_path, repo_url, summary, archived flag, or re-parent a project under a different one. `parent_project` (slug or name) re-parents; pass null to lift it back to the top level. Worth calling right after a project is auto-created: a one-paragraph summary and the output of `git remote get-url origin` are what make it legible to a session on another machine, where the local path means nothing.",
   });
 
   tool("delete_project", "deleteProject", {
     title: "Delete a project",
     description:
-      "Removes a project and everything under it — every task, every log entry, every note and file link. Not recoverable. `confirm` must be the project's slug. This exists because a mistyped `cwd` registers a project like any other path does; ask the human before calling it.",
+      "Removes a project and everything under it — every task, every log entry, every note and file link, and any sub-project hanging off it. Not recoverable. `confirm` must be the project's slug. This exists because a mistyped `cwd` registers a project like any other path does; ask the human before calling it.",
+  });
+
+  tool("list_sub_projects", "listSubProjects", {
+    title: "List sub-projects (project flow)",
+    description:
+      "The sub-projects hanging off a project, with their open task counts. Use this when the /p/[slug] flow needs to be shown, or when the agent wants to know which sibling workspaces the developer has within the same account. Pass `project` (slug or name).",
+    annotations: READ_ONLY,
   });
 
   /* ------------------------------------------------------- the briefing */

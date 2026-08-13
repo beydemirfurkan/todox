@@ -17,8 +17,10 @@ import * as refs from "@/lib/repositories/refs";
 import {
   assertContext,
   assertEntry,
+  assertNotAncestor,
   assertProject,
   assertRef,
+  assertSameOwner,
   assertTask,
 } from "@/lib/services/ownership";
 import * as sharing from "@/lib/services/sharing";
@@ -114,6 +116,52 @@ export async function updateProjectAction(fd: FormData) {
     root_path: str(fd, "root_path") || null,
     summary: str(fd, "summary") || null,
   });
+  revalidatePath("/", "layout");
+}
+
+/**
+ * A sibling workspace under a parent. Same-account, same path resolved by
+ * slug, separate tasks and a separate context. The /p/[slug] page will show
+ * the new one in the flow; this redirects there so the human sees the result
+ * of what they just did.
+ */
+export async function createSubProjectAction(fd: FormData) {
+  const user = await requireUser();
+  const parentId = num(fd, "parent_id");
+  await assertProject(user.id, parentId);
+  const name = str(fd, "name");
+  if (!name) return;
+  const p = await projects.create(user.id, {
+    name,
+    slug: await projects.nextFreeSlug(user.id, name),
+    root_path: str(fd, "root_path") || null,
+    summary: str(fd, "summary") || null,
+    parent_project_id: parentId,
+  });
+  revalidatePath("/", "layout");
+  redirect(`/p/${p.slug}`);
+}
+
+/**
+ * Lift a sub-project back to the top, or move it under a different parent.
+ * `parent_slug` of `""` means "no parent anymore"; an absolute slug routes it
+ * under that project. The cycle check stops a project from being made its
+ * own ancestor.
+ */
+export async function reparentProjectAction(fd: FormData) {
+  const user = await requireUser();
+  const id = num(fd, "id");
+  await assertProject(user.id, id);
+  const parentSlug = str(fd, "parent_slug");
+  if (!parentSlug) {
+    await projects.setParent(user.id, id, null);
+  } else {
+    const parent = await projects.bySlug(user.id, parentSlug);
+    if (!parent) return;
+    await assertSameOwner(user.id, id, parent.id);
+    await assertNotAncestor(user.id, id, parent.id);
+    await projects.setParent(user.id, id, parent.id);
+  }
   revalidatePath("/", "layout");
 }
 

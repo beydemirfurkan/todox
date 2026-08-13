@@ -9,10 +9,11 @@ export type NewProject = {
   root_path?: string | null;
   repo_url?: string | null;
   summary?: string | null;
+  parent_project_id?: number | null;
 };
 
 export type ProjectPatch = Partial<
-  Pick<Project, "name" | "root_path" | "repo_url" | "summary" | "archived">
+  Pick<Project, "name" | "root_path" | "repo_url" | "summary" | "archived" | "parent_project_id">
 >;
 
 /**
@@ -20,8 +21,20 @@ export type ProjectPatch = Partial<
  * a real column, so without this list `{"project":"x","user_id":2}` would be a
  * legal patch that hands the project -- and its tasks, by cascade -- to
  * another account. `share_token` and `share_log` go through `setShare`.
+ *
+ * `parent_project_id` is here because promoting a project to a sub-project (or
+ * moving it back) is a meaningful edit, but only with the safeguards in
+ * `services/ownership.ts` -- a child can never be re-parented under a project
+ * it does not own.
  */
-const COLUMNS = ["name", "root_path", "repo_url", "summary", "archived"] as const;
+const COLUMNS = [
+  "name",
+  "root_path",
+  "repo_url",
+  "summary",
+  "archived",
+  "parent_project_id",
+] as const;
 
 /**
  * `owner_name` joins on a primary key and rides along with every private read.
@@ -108,8 +121,8 @@ export const byShareToken = (token: string) =>
  */
 export async function create(userId: number, input: NewProject): Promise<Project> {
   const row = await one<Project>(
-    `INSERT INTO projects (user_id, slug, name, root_path, repo_url, summary, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+    `INSERT INTO projects (user_id, slug, name, root_path, repo_url, summary, parent_project_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     [
       userId,
       input.slug ?? slugifyOr(input.name),
@@ -117,6 +130,7 @@ export async function create(userId: number, input: NewProject): Promise<Project
       input.root_path ?? null,
       input.repo_url ?? null,
       input.summary ?? null,
+      input.parent_project_id ?? null,
       now(),
     ],
   );
@@ -179,3 +193,52 @@ export const setShare = (
   ]);
 
 export const freshShareToken = () => shareToken();
+
+/**
+ * Direct children of a parent project, owned by the same account.
+ *
+ * Used by the /p/[slug] flow panel and the briefing. Memberships are not
+ * included: a sub-project is a sibling workspace the same person switched
+ * into, not a collaborator's project.
+ */
+export const listChildren = (userId: number, parentId: number) =>
+  all<Project>(
+    `SELECT * FROM projects
+      WHERE parent_project_id = ? AND user_id = ?
+      ORDER BY archived, name`,
+    [parentId, userId],
+  );
+
+/**
+ * Walks up the parent chain. The first row whose `parent_project_id` is null
+ * is the root of the tree this project belongs to.
+ */
+export const parentOf = (userId: number, childId: number) =>
+  one<Project>(
+    `WITH RECURSIVE chain AS (
+       SELECT * FROM projects WHERE id = ? AND user_id = ?
+       UNION ALL
+       SELECT p.* FROM projects p
+         JOIN chain c ON p.id = c.parent_project_id
+         WHERE p.user_id = ?
+     )
+     SELECT * FROM chain WHERE parent_project_id IS NULL
+     LIMIT 1`,
+    [childId, userId, userId],
+  );
+
+/**
+ * Re-parents a project. `parentId` of `null` promotes a sub-project back to
+ * the top level. The caller is responsible for making sure both projects
+ * belong to the same user -- the ownership check is in services, not here.
+ */
+export const setParent = (
+  userId: number,
+  childId: number,
+  parentId: number | null,
+) =>
+  run("UPDATE projects SET parent_project_id = ? WHERE id = ? AND user_id = ?", [
+    parentId,
+    childId,
+    userId,
+  ]);
