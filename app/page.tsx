@@ -181,7 +181,11 @@ export default async function Home() {
                   </SubmitButton>
                 </form>
               </div>
-              <p className="mt-1.5 text-[14px] leading-relaxed whitespace-pre-wrap text-muted">
+              {/* `break-words`: bodies carry paths, urls and commit hashes, and
+                  `pre-wrap` alone will not break an unbroken run. The
+                  `overflow-x: clip` net in globals.css hides the overflow by
+                  cutting the text off, which is worse than a wrap. */}
+              <p className="mt-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap text-muted">
                 {c.body}
               </p>
             </div>

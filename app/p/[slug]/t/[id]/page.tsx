@@ -207,7 +207,7 @@ export default async function TaskPage({
                         </SubmitButton>
                       </form>
                     </div>
-                    <p className="mt-1.5 text-[15px] leading-relaxed whitespace-pre-wrap">
+                    <p className="mt-1.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
                       {e.body}
                     </p>
                   </div>
