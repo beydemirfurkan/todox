@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import type { ContextKind, EntryKind, Status } from "@/lib/constants";
 import { isLang } from "@/lib/i18n";
 import { LANG_COOKIE } from "@/lib/lang";
 import * as contexts from "@/lib/repositories/contexts";
@@ -30,6 +29,7 @@ import { getLang } from "@/lib/lang";
 import * as auth from "@/lib/services/auth";
 import { setSessionCookie } from "@/lib/session";
 import { requireUser } from "@/lib/session";
+import { asContextKind, asEntryKind, asPriority, asStatus } from "@/lib/util/validators";
 import type { AuthState } from "./auth-actions";
 
 const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() || "";
@@ -124,6 +124,10 @@ export async function updateProjectAction(fd: FormData) {
  * slug, separate tasks and a separate context. The /p/[slug] page will show
  * the new one in the flow; this redirects there so the human sees the result
  * of what they just did.
+ *
+ * Layout-wide revalidation is the wrong tool here: the home page only needs
+ * the count badge refreshed, and the parent's flow only needs the new child
+ * to appear. Targeted revalidation keeps the click fast.
  */
 export async function createSubProjectAction(fd: FormData) {
   const user = await requireUser();
@@ -138,7 +142,9 @@ export async function createSubProjectAction(fd: FormData) {
     summary: str(fd, "summary") || null,
     parent_project_id: parentId,
   });
-  revalidatePath("/", "layout");
+  const parent = await projects.byId(user.id, parentId);
+  revalidatePath("/");
+  if (parent) revalidatePath(`/p/${parent.slug}`);
   redirect(`/p/${p.slug}`);
 }
 
@@ -146,12 +152,14 @@ export async function createSubProjectAction(fd: FormData) {
  * Lift a sub-project back to the top, or move it under a different parent.
  * `parent_slug` of `""` means "no parent anymore"; an absolute slug routes it
  * under that project. The cycle check stops a project from being made its
- * own ancestor.
+ * own ancestor. Like createSubProjectAction, only the affected paths get
+ * invalidated -- the rest of the layout does not need to rebuild.
  */
 export async function reparentProjectAction(fd: FormData) {
   const user = await requireUser();
   const id = num(fd, "id");
   await assertProject(user.id, id);
+  const before = await projects.byId(user.id, id);
   const parentSlug = str(fd, "parent_slug");
   if (!parentSlug) {
     await projects.setParent(user.id, id, null);
@@ -162,7 +170,9 @@ export async function reparentProjectAction(fd: FormData) {
     await assertNotAncestor(user.id, id, parent.id);
     await projects.setParent(user.id, id, parent.id);
   }
-  revalidatePath("/", "layout");
+  revalidatePath("/");
+  if (before) revalidatePath(`/p/${before.slug}`);
+  if (parentSlug) revalidatePath(`/p/${parentSlug}`);
 }
 
 /**
@@ -272,7 +282,7 @@ export async function setStatusAction(fd: FormData) {
   await assertTask(user.id, id);
   await taskService.update(
     id,
-    { status: str(fd, "status") as Status },
+    { status: asStatus(str(fd, "status")) },
     { actor: "human", user_id: user.id },
   );
   revalidatePath("/", "layout");
@@ -282,15 +292,14 @@ export async function updateTaskAction(fd: FormData) {
   const user = await requireUser();
   const id = num(fd, "task_id");
   await assertTask(user.id, id);
-  await taskService.update(
-    id,
-    {
-      title: str(fd, "title") || undefined,
-      body: str(fd, "body") || null,
-      priority: num(fd, "priority") || 2,
-    },
-    { actor: "human", user_id: user.id },
-  );
+  // Only attempt validation when the field was sent -- a partial update that
+  // omits a field is legitimate (Zod's `.partial()` has the same shape).
+  const patch: { title?: string; body?: string | null; priority?: number } = {};
+  const title = str(fd, "title");
+  if (title) patch.title = title;
+  if (fd.has("body")) patch.body = str(fd, "body") || null;
+  if (fd.has("priority")) patch.priority = asPriority(num(fd, "priority"));
+  await taskService.update(id, patch, { actor: "human", user_id: user.id });
   revalidatePath("/", "layout");
 }
 
@@ -304,7 +313,7 @@ export async function addEntryAction(fd: FormData) {
   if (!body) return;
   await taskService.addEntry({
     task_id: taskId,
-    kind: str(fd, "kind") as EntryKind,
+    kind: asEntryKind(str(fd, "kind")),
     body,
     author: "human",
     user_id: user.id,
@@ -333,7 +342,7 @@ export async function addContextAction(fd: FormData) {
   await contexts.create({
     user_id: user.id,
     project_id: project?.id ?? null,
-    kind: str(fd, "kind") as ContextKind,
+    kind: asContextKind(str(fd, "kind")),
     title,
     body,
   });

@@ -7,6 +7,7 @@ import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
 import { subProjectFlow } from "./briefing";
 import { BadRequest } from "./errors";
+import { tx } from "../db/client";
 import { assertNotAncestor, assertProject, assertRef, assertSameOwner, assertTask } from "./ownership";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
@@ -118,23 +119,34 @@ export const methods = {
     const { project, parent_project, archived, ...patch } = p;
     const found = await mustResolve(userId, project);
 
-    // Re-parenting is read-modify-write, so the safeguards go in the handler
-    // rather than the repository. The id pair is checked against the same
-    // account, the resulting chain cannot loop, and `parent_project === null`
-    // is the explicit way to lift a project back to the top level.
+    // Re-parenting is its own statement -- the cycle check is baked in -- and
+    // the rest of the patch rides on the same transaction. Two independent
+    // writes were the bug: reparent committed, then the title update failed,
+    // and the project that came back was neither the one the caller asked for
+    // nor the one they could retry.
+    const statements: { text: string; params?: readonly unknown[] }[] = [];
     if (parent_project !== undefined) {
       if (parent_project === null) {
-        await projectsRepo.setParent(userId, found.id, null);
+        statements.push(projectsRepo.setParentStmt({ userId, childId: found.id, parentId: null }));
       } else {
         const newParent = await mustResolve(userId, parent_project);
         await assertSameOwner(userId, found.id, newParent.id);
+        // The CTE in `setParentStmt` walks the same chain and refuses the
+        // write if it loops back to `childId`. We do the same check up front
+        // so a cycle is reported as a clean BadRequest rather than a silent
+        // no-op update.
         await assertNotAncestor(userId, found.id, newParent.id);
-        await projectsRepo.setParent(userId, found.id, newParent.id);
+        statements.push(
+          projectsRepo.setParentStmt({ userId, childId: found.id, parentId: newParent.id }),
+        );
       }
     }
 
     if (archived !== undefined) (patch as Record<string, unknown>).archived = archived ? 1 : 0;
-    await projectsRepo.update(userId, found.id, patch);
+    const update = projectsRepo.updateStmt(userId, found.id, patch);
+    if (update) statements.push(update);
+
+    if (statements.length) await tx(statements);
     return projectsRepo.byId(userId, found.id);
   },
 
@@ -147,8 +159,16 @@ export const methods = {
         `confirm must be the project's slug, "${found.slug}", to delete it and everything in it`,
       );
     const counts = await tasksRepo.counts(found.id);
+    // Whole-subtree cost: a delete is `ON DELETE CASCADE`, so the confirmation
+    // copy and the returned summary both need to count what is going silently.
+    const cascade = await projectsRepo.cascadeImpact(userId, found.id);
     await projectsRepo.remove(userId, found.id);
-    return { deleted: found.slug, tasks_removed: Object.values(counts).reduce((a, b) => a + b, 0) };
+    return {
+      deleted: found.slug,
+      tasks_removed: Object.values(counts).reduce((a, b) => a + b, 0),
+      descendant_projects: Number(cascade?.descendant_projects ?? 0),
+      descendant_tasks_removed: Number(cascade?.descendant_tasks ?? 0),
+    };
   },
 
   listSubProjects: async ({ userId }, p: { project: string }) => {
