@@ -110,6 +110,31 @@ describe("runDoctor", () => {
     expect(report).toEqual({ ok: false, detail: "get_context error: no such project" });
   });
 
+  it("relays a tool error verbatim instead of calling it malformed", async () => {
+    stubFetch({
+      "tools/list": OK_TOOLS,
+      // How the hosted server reports a failed tool: a 200, a JSON-RPC result,
+      // and isError. This is what a rotated database password looks like from
+      // the outside, and it was being reported as "returned non-JSON".
+      "tools/call": {
+        status: 200,
+        body: {
+          result: {
+            content: [{ type: "text", text: "error: the server could not complete that call" }],
+            isError: true,
+          },
+        },
+      },
+    });
+
+    const report = await runDoctor({ url: "https://x/api/mcp", token: "tk" });
+
+    expect(report.ok).toBe(false);
+    expect(report.detail).toBe(
+      "get_context failed: error: the server could not complete that call",
+    );
+  });
+
   it("rejects a get_context body that is not JSON", async () => {
     stubFetch({
       "tools/list": OK_TOOLS,

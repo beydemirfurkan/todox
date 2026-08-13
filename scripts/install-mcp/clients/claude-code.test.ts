@@ -33,7 +33,7 @@ vi.mock("node:child_process", () => ({
   },
 }));
 
-const { client } = await import("./claude-code");
+const { client, nativeCliArgs } = await import("./claude-code");
 
 const root = mkdtempSync(path.join(tmpdir(), "todox-claude-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -133,25 +133,48 @@ describe("claude-code installer, native CLI", () => {
     ]);
   });
 
-  it("passes the header key and value as two separate arguments", async () => {
+  it("installs at user scope, with the header as one `Name: value` argument", async () => {
     await homeFor("native-args");
 
     const result = await client.install(HTTP);
 
     expect(result.entryId).toBe("native");
     const add = state.calls.find((call) => call.command === "claude");
-    // The greedy-parser bug fires when these are joined into one positional.
     expect(add?.args).toEqual([
       "mcp",
       "add",
+      "--scope",
+      "user",
       "todox",
       "--transport",
       "http",
       HTTP.url,
       "--header",
-      "Authorization",
-      "Bearer todox_test",
+      "Authorization: Bearer todox_test",
     ]);
+  });
+
+  /**
+   * These two were one bug hiding another, and the old test froze both: it
+   * asserted the argv the code happened to build rather than the argv the CLI
+   * accepts, so it stayed green while the native path failed on every run.
+   */
+  it("never omits --scope, because the default is this directory only", () => {
+    // A memory that exists in one repository is the opposite of the point, and
+    // it fails quietly -- the tools are simply absent in the next project.
+    const args = nativeCliArgs("https://x/api/mcp", "tk");
+    const scopeAt = args.indexOf("--scope");
+    expect(scopeAt).toBeGreaterThan(-1);
+    expect(args[scopeAt + 1]).toBe("user");
+  });
+
+  it("never splits the header into two arguments", () => {
+    // `claude mcp add` rejects that outright ("Invalid header format"), which
+    // is why the native path always fell through to the JSON fallback.
+    const args = nativeCliArgs("https://x/api/mcp", "tk");
+    const headerAt = args.indexOf("--header");
+    expect(args[headerAt + 1]).toBe("Authorization: Bearer tk");
+    expect(args).not.toContain("Authorization");
   });
 
   it("does not also write the JSON config when the native CLI succeeds", async () => {

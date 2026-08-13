@@ -113,13 +113,21 @@ export async function runDoctor(opts: {
     return { ok: false, detail: explainStatus("get_context", ctx.status) };
   }
   const ctxBody = ctx.json as {
-    result?: { content?: Array<{ type: string; text?: string }> };
+    result?: { content?: Array<{ type: string; text?: string }>; isError?: boolean };
     error?: { message?: string };
   };
   if (ctxBody.error) {
     return { ok: false, detail: `get_context error: ${ctxBody.error.message ?? "unknown"}` };
   }
   const text = ctxBody.result?.content?.[0]?.text ?? "";
+  // A tool that fails reports it as `isError` on a 200 with a JSON-RPC result,
+  // not as a JSON-RPC `error`. Checking only the latter meant a server that
+  // said exactly what was wrong -- "the server could not complete that call",
+  // which is what a rotated database password looks like from out here -- got
+  // relayed as "returned non-JSON", sending the reader after the wrong thing.
+  if (ctxBody.result?.isError) {
+    return { ok: false, detail: `get_context failed: ${text || "no message"}` };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);

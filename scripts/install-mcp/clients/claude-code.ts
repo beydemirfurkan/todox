@@ -28,23 +28,41 @@ async function isClaudeOnPath(): Promise<boolean> {
   return (await exitCodeOf(probe, ["claude"])) === 0;
 }
 
-async function installViaNativeCli(url: string, token: string): Promise<boolean> {
-  if (!(await isClaudeOnPath())) return false;
-  // `--header` takes KEY and VALUE as two separate arguments. Joining them
-  // into one ("Authorization=Bearer ...") hands the parser a single greedy
-  // positional, which is the bug this ordering exists to avoid.
-  const args = [
+/**
+ * The argv for `claude mcp add`. Exported so the two things that are wrong
+ * about it when they are wrong can be asserted without spawning anything.
+ *
+ * `--scope user` is not optional. The default is `local`, which means the
+ * directory you happened to run the installer from — and a memory that exists
+ * in exactly one repository is the opposite of what todox is for. It fails
+ * quietly too: the tools are simply absent in the next project, so the agent
+ * never mentions them.
+ *
+ * `--header` takes one `Name: value` argument. It was being passed as two
+ * ("Authorization", "Bearer …"), which this CLI rejects outright — so the
+ * native path returned a failure every time and the JSON fallback below did
+ * the install. That hid the scope bug rather than avoiding it: the fallback
+ * writes to the top-level `mcpServers`, which is user scope, so fixing the
+ * header alone would have moved every new install into the current directory.
+ */
+export function nativeCliArgs(url: string, token: string): string[] {
+  return [
     "mcp",
     "add",
+    "--scope",
+    "user",
     ENTRY_NAME,
     "--transport",
     "http",
     url,
     "--header",
-    "Authorization",
-    `Bearer ${token}`,
+    `Authorization: Bearer ${token}`,
   ];
-  return (await exitCodeOf("claude", args)) === 0;
+}
+
+async function installViaNativeCli(url: string, token: string): Promise<boolean> {
+  if (!(await isClaudeOnPath())) return false;
+  return (await exitCodeOf("claude", nativeCliArgs(url, token))) === 0;
 }
 
 async function hasEntry(): Promise<boolean> {
