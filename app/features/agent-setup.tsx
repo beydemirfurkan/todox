@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 
+import {
+  MCP_CONFIG_PATHS,
+  MCP_SHAPES,
+  mcpEntryDocument,
+  type McpConfigLocation,
+} from "@/lib/mcp-clients";
+
 import { CopyMarkdown } from "./copy-markdown";
 
 /**
@@ -41,7 +48,27 @@ export type AgentSetupLabels = {
  * is the wrong default in the most expensive possible way: it looks like it
  * worked.
  */
-function snippets(url: string, token: string, otherLabel: string) {
+/** A whole config file, formatted the way it is pasted. */
+function json(shape: (typeof MCP_SHAPES)[keyof typeof MCP_SHAPES], url: string, token: string) {
+  return JSON.stringify(mcpEntryDocument(shape, url, token), null, 2);
+}
+
+export type AgentSnippet = {
+  id: string;
+  name: string;
+  /** Where this goes, in one line. */
+  target: string;
+  /** Set only when the file moves between platforms, which is VS Code alone. */
+  paths?: McpConfigLocation;
+  /** The text that is pasted, complete rather than a fragment. */
+  body: string;
+};
+
+export function snippetsFor(
+  url: string,
+  token: string,
+  otherLabel: string,
+): AgentSnippet[] {
   const bearer = `Bearer ${token}`;
   return [
     {
@@ -54,7 +81,7 @@ function snippets(url: string, token: string, otherLabel: string) {
     {
       id: "codex",
       name: "Codex",
-      target: "~/.codex/config.toml",
+      target: MCP_CONFIG_PATHS.codex.darwin,
       body: [
         "[mcp_servers.todox]",
         `url = "${url}"`,
@@ -66,24 +93,40 @@ function snippets(url: string, token: string, otherLabel: string) {
       name: "Cursor",
       // The one in your home directory, not the `.cursor/mcp.json` inside a
       // repository.
-      target: "~/.cursor/mcp.json",
-      body: JSON.stringify(
-        { mcpServers: { todox: { type: "http", url, headers: { Authorization: bearer } } } },
-        null,
-        2,
-      ),
+      target: MCP_CONFIG_PATHS.cursor.darwin,
+      body: json(MCP_SHAPES.cursor, url, token),
     },
     {
       id: "vscode",
       name: "VS Code",
-      // Different root key from everyone else, which is the sort of thing that
-      // costs an evening if the snippet is copied from the wrong tool.
+      // The command palette leads because it is the one instruction that is
+      // right on every platform. The paths are underneath for anyone opening
+      // the file directly -- this is the only client whose config moves, and
+      // macOS is not where a Linux habit puts it.
       target: "mcp.json — “MCP: Open User Configuration”",
-      body: JSON.stringify(
-        { servers: { todox: { type: "http", url, headers: { Authorization: bearer } } } },
-        null,
-        2,
-      ),
+      paths: MCP_CONFIG_PATHS.vscode,
+      body: json(MCP_SHAPES.vscode, url, token),
+    },
+    {
+      // OpenCode was missing here entirely while the README documented it and
+      // the install CLI supported it, so an OpenCode user fell through to the
+      // generic entry below — `mcpServers` with `type: "http"`, which OpenCode
+      // accepts into the file and then ignores. No error, no warning, the tool
+      // just never appears.
+      id: "opencode",
+      name: "OpenCode",
+      target: MCP_CONFIG_PATHS.opencode.darwin,
+      body: json(MCP_SHAPES["opencode-v2"], url, token),
+    },
+    {
+      // v1 keyed servers directly under `mcp`. Its own entry rather than a note
+      // under the one above: the two differ by a nesting level, and a reader
+      // comparing a snippet against their existing file cannot be expected to
+      // spot that from prose.
+      id: "opencode-v1",
+      name: "OpenCode v1",
+      target: MCP_CONFIG_PATHS.opencode.darwin,
+      body: json(MCP_SHAPES["opencode-v1"], url, token),
     },
     {
       id: "other",
@@ -91,11 +134,7 @@ function snippets(url: string, token: string, otherLabel: string) {
       target: "your client's user-level mcp.json",
       // The shape most clients settled on. `type` is spelled out because a
       // client that finds a url without one tends to assume a local command.
-      body: JSON.stringify(
-        { mcpServers: { todox: { type: "http", url, headers: { Authorization: bearer } } } },
-        null,
-        2,
-      ),
+      body: json(MCP_SHAPES["claude-code"], url, token),
     },
   ];
 }
@@ -115,7 +154,7 @@ export function AgentSetup({
   prompt: string;
   labels: AgentSetupLabels;
 }) {
-  const all = snippets(url, token, labels.other);
+  const all = snippetsFor(url, token, labels.other);
   const [chosen, setChosen] = useState(all[0].id);
   const current = all.find((s) => s.id === chosen);
 
@@ -159,6 +198,28 @@ export function AgentSetup({
         {current && (
           <div className="mt-2.5">
             <p className="mono mb-1 text-[11.5px] text-faint">{current.target}</p>
+            {current.paths && (
+              // Labelled per platform rather than guessed from the browser: the
+              // machine reading this page is not always the machine the config
+              // is for, and a wrong path here is the failure that looks like a
+              // successful install.
+              // `break-all` because these are paths: the longest is 46
+              // characters of unbroken text, which is wider than a 320px
+              // viewport at this size and would scroll the page sideways.
+              <ul className="mono mb-1 space-y-0.5 text-[11.5px] break-all text-faint">
+                {(
+                  [
+                    ["macOS", current.paths.darwin],
+                    ["Linux", current.paths.linux],
+                    ["Windows", current.paths.win32],
+                  ] as const
+                ).map(([platform, file]) => (
+                  <li key={platform}>
+                    <span className="text-muted">{platform}</span> {file}
+                  </li>
+                ))}
+              </ul>
+            )}
             <pre className={pre}>{current.body}</pre>
             <div className="mt-2">
               <CopyMarkdown
