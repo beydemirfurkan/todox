@@ -58,6 +58,35 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  # DIAGNOSTIC, on a throwaway branch — never merge this job.
+  #
+  # The comment below asserts why `smoke` is off, and nobody has checked since
+  # 2026-08-11. This asks the secret itself. Read-only on purpose: `smoke`
+  # writes and deletes rows, and until we know whether this string still points
+  # at the throwaway branch or at something else, nothing may run that does.
+  # Only the role and database names are printed, never the connection string.
+  #
+  # It is worth confirming rather than assuming: `smoke` is the only job that
+  # starts the stdio process, and while it was off a bug shipped that killed
+  # every local MCP session at startup (fixed in ec765c8). `check` and
+  # `windows` were green the whole time.
+  whoami:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: The secret is not even set
+        if: env.DATABASE_URL == ''
+        run: |
+          echo "::error::DATABASE_URL is empty — nothing to diagnose."
+          exit 1
+
+      - name: Which role and database does it authenticate as
+        if: env.DATABASE_URL != ''
+        run: |
+          psql "$DATABASE_URL" -Atc \
+            "select 'CONNECTED role=' || current_user || ' db=' || current_database()"
+
   # TEMP-DISABLED: The DATABASE_URL secret stopped authenticating as 'todox_ci'
   # on 2026-08-11 — Neon rotated the password, the connection string in repo
   # settings was not updated. `check` and `windows` still run; only the
