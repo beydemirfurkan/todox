@@ -58,14 +58,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
-  # TEMP-DISABLED: The DATABASE_URL secret stopped authenticating as 'todox_ci'
-  # on 2026-08-11 — Neon rotated the password, the connection string in repo
-  # settings was not updated. `check` and `windows` still run; only the
-  # database-requiring smoke suites are off. Re-enable by removing `if: false`
-  # once a fresh connection string from Neon is set as the DATABASE_URL repo
-  # secret.
+  # The suites that need a database. They were off between 2026-08-11 and
+  # 2026-08-15, after Neon rotated the password and the repo secret was not
+  # updated. That gap is the argument for the two guards below: this is the only
+  # job that starts the stdio MCP process, and while it was skipped a bug
+  # shipped that killed every local session at startup. `check` and `windows`
+  # were green throughout, so nothing else was ever going to catch it.
   smoke:
-    if: false
     runs-on: ubuntu-latest
     needs: check
     # `secrets` is not available in an `if:` expression, so it is mapped to the
@@ -84,9 +83,36 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Fails rather than reports. This step used to echo a note and let the job
+      # finish green, which is exactly how four days of no database coverage
+      # looked identical to four days of passing coverage.
       - name: No database configured
         if: env.DATABASE_URL == ''
-        run: echo "Set a DATABASE_URL secret (a throwaway branch) to run these."
+        run: |
+          echo "::error::DATABASE_URL is not set, so none of the suites below" \
+               "would run. Set it to a THROWAWAY Neon branch — never the one" \
+               "in PROD_DATABASE_URL; everything here writes and deletes rows."
+          exit 1
+
+      # Everything after this point writes and deletes rows, so it has to be
+      # certain of what it is connected to first.
+      #
+      # The role is the check, not the host: `todox_ci` exists only on the
+      # throwaway branch, and production runs as its own owner. Comparing
+      # against PROD_DATABASE_URL instead would mean putting that secret in
+      # this job's environment, and the whole point of keeping them separate is
+      # that the suites can never reach it.
+      - name: Refuse to run against anything but the CI database
+        if: env.DATABASE_URL != ''
+        run: |
+          role=$(psql "$DATABASE_URL" -Atc "select current_user")
+          echo "connected as: $role"
+          if [ "$role" != "todox_ci" ]; then
+            echo "::error::Connected as '$role', not 'todox_ci'. Refusing to" \
+                 "run suites that delete rows against a database this job was" \
+                 "not meant to touch."
+            exit 1
+          fi
 
       - name: Migrate
         if: env.DATABASE_URL != ''
