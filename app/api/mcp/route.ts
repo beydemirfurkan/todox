@@ -18,9 +18,9 @@ export const maxDuration = 30;
 /**
  * The half of todox that has no filesystem -- so it answers every Workspace
  * probe that needs a disk with "unknown" rather than guessing. Built per
- * request so the bearer token is scoped to the call that authenticated it:
- * a Vercel function can serve several requests in one process, and a module-
- * level token slot would race between them.
+ * request so the bearer token is scoped to the call that authenticated it: one
+ * process serves many requests at once, and a module-level token slot would
+ * race between them -- handing one agent's token to another agent's call.
  */
 function buildRemoteWorkspace(token: string): Workspace {
   return {

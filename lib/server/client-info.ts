@@ -3,10 +3,11 @@
  * on `api_tokens` -- last_client_name, last_client_version,
  * last_client_seen_at -- keyed on the existing unique token_hash.
  *
- * Serverless-safe: a Vercel cold start resets any in-memory Map, but Postgres
- * is shared by every instance. The trade-off is a round-trip per request on
- * the `get_context` path; acceptable because that is also the path that needs
- * the data.
+ * In the database rather than in memory, because a Map only survives as long as
+ * the process: a deploy, a restart or a second replica loses it, and the answer
+ * would then depend on which instance the agent happened to reach. The
+ * trade-off is a round-trip per request on the `get_context` path; acceptable
+ * because that is also the path that needs the data.
  */
 
 import { lastClientUse, recordClientUse } from "../repositories/api-tokens";

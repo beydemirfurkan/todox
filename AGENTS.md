@@ -142,9 +142,14 @@ coverage or error paths half-done. "Good enough for now" is a pre-AI reflex.
   `Workspace`, not a copy of the tool list. `pnpm smoke:mcp` runs the same
   suite through both, which is what keeps that true.
 - **Mail bodies are the one place strings are not in both dictionaries.**
-  They are inline `lang === "tr" ? … : …` in
-  `lib/services/account-recovery.ts`, so the compile-time guarantee below
-  does not cover them. Known, not an invitation.
+  They live in `lib/services/mail-templates.ts`, one function per message
+  returning `subject`, `text` and `html` for both languages, so the
+  compile-time guarantee below does not cover them — nothing fails the build
+  if a translation drifts. Two rules hold there instead: every template
+  returns `text` as well as `html`, because a message with no plain-text part
+  scores worse with spam filters and is what a screen reader reads; and every
+  interpolated value goes through `esc`, because names and project names are
+  chosen by people and two of these messages are security notices.
 - **Colour never carries meaning alone.** Every status, kind and badge has
   a text equivalent, and controls have real labels.
 

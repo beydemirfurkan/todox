@@ -3,12 +3,11 @@ import { Pool } from "pg";
 /**
  * Postgres over a socket pool.
  *
- * This was Neon's HTTP driver while the database was a managed service on the
- * other side of the internet: on serverless functions there was no connection
- * to exhaust and no pool to warm, and HTTP was the honest shape for that. The
+ * This spoke HTTP while the database was a managed service on the other side of
+ * the internet: on serverless functions there was no connection to exhaust and
+ * no pool to warm, so a round trip per statement was the honest shape. The
  * database now runs beside the app, so a pool is both possible and cheaper --
- * a connection is opened once and reused, rather than a fresh round trip per
- * statement.
+ * a connection is opened once and reused.
  *
  * The repositories still load in batches. That was written to survive a
  * network round trip per query and is no longer forced, but an N+1 is a bad
