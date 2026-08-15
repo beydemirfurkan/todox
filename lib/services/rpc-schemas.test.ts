@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseParams } from "./rpc-schemas";
+import { parseParams, SHAPES } from "./rpc-schemas";
 import type { MethodName } from "./rpc-schemas";
 
 /**
@@ -114,6 +114,7 @@ describe("model field round-trips through parseParams on every method", () => {
     createProject: { name: "x" },
     updateProject: { project: "x", summary: "y" },
     deleteProject: { project: "x", confirm: "x" },
+    mergeProjects: { from: "x", into: "y", confirm: "x" },
     createTask: { title: "x" },
     updateTask: { task_id: 1, status: "doing" },
     logEntry: { task_id: 1, kind: "note", body: "x" },
@@ -124,6 +125,15 @@ describe("model field round-trips through parseParams on every method", () => {
     activityReport: { period: "today" },
     recordClientInfo: { name: "claude-code" },
   };
+
+  /**
+   * The map above is hand-written, so a new method is untested by omission
+   * rather than by failure -- the loop simply never reaches it. This is the
+   * assertion that turns that silence into a red test.
+   */
+  it("covers every method in SHAPES", () => {
+    expect(Object.keys(fixtures).sort()).toEqual(Object.keys(SHAPES).sort());
+  });
 
   for (const [method, base] of Object.entries(fixtures) as [MethodName, Record<string, unknown>][]) {
     it(`${method} accepts { ...base, model: "test" }`, () => {
@@ -136,4 +146,33 @@ describe("model field round-trips through parseParams on every method", () => {
       expect(() => parseParams(method, { ...base, bogus_key: 1 })).toThrow();
     });
   }
+});
+
+/**
+ * The remote is what identifies a repository on a machine other than the one it
+ * was registered from, so it has to survive validation on the two methods that
+ * resolve a project from a path.
+ */
+describe("repo_url reaches the resolver", () => {
+  it("is accepted beside a cwd", () => {
+    expect(
+      parseParams("getContext", { cwd: "/tmp", repo_url: "git@github.com:me/repo.git" }).repo_url,
+    ).toBe("git@github.com:me/repo.git");
+    expect(
+      parseParams("createTask", { title: "x", repo_url: "https://github.com/me/repo" }).repo_url,
+    ).toBe("https://github.com/me/repo");
+  });
+});
+
+describe("mergeProjects", () => {
+  /** It deletes a project. Every field is load-bearing. */
+  it("rejects a call missing any of the three", () => {
+    expect(() => parseParams("mergeProjects", { from: "a", into: "b" })).toThrow();
+    expect(() => parseParams("mergeProjects", { from: "a", confirm: "a" })).toThrow();
+    expect(() => parseParams("mergeProjects", { into: "b", confirm: "a" })).toThrow();
+  });
+
+  it("rejects a confirmation that is not a string", () => {
+    expect(() => parseParams("mergeProjects", { from: "a", into: "b", confirm: true })).toThrow();
+  });
 });

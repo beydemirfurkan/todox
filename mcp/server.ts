@@ -18,7 +18,18 @@ import type { MethodName } from "../lib/services/rpc-schemas";
 import { isAbsolutePath } from "../lib/util/paths";
 import { createClient, readConfig } from "./rpc-client";
 import { instructions, registerTools, type Workspace } from "./tools";
-import { checkRefs, findProjectRoot, hashFile } from "./workspace";
+import { checkRefs, findProjectRoot, gitRemote, hashFile } from "./workspace";
+
+/**
+ * Read by `localWorkspace.bearerToken`. Set inside `main`; undefined at import.
+ *
+ * Declared here rather than at the foot of the file: `main()` is called on the
+ * last line and assigns this synchronously, so a `let` below that call is still
+ * in its temporal dead zone when the assignment runs. Every stdio session died
+ * on startup with "Cannot access 'currentToken' before initialization" -- the
+ * hosted transport was unaffected, which is why it survived.
+ */
+let currentToken: string | undefined;
 
 /** The half of todox that has a filesystem, because it runs where the code is. */
 const localWorkspace: Workspace = {
@@ -26,6 +37,9 @@ const localWorkspace: Workspace = {
   // `isAbsolutePath` rather than a leading slash: this process runs where the
   // developer is, and on Windows every path they hand us starts `C:\`.
   repoRoot: (path) => (isAbsolutePath(path) ? findProjectRoot(path) : undefined),
+  // From the root rather than the path itself: an agent hands over the file it
+  // is editing as often as the directory, and `.git` only sits at the top.
+  repoUrl: (path) => (isAbsolutePath(path) ? gitRemote(findProjectRoot(path)) : undefined),
   hash: hashFile,
   checkRefs,
   // Filled in by `main` once `readConfig` has resolved the token. The workspace
@@ -76,6 +90,3 @@ main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });
-
-/** Read by `localWorkspace.bearerToken`. Set inside `main`; undefined at import. */
-let currentToken: string | undefined;

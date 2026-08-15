@@ -1,5 +1,5 @@
 import { OPEN_STATUSES, type Status } from "../constants";
-import { all, one, run, setClause } from "../db/client";
+import { all, one, run, setClause, type Statement } from "../db/client";
 import type { Task } from "../types";
 import { now } from "../util/time";
 
@@ -132,6 +132,18 @@ export const touch = (id: number) =>
   run("UPDATE tasks SET updated_at = ? WHERE id = ?", [now(), id]);
 
 export const remove = (id: number) => run("DELETE FROM tasks WHERE id = ?", [id]);
+
+/**
+ * Move every task to another project, for a merge.
+ *
+ * Entries, events and refs hang off `task_id`, so they follow without being
+ * touched -- and must not be touched, because rewriting them separately is how
+ * a log ends up describing a task that moved without it.
+ */
+export const reassignStmt = (fromId: number, intoId: number): Statement => ({
+  text: "UPDATE tasks SET project_id = ? WHERE project_id = ?",
+  params: [intoId, fromId],
+});
 
 export async function counts(projectId: number) {
   // Postgres has no implicit boolean-to-integer, so FILTER replaces SUM(x=y).

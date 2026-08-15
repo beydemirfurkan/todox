@@ -223,6 +223,7 @@ TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |
 | `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. |
 | `delete_project` | The way back from a mistyped `cwd`. Takes the project and everything under it; `confirm` must be the slug. |
+| `merge_projects` | The way back from one repo registered twice. Moves tasks, notes and paths into the surviving project; `confirm` must be the slug of the one being merged away. |
 
 Every write tool takes a `model`, and the server instructions tell the agent to
 always pass it. That is what makes the per-model breakdown real rather than

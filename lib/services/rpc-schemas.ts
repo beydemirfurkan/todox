@@ -63,6 +63,23 @@ const repoRoot = z
   .optional()
   .describe("Absolute path of the repository root containing `cwd`.");
 
+/**
+ * How the server recognises this repo somewhere other than this machine.
+ *
+ * Same shape as `repoUrl` below, different reader: that one is a field somebody
+ * is deliberately setting on a project, this one rides along with a `cwd` so
+ * resolution has something better than an absolute path to match on. Locally
+ * the MCP server fills it in and the model never sees it; hosted, there is
+ * nobody else who can, so the description has to ask for it plainly.
+ */
+const repoIdentity = z
+  .string()
+  .max(MAX.line)
+  .optional()
+  .describe(
+    "Output of `git remote get-url origin` for this repo. This is how todox recognises the same repository when you open it on another machine — without it, a second machine registers a duplicate project and the history splits in two.",
+  );
+
 /** A path or a slug arriving from a caller, wherever one is accepted. */
 const ref = z.string().max(MAX.path);
 
@@ -136,6 +153,28 @@ export const SHAPES = {
     model,
   },
 
+  /**
+   * The way back from a repo that registered twice.
+   *
+   * `slug` is not an updatable column on purpose, so a project that came out as
+   * `todox-2` cannot be renamed into place -- the rows have to move instead.
+   * Same confirmation shape as `deleteProject`, because one project does stop
+   * existing.
+   */
+  mergeProjects: {
+    from: projectRef.describe(
+      "The duplicate. Its tasks, notes and paths move, then it stops existing.",
+    ),
+    into: projectRef.describe("The project that survives, keeping its slug."),
+    confirm: z
+      .string()
+      .max(MAX.line)
+      .describe(
+        "The slug of `from`, typed again. Ask the human before calling this: it is not undoable.",
+      ),
+    model,
+  },
+
   getContext: {
     project: ref
       .optional()
@@ -157,6 +196,7 @@ export const SHAPES = {
         "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call.",
       ),
     repo_root: repoRoot,
+    repo_url: repoIdentity,
     model,
   },
 
@@ -207,6 +247,7 @@ export const SHAPES = {
       .optional()
       .describe("Absolute paths of files in play, with their sha256"),
     repo_root: repoRoot,
+    repo_url: repoIdentity,
     model,
   },
 

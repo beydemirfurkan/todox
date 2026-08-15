@@ -31,6 +31,9 @@ export type Workspace = {
   tz(): string | undefined;
   /** The repository root containing `path`, or undefined. */
   repoRoot(path: string): string | undefined;
+  /** The repo's remote — the identity that survives moving to another machine.
+   *  undefined when this side has no disk, or the path is not a checkout. */
+  repoUrl(path: string): string | undefined;
   /** sha256 of a file; null when it cannot be read — or when there is no disk. */
   hash(path: string): string | null;
   /** null means this side has no filesystem, so staleness cannot be judged here. */
@@ -126,6 +129,10 @@ const REMOTE_NOTE = [
   "- pass `cwd` as an absolute path, and `repo_root` as the directory holding",
   "  the .git you are working under; without it a project can end up",
   "  registered against a subfolder;",
+  "- pass `repo_url` on get_context and create_task: run",
+  "  `git remote get-url origin` and send it verbatim. A path is a different",
+  "  string on every machine, so this is what stops the same repo opened on a",
+  "  second computer registering as a second project and splitting the log;",
   "- pass `tz` (IANA, e.g. 'Europe/Istanbul') on reports. If you cannot",
   "  determine it, say in your answer that the window is measured in UTC",
   "  rather than letting the developer assume it is their day;",
@@ -374,14 +381,25 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
         result: unknown,
         args: Record<string, unknown>,
       ) => unknown | Promise<unknown>;
+      /**
+       * Fields only *this* tool fills in for itself locally.
+       *
+       * `LOCAL_INTERNAL` is account-wide, and `repo_url` cannot go in it:
+       * `update_project` and `create_project` exist partly to set that field,
+       * so hiding it there would leave a local agent no way to record a remote
+       * -- and the injection below cannot refill it, because their reference is
+       * a slug rather than a path.
+       */
+      localInternal?: string[];
     } = {},
   ) {
     const shape = SHAPES[method];
     const accepted = Object.keys(shape);
+    const hidden = local ? [...internal, ...(opts.localInternal ?? [])] : [];
 
     const advertised = Object.fromEntries(
       Object.entries({ ...shape, ...opts.overrides, ...opts.presentation }).filter(
-        ([k]) => !internal.includes(k),
+        ([k]) => !hidden.includes(k),
       ),
     ) as z.ZodRawShape;
 
@@ -406,6 +424,18 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
         if (typeof ref === "string") {
           const root = ws.repoRoot(ref);
           if (root) params.repo_root = root;
+        }
+      }
+      // And the remote, which is the only identity that survives the developer
+      // opening the same repo on a second machine. Absent, resolution falls
+      // back to matching absolute paths -- which is what split projects in two.
+      // `repo_root` first: it was just resolved above, so this skips walking up
+      // for the .git a second time.
+      if (accepted.includes("repo_url") && params.repo_url === undefined) {
+        const ref = (params.repo_root ?? params.cwd ?? params.project) as string | undefined;
+        if (typeof ref === "string") {
+          const url = ws.repoUrl(ref);
+          if (url) params.repo_url = url;
         }
       }
       if (opts.prepare) params = opts.prepare(params);
@@ -503,6 +533,12 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       "Removes a project and everything under it — every task, every log entry, every note and file link. Not recoverable. `confirm` must be the project's slug. This exists because a mistyped `cwd` registers a project like any other path does; ask the human before calling it.",
   });
 
+  tool("merge_projects", "mergeProjects", {
+    title: "Merge one project into another",
+    description:
+      "Fold a duplicate project into the real one, keeping both sides' tasks, log entries, notes and paths. Use it when the same repository registered twice — usually because it was opened from two machines and the older resolver identified a project by its absolute path, so `todox` and `todox-2` are one repo. A project's slug cannot be renamed, so this moves the rows instead. `from` stops existing; `confirm` must be its slug. Not undoable: ask the human first, and set repo_url on the survivor afterwards so it cannot happen again.",
+  });
+
   /* ------------------------------------------------------- the briefing */
 
   tool(
@@ -518,6 +554,10 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       annotations: READ_ONLY,
     },
     {
+      // A model cannot invent a sha256, and it cannot invent a git remote
+      // either -- but unlike a hash, a plausible guess parses cleanly and
+      // becomes this project's identity for good. So locally it is not asked.
+      localInternal: ["repo_url"],
       after: checkLinkedFiles,
       transform: async (result, _args) => appendClientNotes(ws, result),
     },
@@ -557,6 +597,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     // because there the agent is the one with the file.
     local
       ? {
+          localInternal: ["repo_url"],
           overrides: {
             files: z
               .array(z.string())

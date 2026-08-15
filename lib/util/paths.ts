@@ -71,7 +71,18 @@ export const slugifyOr = (s: string, fallback = SLUG_FALLBACK) =>
  * as relative meant a Windows agent could never register a project from its
  * working directory — the one thing the tool is supposed to do without asking.
  */
-const isWindowsPath = (p: string) => /^[a-zA-Z]:[\\/]/.test(p);
+export const isWindowsPath = (p: string) => /^[a-zA-Z]:[\\/]/.test(p);
+
+/**
+ * Whether two paths were written on the same kind of machine.
+ *
+ * `C:/Users/me/repo` and `/Users/me/repo` cannot be the same directory, so a
+ * project registered from one and a `cwd` arriving from the other are the same
+ * repository on a second machine rather than two repositories. That is the only
+ * thing this answers, and it is a hint -- the remote is the real identity.
+ */
+export const sameOsFamily = (a: string, b: string) =>
+  isWindowsPath(a) === isWindowsPath(b);
 
 export const isAbsolutePath = (p: string) => p.startsWith("/") || isWindowsPath(p);
 
@@ -121,6 +132,57 @@ export function repoLink(raw: string | null | undefined): string | null {
 /** What to print for a repository: "github.com/me/repo", not the whole URL. */
 export const repoLabel = (link: string) =>
   link.replace(/^https:\/\//, "").replace(/^www\./, "");
+
+/**
+ * The name a repository has on every machine: "github.com/me/repo", or null.
+ *
+ * A project used to be identified by its absolute path, which is a different
+ * string on the next laptop -- so the same repo opened on a second machine
+ * registered a second project and the log silently split in two. This is the
+ * key that survives the move. `repoLink` already folds the scp form, the `.git`
+ * suffix and any credential in the userinfo, so all that is left is case: git
+ * hosts are case-insensitive about owner and repo, and a clone written
+ * `github.com/Me/Repo` is the same place as `github.com/me/repo`.
+ */
+export const repoKey = (raw: string | null | undefined) => {
+  const link = repoLink(raw);
+  if (link) return repoLabel(link).toLowerCase();
+
+  // `repoLink` answers "what can a browser open", so it returns null for
+  // `ssh://` and `git://` remotes. Those are perfectly good identities -- they
+  // are just not links -- and this is the comparison key, not something shown.
+  const s = raw?.trim();
+  if (!s) return null;
+  const other =
+    /^(?:ssh|git|git\+ssh):\/\/(?:[^@/]+@)?([\w.-]+)(?::\d+)?\/(.+?)(?:\.git)?\/?$/.exec(s);
+  return other ? `${other[1]}/${other[2]}`.toLowerCase() : null;
+};
+
+/**
+ * The remote with any embedded credential removed.
+ *
+ * `git remote get-url origin` answers with whatever the clone used, and that
+ * can be `https://user:ghp_xxx@github.com/me/repo.git`. The MCP server now
+ * reads and sends this automatically, so a token that used to sit in one
+ * developer's git config would otherwise be stored in the database and copied
+ * into any log that records a request body. `repoLink` strips userinfo, but
+ * only at render time and only for URLs it is willing to link to.
+ *
+ * Anything unparseable is returned as-is: the raw form is what the developer
+ * will recognise, and this is not the function that decides what is valid.
+ */
+export function scrubRemote(raw: string): string {
+  const s = raw.trim();
+  try {
+    const url = new URL(s);
+    if (!url.username && !url.password) return s;
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return s;
+  }
+}
 
 /**
  * Path containment on segment boundaries: "/src/todox-old" must not be treated
