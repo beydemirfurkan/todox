@@ -9,7 +9,14 @@
  */
 import nodemailer from "nodemailer";
 
-export type Mail = { to: string; subject: string; text: string };
+/**
+ * `text` is required and `html` is not, which is the right way round.
+ *
+ * A message with no plain-text part scores worse with spam filters, and the
+ * text is what a screen reader, a terminal client and a notification preview
+ * read. The HTML is the enhancement.
+ */
+export type Mail = { to: string; subject: string; text: string; html?: string };
 
 export type Transport = {
   name: string;
@@ -72,6 +79,9 @@ function smtpTransport(opts: {
         to: mail.to,
         subject: mail.subject,
         text: mail.text,
+        // Both parts, so the client picks. Nodemailer builds the
+        // multipart/alternative for us when html is present.
+        ...(mail.html ? { html: mail.html } : {}),
       });
     },
   };

@@ -6,6 +6,7 @@ import * as memberships from "../repositories/project-memberships";
 import * as notifications from "../repositories/notifications";
 import * as projects from "../repositories/projects";
 import * as users from "../repositories/users";
+import * as templates from "./mail-templates";
 import { send } from "./mailer";
 import { ownsProject } from "./ownership";
 import * as limit from "./rate-limit";
@@ -65,14 +66,12 @@ export async function invite(input: {
   const link = `${publicUrl()}/invite?token=${encodeURIComponent(token)}`;
   await send({
     to: email,
-    subject:
-      input.lang === "tr"
-        ? `${project.name} projesine davet edildiniz`
-        : `You were invited to ${project.name}`,
-    text:
-      input.lang === "tr"
-        ? `${project.name} projesinde birlikte çalışmak için davet edildiniz.\n\nDaveti görüntüleyin ve kabul edin:\n${link}\n\nBu bağlantı ${INVITE_DAYS} gün geçerlidir.`
-        : `You were invited to collaborate on ${project.name}.\n\nReview and accept the invitation:\n${link}\n\nThis link expires in ${INVITE_DAYS} days.`,
+    ...templates.projectInvitation({
+      projectName: project.name,
+      link,
+      days: INVITE_DAYS,
+      lang: input.lang,
+    }),
   });
   return "sent";
 }
@@ -229,14 +228,7 @@ async function announce(
   try {
     await send({
       to: owner.email,
-      subject:
-        lang === "tr"
-          ? `${projectName} davetin kabul edildi`
-          : `Your invitation to ${projectName} was accepted`,
-      text:
-        lang === "tr"
-          ? `${who} ${projectName} projesine katıldı.\n\nArtık görevleri ve kaydı birlikte görüyorsunuz:\n${publicUrl()}`
-          : `${who} joined ${projectName}.\n\nYou now share its tasks and its log:\n${publicUrl()}`,
+      ...templates.invitationAccepted({ who, projectName, url: publicUrl(), lang }),
     });
   } catch {
     // Nothing to recover: the join happened either way.

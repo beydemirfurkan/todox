@@ -6,6 +6,7 @@ import * as users from "../repositories/users";
 import type { AuthTokenPurpose, PublicUser } from "../types";
 import { hashPassword } from "../util/password";
 import { newSessionToken } from "../util/tokens";
+import * as templates from "./mail-templates";
 import { addDays } from "../util/time";
 import { MIN_PASSWORD, publicUser, type Result } from "./auth";
 import { publicUrl } from "../public-url";
@@ -41,27 +42,7 @@ export async function requestPasswordReset(email: string, lang: "tr" | "en") {
 
   await send({
     to: user.email,
-    subject: lang === "tr" ? "todox şifre sıfırlama" : "Reset your todox password",
-    text:
-      lang === "tr"
-        ? [
-            `Merhaba ${user.name},`,
-            "",
-            "Şifreni sıfırlamak için bu bağlantıyı aç:",
-            link,
-            "",
-            `Bağlantı ${RESET_TTL_MIN} dakika geçerli ve yalnızca bir kez kullanılabilir.`,
-            "Bu isteği sen yapmadıysan hiçbir şey yapmana gerek yok.",
-          ].join("\n")
-        : [
-            `Hi ${user.name},`,
-            "",
-            "Open this link to set a new password:",
-            link,
-            "",
-            `It is valid for ${RESET_TTL_MIN} minutes and works once.`,
-            "If you did not ask for this, you can ignore it.",
-          ].join("\n"),
+    ...templates.passwordReset({ name: user.name, link, minutes: RESET_TTL_MIN, lang }),
   });
 }
 
@@ -121,25 +102,7 @@ export async function sendVerification(user: PublicUser, lang: "tr" | "en") {
 
   await send({
     to: user.email,
-    subject: lang === "tr" ? "todox e-posta doğrulama" : "Confirm your todox email",
-    text:
-      lang === "tr"
-        ? [
-            `Merhaba ${user.name},`,
-            "",
-            "E-posta adresini doğrulamak için:",
-            link,
-            "",
-            `Bağlantı ${VERIFY_TTL_DAYS} gün geçerli.`,
-          ].join("\n")
-        : [
-            `Hi ${user.name},`,
-            "",
-            "Confirm your email address:",
-            link,
-            "",
-            `The link is valid for ${VERIFY_TTL_DAYS} days.`,
-          ].join("\n"),
+    ...templates.verifyEmail({ name: user.name, link, days: VERIFY_TTL_DAYS, lang }),
   });
 }
 
@@ -157,30 +120,14 @@ export async function sendEmailChanged(
 ) {
   await send({
     to: previousEmail,
-    subject:
-      lang === "tr" ? "todox e-posta adresin değişti" : "Your todox email was changed",
-    text:
-      lang === "tr"
-        ? [
-            `Merhaba ${user.name},`,
-            "",
-            `@${user.username} hesabının e-posta adresi ${previousEmail} yerine`,
-            `${user.email} olarak değiştirildi.`,
-            "",
-            "Bunu sen yaptıysan yapman gereken bir şey yok.",
-            "Yapmadıysan hesabına başkası erişiyor demektir: hemen şifreni",
-            `sıfırla (${publicUrl()}/forgot) ve ajan tokenlarını iptal et.`,
-          ].join("\n")
-        : [
-            `Hi ${user.name},`,
-            "",
-            `The email address on @${user.username} was changed from ${previousEmail}`,
-            `to ${user.email}.`,
-            "",
-            "If that was you, there is nothing to do.",
-            "If it was not, somebody else has access: reset your password now",
-            `(${publicUrl()}/forgot) and revoke your agent tokens.`,
-          ].join("\n"),
+    ...templates.emailChanged({
+      name: user.name,
+      username: user.username,
+      previousEmail,
+      newEmail: user.email,
+      forgotUrl: `${publicUrl()}/forgot`,
+      lang,
+    }),
   });
 }
 
