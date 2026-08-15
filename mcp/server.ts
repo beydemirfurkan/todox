@@ -20,6 +20,17 @@ import { createClient, readConfig } from "./rpc-client";
 import { instructions, registerTools, type Workspace } from "./tools";
 import { checkRefs, findProjectRoot, hashFile } from "./workspace";
 
+/**
+ * Read by `localWorkspace.bearerToken`. Set inside `main`; undefined at import.
+ *
+ * Declared here rather than at the foot of the file: `main()` is called on the
+ * last line and assigns this synchronously, so a `let` below that call is still
+ * in its temporal dead zone when the assignment runs. Every stdio session died
+ * on startup with "Cannot access 'currentToken' before initialization" -- the
+ * hosted transport was unaffected, which is why it survived unnoticed.
+ */
+let currentToken: string | undefined;
+
 /** The half of todox that has a filesystem, because it runs where the code is. */
 const localWorkspace: Workspace = {
   tz: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -76,6 +87,3 @@ main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });
-
-/** Read by `localWorkspace.bearerToken`. Set inside `main`; undefined at import. */
-let currentToken: string | undefined;
