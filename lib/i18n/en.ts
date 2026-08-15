@@ -58,9 +58,8 @@ export const en = {
   privacySubprocessors: "Sub-processors",
   privacySubprocessorsBody:
     "todox itself is the only processor of your data. We use a small set of infrastructure sub-processors to run the service:",
-  privacySub1: "Neon — managed PostgreSQL hosting. Data residency is the region you pick at signup.",
-  privacySub2: "Vercel — application hosting and edge network. Your requests are served from the nearest region.",
-  privacySub3: "Resend or your own SMTP provider — transactional email for verification and password reset, only when SMTP is configured.",
+  privacySub1: "Hostinger — a virtual server in Frankfurt, Germany. The application and the PostgreSQL database both run on it, so your projects, tasks and notes stay on that one machine.",
+  privacySub2: "Resend — transactional email for verification and password reset. Only the recipient address and the message itself are handed over, and Resend processes them in its Tokyo (ap-northeast-1) region.",
   privacyRetention: "How long we keep your data",
   privacyRetentionBody:
     "We keep your account and your projects for as long as the account exists. Deleting your account deletes your projects, tasks, log entries, and notes; session records are removed within 30 days. Server logs are deleted after 30 days.",

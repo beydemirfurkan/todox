@@ -56,9 +56,8 @@ export const tr: Record<Key, string> = {
   privacySubprocessors: "Alt işlemciler",
   privacySubprocessorsBody:
     "Verilerinin tek işlemcisi todox'un kendisidir. Hizmeti çalıştırmak için küçük bir altyapı alt işlemci listesi kullanıyoruz:",
-  privacySub1: "Neon — yönetilen PostgreSQL barındırma. Veri saklama bölgesi, kayıt olurken seçtiğin bölgedir.",
-  privacySub2: "Vercel — uygulama barındırma ve uç ağı. İsteklerin en yakın bölgeden sunulur.",
-  privacySub3: "Resend ya da kendi SMTP sağlayıcın — doğrulama ve şifre sıfırlama e-postaları için; yalnızca SMTP yapılandırıldığında.",
+  privacySub1: "Hostinger — Frankfurt, Almanya'daki bir sanal sunucu. Uygulama da PostgreSQL veritabanı da orada çalışır; projelerin, görevlerin ve notların o tek makineden çıkmaz.",
+  privacySub2: "Resend — doğrulama ve şifre sıfırlama e-postaları. Yalnızca alıcı adresi ve mesajın kendisi aktarılır; Resend bunları Tokyo (ap-northeast-1) bölgesinde işler.",
   privacyRetention: "Verileri ne kadar süre saklıyoruz",
   privacyRetentionBody:
     "Hesabın ve projelerin, hesap var olduğu sürece saklanır. Hesabı silmek projeleri, görevleri, günlük girdilerini ve notları siler; oturum kayıtları 30 gün içinde temizlenir. Sunucu logları 30 gün sonra silinir.",

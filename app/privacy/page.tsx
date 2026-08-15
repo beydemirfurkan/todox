@@ -43,7 +43,6 @@ export default async function PrivacyPage() {
       <ul className="mt-2 list-disc space-y-1 pl-6 text-[15px] leading-relaxed">
         <li>{t("privacySub1")}</li>
         <li>{t("privacySub2")}</li>
-        <li>{t("privacySub3")}</li>
       </ul>
 
       <h2 className="display mt-8 text-[20px] font-bold">{t("privacyRetention")}</h2>
