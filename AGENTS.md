@@ -90,6 +90,19 @@ coverage or error paths half-done. "Good enough for now" is a pre-AI reflex.
   call site and consider it handled.
 - **Foreign rows answer 404.** Never 403, never "not found for you" — the
   message must not tell a caller that an id exists.
+- **A project is a repository, not a path.** `root_path` is where a repo
+  sits on one machine and is a different string on the next, so identity is
+  `repo_url` first — `repoKey` in `lib/util/paths.ts` folds the clone forms
+  and case to one key — then the paths in `project_paths`, one per machine.
+  Never the name alone: `~/work/api` and `~/personal/api` are two
+  repositories, and fusing their logs is worse than a duplicate, because a
+  duplicate is visible and a bad merge is not. The one heuristic that
+  reaches past the remote needs the name *and* every known path of the
+  candidate to come from the other OS family; anything less registers a
+  second project and says so in a `warning`. Not theoretical: identifying a
+  project by one absolute path split `todox` and `serled-next` in half the
+  first time each was opened on a second machine, and `merge_projects`
+  exists only because `slug` is not updatable and the rows had to move.
 - **Load in batches.** The database is over the network. A per-row query in
   a list is a per-row round trip; use the `listByTasks`-style helpers.
 - **Both dictionaries stay in sync.** `lib/i18n/tr.ts` is typed against the
