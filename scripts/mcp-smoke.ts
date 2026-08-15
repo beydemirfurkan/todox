@@ -19,6 +19,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,6 +35,14 @@ import { normalisePath } from "../lib/util/paths";
 const SCRATCH = join(tmpdir(), "todox-smoke-repo");
 /** A second one, because one account holds many and they must not mix. */
 const OTHER = join(tmpdir(), "todox-smoke-other");
+/**
+ * The same repository as SCRATCH, as it looks on the developer's other computer:
+ * a different absolute path, the same git remote. This is the fixture that
+ * proves one repo stays one project across machines.
+ */
+const ELSEWHERE = join(tmpdir(), "todox-smoke-repo-elsewhere");
+/** Both checkouts answer with this, which is what ties them together. */
+const REMOTE = "git@github.com:todox-smoke/repo.git";
 const URL_BASE = process.env.TODOX_URL ?? "http://localhost:3000";
 const MODEL = "claude-opus-5";
 
@@ -104,6 +113,16 @@ async function runSuite(mode: Mode, token: string) {
   }
   console.log("repo_root advertised:", shows);
 
+  // Same rule for the remote: this side reads it when it has a disk, and asks
+  // the agent when it does not.
+  const showsUrl = props.includes("repo_url");
+  if (showsUrl === mode.local) {
+    throw new Error(
+      `repo_url should be ${mode.local ? "hidden locally" : "offered remotely"}, but properties were: ${props.join(", ")}`,
+    );
+  }
+  console.log("repo_url advertised:", showsUrl);
+
   const text = async (name: string, args: Record<string, unknown> = {}) => {
     const r = await client.callTool({ name, arguments: args });
     return (r.content as { text: string }[])[0].text;
@@ -116,8 +135,9 @@ async function runSuite(mode: Mode, token: string) {
       title: "SMOKE: captured without being told the project",
       body: "The agent only knew its working directory.",
       model: MODEL,
-      // Remote cannot walk up looking for a .git, so the agent says where it is.
-      ...(mode.local ? {} : { repo_root: SCRATCH }),
+      // Remote cannot walk up looking for a .git, nor read one, so the agent
+      // says where it is and what it is. Locally both are filled in for it.
+      ...(mode.local ? {} : { repo_root: SCRATCH, repo_url: REMOTE }),
     }),
   );
   console.log("project_created:", fresh.project_created, "| slug:", fresh.project.slug);
@@ -135,6 +155,48 @@ async function runSuite(mode: Mode, token: string) {
   console.log("project_created:", again.project_created, "| slug:", again.project.slug);
   if (again.project.slug !== fresh.project.slug)
     throw new Error("a nested path should resolve to the project it sits in");
+
+  /**
+   * The bug this whole change exists for: one repository, two machines, one
+   * project. The path is a different string on the other computer and the
+   * remote is not, so the remote is what has to carry the identity.
+   */
+  console.log("\n--- the same repo, opened on a second machine ---");
+  const elsewhere = JSON.parse(
+    await text("get_context", {
+      cwd: ELSEWHERE,
+      ...(mode.local ? {} : { repo_root: ELSEWHERE, repo_url: REMOTE }),
+    }),
+  );
+  console.log(
+    "project_created:", elsewhere.project_created, "| slug:", elsewhere.project.slug,
+  );
+  if (elsewhere.project.slug !== fresh.project.slug)
+    throw new Error(
+      `a second checkout registered as "${elsewhere.project.slug}" instead of joining "${fresh.project.slug}"`,
+    );
+  if (elsewhere.project_created)
+    throw new Error("the second machine created a project rather than finding the existing one");
+
+  /**
+   * And the path was remembered -- asserted with `repo_url` deliberately
+   * omitted, so it cannot pass for the wrong reason. Without the stored path
+   * this only works while the agent keeps sending the remote on every call,
+   * and one that forgets once is back to a duplicate.
+   */
+  console.log("\n--- and the second machine's path stuck, without the remote ---");
+  const remembered = JSON.parse(
+    await text("get_context", {
+      cwd: `${ELSEWHERE}/src/deep/file.ts`,
+      ...(mode.local ? {} : { repo_root: ELSEWHERE }),
+    }),
+  );
+  if (remembered.project.slug !== fresh.project.slug)
+    throw new Error("the second machine's path was not remembered");
+
+  /** The point of all of it: one memory, not two halves. */
+  if (!JSON.stringify(remembered.open_tasks).includes("captured without being told"))
+    throw new Error("the other machine's tasks are not visible from this one");
 
   console.log("\n--- write path ---");
   await text("update_task", { task_id: taskId, status: "doing", model: MODEL });
@@ -297,6 +359,16 @@ async function main() {
   writeFileSync(join(SCRATCH, "package.json"), '{"name":"smoke-repo"}\n');
   mkdirSync(OTHER, { recursive: true });
   writeFileSync(join(OTHER, "package.json"), '{"name":"smoke-other"}\n');
+  mkdirSync(join(ELSEWHERE, "src", "deep"), { recursive: true });
+  writeFileSync(join(ELSEWHERE, "package.json"), '{"name":"smoke-repo"}\n');
+
+  // Real repositories with the same origin: the stdio server actually shells
+  // out to git, so without this the local half of the cross-machine assertions
+  // would pass by reporting no remote at all -- which is not the same thing.
+  for (const dir of [SCRATCH, ELSEWHERE]) {
+    spawnSync("git", ["-C", dir, "init", "-q"], { stdio: "ignore" });
+    spawnSync("git", ["-C", dir, "remote", "add", "origin", REMOTE], { stdio: "ignore" });
+  }
 
   const user = await ensureUser("smoke-agent", "Smoke");
   const { token } = await createApiToken(user.id, "mcp-smoke");
@@ -354,14 +426,23 @@ async function main() {
 
   // leave no trace. Paths are compared normalised because that is how they
   // were stored -- a Windows agent's separators are folded on the way in.
-  const ours = new Set([normalisePath(SCRATCH), normalisePath(OTHER)]);
+  // ELSEWHERE should never become a project's `root_path` -- that is the whole
+  // point, it joins SCRATCH's -- but it is listed anyway. A run that fails
+  // between the two leaves the row behind, and the next run then matches it by
+  // remote and fails somewhere far less obvious.
+  const ours = new Set([
+    normalisePath(SCRATCH),
+    normalisePath(OTHER),
+    normalisePath(ELSEWHERE),
+  ]);
   for (const p of await projectsRepo.list(user.id, true)) {
     for (const t of await tasksRepo.listByProject(p.id, "all"))
       if (t.title.startsWith("SMOKE:")) await tasksRepo.remove(t.id);
     if (p.root_path && ours.has(normalisePath(p.root_path)))
       await projectsRepo.remove(user.id, p.id);
   }
-  for (const dir of [SCRATCH, OTHER]) rmSync(dir, { recursive: true, force: true });
+  for (const dir of [SCRATCH, OTHER, ELSEWHERE])
+    rmSync(dir, { recursive: true, force: true });
 
   console.log("\nOK (cleaned up)");
 }

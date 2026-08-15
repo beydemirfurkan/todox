@@ -229,6 +229,34 @@ CREATE INDEX IF NOT EXISTS idx_refs_context ON refs (context_id);
 -- name it has everywhere.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS repo_url TEXT;
 
+-- Looking a project up by its remote, which is the point of the column above.
+-- Not unique: two projects may share a remote on purpose -- separate worktrees
+-- of one repo, kept apart because their logs are about different work.
+CREATE INDEX IF NOT EXISTS idx_projects_repo ON projects (user_id, repo_url);
+
+-- The same repository sits at a different absolute path on every machine, so
+-- one \`projects.root_path\` cannot identify it. It stays as the first path seen
+-- (every read already projects it, including the member CASE in ACCESS_SELECT);
+-- each further machine adds a row here and resolution looks at both.
+--
+-- \`user_id\` rather than project alone, for the same reason
+-- \`project_memberships\` carries its own root_path: a path is a fact about
+-- somebody's machine, and a collaborator's checkout must not answer a lookup
+-- made by the owner.
+--
+-- UNIQUE (user_id, path) is the invariant that makes the split unrepeatable:
+-- one directory cannot belong to two projects for one person.
+CREATE TABLE IF NOT EXISTS project_paths (
+  id          SERIAL PRIMARY KEY,
+  project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+  path        TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  UNIQUE (user_id, path)
+);
+CREATE INDEX IF NOT EXISTS idx_project_paths_project
+  ON project_paths (project_id, user_id);
+
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS hash_seen  TEXT;
 ALTER TABLE refs ADD COLUMN IF NOT EXISTS checked_at TEXT;
 

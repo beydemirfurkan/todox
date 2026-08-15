@@ -26,6 +26,7 @@ function buildRemoteWorkspace(token: string): Workspace {
   return {
     tz: () => undefined,
     repoRoot: () => undefined,
+    repoUrl: () => undefined,
     hash: () => null,
     checkRefs: () => null,
     bearerToken: () => token,

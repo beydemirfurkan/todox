@@ -94,3 +94,14 @@ export const markAllRead = (userId: number, at: string) =>
 /** Read and old. Unread rows stay however long they take to be looked at. */
 export const purgeRead = (before: string) =>
   run("DELETE FROM notifications WHERE read_at IS NOT NULL AND read_at < ?", [before]);
+
+/**
+ * Point a project's notifications at another project, for a merge.
+ *
+ * Without this the rows would go with the deleted project by cascade, and an
+ * unread badge would clear itself by having its subject removed underneath it.
+ */
+export const reassignStmt = (fromId: number, intoId: number): Statement => ({
+  text: "UPDATE notifications SET project_id = ? WHERE project_id = ?",
+  params: [intoId, fromId],
+});

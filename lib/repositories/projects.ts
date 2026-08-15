@@ -1,4 +1,4 @@
-import { all, one, run, setClause } from "../db/client";
+import { all, one, run, setClause, type Statement } from "../db/client";
 import type { Project } from "../types";
 import { SLUG_FALLBACK, shareToken, slugifyOr } from "../util/paths";
 import { now } from "../util/time";
@@ -67,6 +67,44 @@ export const byName = (userId: number, name: string) =>
     userId,
     userId,
     name,
+  ]);
+
+/**
+ * Every project of this name, not the first one.
+ *
+ * `byName` answers a reference somebody typed, where one row is the answer.
+ * This answers "is there already a project for this folder?", and after a repo
+ * has split across machines the account holds two rows called `todox` -- the
+ * caller has to see both to pick the one it belongs with.
+ */
+export const listByName = (userId: number, name: string) =>
+  all<Project>(`${ACCESS_SELECT} AND lower(p.name) = lower(?) ORDER BY p.id`, [
+    userId,
+    userId,
+    userId,
+    userId,
+    userId,
+    name,
+  ]);
+
+/**
+ * Projects that recorded a remote, oldest first.
+ *
+ * Matching happens in the caller, through `repoKey`, not in SQL. The column
+ * holds whatever form the agent sent -- `git@github.com:me/repo.git`, an https
+ * URL, a trailing slash, a credential in the userinfo -- and folding those in
+ * Postgres would mean a second, untested copy of `repoLink`'s rules. It would
+ * also need `?` inside a regex literal, which `lib/db/client.ts` rewrites as a
+ * placeholder. One query, a handful of rows, compared by the function that
+ * already has the tests.
+ */
+export const withRepoUrl = (userId: number) =>
+  all<Project>(`${ACCESS_SELECT} AND p.repo_url IS NOT NULL ORDER BY p.id`, [
+    userId,
+    userId,
+    userId,
+    userId,
+    userId,
   ]);
 
 export const byId = (userId: number, id: number) =>
@@ -144,6 +182,24 @@ export async function update(userId: number, id: number, patch: ProjectPatch) {
 
 export const remove = (userId: number, id: number) =>
   run("DELETE FROM projects WHERE id = ? AND user_id = ?", [id, userId]);
+
+/** The same delete, for a service that has to pair it with other tables. */
+export const removeStmt = (userId: number, id: number): Statement => ({
+  text: "DELETE FROM projects WHERE id = ? AND user_id = ?",
+  params: [id, userId],
+});
+
+/**
+ * Adopt a remote only when there is none yet.
+ *
+ * A merge should not overwrite the surviving project's own remote with the
+ * absorbed one's -- they are supposed to be the same repository, and if they
+ * are not, the one that was already recorded is the one somebody chose.
+ */
+export const fillRepoUrlStmt = (userId: number, id: number, repoUrl: string): Statement => ({
+  text: "UPDATE projects SET repo_url = ? WHERE id = ? AND user_id = ? AND repo_url IS NULL",
+  params: [repoUrl, id, userId],
+});
 
 /**
  * Slugs only have to be unique within one account.

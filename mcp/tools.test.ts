@@ -36,6 +36,7 @@ function harness(ws: Workspace) {
 const localWs: Workspace = {
   tz: () => "Europe/Istanbul",
   repoRoot: () => "/repo",
+  repoUrl: () => "git@github.com:me/repo.git",
   hash: () => "a".repeat(64),
   checkRefs: (refs) => ({
     checked: refs.map((r) => ({ ...r, status: "fresh" as const })),
@@ -47,6 +48,7 @@ const localWs: Workspace = {
 const remoteWs: Workspace = {
   tz: () => undefined,
   repoRoot: () => undefined,
+  repoUrl: () => undefined,
   hash: () => null,
   checkRefs: () => null,
   bearerToken: () => undefined,
@@ -82,12 +84,14 @@ describe("what each side fills in for itself", () => {
   it("a local process supplies the repo root and timezone, and hides them", () => {
     const { tools } = harness(localWs);
     expect(tools.get("get_context")!.config.inputSchema).not.toHaveProperty("repo_root");
+    expect(tools.get("get_context")!.config.inputSchema).not.toHaveProperty("repo_url");
     expect(tools.get("activity_report")!.config.inputSchema).not.toHaveProperty("tz");
   });
 
   it("a hosted server asks the agent for them instead", () => {
     const { tools } = harness(remoteWs);
     expect(tools.get("get_context")!.config.inputSchema).toHaveProperty("repo_root");
+    expect(tools.get("get_context")!.config.inputSchema).toHaveProperty("repo_url");
     expect(tools.get("activity_report")!.config.inputSchema).toHaveProperty("tz");
   });
 
@@ -95,6 +99,66 @@ describe("what each side fills in for itself", () => {
     const { tools, calls } = harness(localWs);
     await tools.get("get_context")!.handler({ cwd: "/repo/src" });
     expect(calls[0].params.repo_root).toBe("/repo");
+  });
+
+  /**
+   * The path differs on every machine; the remote does not. A local process can
+   * read it, so it must -- otherwise resolution falls back to comparing
+   * absolute paths, which is what registered one repo as two projects.
+   */
+  it("fills the repo remote in from cwd, so a second machine resolves", async () => {
+    const { tools, calls } = harness(localWs);
+    await tools.get("get_context")!.handler({ cwd: "/repo/src" });
+    expect(calls[0].params.repo_url).toBe("git@github.com:me/repo.git");
+  });
+
+  it("sends no remote when this side cannot read one", async () => {
+    const { tools, calls } = harness(remoteWs);
+    await tools.get("get_context")!.handler({ cwd: "/repo/src" });
+    expect(calls[0].params).not.toHaveProperty("repo_url");
+  });
+
+  /** What the model sent wins: it is the side that can see the checkout. */
+  it("does not overwrite a remote the agent supplied", async () => {
+    const { tools, calls } = harness(localWs);
+    await tools
+      .get("get_context")!
+      .handler({ cwd: "/repo/src", repo_url: "https://github.com/me/other.git" });
+    expect(calls[0].params.repo_url).toBe("https://github.com/me/other.git");
+  });
+
+  /**
+   * `repo_url` is hidden per-tool, not account-wide, and this is why.
+   *
+   * `update_project` and `create_project` exist partly to set the remote, and
+   * their reference is a slug -- so the injection above cannot fill it in for
+   * them. Hiding it there would leave a local agent with no way to record one
+   * at all, which is the opposite of the point.
+   */
+  it("still lets a local agent set the remote explicitly", () => {
+    const { tools } = harness(localWs);
+    expect(tools.get("update_project")!.config.inputSchema).toHaveProperty("repo_url");
+    expect(tools.get("create_project")!.config.inputSchema).toHaveProperty("repo_url");
+  });
+});
+
+describe("merge_projects", () => {
+  /** The way back from a repo registered twice; both transports need it. */
+  it.each([
+    ["local", localWs],
+    ["hosted", remoteWs],
+  ])("is registered on the %s transport", (_name, ws) => {
+    const { tools } = harness(ws as Workspace);
+    expect(tools.get("merge_projects")).toBeDefined();
+  });
+
+  it("is not marked read-only, and asks for a confirmation", () => {
+    const { tools } = harness(remoteWs);
+    const tool = tools.get("merge_projects")!;
+
+    expect(tool.config.annotations?.readOnlyHint).not.toBe(true);
+    expect(tool.config.inputSchema).toHaveProperty("confirm");
+    expect(tool.config.description).toMatch(/confirm/);
   });
 });
 

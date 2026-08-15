@@ -1,3 +1,4 @@
+import * as projectPaths from "../repositories/project-paths";
 import * as projects from "../repositories/projects";
 import type { Project } from "../types";
 import {
@@ -5,14 +6,56 @@ import {
   isInside,
   lastSegment,
   normalisePath,
+  repoKey,
+  sameOsFamily,
+  scrubRemote,
   slugify,
 } from "../util/paths";
 import { BadRequest } from "./errors";
 
-/** Resolve a project by slug, by name, or by a filesystem path inside it. */
+/** Everything the caller can tell us about the repo behind a path. */
+export type RepoHints = {
+  /** The repository root containing `cwd`, when the caller can see a disk. */
+  repoRoot?: string;
+  /** `git remote get-url origin`, the only name this repo has on every machine. */
+  repoUrl?: string;
+};
+
+/** Where this account has a project on disk: the first path, plus every other. */
+async function knownPaths(userId: number) {
+  const [rooted, extra] = await Promise.all([
+    projects.withRootPath(userId),
+    projectPaths.listAll(userId),
+  ]);
+
+  // The rows are re-checked rather than trusted through a `!`. The query is
+  // meant to return only projects that have a path, and when it briefly did
+  // not, the assertion turned a null column into a TypeError inside a filter --
+  // so one bad row failed every lookup for the account instead of being skipped.
+  const byProject = new Map<number, { project: Project; paths: string[] }>();
+  for (const p of rooted) {
+    if (typeof p.root_path !== "string") continue;
+    byProject.set(p.id, { project: p, paths: [p.root_path] });
+  }
+  for (const row of extra) {
+    byProject.get(row.project_id)?.paths.push(row.path);
+  }
+  return byProject;
+}
+
+/** The project whose remote matches, or undefined. Oldest wins. */
+async function byRemote(userId: number, repoUrl: string | undefined) {
+  const key = repoKey(repoUrl);
+  if (!key) return undefined;
+  const rows = await projects.withRepoUrl(userId);
+  return rows.find((p) => repoKey(p.repo_url) === key);
+}
+
+/** Resolve a project by slug, by name, by remote, or by a path inside it. */
 export async function resolve(
   userId: number,
   ref: string,
+  hints: RepoHints = {},
 ): Promise<Project | undefined> {
   const bySlug = await projects.bySlug(userId, slugify(ref));
   if (bySlug) return bySlug;
@@ -20,18 +63,16 @@ export async function resolve(
   const byName = await projects.byName(userId, ref);
   if (byName) return byName;
 
+  // Before the path, because the path is the thing that differs between two
+  // machines and the remote is the thing that does not.
+  const byUrl = await byRemote(userId, hints.repoUrl);
+  if (byUrl) return byUrl;
+
   // Deepest root wins, so a nested repo beats the parent that contains it.
-  //
-  // The rows are re-checked rather than trusted through a `!`. The query is
-  // meant to return only projects that have a path, and when it briefly did
-  // not, the assertion turned a null column into a TypeError inside a filter --
-  // so one bad row failed every lookup for the account instead of being skipped.
-  const rooted = (await projects.withRootPath(userId)).filter(
-    (p): p is typeof p & { root_path: string } => typeof p.root_path === "string",
+  const candidates = [...(await knownPaths(userId)).values()].flatMap(({ project, paths }) =>
+    paths.filter((path) => isInside(ref, path)).map((path) => ({ project, path })),
   );
-  return rooted
-    .filter((p) => isInside(ref, p.root_path))
-    .sort((a, b) => b.root_path.length - a.root_path.length)[0];
+  return candidates.sort((a, b) => b.path.length - a.path.length)[0]?.project;
 }
 
 /**
@@ -44,8 +85,12 @@ export async function resolve(
  */
 const SUGGESTIONS = 8;
 
-export async function mustResolve(userId: number, ref: string): Promise<Project> {
-  const p = await resolve(userId, ref);
+export async function mustResolve(
+  userId: number,
+  ref: string,
+  hints: RepoHints = {},
+): Promise<Project> {
+  const p = await resolve(userId, ref, hints);
   if (p) return p;
 
   const all = await projects.list(userId);
@@ -62,6 +107,38 @@ export async function mustResolve(userId: number, ref: string): Promise<Project>
   );
 }
 
+export type Resolution = {
+  project: Project;
+  created: boolean;
+  /** Said out loud when a duplicate was the likely -- but not certain -- read. */
+  warning?: string;
+};
+
+/**
+ * A project already registered for this repo from another machine.
+ *
+ * Only reached when the remote did not answer, which is most of the time: the
+ * column is optional and an agent that never calls `update_project` leaves it
+ * null forever. The folder name alone is far too weak -- two clients can both
+ * have a `website` -- so it has to be paired with something. That something is
+ * the shape of the path: `C:/Users/me/app` and `/Users/me/app` cannot both
+ * exist on one machine, so a project known *only* by paths from the other
+ * family is the same repo seen from a second computer.
+ *
+ * Deliberately not applied within one OS family. `~/work/api` and
+ * `~/personal/api` are two repositories with one folder name, and silently
+ * fusing their logs is worse than the duplicate this function exists to stop.
+ */
+function adoptable(
+  candidates: { project: Project; paths: string[] }[],
+  root: string,
+): Project | undefined {
+  const foreign = candidates.filter(
+    ({ paths }) => paths.length > 0 && paths.every((p) => !sameOsFamily(p, root)),
+  );
+  return foreign[0]?.project;
+}
+
 /**
  * Resolve, creating one when the reference is a real filesystem path we don't
  * know yet. This is what lets an agent capture a task on its first try instead
@@ -76,13 +153,16 @@ export async function mustResolve(userId: number, ref: string): Promise<Project>
 export async function resolveOrCreate(
   userId: number,
   ref: string,
-  repoRoot?: string,
-): Promise<{ project: Project; created: boolean }> {
-  const found = await resolve(userId, ref);
-  if (found) return { project: found, created: false };
+  hints: RepoHints = {},
+): Promise<Resolution> {
+  const found = await resolve(userId, ref, hints);
+  if (found) {
+    await remember(userId, found, ref, hints);
+    return { project: found, created: false };
+  }
 
   if (!isAbsolutePath(ref))
-    return { project: await mustResolve(userId, ref), created: false };
+    return { project: await mustResolve(userId, ref, hints), created: false };
 
   // Normalised whichever branch it came from. Only the `repoRoot` one was, so
   // an agent that passed `cwd` alone -- which the tools explicitly allow --
@@ -91,18 +171,83 @@ export async function resolveOrCreate(
   // comparing. Anything that compares the stored string to a path it built
   // itself does not, and that has already cost a smoke suite once.
   const root = normalisePath(
-    repoRoot && isAbsolutePath(repoRoot) ? repoRoot : ref,
+    hints.repoRoot && isAbsolutePath(hints.repoRoot) ? hints.repoRoot : ref,
   );
   // Not `node:path`'s basename: this process runs on Linux, where a backslash
   // is an ordinary character, so a Windows path would come back whole and the
   // project would be named "C:\Users\me\repo".
   const name = lastSegment(root) || "untitled";
-  return {
-    project: await projects.create(userId, {
-      name,
-      slug: await projects.nextFreeSlug(userId, name),
-      root_path: root,
-    }),
-    created: true,
-  };
+
+  const sameName = await projects.listByName(userId, name);
+  if (sameName.length) {
+    const paths = await knownPaths(userId);
+    const withPaths = sameName.map(
+      (project) => paths.get(project.id) ?? { project, paths: [] },
+    );
+
+    const adopted = adoptable(withPaths, root);
+    if (adopted) {
+      await remember(userId, adopted, ref, hints);
+      return { project: adopted, created: false };
+    }
+
+    return {
+      project: await create(userId, name, root, hints.repoUrl),
+      created: true,
+      warning: duplicateWarning(name, withPaths),
+    };
+  }
+
+  return { project: await create(userId, name, root, hints.repoUrl), created: true };
 }
+
+/**
+ * Write down what this call taught us about the project, so the next one is
+ * cheaper and the next machine is free.
+ *
+ * Two things get learned, and both matter:
+ *
+ * The path, because otherwise the match would depend on the remote arriving on
+ * every single call -- one `get_context` that forgot `repo_url` would miss,
+ * register a duplicate, and undo the whole point.
+ *
+ * The remote, because a project registered before any of this existed has none,
+ * and nothing else will ever fill it in. Every project in the account that
+ * predates this is in exactly that state: identifiable on the machine it was
+ * created on and nowhere else. The first session that arrives with git access
+ * is the chance to fix that, and it costs one write, once.
+ */
+async function remember(userId: number, project: Project, ref: string, hints: RepoHints) {
+  if (!project.repo_url && hints.repoUrl)
+    await projects.update(userId, project.id, { repo_url: scrubRemote(hints.repoUrl) });
+
+  if (!isAbsolutePath(ref)) return;
+  const root = normalisePath(
+    hints.repoRoot && isAbsolutePath(hints.repoRoot) ? hints.repoRoot : ref,
+  );
+  const known = (await knownPaths(userId)).get(project.id)?.paths ?? [];
+  if (known.some((p) => isInside(root, p))) return;
+  await projectPaths.add(userId, project.id, root);
+}
+
+const create = async (userId: number, name: string, root: string, repoUrl?: string) =>
+  projects.create(userId, {
+    name,
+    slug: await projects.nextFreeSlug(userId, name),
+    root_path: root,
+    repo_url: repoUrl ? scrubRemote(repoUrl) : null,
+  });
+
+const duplicateWarning = (
+  name: string,
+  existing: { project: Project; paths: string[] }[],
+) => {
+  const others = existing.map((e) => e.project.slug).join(", ");
+  return (
+    `You already have a project called "${name}" (${others}), and this path is on the ` +
+    `same kind of machine, so it was registered separately rather than assumed to be ` +
+    `the same repo. If it is the same one, merge them: ` +
+    `merge_projects(from:"<the duplicate>", into:"<the original>", confirm:"<the duplicate>"). ` +
+    `Setting repo_url on both with update_project stops this happening again.`
+  );
+};

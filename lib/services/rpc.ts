@@ -8,12 +8,13 @@ import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
 import { BadRequest } from "./errors";
 import { assertProject, assertRef, assertTask } from "./ownership";
+import { merge as mergeProjects } from "./project-merge";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { search } from "./search";
 import * as taskService from "./task-service";
-import { isAbsolutePath } from "../util/paths";
+import { isAbsolutePath, normalisePath, scrubRemote } from "../util/paths";
 import { resolvePeriod, type PeriodName } from "../util/time";
 import { hashToken } from "../util/tokens";
 
@@ -86,6 +87,10 @@ export const methods = {
   ) =>
     projectsRepo.create(userId, {
       ...p,
+      // Normalised the way auto-registration normalises it. These two used to
+      // disagree, and the stored form is now something resolution matches on.
+      root_path: p.root_path ? normalisePath(p.root_path) : undefined,
+      repo_url: p.repo_url ? scrubRemote(p.repo_url) : undefined,
       slug: await projectsRepo.nextFreeSlug(userId, p.slug ?? p.name),
     }),
 
@@ -101,6 +106,8 @@ export const methods = {
   ) => {
     const { project, ...patch } = p;
     const found = await mustResolve(userId, project);
+    if (patch.root_path) patch.root_path = normalisePath(patch.root_path);
+    if (patch.repo_url) patch.repo_url = scrubRemote(patch.repo_url);
     await projectsRepo.update(userId, found.id, patch);
     return projectsRepo.byId(userId, found.id);
   },
@@ -118,9 +125,18 @@ export const methods = {
     return { deleted: found.slug, tasks_removed: Object.values(counts).reduce((a, b) => a + b, 0) };
   },
 
+  mergeProjects: ({ userId }, p: { from: string; into: string; confirm: string }) =>
+    mergeProjects(userId, p),
+
   getContext: async (
     { userId },
-    p: { project?: string; cwd?: string; create_if_missing?: boolean; repo_root?: string },
+    p: {
+      project?: string;
+      cwd?: string;
+      create_if_missing?: boolean;
+      repo_root?: string;
+      repo_url?: string;
+    },
   ) => {
     const which = pickRef(p);
     // The first session in a new repo is the case this product exists for, and
@@ -130,11 +146,17 @@ export const methods = {
     // that matches nothing is still a typo worth reporting.
     const create = p.create_if_missing ?? isAbsolutePath(which);
 
+    const hints = { repoRoot: p.repo_root, repoUrl: p.repo_url };
+
     if (create) {
-      const { project, created } = await resolveOrCreate(userId, which, p.repo_root);
-      return { project_created: created, ...(await briefing(userId, project)) };
+      const { project, created, warning } = await resolveOrCreate(userId, which, hints);
+      return {
+        project_created: created,
+        ...(warning ? { warning } : {}),
+        ...(await briefing(userId, project)),
+      };
     }
-    return briefing(userId, await mustResolve(userId, which));
+    return briefing(userId, await mustResolve(userId, which, hints));
   },
 
   listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {
@@ -183,14 +205,16 @@ export const methods = {
       priority?: number;
       files?: { path: string; hash?: string | null }[];
       repo_root?: string;
+      repo_url?: string;
       model?: string;
     },
   ) => {
+    const hints = { repoRoot: p.repo_root, repoUrl: p.repo_url };
     // An explicit project must already exist; a cwd may create one. That
     // asymmetry stops a typo'd slug from silently spawning a junk project.
-    const { project, created } = p.project
-      ? { project: await mustResolve(userId, p.project), created: false }
-      : await resolveOrCreate(userId, pickRef({ cwd: p.cwd }), p.repo_root);
+    const { project, created, warning } = p.project
+      ? { project: await mustResolve(userId, p.project, hints), created: false, warning: undefined }
+      : await resolveOrCreate(userId, pickRef({ cwd: p.cwd }), hints);
 
     const task = await taskService.create({
       project_id: project.id,
@@ -209,6 +233,7 @@ export const methods = {
       task,
       project: { slug: project.slug, name: project.name, root_path: project.root_path },
       project_created: created,
+      ...(warning ? { warning } : {}),
       ...(created
         ? {
             next: `Registered a new project "${project.slug}". Call update_project with a one-paragraph summary and repo_url set to \`git remote get-url origin\` — the summary is what a cold session reads, and the remote is the only name this project has on any machine but this one.`,

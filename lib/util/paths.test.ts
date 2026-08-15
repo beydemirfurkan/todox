@@ -5,8 +5,11 @@ import {
   isInside,
   lastSegment,
   normalisePath,
+  repoKey,
   repoLabel,
   repoLink,
+  sameOsFamily,
+  scrubRemote,
   shareToken,
   slugify,
   slugifyOr,
@@ -162,6 +165,85 @@ describe("repoLink", () => {
     expect(repoLink("ssh://git@host/repo")).toBeNull();
     expect(repoLink("file:///srv/repo.git")).toBeNull();
     expect(repoLink("https://github.com")).toBeNull();
+  });
+});
+
+/**
+ * The comparison that replaces "same absolute path" as a project's identity.
+ *
+ * Whether two clones are the same repository cannot depend on which URL form
+ * the developer happened to use, or the machine they cloned it on.
+ */
+describe("repoKey", () => {
+  it("gives the two common clone forms the same key", () => {
+    expect(repoKey("git@github.com:me/repo.git")).toBe(
+      repoKey("https://github.com/me/repo"),
+    );
+    expect(repoKey("https://github.com/me/repo.git")).toBe("github.com/me/repo");
+  });
+
+  it("ignores case, which git hosts do too", () => {
+    expect(repoKey("https://GitHub.com/Me/Repo")).toBe(repoKey("git@github.com:me/repo.git"));
+  });
+
+  /** `repoLink` refuses to link to these; they are still identities. */
+  it("handles the remotes that are not browser links", () => {
+    expect(repoKey("ssh://git@github.com/me/repo.git")).toBe("github.com/me/repo");
+    expect(repoKey("ssh://git@github.com:22/me/repo.git")).toBe("github.com/me/repo");
+    expect(repoKey("git://github.com/me/repo")).toBe("github.com/me/repo");
+  });
+
+  it("never lets a credential become part of the key", () => {
+    expect(repoKey("https://user:tok@github.com/me/repo.git")).toBe("github.com/me/repo");
+  });
+
+  it("returns null rather than inventing an identity", () => {
+    expect(repoKey(null)).toBeNull();
+    expect(repoKey("")).toBeNull();
+    expect(repoKey("not a url")).toBeNull();
+  });
+
+  /** Two different repos must never collide, or a merge would be automatic. */
+  it("keeps different repositories apart", () => {
+    expect(repoKey("git@github.com:me/a.git")).not.toBe(repoKey("git@github.com:me/b.git"));
+    expect(repoKey("git@github.com:me/repo.git")).not.toBe(
+      repoKey("git@gitlab.com:me/repo.git"),
+    );
+  });
+});
+
+describe("sameOsFamily", () => {
+  it("separates a Windows path from a POSIX one", () => {
+    expect(sameOsFamily("C:/Users/me/todox", "/Users/me/todox")).toBe(false);
+    expect(sameOsFamily("C:\\Users\\me\\todox", "/Users/me/todox")).toBe(false);
+  });
+
+  it("keeps two paths of the same kind together, whatever the drive", () => {
+    expect(sameOsFamily("C:/a", "D:/b")).toBe(true);
+    expect(sameOsFamily("/Users/a", "/home/b")).toBe(true);
+  });
+});
+
+/**
+ * The MCP server now runs `git remote get-url origin` by itself and sends the
+ * answer, so a token in one developer's git config would travel without them
+ * ever typing it.
+ */
+describe("scrubRemote", () => {
+  it("removes an embedded credential", () => {
+    expect(scrubRemote("https://user:ghp_secret@github.com/me/repo.git")).toBe(
+      "https://github.com/me/repo.git",
+    );
+    expect(scrubRemote("https://ghp_secret@github.com/me/repo.git")).toBe(
+      "https://github.com/me/repo.git",
+    );
+  });
+
+  it("leaves a clean remote exactly as the developer would recognise it", () => {
+    expect(scrubRemote("https://github.com/me/repo.git")).toBe(
+      "https://github.com/me/repo.git",
+    );
+    expect(scrubRemote("git@github.com:me/repo.git")).toBe("git@github.com:me/repo.git");
   });
 });
 

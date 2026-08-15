@@ -1,5 +1,5 @@
 import type { ContextKind } from "../constants";
-import { all, one, run, setClause } from "../db/client";
+import { all, one, run, setClause, type Statement } from "../db/client";
 import type { Context } from "../types";
 import { now } from "../util/time";
 
@@ -58,3 +58,14 @@ export async function update(
 }
 
 export const remove = (id: number) => run("DELETE FROM contexts WHERE id = ?", [id]);
+
+/**
+ * Move a project's notes to another project, for a merge.
+ *
+ * Scoped to a project id, so account-wide notes -- the ones stored with a null
+ * `project_id` -- are left where they are. They were never part of either side.
+ */
+export const reassignStmt = (fromId: number, intoId: number): Statement => ({
+  text: "UPDATE contexts SET project_id = ? WHERE project_id = ?",
+  params: [intoId, fromId],
+});
