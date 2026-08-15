@@ -98,8 +98,8 @@ async function main() {
       user_id: user.id,
       project_id: todox.id,
       kind: "gotcha",
-      title: "The HTTP driver rejects multi-statement SQL",
-      body: "Neon's serverless driver refuses more than one command per request, so the schema is applied statement by statement.",
+      title: "No `?` inside a SQL string literal",
+      body: "lib/db/client.ts rewrites `?` to `$n` positionally and does not parse strings, so a question mark inside a quoted literal shifts every parameter after it.",
     });
   }
 

@@ -10,7 +10,10 @@
 
 ```bash
 pnpm install
-cp .env.example .env.local     # any Postgres; a free Neon branch is fine
+cp .env.example .env.local     # any Postgres 15+; a container is easiest:
+                               #   docker run -d --name todox-pg -p 5432:5432 \
+                               #     -e POSTGRES_PASSWORD=todox -e POSTGRES_USER=todox \
+                               #     -e POSTGRES_DB=todox postgres:18
 pnpm db:migrate
 pnpm seed                      # demo / todox-demo
 pnpm dev
