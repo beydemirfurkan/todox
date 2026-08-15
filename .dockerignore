@@ -1,0 +1,30 @@
+# Rebuilt inside the image; copying them in wastes the layer cache and can
+# leave a host-built binary that does not match the container's libc.
+node_modules
+.next
+out
+build
+dist
+
+# Secrets. `.env.example` is the only one that belongs in an image.
+.env
+.env.*
+!.env.example
+
+# History and tooling that changes on every commit, which would bust the cache
+# for no reason.
+.git
+.github
+.claude
+.vscode
+.idea
+
+coverage
+*.log
+.DS_Store
+
+# Documentation and agent instructions: read by people and editors, never by
+# the running server.
+docs
+*.md
+!README.md
