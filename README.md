@@ -48,7 +48,7 @@ deployment, no uptime promise. Self-host if the log matters to you.
 
 ```bash
 pnpm install
-cp .env.example .env.local     # any Postgres; a free Neon branch works
+cp .env.example .env.local     # any Postgres 15+; see below for a container
 pnpm db:migrate                # idempotent
 pnpm seed                      # optional demo account: demo / todox-demo
 pnpm dev
@@ -261,7 +261,8 @@ The connection string lives in Vercel marked sensitive, which is write-only —
 neither the CLI nor the dashboard will show it again — so a deployment can end
 up running happily against a database nobody can reach to migrate. Keep one
 credential somewhere a human can retrieve it, or keep the ability to mint a new
-one (Neon's console resets a role's password in a click).
+one — on a self-hosted Postgres that is `ALTER ROLE … PASSWORD`, which needs a
+superuser session you can still open.
 
 Coming from the old SQLite version? `pnpm db:import-sqlite [path]` copies a
 `~/.todox/todox.db` across.

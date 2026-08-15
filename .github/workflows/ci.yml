@@ -58,20 +58,42 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
-  # TEMP-DISABLED: The DATABASE_URL secret stopped authenticating as 'todox_ci'
-  # on 2026-08-11 — Neon rotated the password, the connection string in repo
-  # settings was not updated. `check` and `windows` still run; only the
-  # database-requiring smoke suites are off. Re-enable by removing `if: false`
-  # once a fresh connection string from Neon is set as the DATABASE_URL repo
-  # secret.
+  # The suites that need a database, against one this job starts itself.
+  #
+  # They used to need a hosted branch reachable through a repo secret, and were
+  # skipped from 2026-08-11 to 2026-08-15 because that credential was rotated
+  # and the secret was never updated. A container has no such failure: nothing
+  # to provision, nothing to expire, no state shared between runs, and no way
+  # to point at production by accident.
+  #
+  # Worth the care, because this is the only job that starts the stdio MCP
+  # process. A bug that killed every local session at startup shipped during
+  # that window, with `check` and `windows` green throughout.
   smoke:
-    if: false
     runs-on: ubuntu-latest
     needs: check
-    # `secrets` is not available in an `if:` expression, so it is mapped to the
-    # environment first and the steps test that instead.
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: todox
+          POSTGRES_PASSWORD: todox
+          POSTGRES_DB: todox
+        ports:
+          - 5432:5432
+        # Without the health check the steps start before Postgres is accepting
+        # connections, and the failure reads as a broken migration.
+        options: >-
+          --health-cmd "pg_isready -U todox"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL: postgresql://todox:todox@localhost:5432/todox
+      TODOX_PUBLIC_URL: http://localhost:3000
+
     steps:
       - uses: actions/checkout@v7
       # version comes from packageManager in package.json; passing it here
@@ -84,27 +106,24 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: No database configured
-        if: env.DATABASE_URL == ''
-        run: echo "Set a DATABASE_URL secret (a throwaway branch) to run these."
-
       - name: Migrate
-        if: env.DATABASE_URL != ''
         run: pnpm db:migrate
 
       - name: Auth guarantees
-        if: env.DATABASE_URL != ''
         run: pnpm smoke:auth
 
+      # Seeded first: this suite checks report arithmetic against the demo
+      # account, which a fresh database does not have. It says so rather than
+      # guessing, which on a container is every run.
       - name: Report arithmetic
-        if: env.DATABASE_URL != ''
-        run: pnpm smoke:report
+        run: |
+          pnpm seed
+          pnpm smoke:report
 
       # Invite, accept, attribution, removal, and the notice each one owes
       # somebody. Every assertion here is about a row two accounts share, which
       # is the part no unit test can stand in for.
       - name: Collaboration guarantees
-        if: env.DATABASE_URL != ''
         run: pnpm smoke:collab
 
       # The suite that keeps mcp/tools.ts honest as one definition: it runs the
@@ -112,7 +131,6 @@ jobs:
       # a tool that only works one way in fails here. It needs the app running,
       # which is why it is last.
       - name: Agent surface, both transports
-        if: env.DATABASE_URL != ''
         run: |
           pnpm build
           pnpm start &

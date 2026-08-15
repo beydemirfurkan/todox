@@ -1,30 +1,61 @@
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { Pool } from "pg";
 
 /**
- * Postgres over Neon's HTTP driver.
+ * Postgres over a socket pool.
  *
- * HTTP rather than a socket pool because todox runs on serverless functions:
- * there is no connection to exhaust and no pool to warm. The cost is that
- * every call is a round trip, which is why the repositories load in batches
- * instead of per row -- an N+1 that was free against a local SQLite file is
- * genuinely slow across a network.
+ * This was Neon's HTTP driver while the database was a managed service on the
+ * other side of the internet: on serverless functions there was no connection
+ * to exhaust and no pool to warm, and HTTP was the honest shape for that. The
+ * database now runs beside the app, so a pool is both possible and cheaper --
+ * a connection is opened once and reused, rather than a fresh round trip per
+ * statement.
+ *
+ * The repositories still load in batches. That was written to survive a
+ * network round trip per query and is no longer forced, but an N+1 is a bad
+ * habit at any latency and the helpers already exist.
  */
-let client: NeonQueryFunction<false, false> | null = null;
+let pool: Pool | null = null;
 
 export function connectionString(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
       "DATABASE_URL is not set. Copy .env.example to .env.local and put your " +
-        "Neon connection string in it.",
+        "Postgres connection string in it.",
     );
   }
   return url;
 }
 
-function sql(): NeonQueryFunction<false, false> {
-  client ??= neon(connectionString());
-  return client;
+/**
+ * One pool for the process.
+ *
+ * `max` is deliberately small: this app answers a request with several short
+ * statements rather than one long one, so throughput comes from reusing a few
+ * connections quickly, not from holding many open. Postgres' own default limit
+ * is 100 for the whole server, and a pool per replica adds up faster than
+ * people expect.
+ */
+function db(): Pool {
+  pool ??= new Pool({
+    connectionString: connectionString(),
+    max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+    // A statement that has not answered in 30s is not going to; failing the
+    // request beats holding a connection that the next one needs.
+    statement_timeout: 30_000,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
+  });
+  return pool;
+}
+
+/**
+ * Close the pool. For scripts, which otherwise sit with an idle connection
+ * open and never exit; the server wants the pool to outlive every request.
+ */
+export async function disconnect(): Promise<void> {
+  await pool?.end();
+  pool = null;
 }
 
 /**
@@ -42,7 +73,8 @@ function positional(text: string): string {
 export type Params = readonly unknown[];
 
 export async function all<T>(text: string, params: Params = []): Promise<T[]> {
-  return (await sql().query(positional(text), params as unknown[])) as T[];
+  const result = await db().query(positional(text), params as unknown[]);
+  return result.rows as T[];
 }
 
 export async function one<T>(text: string, params: Params = []): Promise<T | undefined> {
@@ -95,24 +127,51 @@ export function setClause(
 /**
  * Multiple statements, all-or-nothing, returning each one's rows.
  *
- * The driver takes a list of prepared queries rather than a callback, so no
- * JavaScript runs between them: a statement cannot use a value the previous one
- * returned. Where a write genuinely needs the id of the row just inserted, the
- * answer is one statement with a CTE, not this.
+ * Still a list of prepared statements rather than a callback, so no JavaScript
+ * runs between them: a statement cannot use a value the previous one returned.
+ * Where a write genuinely needs the id of the row just inserted, the answer is
+ * one statement with a CTE, not this.
+ *
+ * That used to be forced by the HTTP driver and is now a deliberate shape. A
+ * real BEGIN/COMMIT could take a callback and let arbitrary code run mid
+ * transaction — which is exactly how a transaction ends up held open across an
+ * await on something that is not the database. Callers already write to this
+ * contract, `tasks.create` is a CTE because of it, and `AGENTS.md` documents
+ * it; the constraint outlived its cause on purpose.
+ *
+ * One connection for the whole transaction, checked out explicitly: `pool.query`
+ * may hand each call a different connection, which would put BEGIN and COMMIT
+ * on separate sessions and silently commit nothing.
  */
 export async function tx<T = unknown>(
   statements: { text: string; params?: Params }[],
 ): Promise<T[][]> {
-  const s = sql();
-  const results = await s.transaction(
-    statements.map((q) => s.query(positional(q.text), (q.params ?? []) as unknown[])),
-  );
-  return results as T[][];
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    const results: T[][] = [];
+    for (const q of statements) {
+      const result = await client.query(positional(q.text), (q.params ?? []) as unknown[]);
+      results.push(result.rows as T[]);
+    }
+    await client.query("COMMIT");
+    return results;
+  } catch (error) {
+    // The rollback can fail too, when the connection is what broke. The
+    // original error is the one the caller needs, so this one is logged rather
+    // than thrown over the top of it.
+    await client
+      .query("ROLLBACK")
+      .catch((rollbackError) => console.error("tx rollback failed", rollbackError));
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /** DDL and anything else that must run verbatim, without placeholders. */
 export async function exec(text: string): Promise<void> {
-  await sql().query(text);
+  await db().query(text);
 }
 
 /** Group rows by a key, so batch loads can be handed back per parent id. */
