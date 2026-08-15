@@ -6,8 +6,8 @@ const IST = "Europe/Istanbul";
 
 /**
  * These windows used to be built with `setHours(0,0,0,0)`, which is local to
- * whichever machine runs the code. Every caller is server-side and Vercel runs
- * UTC, so "today" began at 03:00 in Istanbul: anything logged after midnight
+ * whichever machine runs the code. Every caller is server-side and the server
+ * runs UTC, so "today" began at 03:00 in Istanbul: anything logged after midnight
  * was filed under the previous day.
  */
 describe("period boundaries", () => {

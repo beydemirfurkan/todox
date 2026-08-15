@@ -6,9 +6,9 @@ export const ms = (iso: string) => new Date(iso).getTime();
  * Report windows are measured in a named timezone, not the server's.
  *
  * These used to use `setHours(0,0,0,0)`, which is local to whatever machine
- * runs the code. Every caller is server-side and Vercel runs UTC, so "today"
- * began at 03:00 for a user in Istanbul: work done after midnight was filed
- * under yesterday, and Monday morning landed in last week. The whole point of
+ * runs the code. Every caller is server-side and the server runs UTC, so
+ * "today" began at 03:00 for a user in Istanbul: work done after midnight was
+ * filed under yesterday, and Monday morning landed in last week. The point of
  * the report is to say what happened on a given day, so the day has to be the
  * reader's.
  */

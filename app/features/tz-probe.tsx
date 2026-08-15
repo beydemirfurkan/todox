@@ -7,7 +7,7 @@ import { TZ_COOKIE } from "@/lib/cookies";
 /**
  * Tells the server which day the reader is having.
  *
- * Pages render on Vercel, which runs UTC, so a report asking for "today" would
+ * Pages render on the server, which runs UTC, so a report asking for "today" would
  * otherwise measure from midnight UTC — three hours late in Istanbul, and a
  * whole day out for anyone west of Greenwich. The browser is the only side
  * that knows, so it writes its IANA name once and the server reads the cookie.

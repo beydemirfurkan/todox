@@ -243,26 +243,30 @@ anything:
 
 ## Deploying
 
-Vercel plus a hosted Postgres.
+A container and a Postgres beside it. The `Dockerfile` at the root builds the
+app; todox.dev runs both on one host, on a private Docker network, so the
+database publishes no port at all.
 
 | variable | why |
 | --- | --- |
-| `DATABASE_URL` | Postgres. Use the pooled connection string. |
+| `DATABASE_URL` | Postgres. When the database is a neighbour on the same network this is its service name, and no certificate or public port is involved. |
+| `DATABASE_POOL_MAX` | Optional, default 10. Connections this process may hold. Raise it only after checking the server's own `max_connections`, which every replica shares. |
 | `TODOX_PUBLIC_URL` | Verification links, reset links and the agent setup snippet are built from it — get it wrong and people, and their agents, land on the wrong host. |
-| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional, but the first four together. Without them mail is printed to the server log rather than sent. Port defaults to 587 (STARTTLS); the address in `MAIL_FROM` should match `SMTP_USER`, since most providers reject a `From` they did not authenticate. If the provider's sending limit is hit, messages are dropped and the failure shows up only in the log. |
+| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional, but the first four together. Without them mail is printed to the server log rather than sent. Port defaults to 587 (STARTTLS). What `MAIL_FROM` may be depends on the provider: a mailbox provider usually wants the address that authenticated, while an API-key provider wants any address on a domain verified with it. If a sending limit is hit, messages are dropped and the failure shows up only in the log. |
 
-Run `pnpm db:migrate` when the schema changes. It deliberately does not run on
-cold start: DDL racing across serverless instances is a bad way to discover lock
-contention. In this deployment it is the **migrate production** workflow, run by
-hand from the Actions tab against a `PROD_DATABASE_URL` secret.
+Run `pnpm db:migrate` when the schema changes. It deliberately does not run at
+startup: DDL racing between instances of a rolling deploy is a bad way to
+discover lock contention, and the schema is idempotent precisely so the decision
+can be made after a deploy rather than during one. From the host:
 
-That secret is the operator's only way in, and it is worth saying why it exists.
-The connection string lives in Vercel marked sensitive, which is write-only —
-neither the CLI nor the dashboard will show it again — so a deployment can end
-up running happily against a database nobody can reach to migrate. Keep one
-credential somewhere a human can retrieve it, or keep the ability to mint a new
-one — on a self-hosted Postgres that is `ALTER ROLE … PASSWORD`, which needs a
-superuser session you can still open.
+```bash
+docker exec <container> pnpm db:migrate
+```
+
+That is also why the image keeps its dev dependencies instead of using Next's
+`standalone` output — pruning them removes `tsx` and everything under
+`scripts/`, and a database that is deliberately unreachable from the internet
+can only be migrated from something already inside the network.
 
 Coming from the old SQLite version? `pnpm db:import-sqlite [path]` copies a
 `~/.todox/todox.db` across.

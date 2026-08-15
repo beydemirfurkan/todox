@@ -21,9 +21,9 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: eslint
         update-types: [version-update:semver-major]
-      # These describe the runtime, so they follow it rather than lead it.
-      # Vercel runs Node 24 and so does CI; types for 26 would advertise APIs
-      # that are not there.
+      # These describe the runtime, so they follow it rather than lead it. The
+      # image, CI and the Dockerfile are all on Node 24; types for 26 would
+      # advertise APIs that are not there.
       - dependency-name: "@types/node"
         update-types: [version-update:semver-major]
 
