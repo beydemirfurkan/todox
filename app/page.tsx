@@ -10,6 +10,7 @@ import * as memberships from "@/lib/repositories/project-memberships";
 import * as projects from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
 import { addContextAction, createProjectAction, deleteContextAction } from "./actions";
+import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { Explainer, FirstRun } from "./features/explainer";
 import { Landing } from "./features/landing";
 import { Picker } from "./features/picker";
@@ -37,7 +38,17 @@ export default async function Home() {
   const user = await currentUser();
   // The one page with two audiences. Signed out this is the only description
   // of the product anyone can reach; signed in it is the dashboard.
-  if (!user) return <Landing t={t} />;
+  //
+  // The schema goes with the signed-out half only. `/` is in the sitemap
+  // because of what a crawler gets there, and a crawler never has a session --
+  // so the dashboard rendering is not the thing being described.
+  if (!user)
+    return (
+      <>
+        <OrganizationJsonLd />
+        <Landing t={t} />
+      </>
+    );
   // One counts query for the whole page instead of one per project card.
   const [allProjects, globalContext, counts] = await Promise.all([
     projects.list(user.id),

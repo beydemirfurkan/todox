@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { OrganizationJsonLd } from "../components/organization-json-ld";
 import { getT } from "@/lib/lang";
 import { pageOpenGraph } from "../metadata-shared";
 
@@ -19,6 +20,7 @@ export default async function ContactPage() {
   const { t } = await getT();
   return (
     <article className="prose pop max-w-[60ch]">
+      <OrganizationJsonLd />
       <h1 className="display text-[28px] font-bold">{t("metaTitleContact")}</h1>
 
       <p className="mt-4 text-[15.5px] leading-relaxed">{t("contactIntro")}</p>
