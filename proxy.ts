@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SESSION_COOKIE } from "./lib/cookies";
+import { LANG_COOKIE, SESSION_COOKIE } from "./lib/cookies";
+import { isLang } from "./lib/i18n";
 
 /**
  * UX only. The proxy cannot reach the database, so it can tell you that a
@@ -71,8 +72,39 @@ const NO_STORE = new Set([
  */
 const SHORT_CACHE = new Set(["/sitemap.xml", "/robots.txt", "/llms.txt"]);
 
+/**
+ * `?lang=en` — a link that arrives in the language it promises.
+ *
+ * Negotiation covers the browser that asks, but a launch post, a directory
+ * listing or a message to one person needs a URL whose language does not depend
+ * on the reader's settings. This makes the choice explicit, stores it like the
+ * switcher does, and sends the reader on to the clean address so the parameter
+ * does not travel any further or turn one page into two.
+ */
+function claimedLang(req: NextRequest): NextResponse | undefined {
+  const asked = req.nextUrl.searchParams.get("lang");
+  if (!isLang(asked)) return undefined;
+
+  const url = req.nextUrl.clone();
+  url.searchParams.delete("lang");
+  const res = NextResponse.redirect(url);
+  res.cookies.set(LANG_COOKIE, asked, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  });
+  return res;
+}
+
 export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Before everything: it applies to any page, and the redirect it returns is
+  // what the rules below should be deciding about.
+  const claimed = claimedLang(req);
+  if (claimed) return claimed;
 
   if (NO_STORE.has(pathname)) {
     const res = NextResponse.next();

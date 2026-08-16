@@ -41,14 +41,14 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s — ${t("siteName")}`,
     },
     description: t("metaDescription"),
-    alternates: {
-      canonical: "/",
-      languages: {
-        en: "/",
-        tr: "/",
-        "x-default": "/",
-      },
-    },
+    // No `languages` map. It used to list `en`, `tr` and `x-default` all
+    // pointing at `/`, which is not an alternate — it is the same URL claimed
+    // three times, and `hreflang` exists to say "the same page, at a different
+    // address". This site serves both languages from one address and picks by
+    // cookie then `Accept-Language`, so there is no second address to name.
+    // Saying nothing is accurate; the old block was a claim that could not be
+    // acted on.
+    alternates: { canonical: "/" },
     openGraph: {
       siteName: t("siteName"),
       locale: lang === "tr" ? "tr_TR" : "en_US",
