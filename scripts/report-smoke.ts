@@ -4,7 +4,9 @@
  */
 import "./env";
 
+import { run } from "../lib/db/client";
 import { translator } from "../lib/i18n";
+import * as entriesRepo from "../lib/repositories/entries";
 import * as eventsRepo from "../lib/repositories/events";
 import * as projectsRepo from "../lib/repositories/projects";
 import * as usersRepo from "../lib/repositories/users";
@@ -15,6 +17,16 @@ import * as taskService from "../lib/services/task-service";
 import { resolvePeriod } from "../lib/util/time";
 
 const MODEL = "claude-opus-5";
+
+/**
+ * Most of this file prints what happened and lets a reader judge it. These two
+ * cannot be judged by reading: both failures produce a report that looks
+ * entirely normal and is quietly wrong, so they have to fail the run.
+ */
+function assert(claim: boolean, what: string) {
+  console.log(`${claim ? "PASS" : "FAIL"}  ${what}`);
+  if (!claim) throw new Error(what);
+}
 
 async function main() {
 const user = await usersRepo.byUsername("demo");
@@ -70,6 +82,73 @@ console.log(
     .split("\n")
     .slice(0, 14)
     .join("\n"),
+);
+
+console.log("\n--- a task that opens already finished still counts as finished ---");
+// `create_task` takes a status, and an agent recording work it has just done
+// passes `done`. That task never transitions, so nothing else would ever set
+// `closed_at`, and it used to be missing from the closed side of every report.
+const bornDone = await taskService.create({
+  project_id: project.id,
+  title: "REPORT-SMOKE: recorded after the fact",
+  status: "done",
+  model: MODEL,
+});
+assert(Boolean(bornDone.closed_at), "closed_at is set at creation, not left null");
+const withBornDone = await activityReport(user.id, resolvePeriod("today"));
+assert(
+  withBornDone.completed.some((r) => r.id === bornDone.id),
+  "and it reaches today's completed list",
+);
+
+console.log("\n--- a row on a period boundary belongs to one day, not two ---");
+// `resolvePeriod` hands back a half-open window, so yesterday's `to` is today's
+// `from` -- the same instant. Read with an inclusive comparison, anything
+// written exactly then was counted twice, once in each report.
+const today = resolvePeriod("today");
+const yesterday = resolvePeriod("yesterday");
+assert(yesterday.to === today.from, "the two windows really do meet at one instant");
+
+await run(
+  `INSERT INTO entries (task_id, kind, body, author, model, user_id, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  [bornDone.id, "note", "REPORT-SMOKE: written on the boundary", "agent", MODEL, null, today.from],
+);
+
+const onTheEdge = (rows: { body: string }[]) =>
+  rows.filter((r) => r.body.includes("written on the boundary")).length;
+assert(
+  onTheEdge(await entriesRepo.listByTasksBetween([bornDone.id], yesterday.from, yesterday.to)) === 0,
+  "the window that ends at that instant does not include it",
+);
+assert(
+  onTheEdge(await entriesRepo.listByTasksBetween([bornDone.id], today.from, today.to)) === 1,
+  "the window that starts at that instant does, exactly once",
+);
+
+// `activeBetween` compares four columns of its own, and an entry on the
+// boundary does not exercise them -- the task has to sit on it. Forced through
+// SQL because nothing in the app can create a row in the past.
+const onBoundary = await taskService.create({
+  project_id: project.id,
+  title: "REPORT-SMOKE: opened and closed on the boundary",
+  model: MODEL,
+});
+await run("UPDATE tasks SET created_at = ?, closed_at = ? WHERE id = ?", [
+  today.from,
+  today.from,
+  onBoundary.id,
+]);
+
+const yesterdaysTasks = await tasksRepo.activeBetween(user.id, yesterday.from, yesterday.to);
+const todaysTasks = await tasksRepo.activeBetween(user.id, today.from, today.to);
+assert(
+  todaysTasks.some((t) => t.id === onBoundary.id),
+  "a task stamped on the boundary is active in the window that starts there",
+);
+assert(
+  !yesterdaysTasks.some((t) => t.id === onBoundary.id),
+  "and not in the one that ends there",
 );
 
 // clean up so the demo data stays honest

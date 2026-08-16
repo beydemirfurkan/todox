@@ -5,8 +5,16 @@ import { invoke } from "./rpc";
 
 /**
  * Ordering, not logic: `invoke` must reject bad params *before* dispatching to
- * a handler. There is no DATABASE_URL here, so anything that reaches a query
- * fails loudly with a different error — which is exactly the assertion.
+ * a handler. The four rejection cases assert the error type directly; the last
+ * one asserts the absence of it, and deliberately does not care what happened
+ * instead.
+ *
+ * It used to care. The assertion was `rejects.not.toBeInstanceOf(BadRequest)`,
+ * which needed the call to fail for any reason at all, and the reason on hand
+ * was that CI runs this suite with no DATABASE_URL. On a developer's machine
+ * with one exported the query succeeds, the promise resolves, and the test
+ * failed while nothing was wrong -- a red suite that says nothing about the
+ * code is worse than no test, because the next person learns to ignore it.
  */
 describe("invoke", () => {
   const ctx = { userId: 1 };
@@ -36,10 +44,13 @@ describe("invoke", () => {
   });
 
   it("gets past validation on a well-formed call", async () => {
-    // Reaches the handler and fails on the absent database, which is the
-    // proof that validation was not what stopped it.
-    await expect(invoke(ctx, "getTask", { task_id: 1 })).rejects.not.toBeInstanceOf(
-      BadRequest,
+    // Whether the handler then answers or fails on the database is none of this
+    // test's business: both mean validation was not what stopped it. Only a
+    // BadRequest would.
+    const stoppedBy = await invoke(ctx, "getTask", { task_id: 1 }).then(
+      () => null,
+      (error: unknown) => error,
     );
+    expect(stoppedBy).not.toBeInstanceOf(BadRequest);
   });
 });

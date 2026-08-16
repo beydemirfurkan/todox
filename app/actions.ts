@@ -4,12 +4,19 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import type { ContextKind, EntryKind, Status } from "@/lib/constants";
+import {
+  DEFAULT_PRIORITY,
+  isContextKind,
+  isEntryKind,
+  isPriority,
+  isStatus,
+} from "@/lib/constants";
 import { isLang } from "@/lib/i18n";
 import { LANG_COOKIE } from "@/lib/lang";
 import * as contexts from "@/lib/repositories/contexts";
 import * as entries from "@/lib/repositories/entries";
 import * as projects from "@/lib/repositories/projects";
+import type { TaskPatch } from "@/lib/repositories/tasks";
 import * as invitations from "@/lib/repositories/project-invitations";
 import * as collaboration from "@/lib/services/collaboration";
 import * as notificationService from "@/lib/services/notifications";
@@ -33,6 +40,24 @@ import type { AuthState } from "./auth-actions";
 
 const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() || "";
 const num = (fd: FormData, k: string) => Number(fd.get(k));
+
+/**
+ * Three answers, because two of them are not the same refusal.
+ *
+ * `undefined` -- the field was not submitted. On a create that means "use the
+ * default", on a patch it means "leave the stored value alone". Collapsing it
+ * into a fallback is what let a form that omitted the field reset a task's
+ * priority to normal.
+ *
+ * `null` -- submitted, but not a priority. That is a caller sending something
+ * the form cannot produce, so the action refuses rather than guessing.
+ */
+const priorityOf = (fd: FormData): number | null | undefined => {
+  const raw = fd.get("priority");
+  if (raw === null || raw === "") return undefined;
+  const value = Number(raw);
+  return isPriority(value) ? value : null;
+};
 
 /* -------------------------------------------------------------- language */
 
@@ -217,12 +242,13 @@ export async function createTaskAction(fd: FormData) {
   const slug = str(fd, "slug");
   const project = await projects.bySlug(user.id, slug);
   const title = str(fd, "title");
-  if (!project || !title) return;
+  const priority = priorityOf(fd);
+  if (!project || !title || priority === null) return;
   await taskService.create({
     project_id: project.id,
     title,
     body: str(fd, "body") || null,
-    priority: num(fd, "priority") || 2,
+    priority: priority ?? DEFAULT_PRIORITY,
     actor: "human",
     user_id: user.id,
   });
@@ -233,27 +259,36 @@ export async function setStatusAction(fd: FormData) {
   const user = await requireUser();
   const id = num(fd, "task_id");
   await assertTask(user.id, id);
-  await taskService.update(
-    id,
-    { status: str(fd, "status") as Status },
-    { actor: "human", user_id: user.id },
-  );
+  const status = str(fd, "status");
+  if (!isStatus(status)) return;
+  await taskService.update(id, { status }, { actor: "human", user_id: user.id });
   revalidatePath("/", "layout");
 }
 
+/**
+ * Only the fields that were actually submitted.
+ *
+ * The previous shape read all three unconditionally, so a request that carried
+ * just a title cleared the body and pushed priority back to normal. The form
+ * on the task page happens to send all three, which is why nothing showed --
+ * but the action is a POST endpoint and the form is not the only thing that
+ * can reach it.
+ */
 export async function updateTaskAction(fd: FormData) {
   const user = await requireUser();
   const id = num(fd, "task_id");
   await assertTask(user.id, id);
-  await taskService.update(
-    id,
-    {
-      title: str(fd, "title") || undefined,
-      body: str(fd, "body") || null,
-      priority: num(fd, "priority") || 2,
-    },
-    { actor: "human", user_id: user.id },
-  );
+
+  const priority = priorityOf(fd);
+  if (priority === null) return;
+
+  const patch: TaskPatch = {};
+  const title = str(fd, "title");
+  if (title) patch.title = title;
+  if (fd.has("body")) patch.body = str(fd, "body") || null;
+  if (priority !== undefined) patch.priority = priority;
+
+  await taskService.update(id, patch, { actor: "human", user_id: user.id });
   revalidatePath("/", "layout");
 }
 
@@ -264,10 +299,11 @@ export async function addEntryAction(fd: FormData) {
   const taskId = num(fd, "task_id");
   await assertTask(user.id, taskId);
   const body = str(fd, "body");
-  if (!body) return;
+  const kind = str(fd, "kind");
+  if (!body || !isEntryKind(kind)) return;
   await taskService.addEntry({
     task_id: taskId,
-    kind: str(fd, "kind") as EntryKind,
+    kind,
     body,
     author: "human",
     user_id: user.id,
@@ -292,11 +328,12 @@ export async function addContextAction(fd: FormData) {
   if (slug && !project) return;
   const title = str(fd, "title");
   const body = str(fd, "body");
-  if (!title || !body) return;
+  const kind = str(fd, "kind");
+  if (!title || !body || !isContextKind(kind)) return;
   await contexts.create({
     user_id: user.id,
     project_id: project?.id ?? null,
-    kind: str(fd, "kind") as ContextKind,
+    kind,
     title,
     body,
   });

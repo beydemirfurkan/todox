@@ -1,5 +1,5 @@
 import type { EntryKind } from "../constants";
-import { all, groupBy, one, run } from "../db/client";
+import { all, groupBy, one, run, type Statement } from "../db/client";
 import type { Entry, EntryView } from "../types";
 import { now } from "../util/time";
 
@@ -49,6 +49,11 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, EntryV
  * report scoped the rows afterwards, in JavaScript, which was correct but meant
  * one account's monthly report pulled every account's log across the network
  * first -- and `period: "all"` made that window the whole table.
+ *
+ * The comparison is half-open for the same reason `tasks.activeBetween` is:
+ * `resolvePeriod`'s `to` is the first instant outside the window and equals the
+ * next window's `from`, so `BETWEEN` filed an entry written exactly on the
+ * boundary under both days.
  */
 export async function listByTasksBetween(
   taskIds: number[],
@@ -59,7 +64,7 @@ export async function listByTasksBetween(
   return all<Entry>(
     `SELECT * FROM entries
      WHERE task_id IN (${taskIds.map(() => "?").join(",")})
-       AND created_at BETWEEN ? AND ?
+       AND created_at >= ? AND created_at < ?
      ORDER BY id`,
     [...taskIds, from, to],
   );
@@ -106,20 +111,28 @@ export async function countsByTasks(taskIds: number[]): Promise<Map<number, Entr
 export const byId = (id: number) =>
   one<Entry>("SELECT * FROM entries WHERE id = ?", [id]);
 
+/**
+ * Beside `create` because the entry has to be written with the task's
+ * `updated_at`, and only `task-service` may sequence the two. The SQL stays
+ * with the table that owns it; see the transaction rule in CONTRIBUTING.md.
+ */
+export const createStmt = (input: NewEntry): Statement => ({
+  text: `INSERT INTO entries (task_id, kind, body, author, model, user_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+  params: [
+    input.task_id,
+    input.kind,
+    input.body,
+    input.author ?? "agent",
+    input.model ?? null,
+    input.user_id ?? null,
+    now(),
+  ],
+});
+
 export async function create(input: NewEntry): Promise<Entry> {
-  const row = await one<Entry>(
-    `INSERT INTO entries (task_id, kind, body, author, model, user_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-    [
-      input.task_id,
-      input.kind,
-      input.body,
-      input.author ?? "agent",
-      input.model ?? null,
-      input.user_id ?? null,
-      now(),
-    ],
-  );
+  const stmt = createStmt(input);
+  const row = await one<Entry>(stmt.text, stmt.params);
   return row!;
 }
 

@@ -1,3 +1,4 @@
+import { isClosedStatus } from "../constants";
 import { tx } from "../db/client";
 import * as entries from "../repositories/entries";
 import * as events from "../repositories/events";
@@ -47,8 +48,7 @@ export async function create(
 function closedAtFor(patch: tasks.TaskPatch, before: Task): tasks.TaskPatch {
   const next = patch.status;
   if (!next || next === before.status) return patch;
-  const closes = next === "done" || next === "dropped";
-  return { ...patch, closed_at: closes ? now() : null };
+  return { ...patch, closed_at: isClosedStatus(next) ? now() : null };
 }
 
 export async function update(
@@ -86,10 +86,22 @@ export async function update(
   return rows[0];
 }
 
+/**
+ * The entry and the task's `updated_at` go in together.
+ *
+ * These were two awaits, and the second one carries the whole reason the first
+ * is interesting: every list in the app is ordered by `updated_at`, so a task
+ * whose log just grew but whose timestamp did not sinks below tasks nobody has
+ * touched. The log would be right and the ordering that surfaces it wrong,
+ * which is the failure this codebase keeps finding -- a write that half
+ * happened and reads as if it fully did.
+ */
 export async function addEntry(input: entries.NewEntry): Promise<Entry> {
-  const entry = await entries.create(input);
-  await tasks.touch(input.task_id);
-  return entry;
+  const [rows] = await tx<Entry>([
+    entries.createStmt(input),
+    tasks.touchStmt(input.task_id),
+  ]);
+  return rows[0];
 }
 
 export const remove = (id: number) => tasks.remove(id);
