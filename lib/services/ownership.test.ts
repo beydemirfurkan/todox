@@ -170,6 +170,7 @@ describe("NotYours", () => {
 describe("the assert wrappers", () => {
   const CASES = [
     ["assertProject", "project"],
+    ["assertProjectAccess", "project"],
     ["assertTask", "task"],
     ["assertEntry", "entry"],
     ["assertRef", "ref"],

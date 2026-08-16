@@ -79,6 +79,17 @@ export async function assertTask(userId: number, id: number) {
 export async function assertProject(userId: number, id: number) {
   if (!(await ownsProject(userId, id))) throw new NotYours("project", id);
 }
+/**
+ * The weaker of the two project gates: a member passes, not only the owner.
+ *
+ * Use it for writes that live *inside* a project -- a task, an entry, a note.
+ * `assertProject` is for writes to the project row itself, which stay with
+ * whoever owns it. Getting these two the wrong way round is why a
+ * collaborator could log an entry but not add a note beside it.
+ */
+export async function assertProjectAccess(userId: number, id: number) {
+  if (!(await accessesProject(userId, id))) throw new NotYours("project", id);
+}
 export async function assertEntry(userId: number, id: number) {
   if (!(await ownsEntry(userId, id))) throw new NotYours("entry", id);
 }

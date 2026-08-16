@@ -50,7 +50,7 @@ export const destroyAllFor = (userId: number) => runStmt(destroyAllForStmt(userI
 
 export type ClientUse = { name: string; version: string; seenAt: string };
 
-export const recordClientUse = (tokenHash: string, use: ClientUse): Promise<void> =>
+export const recordClientUse = (tokenHash: string, use: ClientUse): Promise<number> =>
   run(
     `UPDATE api_tokens
         SET last_client_name = ?, last_client_version = ?, last_client_seen_at = ?

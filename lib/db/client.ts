@@ -81,9 +81,25 @@ export async function one<T>(text: string, params: Params = []): Promise<T | und
   return rows[0];
 }
 
-/** For statements whose result is not read. */
-export async function run(text: string, params: Params = []): Promise<void> {
-  await all(text, params);
+/**
+ * A write, answering how many rows it changed.
+ *
+ * It used to return nothing, which made a whole class of bug invisible: a
+ * write scoped `WHERE id = ? AND user_id = ?` that matches no row is
+ * indistinguishable from one that worked, so the caller reports success and
+ * the row is untouched. `update_project` and `delete_project` did exactly
+ * that to a collaborator -- the agent was told the project was deleted.
+ *
+ * The count is not delegated to `all()`, which projects `result.rows` and
+ * drops `rowCount`; an UPDATE or DELETE without RETURNING has no rows to
+ * project, so that path can only ever answer zero.
+ *
+ * Callers may still ignore the number. Ownership belongs in `ownership.ts`
+ * and is checked before the write -- this is the second line, not the first.
+ */
+export async function run(text: string, params: Params = []): Promise<number> {
+  const result = await db().query(positional(text), params as unknown[]);
+  return result.rowCount ?? 0;
 }
 
 /**
