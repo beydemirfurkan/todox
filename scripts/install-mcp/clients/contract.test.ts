@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { MCP_CONFIG_PATHS, MCP_SHAPES } from "../../../lib/mcp-clients";
+import {
+  MCP_CONFIG_PATHS,
+  MCP_MEMORY_PATHS,
+  MCP_SHAPES,
+  MEMORY_FILE_NAME,
+} from "../../../lib/mcp-clients";
 import {
   claudeCodeContract,
   codexConfigFile,
   cursorContract,
+  memoryFileFor,
   openCodeContract,
   vsCodeContract,
   type JsonClientContract,
@@ -225,6 +231,60 @@ describe("contract agrees with the documented locations", () => {
     expect(openCodeContract("v1").current.rootKeys).toEqual(MCP_SHAPES["opencode-v1"].rootKeys);
     expect(openCodeContract("v2").current.rootKeys).toEqual(MCP_SHAPES["opencode-v2"].rootKeys);
     expect(openCodeContract("v2").httpType).toBe(MCP_SHAPES["opencode-v2"].remoteType);
+  });
+});
+
+/**
+ * The memory file gets the same platform matrix as the config, for the same
+ * reason: `--write-memory` writes it and then nothing reads it back, because
+ * the only reader is a client we do not run. A wrong path here is a file that
+ * appears, contains exactly what we meant, and is never loaded by anything.
+ */
+describe("the memory file each client reads", () => {
+  const CLIENTS = ["claude-code", "codex", "cursor", "vscode", "opencode"] as const;
+
+  it("resolves under the home directory on every platform", () => {
+    for (const client of CLIENTS) {
+      for (const platform of PLATFORMS) {
+        withPlatform(platform, () => {
+          const file = memoryFileFor(client);
+          expect(path.isAbsolute(file), `${client} on ${platform}`).toBe(true);
+          expect(file.startsWith(os.homedir()), `${client} on ${platform}`).toBe(true);
+        });
+      }
+    }
+  });
+
+  it("resolves to the location the docs print", () => {
+    for (const client of CLIENTS) {
+      const documented = MCP_MEMORY_PATHS[client].location.linux;
+      const expanded = path.join(os.homedir(), ...documented.replace("~/", "").split("/"));
+      expect(memoryFileFor(client), client).toContain(expanded);
+    }
+  });
+
+  it("writes todox's own file where the client reads a directory", () => {
+    // Cursor and VS Code read a folder of instruction files. Appending to a
+    // file somebody else created there is a worse neighbour than adding one
+    // that can be deleted on its own.
+    for (const client of CLIENTS) {
+      const target = MCP_MEMORY_PATHS[client];
+      const file = memoryFileFor(client);
+      if (target.kind === "directory") {
+        expect(path.basename(file), client).toBe(MEMORY_FILE_NAME);
+      } else {
+        expect(path.basename(file), client).not.toBe(MEMORY_FILE_NAME);
+      }
+    }
+  });
+
+  it("is never the MCP config file", () => {
+    // They live one directory apart for claude-code (~/.claude.json against
+    // ~/.claude/CLAUDE.md), and writing the habit into the config would take
+    // the server entry with it.
+    expect(memoryFileFor("claude-code")).not.toBe(claudeCodeContract().current.file);
+    expect(memoryFileFor("cursor")).not.toBe(cursorContract().current.file);
+    expect(memoryFileFor("codex")).not.toBe(codexConfigFile());
   });
 });
 

@@ -14,6 +14,16 @@ export type ParsedArgs = {
   dryRun: boolean;
   verbose: boolean;
   /**
+   * Also write the four-line habit into the client's user-level memory file.
+   *
+   * Off by default, and asked for by name. Registering a server in a config
+   * file todox owns the entry in is one thing; adding lines to the file someone
+   * keeps their own standing instructions in is another, and doing the second
+   * because they asked for the first is the kind of surprise that gets a tool
+   * uninstalled. `--dry-run` prints what it would write.
+   */
+  writeMemory: boolean;
+  /**
    * OpenCode only. Undefined means "work it out from the existing config",
    * which is what almost every run does; the flag is for the case where there
    * is no config to read yet and the user knows which major they run.
@@ -31,7 +41,7 @@ const KNOWN_CLIENTS = ["claude-code", "codex", "cursor", "vscode", "opencode"] a
  * what follows, and `pnpm install:mcp --dry-run claude-code` is the natural
  * order for a one-shot script.
  */
-const BOOLEAN_FLAGS = new Set(["dry-run", "verbose"]);
+const BOOLEAN_FLAGS = new Set(["dry-run", "verbose", "write-memory"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const positional: string[] = [];
@@ -92,5 +102,6 @@ export function parseArgs(argv: string[]): ParsedArgs {
     transport,
     dryRun: Boolean(flags["dry-run"]),
     verbose: Boolean(flags.verbose),
+    writeMemory: Boolean(flags["write-memory"]),
   };
 }

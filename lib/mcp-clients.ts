@@ -80,6 +80,71 @@ export const MCP_CONFIG_PATHS = {
 } as const satisfies Record<McpClientId, McpConfigLocation>;
 
 /**
+ * The habit, written once.
+ *
+ * Connecting a server and having it used are different things: an MCP server's
+ * `instructions` are background reading, and lose to a rule in the file the
+ * agent actually obeys. Measured, in a fresh project, with todox connected the
+ * whole time and never once called. These lines are the fix, and they are
+ * pasted by a reader of the README, offered by the Account page, and written by
+ * the installer -- three surfaces, which is exactly how the config shapes above
+ * ended up disagreeing before this module existed.
+ *
+ * The token deliberately does not appear. It belongs in the MCP config; this is
+ * the habit, not the credential, and memory files get committed to repositories.
+ */
+export const MEMORY_SNIPPET = `todox MCP is installed here — persistent memory across projects.
+
+- Call \`get_context\` before starting non-trivial work (cwd = your working
+  directory). It registers a new repo by itself.
+- \`create_task\` for anything that will not finish this session.
+- Before stopping, \`log_entry(kind:'handoff')\` on every task you touched,
+  and \`dead_end\` for approaches that failed.
+- Always pass your own model id.`;
+
+/**
+ * Where a client reads instructions that apply to *every* project.
+ *
+ * User-level, never the project file, and the distinction is the whole point.
+ * `.cursorrules`, `.github/copilot-instructions.md` and a repo's `AGENTS.md`
+ * are all read only inside the checkout that holds them, so a habit written
+ * there is absent in the next repository -- the same failure the MCP config
+ * has when it lands in `local` scope, where the tools simply are not there and
+ * nothing errors. A memory that is meant to cross projects cannot be installed
+ * per project.
+ *
+ * `kind` is not decoration: Cursor and VS Code read a *directory* of
+ * instruction files rather than one file, so todox writes its own file inside
+ * rather than appending to somebody else's.
+ *
+ * Every entry is a claim about someone else's software, checked against that
+ * software's own documentation on 2026-08-16 rather than remembered:
+ *   claude-code  code.claude.com/docs — ~/.claude/CLAUDE.md
+ *   codex        developers.openai.com/codex/cli — ~/.codex/AGENTS.md
+ *   cursor       cursor.com/docs/rules — user rules in ~/.cursor/rules;
+ *                `.cursorrules` is legacy and on its way out
+ *   vscode       code.visualstudio.com/docs/agent-customization —
+ *                ~/.copilot/instructions, searched recursively
+ *   opencode     opencode.ai/docs/rules — ~/.config/opencode/AGENTS.md
+ */
+export type McpMemoryTarget = {
+  readonly location: McpConfigLocation;
+  /** Whether `location` names the file itself or a directory to write into. */
+  readonly kind: "file" | "directory";
+};
+
+/** What todox calls its own file, where the client reads a directory. */
+export const MEMORY_FILE_NAME = "todox.md";
+
+export const MCP_MEMORY_PATHS = {
+  "claude-code": { location: everywhere("~/.claude/CLAUDE.md"), kind: "file" },
+  codex: { location: everywhere("~/.codex/AGENTS.md"), kind: "file" },
+  cursor: { location: everywhere("~/.cursor/rules"), kind: "directory" },
+  vscode: { location: everywhere("~/.copilot/instructions"), kind: "directory" },
+  opencode: { location: everywhere("~/.config/opencode/AGENTS.md"), kind: "file" },
+} as const satisfies Record<McpClientId, McpMemoryTarget>;
+
+/**
  * The entry todox writes, for a client that takes JSON over HTTP.
  *
  * Returned rather than stringified so callers can nest it wherever their shape
