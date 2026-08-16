@@ -151,6 +151,77 @@ describe("owner-only versus shared", () => {
   });
 });
 
+describe("assertRefs, the batch check", () => {
+  /** Run it against a set of reachable ids and hand back the statement built. */
+  async function check(ids: number[], reachable: number[]) {
+    db.all.mockClear();
+    db.all.mockResolvedValue(reachable.map((id) => ({ id })));
+    const outcome = await ownership.assertRefs(USER, ids).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    const [text, params] = (db.all.mock.calls[0] ?? [undefined, undefined]) as [
+      string | undefined,
+      unknown[] | undefined,
+    ];
+    return { outcome, text, params };
+  }
+
+  it("asks once, however many ids there are", async () => {
+    // The point of the whole change: five hundred are allowed per call, and
+    // one query each is five hundred at once against a pool of ten.
+    const ids = Array.from({ length: 500 }, (_, i) => i + 1);
+    await check(ids, ids);
+    expect(db.all).toHaveBeenCalledTimes(1);
+  });
+
+  it("binds one parameter per placeholder", async () => {
+    // The `IN` list is built by hand, so the count moves with the input --
+    // exactly where positional rewriting shifts every later binding.
+    const { text, params } = await check([1, 2, 3], [1, 2, 3]);
+    expect(placeholderCount(text!)).toBe(params!.length);
+  });
+
+  it("restricts on an account column in the WHERE, not just in a join", async () => {
+    const where = whereClause((await check([1], [1])).text!);
+    expect(where).toMatch(/user_id/);
+  });
+
+  it("binds the ids rather than interpolating them", async () => {
+    const { text, params } = await check([41, 42], [41, 42]);
+    expect(params).toContain(41);
+    expect(text).not.toContain("41");
+  });
+
+  it("passes when every id comes back", async () => {
+    expect((await check([1, 2, 3], [1, 2, 3])).outcome).toBeNull();
+  });
+
+  it("refuses when one id does not", async () => {
+    const { outcome } = await check([1, 2, 3], [1, 3]);
+    expect(outcome).toBeInstanceOf(NotYours);
+    expect((outcome as Error).message).toBe("ref #2 does not exist or is not yours");
+  });
+
+  it("refuses when the account can reach none of them", async () => {
+    expect((await check([7, 8], [])).outcome).toBeInstanceOf(NotYours);
+  });
+
+  it("counts a duplicated id once", async () => {
+    // Otherwise the same id repeated would have to come back repeated, and a
+    // set of returned rows never does that.
+    const { outcome, params } = await check([5, 5, 5], [5]);
+    expect(outcome).toBeNull();
+    expect(params!.filter((p) => p === 5)).toHaveLength(1);
+  });
+
+  it("asks nothing at all for an empty list", async () => {
+    const { outcome } = await check([], []);
+    expect(outcome).toBeNull();
+    expect(db.all).not.toHaveBeenCalled();
+  });
+});
+
 describe("NotYours", () => {
   it("does not say whether the id exists", async () => {
     // A message that distinguished the two would turn this check into a probe

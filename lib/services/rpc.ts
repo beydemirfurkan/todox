@@ -7,7 +7,7 @@ import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
 import { BadRequest } from "./errors";
-import { assertProject, assertProjectAccess, assertRef, assertTask } from "./ownership";
+import { assertProject, assertProjectAccess, assertRefs, assertTask } from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
@@ -286,8 +286,10 @@ export const methods = {
   reportRefs: async ({ userId }, p: { refs: { id: number; hash: string | null }[] }) => {
     // Each row is proved to be the caller's before anything is written; the
     // ids come off a payload we handed out, but that is not a reason to trust
-    // them coming back.
-    await Promise.all(p.refs.map((r) => assertRef(userId, r.id)));
+    // them coming back. One query for the lot: the schema allows five hundred
+    // per call, and one join each is five hundred of them at once against a
+    // pool of ten.
+    await assertRefs(userId, p.refs.map((r) => r.id));
     await refsRepo.recordCheck(p.refs);
     return { recorded: p.refs.length };
   },
