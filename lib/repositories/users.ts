@@ -52,6 +52,36 @@ export const updatePasswordStmt = (id: number, passwordHash: string): Statement 
   params: [passwordHash, id],
 });
 
+/**
+ * Set the password only when this transaction is the one that burned the link.
+ *
+ * The recovery path cannot use the plain statement above. Its transaction is a
+ * fixed list with no JavaScript between the statements, so it cannot look at
+ * whether the consume before it matched a row and stop; every statement has to
+ * carry the condition itself. Two requests racing the same reset link both
+ * reached this write, and the loser overwrote the winner's password -- which
+ * matters least when they are the same person clicking twice and most when
+ * they are not.
+ *
+ * The claim is identified by the timestamp the consume wrote, which is how
+ * `project-memberships.createForAcceptedInvitationStmt` recognises its own
+ * invitation. Ordering is part of the contract: the consume runs first, or
+ * this sees nothing to match.
+ */
+export const updatePasswordForConsumedTokenStmt = (input: {
+  userId: number;
+  passwordHash: string;
+  tokenId: number;
+  consumedAt: string;
+}): Statement => ({
+  text: `UPDATE users SET password_hash = ?
+          WHERE id = ?
+            AND EXISTS (SELECT 1 FROM auth_tokens
+                         WHERE id = ? AND user_id = users.id AND used_at = ?)
+         RETURNING *`,
+  params: [input.passwordHash, input.userId, input.tokenId, input.consumedAt],
+});
+
 export const updatePassword = (id: number, passwordHash: string) =>
   runStmt(updatePasswordStmt(id, passwordHash));
 

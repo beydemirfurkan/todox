@@ -7,7 +7,7 @@ import type { AuthTokenPurpose, PublicUser } from "../types";
 import { hashPassword } from "../util/password";
 import { newSessionToken } from "../util/tokens";
 import * as templates from "./mail-templates";
-import { addDays } from "../util/time";
+import { addDays, now } from "../util/time";
 import { MIN_PASSWORD, publicUser, type Result } from "./auth";
 import { publicUrl } from "../public-url";
 import { send } from "./mailer";
@@ -63,9 +63,23 @@ export async function completePasswordReset(
   // password without the token consumed leaves a reset link that still works,
   // and the new password without the sessions dropped tells the owner they have
   // recovered the account while the intruder is still signed in.
+  //
+  // The consume goes first and everything that must not happen twice is written
+  // against the claim it makes. `resolve` above already checked the link was
+  // unused, but that check and this transaction are separate round trips, so two
+  // requests carrying the same link could both pass it. The rest of the list is
+  // safe to repeat -- deleting the same sessions again removes nothing, and an
+  // address does not become more verified -- and only the password is not.
+  const consumedAt = now();
+  const passwordHash = await hashPassword(password);
   await tx([
-    users.updatePasswordStmt(hit.user.id, await hashPassword(password)),
-    authTokens.consumeStmt(hit.row.id),
+    authTokens.consumeStmt(hit.row.id, consumedAt),
+    users.updatePasswordForConsumedTokenStmt({
+      userId: hit.user.id,
+      passwordHash,
+      tokenId: hit.row.id,
+      consumedAt,
+    }),
     // Whoever knew the old password loses their grip on the account.
     sessions.destroyAllForStmt(hit.user.id),
     // Agent tokens too. This is the recovery path -- you are here because you
@@ -136,6 +150,12 @@ export async function completeVerification(token: string): Promise<boolean> {
   if (!hit) return false;
   // Together: marking the address verified while leaving the link usable, or
   // burning the link without recording the result, are both worse than failing.
-  await tx([users.markEmailVerifiedStmt(hit.user.id), authTokens.consumeStmt(hit.row.id)]);
+  // The consume leads here too, for the same reason it does in the reset -- but
+  // nothing downstream needs guarding, because verifying an address twice
+  // arrives at the state it was already going to.
+  await tx([
+    authTokens.consumeStmt(hit.row.id, now()),
+    users.markEmailVerifiedStmt(hit.user.id),
+  ]);
   return true;
 }

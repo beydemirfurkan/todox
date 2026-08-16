@@ -34,12 +34,28 @@ export async function resolve(
   return user ? { row: found, user } : undefined;
 }
 
-export const consumeStmt = (id: number): Statement => ({
-  text: "UPDATE auth_tokens SET used_at = ? WHERE id = ?",
-  params: [now(), id],
+/**
+ * Claims the token, and answers whether it was this caller who claimed it.
+ *
+ * `used_at IS NULL` is the whole point. `resolve` checks it too, but that is a
+ * separate round trip: two requests carrying the same link can both pass it
+ * before either writes, and the update used to match on the id alone, so both
+ * committed. "Single use" was a property of the read, which is the one place it
+ * cannot be enforced.
+ *
+ * `consumedAt` is passed in rather than taken here, because the statements that
+ * depend on this one identify the claim by its timestamp -- the same shape
+ * `project-invitations.acceptStmt` and the membership insert beside it use.
+ * `RETURNING *` so a caller with somewhere to put the answer can have it.
+ */
+export const consumeStmt = (id: number, consumedAt: string): Statement => ({
+  text: `UPDATE auth_tokens SET used_at = ?
+          WHERE id = ? AND used_at IS NULL
+         RETURNING *`,
+  params: [consumedAt, id],
 });
 
-export const consume = (id: number) => runStmt(consumeStmt(id));
+export const consume = (id: number) => runStmt(consumeStmt(id, now()));
 
 /** Issuing a new one retires the old: two live reset links is one too many. */
 export const invalidateAll = (userId: number, purpose: AuthTokenPurpose) =>
