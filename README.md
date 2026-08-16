@@ -290,8 +290,9 @@ Details, and an honest list of what is **not** covered, in
 - Staleness is per-file hash; per-symbol would be the honest version. Hosted,
   it depends on the agent actually sending hashes — the instructions ask, and
   nothing can make it.
-- The smoke suites need a database. Point `DATABASE_URL` at a throwaway branch
-  and CI runs them; without the secret that job skips and says so.
+- Coverage sits around 39%, and the shape matters more than the number: the
+  agent surface, the auth boundary and the repositories that answer "is this
+  yours" are covered, while much of the UI is not.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

@@ -29,10 +29,15 @@ pnpm exec tsc --noEmit         # globals Next generates into .next/types
 pnpm smoke:auth                # if you touched anything under auth
 ```
 
-CI runs the first four. `pnpm test` needs no database — it covers the logic
-that has none: column allow-lists, RPC parameter validation, report windows,
-duration replay. The smoke suites do need one, so they only run where it is
-configured.
+CI runs all of these, and the other three smoke suites with them: it starts its
+own `postgres:18` service container, so nothing here depends on a secret and
+nothing is skipped. `pnpm test` needs no database of its own — it covers the
+logic that has none: column allow-lists, RPC parameter validation, report
+windows, duration replay.
+
+`pnpm test:coverage` writes a report to `coverage/`. There is no threshold, on
+purpose: a number becomes the target, and this one is misleading in both
+directions.
 
 ## The rules the codebase actually follows
 
@@ -72,9 +77,11 @@ see in review.
   exposes a `…Stmt` builder beside any write a service may need to pair with
   another table's — the SQL stays with the table that owns it and only the
   sequencing moves. There is no JavaScript between the statements, so a write
-  that needs the id of the row just inserted cannot use it; `tasks.create` is
-  a CTE for exactly that reason, and is the one place a repository writes
-  another table. This is not theoretical tidiness: a dropped second write once
+  that needs the id of the row just inserted cannot use it; `tasks.create` is a
+  CTE for exactly that reason, and so is `project-invitations.acceptWithNewUser`,
+  which has to create the account before it can grant it anything. Those two are
+  the exceptions; a third needs the same justification, not the same shape.
+  This is not theoretical tidiness: a dropped second write once
   left a task marked `done` whose last event was `doing`, and every daily
   report after it gained a permanent 24 hours.
 - **Never build a `SET` clause by hand.** Use `setClause(patch, COLUMNS)` from
