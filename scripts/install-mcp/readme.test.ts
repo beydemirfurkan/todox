@@ -25,7 +25,17 @@ import {
  * wrong, and the wrong one was the table a reader is most likely to copy.
  */
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..");
-const README = readFileSync(path.join(repoRoot, "README.md"), "utf8");
+
+/**
+ * Line endings normalised on the way in. A Windows checkout hands this file
+ * back with CRLF, and the snippet it is compared against is a `\n` string in
+ * TypeScript source -- so a multi-line assertion passes on the developer's
+ * machine and fails only on the Windows runner, which is the job that exists
+ * to catch exactly this and did.
+ *
+ * Every earlier assertion here matches a single line and never noticed.
+ */
+const README = readFileSync(path.join(repoRoot, "README.md"), "utf8").replace(/\r\n/g, "\n");
 
 /** The `~`-shortened form a document writes, from the absolute path we resolve. */
 function tildeForm(absolute: string): string {
