@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { CONTEXT_KINDS, ENTRY_KINDS, STATUSES } from "../constants";
+import {
+  CONTEXT_KINDS,
+  ENTRY_KINDS,
+  MAX_PRIORITY,
+  MIN_PRIORITY,
+  STATUSES,
+} from "../constants";
 import { BadRequest } from "./errors";
 
 /**
@@ -229,8 +235,8 @@ export const SHAPES = {
     priority: z
       .number()
       .int()
-      .min(1)
-      .max(3)
+      .min(MIN_PRIORITY)
+      .max(MAX_PRIORITY)
       .optional()
       .describe("1 high, 2 normal (default), 3 low. This is what reports call importance."),
     files: z
@@ -256,7 +262,7 @@ export const SHAPES = {
     title: z.string().min(1).max(MAX.line).optional(),
     body: z.string().max(MAX.text).optional(),
     status: z.enum(STATUSES).optional(),
-    priority: z.number().int().min(1).max(3).optional(),
+    priority: z.number().int().min(MIN_PRIORITY).max(MAX_PRIORITY).optional(),
     model,
   },
 
