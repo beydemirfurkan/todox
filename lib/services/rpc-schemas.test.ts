@@ -24,10 +24,64 @@ describe("update refinements cover every field they gate", () => {
     expect(() => parseParams("updateTask", { task_id: 1, priority: 1 })).not.toThrow();
   });
 
+  it("updateContext accepts each of its fields on its own", () => {
+    expect(() => parseParams("updateContext", { context_id: 1, kind: "gotcha" })).not.toThrow();
+    expect(() => parseParams("updateContext", { context_id: 1, title: "x" })).not.toThrow();
+    expect(() => parseParams("updateContext", { context_id: 1, body: "x" })).not.toThrow();
+  });
+
   it("still refuses a patch of nothing", () => {
     expect(() => parseParams("updateProject", { project: "todox" })).toThrow();
     expect(() => parseParams("updateTask", { task_id: 1 })).toThrow();
+    expect(() => parseParams("updateContext", { context_id: 1 })).toThrow(/at least one/);
+    // `model` is on every shape and patches nothing, so it must not satisfy
+    // the refinement on its own.
+    expect(() => parseParams("updateContext", { context_id: 1, model: "opus" })).toThrow(
+      /at least one/,
+    );
   });
+});
+
+/**
+ * The methods that remove something an earlier session wrote.
+ *
+ * They take an id and nothing else, which makes the id the entire request --
+ * so what is asserted here is that nothing *but* an id gets through. A string
+ * id in particular: `"1 OR 1=1"` is the shape a caller reaches for, and these
+ * are the two calls where a coerced one would delete a row.
+ */
+describe("the corrections an agent can make", () => {
+  const REMOVALS = [
+    ["deleteContext", "context_id"],
+    ["deleteEntry", "entry_id"],
+  ] as const;
+
+  for (const [method, field] of REMOVALS) {
+    it(`${method} accepts an integer id`, () => {
+      expect(() => parseParams(method, { [field]: 7 })).not.toThrow();
+    });
+
+    it(`${method} refuses an id that is not a number`, () => {
+      expect(() => parseParams(method, { [field]: "7 OR 1=1" })).toThrow(/invalid params/);
+      expect(() => parseParams(method, { [field]: "7" })).toThrow(/invalid params/);
+    });
+
+    it(`${method} refuses a fractional id`, () => {
+      expect(() => parseParams(method, { [field]: 1.5 })).toThrow(/invalid params/);
+    });
+
+    it(`${method} refuses a missing id`, () => {
+      expect(() => parseParams(method, {})).toThrow(/invalid params/);
+    });
+
+    it(`${method} refuses anything alongside the id`, () => {
+      // `strict()` everywhere, but these are the shapes where a stray key
+      // would be a caller aiming at a column.
+      expect(() => parseParams(method, { [field]: 7, user_id: 2 })).toThrow(
+        /invalid params/,
+      );
+    });
+  }
 });
 
 /**
@@ -118,9 +172,12 @@ describe("model field round-trips through parseParams on every method", () => {
     createTask: { title: "x" },
     updateTask: { task_id: 1, status: "doing" },
     logEntry: { task_id: 1, kind: "note", body: "x" },
+    deleteEntry: { entry_id: 1 },
     linkFiles: { task_id: 1, paths: [{ path: "/tmp/x" }] },
     reportRefs: { refs: [{ id: 1, hash: "a".repeat(64) }] },
     addContext: { kind: "convention", title: "x", body: "x" },
+    updateContext: { context_id: 1, body: "x" },
+    deleteContext: { context_id: 1 },
     search: { query: "x" },
     activityReport: { period: "today" },
     recordClientInfo: { name: "claude-code" },

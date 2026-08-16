@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { describe, expect, it } from "vitest";
 
+import { SHAPES } from "@/lib/services/rpc-schemas";
 import { instructions, registerTools, type Workspace } from "./tools";
 
 type Registered = {
@@ -265,6 +266,45 @@ describe("annotations", () => {
     expect(del.config.annotations?.readOnlyHint).toBeUndefined();
     expect(del.config.description).toContain("confirm");
     expect(Object.keys(del.config.inputSchema)).toContain("confirm");
+  });
+});
+
+/**
+ * Every method reaches an agent, or is on the list of the ones that do not.
+ *
+ * Registering a tool is step four of a six-file change, and the four steps
+ * before it all fail loudly: a schema without a handler will not compile, a
+ * handler without a schema will not either. This one fails by silence — the
+ * method works over `/api/rpc` and simply does not exist as a tool, which is
+ * indistinguishable from a model choosing not to call it.
+ *
+ * Counted rather than matched by name, because the two do not line up:
+ * `reportRefs` is registered as `report_file_hashes`.
+ */
+describe("the agent surface covers the method list", () => {
+  /** Server-side only; the agent is the thing it records, so it is not a tool. */
+  const NEVER_A_TOOL = ["recordClientInfo"];
+  /** The local process checks its own files, so hosted is the only one that asks. */
+  const HOSTED_ONLY = ["reportRefs"];
+
+  const methods = Object.keys(SHAPES).length;
+
+  it("registers every method hosted, bar the server-side one", () => {
+    expect(harness(remoteWs).tools.size).toBe(methods - NEVER_A_TOOL.length);
+  });
+
+  it("registers every method locally, bar that one and the hosted-only one", () => {
+    expect(harness(localWs).tools.size).toBe(
+      methods - NEVER_A_TOOL.length - HOSTED_ONLY.length,
+    );
+  });
+
+  it("differs between the two transports by exactly the hosted-only tool", () => {
+    // The agent surface is defined once; what changes between transports is a
+    // Workspace, not a copy of the tool list.
+    const local = new Set(harness(localWs).tools.keys());
+    const missing = [...harness(remoteWs).tools.keys()].filter((n) => !local.has(n));
+    expect(missing).toEqual(["report_file_hashes"]);
   });
 });
 

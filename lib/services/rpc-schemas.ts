@@ -272,6 +272,17 @@ export const SHAPES = {
     model,
   },
 
+  /**
+   * For an entry that was wrong when it was written -- a decision recorded
+   * before it was made, a handoff posted to the wrong task. An entry that has
+   * merely been overtaken is history, and history is the product: correct it
+   * with another entry rather than removing this one.
+   */
+  deleteEntry: {
+    entry_id: z.number().int(),
+    model,
+  },
+
   linkFiles: {
     task_id: z.number().int(),
     paths: z
@@ -318,6 +329,31 @@ export const SHAPES = {
     kind: z.enum(CONTEXT_KINDS),
     title: z.string().min(1).max(MAX.line),
     body: z.string().min(1).max(MAX.text),
+    model,
+  },
+
+  /**
+   * The other half of `addContext`, and the reason it exists: a note that
+   * cannot be corrected stops being worth trusting the moment it is wrong.
+   */
+  updateContext: {
+    context_id: z.number().int(),
+    kind: z.enum(CONTEXT_KINDS).optional(),
+    title: z.string().min(1).max(MAX.line).optional(),
+    body: z
+      .string()
+      .min(1)
+      .max(MAX.text)
+      .optional()
+      .describe("Replaces the body outright. Send the whole note, not a diff."),
+    model,
+  },
+
+  deleteContext: {
+    context_id: z
+      .number()
+      .int()
+      .describe("Prefer update_context when the note is merely out of date."),
     model,
   },
 
@@ -395,6 +431,14 @@ const OBJECTS: Record<string, z.ZodType> = {
         p.status !== undefined ||
         p.priority !== undefined,
       { message: "pass at least one of title, body, status or priority" },
+    ),
+
+  updateContext: z
+    .object(SHAPES.updateContext)
+    .strict()
+    .refine(
+      (p) => p.kind !== undefined || p.title !== undefined || p.body !== undefined,
+      { message: "pass at least one of kind, title or body" },
     ),
 
   updateProject: z

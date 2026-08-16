@@ -7,7 +7,14 @@ import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
 import { BadRequest } from "./errors";
-import { assertProject, assertProjectAccess, assertRefs, assertTask } from "./ownership";
+import {
+  assertContext,
+  assertEntry,
+  assertProject,
+  assertProjectAccess,
+  assertRefs,
+  assertTask,
+} from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
@@ -312,6 +319,30 @@ export const methods = {
       title: p.title,
       body: p.body,
     });
+  },
+
+  updateContext: async (
+    { userId },
+    p: { context_id: number; kind?: ContextKind; title?: string; body?: string },
+  ) => {
+    const { context_id: id, ...patch } = p;
+    // `contexts.update` takes no user id -- this is the only thing standing
+    // between a context id off the wire and somebody else's note.
+    await assertContext(userId, id);
+    await contextsRepo.update(id, patch);
+    return contextsRepo.byId(id);
+  },
+
+  deleteContext: async ({ userId }, p: { context_id: number }) => {
+    await assertContext(userId, p.context_id);
+    const removed = await contextsRepo.remove(p.context_id);
+    return { deleted: removed > 0 };
+  },
+
+  deleteEntry: async ({ userId }, p: { entry_id: number }) => {
+    await assertEntry(userId, p.entry_id);
+    const removed = await entriesRepo.remove(p.entry_id);
+    return { deleted: removed > 0 };
   },
 
   search: ({ userId }, p: { query: string; limit?: number }) =>

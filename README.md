@@ -214,10 +214,12 @@ TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
 | `create_task` | Capture work. Pass `cwd` and it finds the project, **registering one for that repo if it has never seen it** — so the agent never stops to ask. |
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. |
+| `delete_entry` | For an entry that was wrong when it was written. One overtaken by later work is history, not an error — append instead. |
 | `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
 | `link_files` | Attach paths with their hashes. Safe to call again for the same file. |
 | `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
+| `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
 | `search` | Across all your projects — *have I solved this before?* |
 | `get_task` | One task with its log and linked files. |
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |

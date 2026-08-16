@@ -24,6 +24,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import * as contextsRepo from "../lib/repositories/contexts";
+import * as entriesRepo from "../lib/repositories/entries";
 import * as projectsRepo from "../lib/repositories/projects";
 import * as tasksRepo from "../lib/repositories/tasks";
 import * as usersRepo from "../lib/repositories/users";
@@ -336,6 +338,57 @@ async function runSuite(mode: Mode, token: string) {
     "account-wide note reached both · stale warning did not travel",
   );
 
+  // The claim this product makes is that the log is worth trusting, and a log
+  // that can only be added to stops being worth trusting the moment it is
+  // wrong. So: write a note, correct it, and check the briefing the next
+  // session gets carries the correction rather than both versions.
+  console.log("\n--- a note can be corrected, and the briefing shows the correction ---");
+  const note = JSON.parse(
+    await text("add_context", {
+      cwd: SCRATCH,
+      kind: "gotcha",
+      title: "SMOKE-CORRECTION",
+      body: "WRONG: the first thing this session believed.",
+      ...(mode.local ? {} : { repo_root: SCRATCH }),
+    }),
+  );
+
+  await text("update_context", {
+    context_id: note.id,
+    body: "RIGHT: what turned out to be true.",
+  });
+
+  const corrected = JSON.parse(await text("get_context", { cwd: SCRATCH }));
+  const noteIn = (brief: { project_context: { title: string; body: string }[] }) =>
+    brief.project_context.find((c) => c.title === "SMOKE-CORRECTION");
+
+  if (noteIn(corrected)?.body.includes("WRONG"))
+    throw new Error("the briefing still carries the note the session corrected");
+  if (!noteIn(corrected)?.body.includes("RIGHT"))
+    throw new Error("the correction never reached the briefing");
+  console.log("corrected in place:", noteIn(corrected)?.body);
+
+  // An entry that was wrong when it was written, rather than overtaken.
+  const slip = JSON.parse(
+    await text("log_entry", {
+      task_id: openA,
+      kind: "decision",
+      body: "SMOKE-SLIP: recorded against the wrong task.",
+      model: MODEL,
+    }),
+  );
+  await text("delete_entry", { entry_id: slip.id });
+
+  const afterDelete = JSON.parse(await text("get_task", { task_id: openA }));
+  if (JSON.stringify(afterDelete.entries).includes("SMOKE-SLIP"))
+    throw new Error("a deleted entry is still in the task's log");
+
+  await text("delete_context", { context_id: note.id });
+  const afterRemoval = JSON.parse(await text("get_context", { cwd: SCRATCH }));
+  if (noteIn(afterRemoval))
+    throw new Error("a deleted note is still in the briefing");
+  console.log("entry and note both removed, and gone from what the next session reads");
+
   console.log("\n--- report sees it ---");
   const md = await text("activity_report", {
     period: "today",
@@ -406,6 +459,48 @@ async function main() {
     params: { task_id: anyTask.id },
   });
   console.log(denied.status, (await denied.json()).error);
+
+  // The methods that remove somebody's work take an id and nothing else, and
+  // the repository call underneath takes no account id at all -- `remove(id)`
+  // deletes whatever it is handed. The assert above it is the only thing in
+  // the way, so a foreign id has to come back 404 and the row has to survive.
+  console.log("\n--- and cannot delete somebody else's note or entry ---");
+  // Made here rather than reused from the suite: the suite ends by correcting
+  // and then removing its own note, so by this point there is nothing of its
+  // making left to defend, and an intruder refused access to a row that was
+  // already gone would pass for the wrong reason.
+  const victimNote = await contextsRepo.create({
+    user_id: user.id,
+    project_id: project.id,
+    kind: "gotcha",
+    title: "SMOKE-VICTIM",
+    body: "Belongs to the owner. An intruder must not be able to remove it.",
+  });
+  const victimEntry = (await entriesRepo.listByTask(anyTask.id))[0];
+  for (const [label, method, params, stillThere] of [
+    [
+      "delete_context",
+      "deleteContext",
+      { context_id: victimNote?.id },
+      async () => Boolean(await contextsRepo.byId(victimNote!.id)),
+    ],
+    [
+      "delete_entry",
+      "deleteEntry",
+      { entry_id: victimEntry?.id },
+      async () => Boolean(await entriesRepo.byId(victimEntry!.id)),
+    ],
+  ] as const) {
+    if (params[Object.keys(params)[0] as keyof typeof params] === undefined)
+      throw new Error(`the suite never created anything for ${label} to defend`);
+    const refused = await rpc(intruderToken, { method, params });
+    const body = await refused.json();
+    if (refused.status !== 404)
+      throw new Error(`${label} answered ${refused.status}, not 404: ${body.error}`);
+    if (!(await stillThere()))
+      throw new Error(`${label} was refused and deleted the row anyway`);
+    console.log(`${label}: ${refused.status} ${body.error} · row survived`);
+  }
 
   console.log("\n--- an unauthenticated call is refused, on both surfaces ---");
   const anon = await rpc(null, { method: "listProjects" });
