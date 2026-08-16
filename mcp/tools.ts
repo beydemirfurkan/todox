@@ -662,6 +662,18 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       : {},
   );
 
+  tool("unlink_file", "unlinkRef", {
+    title: "Remove a file link",
+    description:
+      "For a path that is no longer what the task is about — the file was deleted, renamed, or attached by mistake. It removes the link only; nothing on disk is touched. A link left behind produces a stale warning nobody can ever clear, in every briefing from now on.",
+  });
+
+  tool("accept_file_change", "acceptRef", {
+    title: "Accept a changed file as still correct",
+    description:
+      "Clears the stale warning on a linked file once you have read the change and the note still holds. Nothing else can clear it: the server has no copy of the repository, so it can only ever see that the two hashes differ, never that the difference is fine. Report the file's current hash first — hosted, with report_file_hashes; locally that already happened when you read the briefing. If the note no longer holds, fix the note instead of accepting the file.",
+  });
+
   /**
    * The remote half of staleness.
    *

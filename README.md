@@ -218,6 +218,7 @@ TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
 | `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
 | `link_files` | Attach paths with their hashes. Safe to call again for the same file. |
 | `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
+| `accept_file_change` · `unlink_file` | Clear a stale warning once you have read the change, or drop a link that has stopped meaning anything. Nothing else can clear it — the server never sees the file. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
 | `search` | Across all your projects — *have I solved this before?* |

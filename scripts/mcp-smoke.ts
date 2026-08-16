@@ -260,6 +260,30 @@ async function runSuite(mode: Mode, token: string) {
   if (after !== "changed")
     throw new Error(`an edited file should read changed in ${mode.label}, got ${after}`);
   console.log("after editing the file:", after);
+
+  // A stale warning nothing can clear is worse than no warning: it returns in
+  // every briefing from here on, and a session learns to read past it. Only
+  // the agent can clear this one -- the server has no copy of the file, so all
+  // it can ever know is that two hashes differ, never that the difference is
+  // fine. Checked here, while the file is still edited: the line below puts it
+  // back, and a warning that cleared itself would prove nothing.
+  console.log("\n--- and the agent can say it has read the change ---");
+  const accepted = JSON.parse(await text("accept_file_change", { ref_id: refId }));
+  if (!accepted.accepted)
+    throw new Error(`accept_file_change refused: ${accepted.reason ?? "no reason given"}`);
+
+  const settled = JSON.parse(await text("get_task", { task_id: taskId })).files[0].status;
+  if (settled === "changed") throw new Error("the warning survived being accepted");
+  console.log("after accepting:", settled);
+
+  await text("unlink_file", { ref_id: refId });
+  const unlinked = JSON.parse(await text("get_task", { task_id: taskId })).files as {
+    id: number;
+  }[];
+  if (unlinked.some((f) => f.id === refId))
+    throw new Error("an unlinked file is still attached to the task");
+  console.log("and a link that stopped meaning anything can be dropped");
+
   writeFileSync(marker, '{"name":"smoke-repo"}\n');
 
   /**

@@ -302,6 +302,24 @@ export const SHAPES = {
     model,
   },
 
+  unlinkRef: {
+    ref_id: z
+      .number()
+      .int()
+      .describe("From the `refs` of get_context or get_task. Removes the link, not the file."),
+    model,
+  },
+
+  /**
+   * Closes a stale warning the agent has actually looked into. Nothing else
+   * can: the server has no copy of the file, so `report_file_hashes` can only
+   * ever tell it the two hashes differ, never that the difference is fine.
+   */
+  acceptRef: {
+    ref_id: z.number().int(),
+    model,
+  },
+
   /**
    * Reports what the agent found on disk. The web UI has no filesystem, so
    * this is the only way it can ever show that a note has gone stale.

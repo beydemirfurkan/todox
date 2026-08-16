@@ -43,20 +43,23 @@ describe("update refinements cover every field they gate", () => {
 });
 
 /**
- * The methods that remove something an earlier session wrote.
+ * The methods that act on something an earlier session wrote.
  *
- * They take an id and nothing else, which makes the id the entire request --
+ * Each takes an id and nothing else, which makes the id the entire request --
  * so what is asserted here is that nothing *but* an id gets through. A string
  * id in particular: `"1 OR 1=1"` is the shape a caller reaches for, and these
- * are the two calls where a coerced one would delete a row.
+ * are the calls where a coerced one would remove a row or silence a warning
+ * on somebody else's.
  */
 describe("the corrections an agent can make", () => {
-  const REMOVALS = [
+  const ID_ONLY = [
     ["deleteContext", "context_id"],
     ["deleteEntry", "entry_id"],
+    ["unlinkRef", "ref_id"],
+    ["acceptRef", "ref_id"],
   ] as const;
 
-  for (const [method, field] of REMOVALS) {
+  for (const [method, field] of ID_ONLY) {
     it(`${method} accepts an integer id`, () => {
       expect(() => parseParams(method, { [field]: 7 })).not.toThrow();
     });
@@ -175,6 +178,8 @@ describe("model field round-trips through parseParams on every method", () => {
     deleteEntry: { entry_id: 1 },
     linkFiles: { task_id: 1, paths: [{ path: "/tmp/x" }] },
     reportRefs: { refs: [{ id: 1, hash: "a".repeat(64) }] },
+    unlinkRef: { ref_id: 1 },
+    acceptRef: { ref_id: 1 },
     addContext: { kind: "convention", title: "x", body: "x" },
     updateContext: { context_id: 1, body: "x" },
     deleteContext: { context_id: 1 },

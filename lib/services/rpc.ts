@@ -12,6 +12,7 @@ import {
   assertEntry,
   assertProject,
   assertProjectAccess,
+  assertRef,
   assertRefs,
   assertTask,
 } from "./ownership";
@@ -299,6 +300,28 @@ export const methods = {
     await assertRefs(userId, p.refs.map((r) => r.id));
     await refsRepo.recordCheck(p.refs);
     return { recorded: p.refs.length };
+  },
+
+  unlinkRef: async ({ userId }, p: { ref_id: number }) => {
+    await assertRef(userId, p.ref_id);
+    const removed = await refsRepo.unlink(p.ref_id);
+    return { unlinked: removed > 0 };
+  },
+
+  acceptRef: async ({ userId }, p: { ref_id: number }) => {
+    await assertRef(userId, p.ref_id);
+    // `acceptSeen` re-baselines onto what an agent last reported, so it does
+    // nothing at all until one has looked. Saying which of the two happened
+    // matters: a silent no-op here reads as "warning cleared", and the next
+    // briefing carrying the same warning is then the confusing part.
+    const accepted = await refsRepo.acceptSeen(p.ref_id);
+    return accepted > 0
+      ? { accepted: true }
+      : {
+          accepted: false,
+          reason:
+            "nothing has been reported for this file yet, so there is no state to accept — hash it and send report_file_hashes first",
+        };
   },
 
   addContext: async (
