@@ -16,11 +16,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   tx: vi.fn(),
   resolve: vi.fn(),
-  consumeStmt: vi.fn((id: number) => ({ text: "consume", params: [id] })),
+  consumeStmt: vi.fn((id: number, consumedAt: string) => ({
+    text: "consume",
+    params: [id, consumedAt],
+  })),
   invalidateAll: vi.fn(),
   createAuthToken: vi.fn(),
   purgeExpired: vi.fn(),
-  updatePasswordStmt: vi.fn((id: number) => ({ text: "password", params: [id] })),
+  updatePasswordForConsumedTokenStmt: vi.fn((input: { userId: number }) => ({
+    text: "password",
+    params: [input.userId],
+  })),
   markEmailVerifiedStmt: vi.fn((id: number) => ({ text: "verified", params: [id] })),
   destroySessionsStmt: vi.fn((id: number) => ({ text: "sessions", params: [id] })),
   destroyApiTokensStmt: vi.fn((id: number) => ({ text: "api-tokens", params: [id] })),
@@ -39,7 +45,7 @@ vi.mock("../repositories/auth-tokens", () => ({
 }));
 vi.mock("../repositories/users", () => ({
   byEmail: mocks.byEmail,
-  updatePasswordStmt: mocks.updatePasswordStmt,
+  updatePasswordForConsumedTokenStmt: mocks.updatePasswordForConsumedTokenStmt,
   markEmailVerifiedStmt: mocks.markEmailVerifiedStmt,
 }));
 vi.mock("../repositories/sessions", () => ({
@@ -128,23 +134,48 @@ describe("completing a password reset", () => {
     // which is already the account's. Everything else takes an id, and taking
     // the wrong one would sign somebody else out or change their password.
     await run();
-    for (const stmt of [
-      mocks.updatePasswordStmt,
-      mocks.destroySessionsStmt,
-      mocks.destroyApiTokensStmt,
-    ])
+    for (const stmt of [mocks.destroySessionsStmt, mocks.destroyApiTokensStmt])
       expect(stmt).toHaveBeenCalledWith(USER.id, ...stmt.mock.calls[0]!.slice(1));
+    expect(mocks.updatePasswordForConsumedTokenStmt).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: USER.id }),
+    );
   });
 
   it("burns the row the link resolved to, not one the caller named", async () => {
     await run();
-    expect(mocks.consumeStmt).toHaveBeenCalledWith(3);
+    expect(mocks.consumeStmt).toHaveBeenCalledWith(3, expect.any(String));
   });
 
   it("stores a hash, never the password", async () => {
     await run("a-long-enough-password");
-    expect(mocks.updatePasswordStmt).toHaveBeenCalledWith(USER.id, "hashed");
+    expect(mocks.updatePasswordForConsumedTokenStmt).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: USER.id, passwordHash: "hashed" }),
+    );
     expect(JSON.stringify(mocks.tx.mock.calls)).not.toContain("a-long-enough-password");
+  });
+
+  /**
+   * Two requests can carry the same link. `resolve` checks `used_at IS NULL`,
+   * but that read and this transaction are separate round trips, so both can
+   * pass it -- and there is no JavaScript inside `tx` to notice the loser and
+   * stop. The consume claims the row, and the password write is the one
+   * statement in the list that must not happen twice, so it asks for that claim
+   * by name. The rest are safe to repeat.
+   */
+  it("burns the link before it writes anything else", async () => {
+    await run();
+    // Ordering is the contract, not an accident of how the list was typed: the
+    // password statement looks for a claim the consume has not made yet if it
+    // runs first.
+    expect(statementsSent()[0]).toBe("consume");
+  });
+
+  it("ties the password write to the claim the consume just made", async () => {
+    await run();
+    const [tokenId, consumedAt] = mocks.consumeStmt.mock.calls[0]!;
+    expect(mocks.updatePasswordForConsumedTokenStmt).toHaveBeenCalledWith(
+      expect.objectContaining({ tokenId, consumedAt }),
+    );
   });
 
   it("verifies the address, since reaching the inbox proved it", async () => {
@@ -199,6 +230,15 @@ describe("completing a verification", () => {
     await expect(recovery.completeVerification("token")).resolves.toBe(true);
     expect(mocks.tx).toHaveBeenCalledTimes(1);
     expect(statementsSent()).toEqual(expect.arrayContaining(["verified", "consume"]));
+  });
+
+  it("burns the link first here too, though nothing downstream needs it to", async () => {
+    // Verifying an address twice arrives where it was already going, so this
+    // ordering buys nothing on its own. It is here so the two recovery paths
+    // read the same way -- the next statement added below it will be written by
+    // somebody who assumes the claim has been made.
+    await recovery.completeVerification("token");
+    expect(statementsSent()[0]).toBe("consume");
   });
 
   it("answers false for a link that does not resolve, and writes nothing", async () => {

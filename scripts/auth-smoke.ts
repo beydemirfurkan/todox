@@ -7,7 +7,7 @@
  */
 import "./env";
 
-import { one, run } from "../lib/db/client";
+import { one, run, tx } from "../lib/db/client";
 import * as apiTokensRepo from "../lib/repositories/api-tokens";
 import * as authTokensRepo from "../lib/repositories/auth-tokens";
 import * as sessionsRepo from "../lib/repositories/sessions";
@@ -59,6 +59,16 @@ const issueRaw = async (userId: number, purpose: "reset" | "verify", token: stri
 };
 
 const rnd = (p: string) => `${p}-${Math.random().toString(36).slice(2)}`;
+
+/** Read back through SQL: the repository has no getter for either of these,
+ *  and both are exactly what the race check needs to see. */
+const storedHash = async (userId: number) =>
+  (await one<{ password_hash: string }>("SELECT password_hash FROM users WHERE id = ?", [userId]))
+    ?.password_hash;
+
+const usedAt = async (tokenId: number) =>
+  (await one<{ used_at: string | null }>("SELECT used_at FROM auth_tokens WHERE id = ?", [tokenId]))
+    ?.used_at;
 
 async function countResetTokens() {
   const row = await one<{ n: string }>(
@@ -152,6 +162,42 @@ async function main() {
     "reset link is single use",
     (await completePasswordReset(secondReset, "another-one")).ok === false,
   );
+
+  line("two requests racing one link change the password once");
+  // The check above is the sequential case, and `resolve` catches that on its
+  // own. This is the one it cannot: `resolve` and the transaction are separate
+  // round trips, so two requests carrying the same link can both pass the
+  // `used_at IS NULL` read before either writes. There is no JavaScript inside
+  // `tx()` to spot the loser and stop, so the writes carry the condition.
+  //
+  // Driven through the statements rather than by firing two requests at once,
+  // because a race you have to win a coin toss to observe is not a check. What
+  // the second transaction here does is exactly what a losing racer does.
+  const raced = await issueRaw(user.id, "reset", rnd("reset"));
+  const racedRow = await one<{ id: number }>(
+    "SELECT id FROM auth_tokens WHERE token_hash = ?",
+    [hashToken(raced)],
+  );
+  if (!racedRow) throw new Error("the token just issued is not there");
+
+  const attempt = async (passwordHash: string, consumedAt: string) =>
+    tx([
+      authTokensRepo.consumeStmt(racedRow.id, consumedAt),
+      usersRepo.updatePasswordForConsumedTokenStmt({
+        userId: user.id,
+        passwordHash,
+        tokenId: racedRow.id,
+        consumedAt,
+      }),
+    ]);
+
+  const winnerAt = new Date().toISOString();
+  await attempt("winner-hash", winnerAt);
+  expect("the request that claims the link sets the password", (await storedHash(user.id)) === "winner-hash");
+
+  await attempt("loser-hash", new Date(Date.now() + 1).toISOString());
+  expect("the one that lost the claim writes nothing", (await storedHash(user.id)) === "winner-hash");
+  expect("and the link stays burned by the winner", (await usedAt(racedRow.id)) === winnerAt);
 
   line("a reset revokes agent tokens, not just sessions");
   // A token that never expires and carries the whole account is exactly what
