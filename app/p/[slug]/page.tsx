@@ -25,6 +25,7 @@ import {
   inviteProjectAction,
   removeProjectMemberAction,
   revokeProjectInviteAction,
+  updateProjectAction,
 } from "../../actions";
 import { authMessages } from "../../auth-messages";
 import {
@@ -157,6 +158,43 @@ export default async function ProjectPage({
               className="ml-auto shrink-0 text-small"
             >
               <div className="space-y-5">
+              <section>
+                <h3 className="display mb-2 text-[15px] font-bold">{t("projectDetails")}</h3>
+                {/* `updateProjectAction` was written, tested and wired to
+                    nothing, so there was no way to rename a project or fix its
+                    summary from here at all. `repo_url` is the worse half: it
+                    is the only identifier that means the same thing on another
+                    machine, it is shown at the top of this page, and only an
+                    agent could set it. */}
+                <form action={updateProjectAction} className="space-y-2">
+                  <input type="hidden" name="id" value={project.id} />
+                  <Field label={t("projectNameLabel")}>
+                    <input name="name" defaultValue={project.name} required />
+                  </Field>
+                  <Field label={t("projectPathLabel")}>
+                    <input
+                      name="root_path"
+                      defaultValue={project.root_path ?? ""}
+                      placeholder={t("projectPathPh")}
+                      className="mono text-small"
+                    />
+                  </Field>
+                  <Field label={t("projectRepoLabel")}>
+                    <input
+                      name="repo_url"
+                      defaultValue={project.repo_url ?? ""}
+                      placeholder={t("projectRepoPh")}
+                      className="mono text-small"
+                    />
+                  </Field>
+                  <p className="text-[13px] text-muted">{t("projectRepoNote")}</p>
+                  <Field label={t("projectSummaryLabel")}>
+                    <textarea name="summary" defaultValue={project.summary ?? ""} />
+                  </Field>
+                  <SubmitButton pendingLabel={t("working")}>{t("apply")}</SubmitButton>
+                </form>
+              </section>
+
               <section>
                 <h3 className="display mb-2 text-[15px] font-bold">{t("sharing")}</h3>
                 <SharePanel

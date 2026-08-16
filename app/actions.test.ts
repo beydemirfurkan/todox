@@ -33,6 +33,9 @@ const mocks = vi.hoisted(() => ({
   sharingSetSharing: vi.fn(),
   sharingRotate: vi.fn(),
   projectsUpdate: vi.fn(),
+  // Typed with its arguments: the assertions below read `calls[0][1]`, and a
+  // `vi.fn()` with no signature has an empty tuple there rather than a value.
+  projectsCreate: vi.fn(async (..._args: unknown[]) => ({ id: 1, slug: "todox" })),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -62,7 +65,7 @@ vi.mock("@/lib/repositories/projects", () => ({
   update: mocks.projectsUpdate,
   bySlug: vi.fn(),
   byId: vi.fn(),
-  create: vi.fn(),
+  create: mocks.projectsCreate,
   remove: vi.fn(),
   nextFreeSlug: vi.fn(),
 }));
@@ -234,4 +237,49 @@ describe("every exported action", () => {
       expect(body).toMatch(/user\.id/);
     });
   }
+});
+
+/**
+ * The web write path stores a project the same way the agent surface does.
+ *
+ * `lib/services/rpc.ts` normalises `root_path` and scrubs `repo_url` before
+ * either reaches the row; these two actions did neither. That is not cosmetic:
+ * resolution matches on the normalised form, so a path saved here with
+ * backslashes is a path an agent arriving with the same `cwd` will not match --
+ * and a project that fails to resolve is registered a second time rather than
+ * reported. Splitting one repository in two is the failure this codebase
+ * already has a `merge_projects` method to undo.
+ */
+describe("a project saved from the web is stored the way an agent would store it", () => {
+  const WINDOWS = "C:\\Users\\Furkan\\todox";
+
+  it("updateProjectAction folds the separators", async () => {
+    await actions.updateProjectAction(form({ id: "1", name: "todox", root_path: WINDOWS }));
+    const patch = mocks.projectsUpdate.mock.calls[0]![2] as { root_path: string };
+    expect(patch.root_path).toBe("C:/Users/Furkan/todox");
+  });
+
+  it("createProjectAction folds them too", async () => {
+    await actions.createProjectAction(form({ name: "todox", root_path: WINDOWS }));
+    const created = mocks.projectsCreate.mock.calls[0]![1] as { root_path: string };
+    expect(created.root_path).toBe("C:/Users/Furkan/todox");
+  });
+
+  it("updateProjectAction keeps the remote, which is the cross-machine identity", async () => {
+    // Displayed on the project page and, until now, settable only by an agent.
+    await actions.updateProjectAction(
+      form({ id: "1", name: "todox", repo_url: "git@github.com:me/todox.git" }),
+    );
+    const patch = mocks.projectsUpdate.mock.calls[0]![2] as { repo_url: string | null };
+    expect(patch.repo_url).toBeTruthy();
+  });
+
+  it("stores an empty path and an empty remote as null, not as an empty string", async () => {
+    // `repoKey` folds a remote to an identity; an empty string is a value that
+    // would compare equal across unrelated projects.
+    await actions.updateProjectAction(form({ id: "1", name: "todox" }));
+    const patch = mocks.projectsUpdate.mock.calls[0]![2] as Record<string, unknown>;
+    expect(patch.root_path).toBeNull();
+    expect(patch.repo_url).toBeNull();
+  });
 });
