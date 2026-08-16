@@ -94,7 +94,6 @@ export function NotificationBell({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
-        aria-label={labels.label}
         onClick={() => {
           const next = !open;
           setOpen(next);
@@ -107,6 +106,16 @@ export function NotificationBell({
             {count > 9 ? "9+" : count}
           </span>
         )}
+        {/* The name, from the live count rather than from an `aria-label`.
+            That label was translated on the server out of the number at render
+            time, so opening the panel dropped the badge to zero and left the
+            button still announcing "N unread" until the next navigation --
+            with the badge `aria-hidden`, there was no other source. `count` is
+            only ever the server's number or zero, so both readings are already
+            to hand. It is a live region because it changes without one. */}
+        <span className="sr-only" role="status" aria-live="polite">
+          {count > 0 ? labels.label : labels.title}
+        </span>
       </button>
 
       <div

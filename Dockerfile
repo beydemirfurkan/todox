@@ -42,10 +42,15 @@ USER node
 EXPOSE 3000
 
 # Answers only once the server is actually serving, so a deploy that boots and
-# then fails to start is not reported as healthy. /login is a real page and
-# needs no session.
+# then fails to start is not reported as healthy.
+#
+# This fetched /login, which renders a React page and touches nothing else --
+# so a container whose database was unreachable reported itself healthy for as
+# long as it kept serving HTML, which is exactly the window where a restart or
+# a held deploy would have helped. /api/health takes a connection from the pool
+# and round-trips a statement, and answers 503 when it cannot.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Migrations are not run here. Applying DDL is a decision, and the schema is
 # idempotent precisely so it can be made after a deploy rather than during one:

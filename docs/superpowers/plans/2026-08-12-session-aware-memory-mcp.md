@@ -1,5 +1,14 @@
 # Session-Aware Memory MCP (SAM) Implementation Plan
 
+
+> **Historical record, not the current architecture.** Dated 12 August 2026. Kept
+> because it is what was decided and why, which is the point of this project —
+> not because it describes how todox works now. It was written against a
+> serverless deployment on a managed Postgres with a platform cron; todox runs
+> as a container beside its own database, and the driver, the deployment and
+> the scheduling assumptions here are all out of date. The design was approved
+> and never built. Read it as an argument, and re-cost it before acting on it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every todox RPC call is recorded server-side, grouped by session, and surfaced as a structured `last_session` in `get_context` — even if the agent forgets to call `log_entry`. Zero client cooperation required.

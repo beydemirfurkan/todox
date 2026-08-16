@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 
 import { instructions, registerTools, type Workspace } from "@/mcp/tools";
 import { clientIp } from "@/lib/server/client-ip";
+import { logError } from "@/lib/server/log";
 import { normalise, record } from "@/lib/server/client-info";
 import { userForApiToken } from "@/lib/services/auth";
 import { BadRequest } from "@/lib/services/errors";
@@ -63,7 +64,7 @@ async function captureClientInfo(token: string, body: unknown): Promise<void> {
   try {
     await record(token, info);
   } catch (e) {
-    console.error("mcp clientInfo", e);
+    logError("mcp.clientInfo", e);
   }
 }
 
@@ -88,7 +89,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     return await answer(req);
   } catch (e) {
-    console.error("mcp", e);
+    logError("mcp.failed", e);
     return json(
       { jsonrpc: "2.0", error: { code: -32603, message: "the server could not complete that call" } },
       500,
@@ -168,7 +169,8 @@ async function answer(req: Request): Promise<Response> {
       // failures must not say whether the id exists for somebody else, and
       // `NotYours` is already worded for that.
       if (e instanceof BadRequest || e instanceof NotYours) throw e;
-      console.error("mcp", method, e);
+      // The method, never the params: those carry task bodies and notes.
+      logError("mcp.tool", e, { method });
       throw new Error("the server could not complete that call");
     }
   };

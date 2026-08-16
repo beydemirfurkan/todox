@@ -25,6 +25,7 @@ import {
   inviteProjectAction,
   removeProjectMemberAction,
   revokeProjectInviteAction,
+  updateProjectAction,
 } from "../../actions";
 import { authMessages } from "../../auth-messages";
 import {
@@ -92,10 +93,9 @@ export default async function ProjectPage({
   if (!project) notFound();
 
   const owner = project.access_role === "owner";
-  const [all, projectContext, stale, members, invitations] = await Promise.all([
+  const [all, projectContext, members, invitations] = await Promise.all([
     tasksRepo.listByProject(project.id, "all"),
     contexts.listByProject(user.id, project.id),
-    staleRefs(user.id, project),
     // Everyone with access sees who else has it. This used to be owner-only,
     // which meant the person who had just been invited into a project could
     // not see that anybody else was in it -- including, from their side, that
@@ -106,12 +106,19 @@ export default async function ProjectPage({
     owner ? invitationsRepo.listByProject(project.id) : Promise.resolve([]),
   ]);
 
-  // Counted in the database. This used to load every entry of every task to
-  // render three badges a row.
-  const counts = await entriesRepo.countsByTasks(all.map((x) => x.id));
-
   const by = (s: Status) => all.filter((x) => x.status === s).length;
   const open = all.filter((x) => !isClosed(x.status));
+
+  // Both depend on the list above, so they wait for it -- but they wait
+  // together. `staleRefs` used to fetch the project's open tasks for itself,
+  // which queried the same table this render had already read in full.
+  const [counts, stale] = await Promise.all([
+    // Counted in the database. This used to load every entry of every task to
+    // render three badges a row.
+    entriesRepo.countsByTasks(all.map((x) => x.id)),
+    staleRefs(open),
+  ]);
+
   const closed = all.filter((x) => isClosed(x.status));
 
   const filters: { id: FilterId; label: string; n: number }[] = [
@@ -157,6 +164,43 @@ export default async function ProjectPage({
               className="ml-auto shrink-0 text-small"
             >
               <div className="space-y-5">
+              <section>
+                <h3 className="display mb-2 text-[15px] font-bold">{t("projectDetails")}</h3>
+                {/* `updateProjectAction` was written, tested and wired to
+                    nothing, so there was no way to rename a project or fix its
+                    summary from here at all. `repo_url` is the worse half: it
+                    is the only identifier that means the same thing on another
+                    machine, it is shown at the top of this page, and only an
+                    agent could set it. */}
+                <form action={updateProjectAction} className="space-y-2">
+                  <input type="hidden" name="id" value={project.id} />
+                  <Field label={t("projectNameLabel")}>
+                    <input name="name" defaultValue={project.name} required />
+                  </Field>
+                  <Field label={t("projectPathLabel")}>
+                    <input
+                      name="root_path"
+                      defaultValue={project.root_path ?? ""}
+                      placeholder={t("projectPathPh")}
+                      className="mono text-small"
+                    />
+                  </Field>
+                  <Field label={t("projectRepoLabel")}>
+                    <input
+                      name="repo_url"
+                      defaultValue={project.repo_url ?? ""}
+                      placeholder={t("projectRepoPh")}
+                      className="mono text-small"
+                    />
+                  </Field>
+                  <p className="text-[13px] text-muted">{t("projectRepoNote")}</p>
+                  <Field label={t("projectSummaryLabel")}>
+                    <textarea name="summary" defaultValue={project.summary ?? ""} />
+                  </Field>
+                  <SubmitButton pendingLabel={t("working")}>{t("apply")}</SubmitButton>
+                </form>
+              </section>
+
               <section>
                 <h3 className="display mb-2 text-[15px] font-bold">{t("sharing")}</h3>
                 <SharePanel

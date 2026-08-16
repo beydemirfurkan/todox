@@ -1,5 +1,7 @@
 import { Pool } from "pg";
 
+import { logError } from "../server/log";
+
 /**
  * Postgres over a socket pool.
  *
@@ -177,7 +179,7 @@ export async function tx<T = unknown>(
     // than thrown over the top of it.
     await client
       .query("ROLLBACK")
-      .catch((rollbackError) => console.error("tx rollback failed", rollbackError));
+      .catch((rollbackError) => logError("db.rollbackFailed", rollbackError));
     throw error;
   } finally {
     client.release();

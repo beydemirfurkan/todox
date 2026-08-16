@@ -25,6 +25,7 @@ import * as sharing from "@/lib/services/sharing";
 import * as taskService from "@/lib/services/task-service";
 import { accept, acceptWithNewAccount, invite } from "@/lib/services/project-invitations";
 import { getLang } from "@/lib/lang";
+import { normalisePath, scrubRemote } from "@/lib/util/paths";
 import * as auth from "@/lib/services/auth";
 import { setSessionCookie } from "@/lib/session";
 import { requireUser } from "@/lib/session";
@@ -96,10 +97,13 @@ export async function createProjectAction(fd: FormData) {
   const user = await requireUser();
   const name = str(fd, "name");
   if (!name) return;
+  const path = str(fd, "root_path");
   const p = await projects.create(user.id, {
     name,
     slug: await projects.nextFreeSlug(user.id, str(fd, "name")),
-    root_path: str(fd, "root_path") || null,
+    // Same normalisation as the agent surface, for the same reason: these two
+    // disagreeing is how one repository comes to be registered twice.
+    root_path: path ? normalisePath(path) : null,
     summary: str(fd, "summary") || null,
   });
   redirect(`/p/${p.slug}`);
@@ -109,9 +113,16 @@ export async function updateProjectAction(fd: FormData) {
   const user = await requireUser();
   const id = num(fd, "id");
   await assertProject(user.id, id);
+  const path = str(fd, "root_path");
+  const remote = str(fd, "repo_url");
   await projects.update(user.id, id, {
     name: str(fd, "name") || undefined,
-    root_path: str(fd, "root_path") || null,
+    // Stored the way the agent surface stores it. Resolution matches on the
+    // normalised form, so a path typed here with backslashes would not match
+    // the same repo arriving from an agent -- and a project that fails to
+    // resolve is registered a second time rather than reported.
+    root_path: path ? normalisePath(path) : null,
+    repo_url: remote ? scrubRemote(remote) : null,
     summary: str(fd, "summary") || null,
   });
   revalidatePath("/", "layout");

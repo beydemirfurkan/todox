@@ -22,6 +22,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Not ours: `pnpm test:coverage` writes a bundled HTML report here, and
+    // linting somebody else's minified viewer says nothing about this code.
+    "coverage/**",
   ]),
 ]);
 

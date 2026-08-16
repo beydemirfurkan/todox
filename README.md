@@ -214,10 +214,13 @@ TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
 | `create_task` | Capture work. Pass `cwd` and it finds the project, **registering one for that repo if it has never seen it** — so the agent never stops to ask. |
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. |
+| `delete_entry` | For an entry that was wrong when it was written. One overtaken by later work is history, not an error — append instead. |
 | `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
 | `link_files` | Attach paths with their hashes. Safe to call again for the same file. |
 | `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
+| `accept_file_change` · `unlink_file` | Clear a stale warning once you have read the change, or drop a link that has stopped meaning anything. Nothing else can clear it — the server never sees the file. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
+| `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
 | `search` | Across all your projects — *have I solved this before?* |
 | `get_task` | One task with its log and linked files. |
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |
@@ -287,8 +290,9 @@ Details, and an honest list of what is **not** covered, in
 - Staleness is per-file hash; per-symbol would be the honest version. Hosted,
   it depends on the agent actually sending hashes — the instructions ask, and
   nothing can make it.
-- The smoke suites need a database. Point `DATABASE_URL` at a throwaway branch
-  and CI runs them; without the secret that job skips and says so.
+- Coverage sits around 39%, and the shape matters more than the number: the
+  agent surface, the auth boundary and the repositories that answer "is this
+  yours" are covered, while much of the UI is not.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

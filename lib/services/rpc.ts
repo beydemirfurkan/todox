@@ -7,7 +7,15 @@ import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
 import { BadRequest } from "./errors";
-import { assertProject, assertProjectAccess, assertRef, assertTask } from "./ownership";
+import {
+  assertContext,
+  assertEntry,
+  assertProject,
+  assertProjectAccess,
+  assertRef,
+  assertRefs,
+  assertTask,
+} from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
@@ -50,12 +58,12 @@ const pickRef = (p: { project?: string; cwd?: string }) => {
  */
 const PAGE = 200;
 
-/** Always the same shape, truncated or not: a result that changes type under
- *  load is a result an agent cannot parse with any confidence. */
-const capped = <T>(rows: T[]) => ({
-  tasks: rows.slice(0, PAGE),
-  omitted: Math.max(0, rows.length - PAGE),
-});
+/*
+ * The shape stays the same truncated or not -- a result that changes type
+ * under load is a result an agent cannot parse with any confidence -- but the
+ * cut moved into SQL. Slicing here read the project's whole backlog to hand
+ * back two hundred rows.
+ */
 
 export const methods = {
   listProjects: async ({ userId }) => {
@@ -169,11 +177,12 @@ export const methods = {
   },
 
   listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {
-    const rows = await tasksRepo.listByProject(
+    const { rows, total } = await tasksRepo.pageByProject(
       (await mustResolve(userId, pickRef(p))).id,
-      p.status as never,
+      (p.status ?? "open") as never,
+      PAGE,
     );
-    return capped(rows);
+    return { tasks: rows, omitted: Math.max(0, total - rows.length) };
   },
 
   getTask: async ({ userId }, p: { task_id: number }) => {
@@ -286,10 +295,34 @@ export const methods = {
   reportRefs: async ({ userId }, p: { refs: { id: number; hash: string | null }[] }) => {
     // Each row is proved to be the caller's before anything is written; the
     // ids come off a payload we handed out, but that is not a reason to trust
-    // them coming back.
-    await Promise.all(p.refs.map((r) => assertRef(userId, r.id)));
+    // them coming back. One query for the lot: the schema allows five hundred
+    // per call, and one join each is five hundred of them at once against a
+    // pool of ten.
+    await assertRefs(userId, p.refs.map((r) => r.id));
     await refsRepo.recordCheck(p.refs);
     return { recorded: p.refs.length };
+  },
+
+  unlinkRef: async ({ userId }, p: { ref_id: number }) => {
+    await assertRef(userId, p.ref_id);
+    const removed = await refsRepo.unlink(p.ref_id);
+    return { unlinked: removed > 0 };
+  },
+
+  acceptRef: async ({ userId }, p: { ref_id: number }) => {
+    await assertRef(userId, p.ref_id);
+    // `acceptSeen` re-baselines onto what an agent last reported, so it does
+    // nothing at all until one has looked. Saying which of the two happened
+    // matters: a silent no-op here reads as "warning cleared", and the next
+    // briefing carrying the same warning is then the confusing part.
+    const accepted = await refsRepo.acceptSeen(p.ref_id);
+    return accepted > 0
+      ? { accepted: true }
+      : {
+          accepted: false,
+          reason:
+            "nothing has been reported for this file yet, so there is no state to accept — hash it and send report_file_hashes first",
+        };
   },
 
   addContext: async (
@@ -310,6 +343,30 @@ export const methods = {
       title: p.title,
       body: p.body,
     });
+  },
+
+  updateContext: async (
+    { userId },
+    p: { context_id: number; kind?: ContextKind; title?: string; body?: string },
+  ) => {
+    const { context_id: id, ...patch } = p;
+    // `contexts.update` takes no user id -- this is the only thing standing
+    // between a context id off the wire and somebody else's note.
+    await assertContext(userId, id);
+    await contextsRepo.update(id, patch);
+    return contextsRepo.byId(id);
+  },
+
+  deleteContext: async ({ userId }, p: { context_id: number }) => {
+    await assertContext(userId, p.context_id);
+    const removed = await contextsRepo.remove(p.context_id);
+    return { deleted: removed > 0 };
+  },
+
+  deleteEntry: async ({ userId }, p: { entry_id: number }) => {
+    await assertEntry(userId, p.entry_id);
+    const removed = await entriesRepo.remove(p.entry_id);
+    return { deleted: removed > 0 };
   },
 
   search: ({ userId }, p: { query: string; limit?: number }) =>

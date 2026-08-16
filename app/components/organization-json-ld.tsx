@@ -1,35 +1,23 @@
-import { headers } from "next/headers";
-
 import { publicUrl } from "@/lib/public-url";
 
 /**
- * Paths that set `robots: { index: false }` in their `generateMetadata`. JSON-LD
- * on these pages is a contradiction: a search engine is told not to index the
- * page, then handed structured data that says "here is a thing to index".
- * The `crawl/schema-noindex-conflict` rule flags it; we suppress the JSON-LD
- * for these routes instead.
+ * Two schemas, for the pages a crawler is allowed to index.
  *
- * Public auth routes that are siblings of the matched prefix are also included
- * so a future page like `/login/2fa` does not silently start emitting schema.
- */
-const NOINDEX_PREFIXES = [
-  "/login",
-  "/register",
-  "/forgot",
-  "/reset",
-  "/verify",
-  "/invite",
-  "/s/",
-  "/p/",
-  "/account",
-  "/report",
-  "/search",
-  "/api/",
-];
-
-/**
- * Two schemas, both top-level so search and AI crawlers see them on every
- * indexable page:
+ * Rendered by those pages themselves rather than by the root layout. It used to
+ * sit in the layout and suppress itself on a list of noindex prefixes, read
+ * from an `x-invoke-path` header — which nothing sets. There is no middleware
+ * here and the config adds only security headers, so the path was always the
+ * empty string, the list never matched, and the schema went out on `/login`,
+ * `/account`, every project page and every share link: exactly the
+ * `schema-noindex-conflict` the suppression existed to avoid.
+ *
+ * A page saying what it is beats a component guessing where it is. It also
+ * leaves one list instead of two: `app/sitemap.ts` names the indexable routes,
+ * and those are the routes that import this. `organization-json-ld.test.ts`
+ * holds the two to each other, because a new public page that quietly does or
+ * does not emit schema is not visible in review.
+ *
+ * The schemas:
  *
  * - `Organization` identifies the project, its GitHub repo, and the maintainer.
  *   This is what feeds the E-E-A-T audit and what lets a knowledge panel show
@@ -42,10 +30,7 @@ const NOINDEX_PREFIXES = [
  * the same identifiers would not match the `url` / `name` fields other systems
  * already index.
  */
-export async function OrganizationJsonLd() {
-  const path = (await headers()).get("x-invoke-path") ?? "";
-  if (NOINDEX_PREFIXES.some((p) => path === p || path.startsWith(p))) return null;
-
+export function OrganizationJsonLd() {
   const base = publicUrl();
   const org = {
     "@context": "https://schema.org",

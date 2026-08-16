@@ -1,3 +1,4 @@
+import { logError } from "../server/log";
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
@@ -67,7 +68,7 @@ export async function verifyPassword(
     // Cost parameters out of range, or over maxmem. Logged because a stored
     // record that cannot be derived from is data corruption worth seeing --
     // never with the password or the record itself.
-    console.error("verifyPassword: unusable stored record", (e as Error).message);
+    logError("password.unusableRecord", e);
     return false;
   }
 

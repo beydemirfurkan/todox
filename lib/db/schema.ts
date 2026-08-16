@@ -157,6 +157,17 @@ CREATE TABLE IF NOT EXISTS tasks (
   closed_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks (project_id, status);
+-- The order every list of tasks is read in, so a bounded read can stop early
+-- instead of sorting the project's whole backlog to show the top of it.
+--
+-- Worth nothing on its own, and that was measured rather than assumed: without
+-- a LIMIT the planner ignores it, correctly, because every matching row has to
+-- be read anyway. With one it is the difference between 33.5ms and 0.16ms on a
+-- project holding 20,500 tasks. The status column is deliberately not in it:
+-- the open filter matches several statuses at once, and an index ordered
+-- inside each one cannot satisfy an ORDER BY that spans them.
+CREATE INDEX IF NOT EXISTS idx_tasks_project_rank
+  ON tasks (project_id, priority, updated_at DESC);
 
 -- The work log. This is the part no issue tracker has: an append-only record
 -- of what was decided, what was tried and failed, and what the last session
@@ -298,6 +309,15 @@ DELETE FROM refs a USING refs b
 -- compare as distinct and let the duplicates straight back in.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_task ON refs (task_id, path)
   WHERE task_id IS NOT NULL;
+-- The other half. Only task refs were covered, so a context could still
+-- collect the same path twice: \`refs.link\` guards with NOT EXISTS, which two
+-- concurrent calls both pass. That left the DELETE above as the only thing
+-- clearing them, which made a migration into a repair job -- it ran on every
+-- deploy and quietly tidied duplicates that should never have been insertable.
+-- With both indexes in place that statement is what it reads as: a one-time
+-- backfill for databases that predate them.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_context ON refs (context_id, path)
+  WHERE context_id IS NOT NULL;
 `;
 
 /**

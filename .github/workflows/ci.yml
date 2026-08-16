@@ -25,10 +25,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
 
-      # Unit tests, so they run whether or not a database secret is configured.
-      # The smoke suites below need one and are usually skipped; these cover the
-      # logic that has no database in it -- SQL column allow-lists, RPC param
-      # validation, report windows and duration replay.
+      # The domain rules live in both AGENTS.md and CONTRIBUTING.md on purpose:
+      # Codex and Cursor read the first directly and will not follow a
+      # reference to the second. They had already drifted, guarded only by a
+      # checkbox in the PR template, which is a thing that cannot notice.
+      - run: pnpm check:docs
+
+      # Unit tests, which need no database of their own -- SQL column
+      # allow-lists, RPC param validation, report windows, duration replay.
+      # The smoke job below brings up its own Postgres for the rest.
       - run: pnpm test
 
       # Build first: PageProps and LayoutProps are globals Next generates into

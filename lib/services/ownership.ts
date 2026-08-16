@@ -1,4 +1,4 @@
-import { one } from "../db/client";
+import { all, one } from "../db/client";
 
 /**
  * Single place that answers "does this row belong to this account?".
@@ -98,4 +98,41 @@ export async function assertRef(userId: number, id: number) {
 }
 export async function assertContext(userId: number, id: number) {
   if (!(await ownsContext(userId, id))) throw new NotYours("context", id);
+}
+
+/**
+ * The batch sibling of `assertRef`, for a call that arrives with a list.
+ *
+ * `report_file_hashes` accepts up to five hundred refs, and checking them one
+ * at a time meant five hundred of the six-way join above, issued together
+ * against a pool of ten, on a route that gives up after thirty seconds. The
+ * write that follows was already a single statement, which is what made the
+ * check the expensive half.
+ *
+ * Same query, one round trip: ask which of these ids the account can reach and
+ * refuse if any is missing. Refusing on the first absent id keeps the message
+ * identical to the single version -- `NotYours` still cannot say whether the
+ * row exists for somebody else, so a caller learns nothing from which id came
+ * back named.
+ */
+export async function assertRefs(userId: number, ids: number[]): Promise<void> {
+  const wanted = [...new Set(ids)];
+  if (!wanted.length) return;
+
+  const rows = await all<{ id: number }>(
+    `SELECT r.id FROM refs r
+     LEFT JOIN tasks t     ON t.id = r.task_id
+     LEFT JOIN contexts c  ON c.id = r.context_id
+     LEFT JOIN projects tp ON tp.id = t.project_id
+     LEFT JOIN project_memberships pm ON pm.project_id = tp.id AND pm.user_id = ?
+     LEFT JOIN project_memberships cm ON cm.project_id = c.project_id AND cm.user_id = ?
+     WHERE r.id IN (${wanted.map(() => "?").join(",")}) AND (
+       tp.user_id = ? OR pm.user_id IS NOT NULL OR c.user_id = ? OR cm.user_id IS NOT NULL
+     )`,
+    [userId, userId, ...wanted, userId, userId],
+  );
+
+  const reachable = new Set(rows.map((r) => r.id));
+  const missing = wanted.find((id) => !reachable.has(id));
+  if (missing !== undefined) throw new NotYours("ref", missing);
 }

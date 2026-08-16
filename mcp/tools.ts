@@ -19,6 +19,7 @@ import { z } from "zod";
 
 import { translator, type Lang } from "../lib/i18n";
 import { clientFamily, lookup } from "../lib/server/client-info";
+import { logError } from "../lib/server/log";
 import { renderMarkdown } from "../lib/services/report-markdown";
 import type { ActivityReport } from "../lib/services/reports";
 import { SHAPES, type MethodName } from "../lib/services/rpc-schemas";
@@ -206,7 +207,7 @@ async function appendClientNotes(ws: Workspace, result: unknown): Promise<unknow
   try {
     info = await lookup(token);
   } catch (e) {
-    console.error("mcp clientInfo lookup", e);
+    logError("mcp.clientInfoLookup", e);
     return result;
   }
   if (!info) return result;
@@ -628,6 +629,12 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       "Append one entry. kinds: 'decision' (what was chosen and why), 'dead_end' (approach tried that did NOT work -- highest value, prevents repeats), 'question' (needs the human), 'note', 'handoff' (state at end of session: what is done, what is next, what to watch out for).",
   });
 
+  tool("delete_entry", "deleteEntry", {
+    title: "Remove a log entry",
+    description:
+      "For an entry that was wrong when it was written: a decision recorded before it was actually made, a handoff posted against the wrong task, a dead end that turned out to be your own mistake rather than the approach's. An entry that has merely been overtaken by later work is not wrong, it is history — and the history is the product here, so leave it and append what you now know. Do not use this to tidy a log.",
+  });
+
   tool(
     "link_files",
     "linkFiles",
@@ -656,6 +663,18 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       : {},
   );
 
+  tool("unlink_file", "unlinkRef", {
+    title: "Remove a file link",
+    description:
+      "For a path that is no longer what the task is about — the file was deleted, renamed, or attached by mistake. It removes the link only; nothing on disk is touched. A link left behind produces a stale warning nobody can ever clear, in every briefing from now on.",
+  });
+
+  tool("accept_file_change", "acceptRef", {
+    title: "Accept a changed file as still correct",
+    description:
+      "Clears the stale warning on a linked file once you have read the change and the note still holds. Nothing else can clear it: the server has no copy of the repository, so it can only ever see that the two hashes differ, never that the difference is fine. Report the file's current hash first — hosted, with report_file_hashes; locally that already happened when you read the briefing. If the note no longer holds, fix the note instead of accepting the file.",
+  });
+
   /**
    * The remote half of staleness.
    *
@@ -679,6 +698,18 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     title: "Record durable knowledge",
     description:
       "Knowledge that outlives any single task. Omit both `project` and `cwd` to make it apply across every one of your projects (use for standing preferences and cross-project decisions). kinds: decision, convention, gotcha, preference.",
+  });
+
+  tool("update_context", "updateContext", {
+    title: "Correct a context note",
+    description:
+      "Rewrite a note you or an earlier session recorded, once you find it is wrong or has gone out of date. `body` replaces the old one outright, so send the whole note rather than a diff. Correcting a note is worth more than adding a second one beside it: get_context hands every note to the next session, and two notes that disagree cost that session the time it takes to work out which one to believe.",
+  });
+
+  tool("delete_context", "deleteContext", {
+    title: "Remove a context note",
+    description:
+      "For a note that should never have been written — recorded against the wrong project, or superseded so completely that keeping it would mislead. If the note is merely out of date, use update_context: a corrected note still carries why the old answer looked right, and that is often the useful half.",
   });
 
   /* -------------------------------------------------------------- search */

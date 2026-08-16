@@ -82,29 +82,29 @@ coverage or error paths half-done. "Good enough for now" is a pre-AI reflex.
 
 ## Domain rules (this repo — mirrored in CONTRIBUTING.md)
 
-- **Repositories never call each other.** One module per table, no
-  cross-table logic. Anything that must stay consistent across tables — a
-  status change writing a `task_events` row, say — belongs in `lib/services/`.
+- **Repositories never call each other.** One module per table, no cross-table
+  logic. Anything that must stay consistent across tables — a status change
+  writing a `task_events` row, say — belongs in `lib/services/`.
 - **Ownership is checked in exactly one place.** Add a check to
-  `lib/services/ownership.ts`; do not inline a `WHERE user_id = ?` at a
-  call site and consider it handled.
+  `lib/services/ownership.ts`; do not inline a `WHERE user_id = ?` at a call
+  site and consider it handled.
 - **Foreign rows answer 404.** Never 403, never "not found for you" — the
   message must not tell a caller that an id exists.
-- **A project is a repository, not a path.** `root_path` is where a repo
-  sits on one machine and is a different string on the next, so identity is
-  `repo_url` first — `repoKey` in `lib/util/paths.ts` folds the clone forms
-  and case to one key — then the paths in `project_paths`, one per machine.
-  Never the name alone: `~/work/api` and `~/personal/api` are two
-  repositories, and fusing their logs is worse than a duplicate, because a
-  duplicate is visible and a bad merge is not. The one heuristic that
-  reaches past the remote needs the name *and* every known path of the
-  candidate to come from the other OS family; anything less registers a
-  second project and says so in a `warning`. Not theoretical: identifying a
-  project by one absolute path split `todox` and `serled-next` in half the
-  first time each was opened on a second machine, and `merge_projects`
-  exists only because `slug` is not updatable and the rows had to move.
-- **Load in batches.** The database is over the network. A per-row query in
-  a list is a per-row round trip; use the `listByTasks`-style helpers.
+- **A project is a repository, not a path.** `root_path` is where a repo sits
+  on one machine and is a different string on the next, so identity is
+  `repo_url` first — `repoKey` in `lib/util/paths.ts` folds the clone forms and
+  case to one key — then the paths in `project_paths`, one per machine. Never
+  the name alone: `~/work/api` and `~/personal/api` are two repositories, and
+  fusing their logs is worse than a duplicate, because a duplicate is visible
+  and a bad merge is not. The one heuristic that reaches past the remote needs
+  the name *and* every known path of the candidate to come from the other OS
+  family; anything less registers a second project and says so in a `warning`.
+  Not theoretical: identifying a project by one absolute path split `todox` and
+  `serled-next` in half the first time each was opened on a second machine, and
+  `merge_projects` exists only because `slug` is not updatable and the rows had
+  to move.
+- **Load in batches.** The database is over the network. A per-row query in a
+  list is a per-row round trip; use the `listByTasks`-style helpers.
 - **Both dictionaries stay in sync.** `lib/i18n/tr.ts` is typed against the
   keys of `en.ts`, so a missing translation fails the build. Turkish is the
   default language; write it properly rather than machine-translating.
@@ -114,44 +114,48 @@ coverage or error paths half-done. "Good enough for now" is a pre-AI reflex.
   `lib/db/client.ts` takes a list of prepared statements, so a repository
   exposes a `…Stmt` builder beside any write a service may need to pair with
   another table's — the SQL stays with the table that owns it and only the
-  sequencing moves. There is no JavaScript between the statements, so a
-  write that needs the id of the row just inserted cannot use it;
-  `tasks.create` is a CTE for exactly that reason, and is the one place a
-  repository writes another table. This is not theoretical tidiness: a
-  dropped second write once left a task marked `done` whose last event was
-  `doing`, and every daily report after it gained a permanent 24 hours.
-- **Never build a `SET` clause by hand.** Use `setClause(patch, COLUMNS)`
-  from `lib/db/client.ts`. Column names cannot be bound as parameters, so
-  they get interpolated; patches arrive from
-  `const { id, ...patch } = params` at the RPC boundary, and iterating the
-  patch's own keys put caller-chosen text into the statement. This was a
-  live SQL injection, not a hypothetical one.
+  sequencing moves. There is no JavaScript between the statements, so a write
+  that needs the id of the row just inserted cannot use it; `tasks.create` is a
+  CTE for exactly that reason, and so is `project-invitations.acceptWithNewUser`,
+  which has to create the account before it can grant it anything. Those two are
+  the exceptions; a third needs the same justification, not the same shape.
+  This is not theoretical tidiness: a dropped second write once
+  left a task marked `done` whose last event was `doing`, and every daily
+  report after it gained a permanent 24 hours.
+- **Never build a `SET` clause by hand.** Use `setClause(patch, COLUMNS)` from
+  `lib/db/client.ts`. Column names cannot be bound as parameters, so they get
+  interpolated; patches arrive from `const { id, ...patch } = params` at the
+  RPC boundary, and iterating the patch's own keys put caller-chosen text into
+  the statement. This was a live SQL injection, not a hypothetical one.
 - **Every RPC method has a schema.** `lib/services/rpc-schemas.ts` is the
-  runtime contract and the MCP tool surface at once; the handler signatures
-  in `rpc.ts` are erased at build time and guard nothing. `methods` is keyed
-  by `MethodName`, so a handler without a schema will not compile.
-- **The server never touches the filesystem.** It has no checkout, so
-  anything that reads a path belongs in `mcp/workspace.ts`, on the machine
-  that holds the code. `app/api/mcp/route.ts` is where that temptation
-  comes back, because it is an agent surface running in the server process:
-  it answers the filesystem questions with `null`, and the tools degrade to
-  "not checked" rather than guessing.
+  runtime contract and the MCP tool surface at once; the handler signatures in
+  `rpc.ts` are erased at build time and guard nothing. `methods` is keyed by
+  `MethodName`, so a handler without a schema will not compile.
+- **The server never touches the filesystem.** It has no checkout, so anything
+  that reads a path belongs in `mcp/workspace.ts`, on the machine that holds
+  the code. Hashing files and finding a repository root used to happen in
+  request handlers, where they returned nonsense and turned a caller-supplied
+  path into a real `readFileSync` (`lib/repositories/refs.ts` still carries the
+  note). `app/api/mcp/route.ts` is where that temptation comes back, because it
+  is an agent surface running in the server process: it answers the filesystem
+  questions with `null`, and the tools degrade to "not checked" rather than
+  guessing.
 - **The agent surface is defined once.** Tools, descriptions and session
   instructions live in `mcp/tools.ts` and are registered by both the hosted
-  endpoint and the stdio process. What differs between them is a
-  `Workspace`, not a copy of the tool list. `pnpm smoke:mcp` runs the same
-  suite through both, which is what keeps that true.
-- **Mail bodies are the one place strings are not in both dictionaries.**
-  They live in `lib/services/mail-templates.ts`, one function per message
-  returning `subject`, `text` and `html` for both languages, so the
-  compile-time guarantee below does not cover them — nothing fails the build
-  if a translation drifts. Two rules hold there instead: every template
-  returns `text` as well as `html`, because a message with no plain-text part
-  scores worse with spam filters and is what a screen reader reads; and every
+  endpoint and the stdio process. What differs between them is a `Workspace`,
+  not a copy of the tool list. `pnpm smoke:mcp` runs the same suite through
+  both, which is what keeps that true.
+- **Mail bodies are the one place strings are not in both dictionaries.** They
+  live in `lib/services/mail-templates.ts`, one function per message returning
+  `subject`, `text` and `html` for both languages, so the compile-time
+  guarantee below does not cover them — nothing fails the build if a
+  translation drifts. Two rules hold there instead: every template returns
+  `text` as well as `html`, because a message with no plain-text part scores
+  worse with spam filters and is what a screen reader reads; and every
   interpolated value goes through `esc`, because names and project names are
   chosen by people and two of these messages are security notices.
-- **Colour never carries meaning alone.** Every status, kind and badge has
-  a text equivalent, and controls have real labels.
+- **Colour never carries meaning alone.** Every status, kind and badge has a
+  text equivalent, and controls have real labels.
 
 ## Cross-file workflows (skills)
 

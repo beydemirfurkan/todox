@@ -7,7 +7,6 @@ import { getLang, getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import { publicUrl } from "@/lib/public-url";
 import { Blob } from "./components";
-import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { LangSwitcher } from "./features/lang-switcher";
 import { Notifications } from "./features/notifications";
 import { SearchBox } from "./features/search-box";
@@ -75,7 +74,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${shantell.variable} ${instrument.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <OrganizationJsonLd />
         <TzProbe />
 
         <a href="#main" className="skip-link display">
