@@ -1,5 +1,5 @@
-import { OPEN_STATUSES, type Status } from "../constants";
-import { all, one, run, setClause, type Statement } from "../db/client";
+import { DEFAULT_PRIORITY, OPEN_STATUSES, isClosedStatus, type Status } from "../constants";
+import { all, one, run, runStmt, setClause, type Statement } from "../db/client";
 import type { Task } from "../types";
 import { now } from "../util/time";
 
@@ -123,16 +123,26 @@ async function countByProject(projectId: number, status: StatusFilter): Promise<
 
 export const byId = (id: number) => one<Task>("SELECT * FROM tasks WHERE id = ?", [id]);
 
-/** Everything created, closed or touched inside a window -- the report's raw input. */
+/**
+ * Everything created, closed or touched inside a window -- the report's raw input.
+ *
+ * `>= from AND < to`, never `BETWEEN`. `resolvePeriod` hands back a half-open
+ * window whose `to` is the first instant *outside* it, and yesterday's `to` is
+ * today's `from`; `BETWEEN` includes both ends, so a row written exactly on a
+ * midnight boundary was counted in both days' reports. The window was made
+ * half-open to fix precisely that -- see the note in `lib/util/time.ts` -- and
+ * these four comparisons were what the fix never reached.
+ */
 export const activeBetween = (userId: number, from: string, to: string) =>
   all<Task>(
     `SELECT DISTINCT t.* FROM tasks t
      JOIN projects p ON p.id = t.project_id
      LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
-     LEFT JOIN entries e     ON e.task_id = t.id AND e.created_at BETWEEN ? AND ?
-     LEFT JOIN task_events v ON v.task_id = t.id AND v.at         BETWEEN ? AND ?
-      WHERE (p.user_id = ? OR pm.user_id IS NOT NULL) AND ((t.created_at BETWEEN ? AND ?)
-         OR (t.closed_at  BETWEEN ? AND ?)
+     LEFT JOIN entries e     ON e.task_id = t.id AND e.created_at >= ? AND e.created_at < ?
+     LEFT JOIN task_events v ON v.task_id = t.id AND v.at         >= ? AND v.at         < ?
+      WHERE (p.user_id = ? OR pm.user_id IS NOT NULL)
+        AND ((t.created_at >= ? AND t.created_at < ?)
+         OR (t.closed_at   >= ? AND t.closed_at  < ?)
          OR e.id IS NOT NULL
          OR v.id IS NOT NULL)
      ORDER BY t.updated_at DESC`,
@@ -153,10 +163,17 @@ export async function create(
   input: NewTask & { actor?: string; model?: string | null; user_id?: number | null },
 ): Promise<Task> {
   const ts = now();
+  const status = input.status ?? "todo";
+  // A task may open already closed -- `create_task` takes a status, and an
+  // agent recording work it has just finished passes `done`. Deriving the
+  // column here is safe in a way it is not in `update`: there is no previous
+  // status to preserve. Left null, the task was missing from the closed side
+  // of every report, so it counted as opened and never as finished.
+  const closedAt = isClosedStatus(status) ? ts : null;
   const row = await one<Task>(
     `WITH t AS (
-       INSERT INTO tasks (project_id, title, body, status, priority, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+       INSERT INTO tasks (project_id, title, body, status, priority, created_at, updated_at, closed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *
      ), e AS (
        INSERT INTO task_events (task_id, from_status, to_status, at, actor, model, user_id)
@@ -167,10 +184,11 @@ export async function create(
       input.project_id,
       input.title,
       input.body ?? null,
-      input.status ?? "todo",
-      input.priority ?? 2,
+      status,
+      input.priority ?? DEFAULT_PRIORITY,
       ts,
       ts,
+      closedAt,
       ts,
       input.actor ?? "agent",
       input.model ?? null,
@@ -207,8 +225,12 @@ export async function update(id: number, patch: TaskPatch): Promise<Task | undef
   return one<Task>(stmt.text, stmt.params);
 }
 
-export const touch = (id: number) =>
-  run("UPDATE tasks SET updated_at = ? WHERE id = ?", [now(), id]);
+export const touchStmt = (id: number): Statement => ({
+  text: "UPDATE tasks SET updated_at = ? WHERE id = ?",
+  params: [now(), id],
+});
+
+export const touch = (id: number) => runStmt(touchStmt(id));
 
 export const remove = (id: number) => run("DELETE FROM tasks WHERE id = ?", [id]);
 
