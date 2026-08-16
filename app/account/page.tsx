@@ -185,7 +185,10 @@ export default async function AccountPage({
             <span>{tab.label}</span>
             {((tab.id === "tokens" && tokens.length > 0) ||
               (tab.id === "invites" && pendingInvites.length > 0)) && (
-              <span className="account-tab-count" aria-label={tab.label}>
+              // `aria-label` here replaced the number with the tab's own
+              // name, so the badge announced "API tokens, API tokens" and the
+              // count -- the only thing it exists to say -- was never read.
+              <span className="account-tab-count">
                 {tab.id === "tokens" ? tokens.length : pendingInvites.length}
               </span>
             )}

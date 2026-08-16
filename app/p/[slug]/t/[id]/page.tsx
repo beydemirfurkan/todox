@@ -134,6 +134,15 @@ export default async function TaskPage({
         / <span aria-current="page">#{task.id}</span>
       </nav>
 
+      {/* The most-used page in the app had no h1 at all: its outline started
+          at the h2 every Panel emits, and the thing that reads as the title is
+          a textarea -- an editing control, not a heading. Visually hidden
+          because the title is already on screen; a second copy of it would be
+          the wrong fix for a document-structure problem. */}
+      <h1 className="sr-only">
+        {t("task")} #{task.id} — {task.title}
+      </h1>
+
       <Panel
             title={
               <span className="flex items-center gap-2">

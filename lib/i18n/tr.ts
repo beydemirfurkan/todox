@@ -432,6 +432,9 @@ export const tr: Record<Key, string> = {
   noActivity: "Bu aralıkta hiçbir şey olmamış.",
   leadTime: "baştan sona",
   activeTime: "çalışılan",
+  approxLabel: "yaklaşık",
+  approxWhy:
+    "yaklaşık — bu görev sonradan aktarıldı ya da hiç \u201Cyapılıyor\u201D işaretlenmeden kapandı, dolayısıyla çalışılan süre bir ölçüm değil",
   importance: "önem",
   imp_high: "yüksek",
   imp_normal: "normal",

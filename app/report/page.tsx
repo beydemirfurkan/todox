@@ -227,7 +227,11 @@ function Stat({
 }
 
 function TaskRow({ task, t }: { task: TaskReport; t: T }) {
-  const tilde = task.partial ? "~" : "";
+  // The glyph is a hint, not the message. It marked a figure the report cannot
+  // stand behind -- a backfilled task, or one closed without ever being in
+  // flight -- and said so nowhere: no legend, no title, nothing a screen
+  // reader reaches. Colour and glyphs never carry meaning alone here.
+  const approx = task.partial;
   return (
     <li className="sticker-flat p-3">
       <div className="flex flex-wrap items-baseline gap-2">
@@ -248,9 +252,10 @@ function TaskRow({ task, t }: { task: TaskReport; t: T }) {
       </div>
 
       <div className="mono mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
-        <span>
-          {t("activeTime")}: {tilde}
+        <span title={approx ? t("approxWhy") : undefined}>
+          {t("activeTime")}: {approx && <span aria-hidden="true">~</span>}
           {duration(task.active_ms_in_period, t)}
+          {approx && <span className="sr-only"> ({t("approxWhy")})</span>}
         </span>
         <span>
           {t("leadTime")}: {duration(task.lead_ms, t)}

@@ -447,6 +447,9 @@ export const en = {
   noActivity: "Nothing happened in this window.",
   leadTime: "start to finish",
   activeTime: "worked",
+  approxLabel: "approximate",
+  approxWhy:
+    "approximate — this task was backfilled, or it closed without ever being marked in flight, so the time worked is not a measurement",
   importance: "importance",
   imp_high: "high",
   imp_normal: "normal",
