@@ -11,14 +11,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * knowing less than it should and nobody can tell.
  */
 const mocks = vi.hoisted(() => ({
-  listByProject: vi.fn(),
+  pageByProject: vi.fn(),
   listContexts: vi.fn(),
   listByTasks: vi.fn(),
   listRefs: vi.fn(),
   freshness: vi.fn(() => "fresh"),
 }));
 
-vi.mock("../repositories/tasks", () => ({ listByProject: mocks.listByProject }));
+vi.mock("../repositories/tasks", () => ({ pageByProject: mocks.pageByProject }));
 vi.mock("../repositories/contexts", () => ({ listByProject: mocks.listContexts }));
 vi.mock("../repositories/entries", () => ({ listByTasks: mocks.listByTasks }));
 vi.mock("../repositories/refs", () => ({
@@ -53,7 +53,7 @@ const entry = (kind: string, body: string) => ({ id: 1, kind, body });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.listByProject.mockResolvedValue([task(1)]);
+  mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
   mocks.listContexts.mockResolvedValue([]);
   mocks.listByTasks.mockResolvedValue(new Map());
   mocks.listRefs.mockResolvedValue(new Map());
@@ -61,16 +61,19 @@ beforeEach(() => {
 });
 
 describe("what the briefing costs", () => {
-  it("asks for the open tasks only", async () => {
-    // Closed work is history; the briefing is about what is in flight.
+  it("asks for the open tasks only, and asks for fifty of them", async () => {
+    // Closed work is history; the briefing is about what is in flight. The
+    // ceiling goes to the database rather than being applied to the answer:
+    // reading a project's whole backlog to show fifty rows is the first query
+    // of every session.
     await brief();
-    expect(mocks.listByProject).toHaveBeenCalledWith(PROJECT.id, "open");
+    expect(mocks.pageByProject).toHaveBeenCalledWith(PROJECT.id, "open", 50);
   });
 
   it("loads every task's log in one query, not one per task", async () => {
     // A round trip per task is the shape this was written to avoid, on the
     // call every session makes first.
-    mocks.listByProject.mockResolvedValue([task(1), task(2), task(3)]);
+    mocks.pageByProject.mockResolvedValue({ rows: [task(1), task(2), task(3)], total: 3 });
     await brief();
     expect(mocks.listByTasks).toHaveBeenCalledTimes(1);
     expect(mocks.listByTasks).toHaveBeenCalledWith([1, 2, 3]);
@@ -79,18 +82,17 @@ describe("what the briefing costs", () => {
 });
 
 describe("the ceiling on open tasks", () => {
-  const many = Array.from({ length: 60 }, (_, i) => task(i + 1));
+  const fifty = Array.from({ length: 50 }, (_, i) => task(i + 1));
 
-  it("carries at most fifty", async () => {
+  it("asks the database for the ceiling", async () => {
     // A project that has drifted would otherwise spend an agent's context on
     // the backlog before it read a line of code.
-    mocks.listByProject.mockResolvedValue(many);
-    const out = await brief();
-    expect(out.open_tasks).toHaveLength(50);
+    await brief();
+    expect(mocks.pageByProject.mock.calls[0]![2]).toBe(50);
   });
 
   it("says how many it left out rather than trimming in silence", async () => {
-    mocks.listByProject.mockResolvedValue(many);
+    mocks.pageByProject.mockResolvedValue({ rows: fifty, total: 60 });
     const out = await brief();
     expect(out.open_tasks_omitted).toBe(10);
   });
@@ -100,8 +102,8 @@ describe("the ceiling on open tasks", () => {
     expect(out.open_tasks_omitted).toBe(0);
   });
 
-  it("does not fetch logs for the tasks it dropped", async () => {
-    mocks.listByProject.mockResolvedValue(many);
+  it("fetches logs only for the tasks it is going to show", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: fifty, total: 60 });
     await brief();
     expect(mocks.listByTasks.mock.calls[0]![0]).toHaveLength(50);
   });

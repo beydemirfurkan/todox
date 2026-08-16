@@ -93,10 +93,9 @@ export default async function ProjectPage({
   if (!project) notFound();
 
   const owner = project.access_role === "owner";
-  const [all, projectContext, stale, members, invitations] = await Promise.all([
+  const [all, projectContext, members, invitations] = await Promise.all([
     tasksRepo.listByProject(project.id, "all"),
     contexts.listByProject(user.id, project.id),
-    staleRefs(user.id, project),
     // Everyone with access sees who else has it. This used to be owner-only,
     // which meant the person who had just been invited into a project could
     // not see that anybody else was in it -- including, from their side, that
@@ -107,12 +106,19 @@ export default async function ProjectPage({
     owner ? invitationsRepo.listByProject(project.id) : Promise.resolve([]),
   ]);
 
-  // Counted in the database. This used to load every entry of every task to
-  // render three badges a row.
-  const counts = await entriesRepo.countsByTasks(all.map((x) => x.id));
-
   const by = (s: Status) => all.filter((x) => x.status === s).length;
   const open = all.filter((x) => !isClosed(x.status));
+
+  // Both depend on the list above, so they wait for it -- but they wait
+  // together. `staleRefs` used to fetch the project's open tasks for itself,
+  // which queried the same table this render had already read in full.
+  const [counts, stale] = await Promise.all([
+    // Counted in the database. This used to load every entry of every task to
+    // render three badges a row.
+    entriesRepo.countsByTasks(all.map((x) => x.id)),
+    staleRefs(open),
+  ]);
+
   const closed = all.filter((x) => isClosed(x.status));
 
   const filters: { id: FilterId; label: string; n: number }[] = [

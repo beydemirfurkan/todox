@@ -2,7 +2,7 @@ import * as contexts from "../repositories/contexts";
 import * as entries from "../repositories/entries";
 import * as refs from "../repositories/refs";
 import * as tasks from "../repositories/tasks";
-import type { Project } from "../types";
+import type { Project, Task } from "../types";
 
 /**
  * Everything a cold agent needs to resume work on a project, in one payload.
@@ -24,8 +24,9 @@ import type { Project } from "../types";
 const BRIEFING_TASKS = 50;
 
 export async function briefing(userId: number, project: Project) {
-  const allOpen = await tasks.listByProject(project.id, "open");
-  const open = allOpen.slice(0, BRIEFING_TASKS);
+  // Cut in SQL rather than after the fact. This read every open task and then
+  // took fifty, on the first query of every session.
+  const { rows: open, total } = await tasks.pageByProject(project.id, "open", BRIEFING_TASKS);
   const ids = open.map((t) => t.id);
 
   const [globalContext, projectContext, logs, files] = await Promise.all([
@@ -83,7 +84,7 @@ export async function briefing(userId: number, project: Project) {
     global_context: globalContext.map(strip),
     project_context: projectContext.map(strip),
     open_tasks: openTasks,
-    open_tasks_omitted: allOpen.length - open.length,
+    open_tasks_omitted: total - open.length,
     stale_refs: stale,
     hint:
       "Before you finish, call log_entry(kind:'handoff') on any task you touched, " +
@@ -101,12 +102,17 @@ const strip = (c: { id: number; kind: string; title: string; body: string }) => 
 /**
  * Just the staleness lines, for the banner on the project page.
  *
- * Two queries, not the whole briefing. This used to build the entire payload --
+ * One query, not the whole briefing. This used to build the entire payload --
  * context notes, every task's log, the lot -- and throw all but this array
  * away, on the page that already loads the tasks and their entries itself.
+ *
+ * It then still fetched the project's open tasks for itself, on a page that
+ * had just fetched every task in the project: the same table, twice, in the
+ * same render. It takes the tasks now, so the caller's list is the only one.
+ * It also took a user id it never used -- the tasks it is handed have already
+ * been through the account's own read.
  */
-export async function staleRefs(_userId: number, project: Project): Promise<string[]> {
-  const open = await tasks.listByProject(project.id, "open");
+export async function staleRefs(open: Task[]): Promise<string[]> {
   const files = await refs.listByTasks(open.map((t) => t.id));
 
   return open.flatMap((t) =>

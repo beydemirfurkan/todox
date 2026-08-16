@@ -58,12 +58,12 @@ const pickRef = (p: { project?: string; cwd?: string }) => {
  */
 const PAGE = 200;
 
-/** Always the same shape, truncated or not: a result that changes type under
- *  load is a result an agent cannot parse with any confidence. */
-const capped = <T>(rows: T[]) => ({
-  tasks: rows.slice(0, PAGE),
-  omitted: Math.max(0, rows.length - PAGE),
-});
+/*
+ * The shape stays the same truncated or not -- a result that changes type
+ * under load is a result an agent cannot parse with any confidence -- but the
+ * cut moved into SQL. Slicing here read the project's whole backlog to hand
+ * back two hundred rows.
+ */
 
 export const methods = {
   listProjects: async ({ userId }) => {
@@ -177,11 +177,12 @@ export const methods = {
   },
 
   listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {
-    const rows = await tasksRepo.listByProject(
+    const { rows, total } = await tasksRepo.pageByProject(
       (await mustResolve(userId, pickRef(p))).id,
-      p.status as never,
+      (p.status ?? "open") as never,
+      PAGE,
     );
-    return capped(rows);
+    return { tasks: rows, omitted: Math.max(0, total - rows.length) };
   },
 
   getTask: async ({ userId }, p: { task_id: number }) => {

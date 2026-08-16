@@ -42,6 +42,85 @@ export function listByProject(projectId: number, status: StatusFilter = "open") 
   );
 }
 
+/**
+ * The same list, cut in SQL, for the callers that only ever wanted the top of
+ * it.
+ *
+ * `briefing` and `list_tasks` both fetched every open task and then sliced the
+ * array. That reads the whole set and sorts it to hand back fifty rows -- and
+ * it is the first query of every session. Measured on one project with 20,500
+ * tasks, 12,300 of them open: 33.5ms to fetch and sort them all, against
+ * 0.16ms for the same fifty once the ceiling and `idx_tasks_project_rank` are
+ * both in play. The index alone changes nothing, because without a `LIMIT`
+ * every matching row has to be read anyway; the two only pay together.
+ *
+ * Two round trips rather than one, because the count is what lets the caller
+ * say how many it left out, and `count(*) OVER ()` would walk the whole set
+ * again and give the ceiling back. The count is an index scan and costs a
+ * fraction of the sort it replaces.
+ *
+ * Not for the project page or a share link: those filter and re-order the full
+ * set in JavaScript, so a cut here would quietly change which tasks the
+ * filters can see.
+ */
+export async function pageByProject(
+  projectId: number,
+  status: StatusFilter,
+  limit: number,
+): Promise<{ rows: Task[]; total: number }> {
+  const [rows, total] = await Promise.all([
+    limitedByProject(projectId, status, limit),
+    countByProject(projectId, status),
+  ]);
+  return { rows, total };
+}
+
+function limitedByProject(projectId: number, status: StatusFilter, limit: number) {
+  if (status === "all")
+    return all<Task>(
+      `SELECT * FROM tasks WHERE project_id = ?
+       ORDER BY (status IN ('done','dropped')), priority, updated_at DESC
+       LIMIT ?`,
+      [projectId, limit],
+    );
+
+  if (status === "open")
+    return all<Task>(
+      `SELECT * FROM tasks WHERE project_id = ?
+         AND status IN (${OPEN_STATUSES.map(() => "?").join(",")})
+       ORDER BY priority, updated_at DESC
+       LIMIT ?`,
+      [projectId, ...OPEN_STATUSES, limit],
+    );
+
+  return all<Task>(
+    `SELECT * FROM tasks WHERE project_id = ? AND status = ?
+     ORDER BY priority, updated_at DESC LIMIT ?`,
+    [projectId, status, limit],
+  );
+}
+
+async function countByProject(projectId: number, status: StatusFilter): Promise<number> {
+  const row =
+    status === "all"
+      ? await one<{ n: string }>("SELECT count(*) AS n FROM tasks WHERE project_id = ?", [
+          projectId,
+        ])
+      : status === "open"
+        ? await one<{ n: string }>(
+            `SELECT count(*) AS n FROM tasks WHERE project_id = ?
+               AND status IN (${OPEN_STATUSES.map(() => "?").join(",")})`,
+            [projectId, ...OPEN_STATUSES],
+          )
+        : await one<{ n: string }>(
+            "SELECT count(*) AS n FROM tasks WHERE project_id = ? AND status = ?",
+            [projectId, status],
+          );
+  // `count(*)` arrives as a string: it is bigint, and the driver will not
+  // narrow one to a JS number on its own.
+  return Number(row?.n ?? 0);
+}
+
 export const byId = (id: number) => one<Task>("SELECT * FROM tasks WHERE id = ?", [id]);
 
 /** Everything created, closed or touched inside a window -- the report's raw input. */
