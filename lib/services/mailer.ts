@@ -3,9 +3,15 @@
  *
  * Delivery is a driver, not a feature: the security-critical parts (single-use
  * hashed tokens, expiry, no account enumeration) do not care how the message
- * travels. With no SMTP configured the default transport prints the link to the
- * server log, which is exactly what you want in development and honest about
- * what it is in production -- nothing silently disappears.
+ * travels. With no SMTP configured the transport prints the link to the server
+ * log, which is exactly what you want in development.
+ *
+ * In production it refuses instead. Printing was meant to be the honest
+ * option -- nothing silently disappears -- but the thing being printed is a
+ * link that grants an hour of full account access, and a server log is read by
+ * more people, and kept in more places, than the mailbox it was meant for.
+ * Refusing is louder: the failure is in the log either way, and the credential
+ * is not.
  */
 import nodemailer from "nodemailer";
 
@@ -37,6 +43,20 @@ const consoleTransport: Transport = {
         "────────────────────────────────────────────────────────────",
         "",
       ].join("\n"),
+    );
+  },
+};
+
+/**
+ * Production's answer to missing SMTP. It throws, and `send` turns that into
+ * the same logged failure any other undeliverable message produces -- so the
+ * caller still cannot tell whether the address existed.
+ */
+const refusingTransport: Transport = {
+  name: "refusing",
+  async send() {
+    throw new Error(
+      "SMTP is not configured; refusing to write the message to the log in production",
     );
   },
 };
@@ -120,12 +140,15 @@ function build(): Transport {
 
   // The reason nobody noticed mail was not being delivered: it failed quietly
   // and looked like a working default. Say it once per instance.
-  if (process.env.NODE_ENV === "production" && !warned) {
-    warned = true;
-    console.warn(
-      "[todox] SMTP is not configured; mail is printed to the log, not sent. " +
-        "Set SMTP_HOST, SMTP_USER, SMTP_PASS and MAIL_FROM.",
-    );
+  if (process.env.NODE_ENV === "production") {
+    if (!warned) {
+      warned = true;
+      console.error(
+        "[todox] SMTP is not configured; mail is refused, not sent. " +
+          "Set SMTP_HOST, SMTP_USER, SMTP_PASS and MAIL_FROM.",
+      );
+    }
+    return refusingTransport;
   }
   return consoleTransport;
 }
