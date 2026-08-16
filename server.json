@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.beydemirfurkan/todox",
+  "description": "Memory across sessions: the decisions, the dead ends, and the handoff the last one left.",
+  "version": "0.1.0",
+  "websiteUrl": "https://www.todox.dev",
+  "repository": {
+    "url": "https://github.com/beydemirfurkan/todox",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://www.todox.dev/api/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <token>. Create an agent token on the Account page at https://www.todox.dev/account.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
