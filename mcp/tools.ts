@@ -19,6 +19,7 @@ import { z } from "zod";
 
 import { translator, type Lang } from "../lib/i18n";
 import { clientFamily, lookup } from "../lib/server/client-info";
+import { logError } from "../lib/server/log";
 import { renderMarkdown } from "../lib/services/report-markdown";
 import type { ActivityReport } from "../lib/services/reports";
 import { SHAPES, type MethodName } from "../lib/services/rpc-schemas";
@@ -206,7 +207,7 @@ async function appendClientNotes(ws: Workspace, result: unknown): Promise<unknow
   try {
     info = await lookup(token);
   } catch (e) {
-    console.error("mcp clientInfo lookup", e);
+    logError("mcp.clientInfoLookup", e);
     return result;
   }
   if (!info) return result;

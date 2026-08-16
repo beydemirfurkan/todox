@@ -22,6 +22,11 @@ const PUBLIC = [
   // rather than as a refusal.
   "/api/rpc",
   "/api/mcp",
+  // The container's own liveness check, which has no cookie and never will.
+  // Redirected, it answers 307 to a runtime that only asked whether this
+  // process can serve anything -- and a redirect is a perfectly healthy
+  // answer, so the container would stay up with its database unreachable.
+  "/api/health",
   // Metadata files. Redirecting these to /login silently breaks the favicon
   // and every social link preview, which is the sort of thing nobody notices
   // until somebody pastes the URL into Slack.
