@@ -7,7 +7,7 @@ import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
 import { BadRequest } from "./errors";
-import { assertProject, assertRef, assertTask } from "./ownership";
+import { assertProject, assertProjectAccess, assertRef, assertTask } from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
@@ -106,6 +106,11 @@ export const methods = {
   ) => {
     const { project, ...patch } = p;
     const found = await mustResolve(userId, project);
+    // `mustResolve` answers for a member too, but the project row belongs to
+    // its owner: without this the UPDATE below matches nothing and the
+    // unchanged row goes back as if it had been written. The web path has
+    // always asserted here; this surface had not.
+    await assertProject(userId, found.id);
     if (patch.root_path) patch.root_path = normalisePath(patch.root_path);
     if (patch.repo_url) patch.repo_url = scrubRemote(patch.repo_url);
     await projectsRepo.update(userId, found.id, patch);
@@ -114,6 +119,10 @@ export const methods = {
 
   deleteProject: async ({ userId }, p: { project: string; confirm: string }) => {
     const found = await mustResolve(userId, p.project);
+    // Same reason as `updateProject`, one degree worse: the DELETE is scoped
+    // to the owner, so a member's call removed nothing and still came back
+    // with `{ deleted: <slug>, tasks_removed: N }`.
+    await assertProject(userId, found.id);
     // Case-insensitive, like the account page's own confirmation: the point is
     // to stop this happening by reflex, not to test anybody's typing.
     if (p.confirm.trim().toLowerCase() !== found.slug.toLowerCase())
@@ -289,7 +298,11 @@ export const methods = {
   ) => {
     const ref = p.project ?? p.cwd;
     const projectId = ref ? (await mustResolve(userId, ref)).id : null;
-    if (projectId) await assertProject(userId, projectId);
+    // A note inside a shared project, not the project row: a member who can
+    // already open tasks and log entries here can write one. This asserted
+    // ownership, which left a collaborator able to record work but not what
+    // the work decided.
+    if (projectId) await assertProjectAccess(userId, projectId);
     return contextsRepo.create({
       user_id: userId,
       project_id: projectId,
