@@ -175,8 +175,7 @@ An MCP server's `instructions` are background reading; a skill or a CLAUDE.md
 rule is an instruction. When they disagree, the server loses — measured, in a
 fresh project, with todox connected the whole time and never once called.
 
-So put four lines in the memory file your agent actually obeys — user-level
-`CLAUDE.md`, `AGENTS.md`, or whatever your tool reads:
+So put four lines in the memory file your agent actually obeys:
 
 ```markdown
 todox MCP is installed here — persistent memory across projects.
@@ -188,6 +187,32 @@ todox MCP is installed here — persistent memory across projects.
   and `dead_end` for approaches that failed.
 - Always pass your own model id.
 ```
+
+Or let the installer do it:
+
+```bash
+pnpm install:mcp claude-code --write-memory
+```
+
+It is off unless asked, because that file is yours rather than ours, and it is
+idempotent — the block is fenced with an HTML comment, so a second run replaces
+it instead of leaving two sets of instructions where the older one wins. Add
+`--dry-run` to see the exact block first.
+
+**The user-level file, not the project one.** This is the same trap as the
+config above, one directory over:
+
+| Agent | The file that applies everywhere |
+| --- | --- |
+| Claude Code | `~/.claude/CLAUDE.md` |
+| Codex | `~/.codex/AGENTS.md` |
+| Cursor | `~/.cursor/rules/todox.md` |
+| VS Code | `~/.copilot/instructions/todox.md` |
+| OpenCode | `~/.config/opencode/AGENTS.md` |
+
+A repository's own `AGENTS.md`, and the per-project rules files the editors also
+read, apply inside that checkout only. A cross-project memory installed into one
+project is the thing this whole section exists to avoid.
 
 The token stays out of that file — it lives in your MCP config. This is the
 habit, not the credential.

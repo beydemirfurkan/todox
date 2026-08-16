@@ -1,8 +1,14 @@
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { MCP_SHAPES } from "../../../lib/mcp-clients";
-import { vsCodeConfigDir, vsCodeStaleConfigDirs } from "./paths";
+import {
+  MCP_MEMORY_PATHS,
+  MCP_SHAPES,
+  MEMORY_FILE_NAME,
+  type McpClientId,
+  type McpConfigLocation,
+} from "../../../lib/mcp-clients";
+import { expandHome, vsCodeConfigDir, vsCodeStaleConfigDirs } from "./paths";
 
 /**
  * Where each client reads its MCP config, and under which keys. One table,
@@ -118,4 +124,29 @@ export type OpenCodeMajor = "v1" | "v2";
 /** Codex is TOML, so it has a file but no JSON key path. */
 export function codexConfigFile(): string {
   return path.join(os.homedir(), ".codex", "config.toml");
+}
+
+/**
+ * The absolute file the habit goes in, for a client.
+ *
+ * Same division of labour as the config paths above: `lib/mcp-clients.ts` holds
+ * the `~`-form locations so the Account page can print them in a browser, and
+ * the resolving to an absolute path happens here, where `node:` is available.
+ *
+ * Where the client reads a directory of instruction files rather than one file,
+ * todox writes its own file inside it. Appending to a file the user did not
+ * create for us is a worse neighbour than adding one they can delete.
+ */
+export function memoryFileFor(client: McpClientId): string {
+  const target = MCP_MEMORY_PATHS[client];
+  const resolved = expandHome(target.location[platformKey()]);
+  return target.kind === "directory"
+    ? path.join(resolved, MEMORY_FILE_NAME)
+    : resolved;
+}
+
+function platformKey(): keyof McpConfigLocation {
+  if (process.platform === "win32") return "win32";
+  if (process.platform === "darwin") return "darwin";
+  return "linux";
 }

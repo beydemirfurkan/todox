@@ -3,7 +3,8 @@
  *
  * Usage:
  *   pnpm install:mcp <client> [--url URL] [--token TOKEN] [--transport http|stdio]
- *                             [--opencode-layout v1|v2] [--dry-run] [--verbose]
+ *                             [--opencode-layout v1|v2] [--write-memory]
+ *                             [--dry-run] [--verbose]
  *
  * Where <client> is one of: claude-code, codex, cursor, vscode, opencode.
  *
@@ -11,6 +12,11 @@
  * otherwise the script prompts (TTY only, with input muted so the secret does
  * not land in the scrollback). --dry-run prints the plan and exits without
  * writing. The doctor pass at the end is what makes a silent failure loud.
+ *
+ * --write-memory does the other half: the config makes the tools exist, and the
+ * habit in the client's user-level memory file is what makes an agent reach for
+ * them. Off by default because that file is the user's own, and every run says
+ * which file it would be either way.
  */
 import * as os from "node:os";
 
@@ -19,9 +25,12 @@ import { client as codex } from "./clients/codex";
 import { client as cursor } from "./clients/cursor";
 import { client as opencode } from "./clients/opencode";
 import { client as vscode } from "./clients/vscode";
+import { memoryFileFor } from "./clients/contract";
 import { runDoctor } from "./doctor";
+import { memoryBlock, planMemoryWrite, readMemoryFile, writeMemoryFile } from "./memory";
 import { parseArgs } from "./parse";
 import { maskToken, promptForToken } from "./prompt";
+import type { McpClientId } from "../../lib/mcp-clients";
 
 const CLIENTS = {
   "claude-code": claudeCode,
@@ -73,7 +82,23 @@ async function main() {
   // install has been sitting somewhere the client never reads.
   reportStale(await installer.staleInstalls());
 
+  // Named before the write, so a dry run says what both halves would do.
+  const memoryFile = memoryFileFor(args.client as McpClientId);
+  if (args.writeMemory) {
+    console.error(`[todox] memory : ${memoryFile}`);
+  } else {
+    console.error(
+      `[todox] memory : not written. Connecting is not the same as being used — ` +
+        `re-run with --write-memory to put the habit in ${memoryFile}, or paste it yourself.`,
+    );
+  }
+
   if (args.dryRun) {
+    if (args.writeMemory) {
+      const plan = planMemoryWrite(await readMemoryFile(memoryFile));
+      console.error(`[todox] memory : would be ${plan.status}; the block it adds:`);
+      for (const l of memoryBlock().split("\n")) console.error(`[todox]          ${l}`);
+    }
     console.error("[todox] dry-run; nothing written");
     return;
   }
@@ -93,6 +118,18 @@ async function main() {
     process.exit(1);
   }
   console.error(`[todox] verify : ok (${verify.detail})`);
+
+  // After verify, not before it. The habit tells an agent to call tools that
+  // only exist if the config landed, so writing it while the install is still
+  // unproven leaves standing instructions pointing at nothing -- in a file the
+  // user keeps, and which nothing here will come back to clean up.
+  //
+  // Before the doctor, though, which is a reachability check: a server that is
+  // registered correctly and briefly unreachable still wants the habit.
+  if (args.writeMemory) {
+    const written = await writeMemoryFile(memoryFile);
+    console.error(`[todox] memory : ${memoryFile} (${written.status})`);
+  }
 
   // Only run the doctor on http transports. Stdio spawns a child process
   // that we cannot reach from this CLI without a known MCP client.

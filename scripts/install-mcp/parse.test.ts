@@ -55,6 +55,7 @@ describe("parseArgs", () => {
       transport: "http",
       dryRun: false,
       verbose: false,
+      writeMemory: false,
     });
   });
 
@@ -78,6 +79,7 @@ describe("parseArgs", () => {
       transport: "stdio",
       dryRun: true,
       verbose: true,
+      writeMemory: false,
     });
   });
 
@@ -88,6 +90,21 @@ describe("parseArgs", () => {
   it("treats --dry-run and --verbose as boolean flags without a value", () => {
     expect(parseArgs(["opencode", "--dry-run"]).dryRun).toBe(true);
     expect(parseArgs(["opencode", "--verbose"]).verbose).toBe(true);
+  });
+
+  it("leaves the memory file alone unless it is asked", () => {
+    // The default matters more than the flag: this writes to the file someone
+    // keeps their own standing instructions in, and doing that because they
+    // asked to register a server is not what they asked for.
+    expect(parseArgs(["claude-code"]).writeMemory).toBe(false);
+    expect(parseArgs(["claude-code", "--write-memory"]).writeMemory).toBe(true);
+  });
+
+  it("does not swallow the client name after --write-memory", () => {
+    // Same trap as --dry-run: without being declared boolean, the parser takes
+    // the next argv as its value and the client name disappears.
+    expect(parseArgs(["--write-memory", "codex"]).client).toBe("codex");
+    expect(parseArgs(["--write-memory", "codex"]).writeMemory).toBe(true);
   });
 
   it("does not consume the next argv as a value for boolean flags", () => {
@@ -101,6 +118,7 @@ describe("parseArgs", () => {
       transport: "http",
       dryRun: true,
       verbose: false,
+      writeMemory: false,
     });
     expect(parseArgs(["--verbose", "codex"]).verbose).toBe(true);
     expect(parseArgs(["--verbose", "codex"]).client).toBe("codex");

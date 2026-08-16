@@ -4,10 +4,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { MEMORY_SNIPPET } from "../../lib/mcp-clients";
 import {
   claudeCodeContract,
   codexConfigFile,
   cursorContract,
+  memoryFileFor,
   openCodeContract,
   vsCodeContract,
 } from "./clients/contract";
@@ -23,7 +25,17 @@ import {
  * wrong, and the wrong one was the table a reader is most likely to copy.
  */
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..");
-const README = readFileSync(path.join(repoRoot, "README.md"), "utf8");
+
+/**
+ * Line endings normalised on the way in. A Windows checkout hands this file
+ * back with CRLF, and the snippet it is compared against is a `\n` string in
+ * TypeScript source -- so a multi-line assertion passes on the developer's
+ * machine and fails only on the Windows runner, which is the job that exists
+ * to catch exactly this and did.
+ *
+ * Every earlier assertion here matches a single line and never noticed.
+ */
+const README = readFileSync(path.join(repoRoot, "README.md"), "utf8").replace(/\r\n/g, "\n");
 
 /** The `~`-shortened form a document writes, from the absolute path we resolve. */
 function tildeForm(absolute: string): string {
@@ -89,5 +101,39 @@ describe("README documents what the installer writes", () => {
     expect(README).toMatch(
       /\|\s*OpenCode v2\s*\|\s*`mcp\.servers\.NAME`\s*\|\s*`"remote"`\s*\|/,
     );
+  });
+});
+
+/**
+ * The habit is a copy-paste surface too, and a longer-lived one than the config:
+ * a reader pastes it into a file they keep for years. Three places already held
+ * their own wording of it -- this README, the Account page, and the project's
+ * own AGENTS.md -- which is how the config shapes drifted before
+ * `lib/mcp-clients.ts` existed.
+ */
+describe("README prints the habit the installer writes", () => {
+  it("quotes the snippet exactly, not a paraphrase of it", () => {
+    expect(README).toContain(MEMORY_SNIPPET);
+  });
+
+  it("prints the user-level memory file for every client", () => {
+    for (const client of ["claude-code", "codex", "cursor", "vscode", "opencode"] as const) {
+      const file = memoryFileFor(client);
+      expect(README, `${client}: ${file}`).toContain(tildeForm(file));
+    }
+  });
+
+  it("documents the flag that writes it", () => {
+    expect(README).toContain("--write-memory");
+  });
+
+  it("does not offer a project-level file as the place for it", () => {
+    // `.cursorrules` and `.github/copilot-instructions.md` reach one checkout.
+    // A README that names them beside the habit sends a reader to install a
+    // cross-project memory into a single project.
+    const habitSection = README.slice(README.indexOf(MEMORY_SNIPPET) - 1200);
+    for (const wrong of [".cursorrules", ".github/copilot-instructions.md"]) {
+      expect(habitSection, wrong).not.toContain(wrong);
+    }
   });
 });
