@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
 import { instructions, registerTools, type Workspace } from "@/mcp/tools";
+import { clientIp } from "@/lib/server/client-ip";
 import { normalise, record } from "@/lib/server/client-info";
 import { userForApiToken } from "@/lib/services/auth";
 import { BadRequest } from "@/lib/services/errors";
@@ -74,11 +75,29 @@ async function captureClientInfo(token: string, body: unknown): Promise<void> {
 const unauthorised = (error: string) =>
   json({ jsonrpc: "2.0", error: { code: -32001, message: error } }, 401);
 
-export async function POST(req: Request) {
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
-    "unknown";
+/**
+ * The error boundary, and nothing else.
+ *
+ * Authentication and rate limiting used to run above every `try` in this file,
+ * where a database that was down threw straight out of the handler: no log line
+ * of ours, and the framework's own HTML 500 handed to a client that only parses
+ * JSON-RPC. Keeping the work in its own function puts all of it inside one
+ * catch without indenting the whole route a level.
+ */
+export async function POST(req: Request): Promise<Response> {
+  try {
+    return await answer(req);
+  } catch (e) {
+    console.error("mcp", e);
+    return json(
+      { jsonrpc: "2.0", error: { code: -32603, message: "the server could not complete that call" } },
+      500,
+    );
+  }
+}
+
+async function answer(req: Request): Promise<Response> {
+  const ip = clientIp(req.headers);
 
   const auth = req.headers.get("authorization") ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
@@ -168,12 +187,6 @@ export async function POST(req: Request) {
   try {
     await server.connect(transport);
     return await transport.handleRequest(req, { parsedBody: body });
-  } catch (e) {
-    console.error("mcp", e);
-    return json(
-      { jsonrpc: "2.0", error: { code: -32603, message: "the server could not complete that call" } },
-      500,
-    );
   } finally {
     // Safe with enableJsonResponse: handleRequest has already resolved with a
     // complete body by this point.
