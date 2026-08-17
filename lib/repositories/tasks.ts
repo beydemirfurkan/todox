@@ -1,9 +1,21 @@
-import { DEFAULT_PRIORITY, OPEN_STATUSES, isClosedStatus, type Status } from "../constants";
+import {
+  CLOSED_STATUSES,
+  DEFAULT_PRIORITY,
+  OPEN_STATUSES,
+  isClosedStatus,
+  type Status,
+} from "../constants";
 import { all, one, run, runStmt, setClause, type Statement } from "../db/client";
 import type { Task } from "../types";
 import { now } from "../util/time";
 
-export type StatusFilter = Status | "open" | "all";
+/**
+ * `"closed"` is the complement of `"open"` and exists for the same reason: a
+ * caller that wants finished work had to ask for `"all"` and split the answer
+ * in JavaScript, which on the public share page meant reading every task in a
+ * project to print forty of them.
+ */
+export type StatusFilter = Status | "open" | "closed" | "all";
 
 export type NewTask = {
   project_id: number;
@@ -28,13 +40,15 @@ export function listByProject(projectId: number, status: StatusFilter = "open") 
       [projectId],
     );
 
-  if (status === "open")
+  if (status === "open" || status === "closed") {
+    const set = status === "open" ? OPEN_STATUSES : CLOSED_STATUSES;
     return all<Task>(
       `SELECT * FROM tasks WHERE project_id = ?
-         AND status IN (${OPEN_STATUSES.map(() => "?").join(",")})
+         AND status IN (${set.map(() => "?").join(",")})
        ORDER BY priority, updated_at DESC`,
-      [projectId, ...OPEN_STATUSES],
+      [projectId, ...set],
     );
+  }
 
   return all<Task>(
     "SELECT * FROM tasks WHERE project_id = ? AND status = ? ORDER BY priority, updated_at DESC",
@@ -84,14 +98,16 @@ function limitedByProject(projectId: number, status: StatusFilter, limit: number
       [projectId, limit],
     );
 
-  if (status === "open")
+  if (status === "open" || status === "closed") {
+    const set = status === "open" ? OPEN_STATUSES : CLOSED_STATUSES;
     return all<Task>(
       `SELECT * FROM tasks WHERE project_id = ?
-         AND status IN (${OPEN_STATUSES.map(() => "?").join(",")})
+         AND status IN (${set.map(() => "?").join(",")})
        ORDER BY priority, updated_at DESC
        LIMIT ?`,
-      [projectId, ...OPEN_STATUSES, limit],
+      [projectId, ...set, limit],
     );
+  }
 
   return all<Task>(
     `SELECT * FROM tasks WHERE project_id = ? AND status = ?
@@ -106,11 +122,13 @@ async function countByProject(projectId: number, status: StatusFilter): Promise<
       ? await one<{ n: string }>("SELECT count(*) AS n FROM tasks WHERE project_id = ?", [
           projectId,
         ])
-      : status === "open"
+      : status === "open" || status === "closed"
         ? await one<{ n: string }>(
             `SELECT count(*) AS n FROM tasks WHERE project_id = ?
-               AND status IN (${OPEN_STATUSES.map(() => "?").join(",")})`,
-            [projectId, ...OPEN_STATUSES],
+               AND status IN (${(status === "open" ? OPEN_STATUSES : CLOSED_STATUSES)
+                 .map(() => "?")
+                 .join(",")})`,
+            [projectId, ...(status === "open" ? OPEN_STATUSES : CLOSED_STATUSES)],
           )
         : await one<{ n: string }>(
             "SELECT count(*) AS n FROM tasks WHERE project_id = ? AND status = ?",
@@ -132,8 +150,18 @@ export const byId = (id: number) => one<Task>("SELECT * FROM tasks WHERE id = ?"
  * midnight boundary was counted in both days' reports. The window was made
  * half-open to fix precisely that -- see the note in `lib/util/time.ts` -- and
  * these four comparisons were what the fix never reached.
+ *
+ * `projectId` narrows in SQL. The report used to take every task the account
+ * touched in the window and keep the matching ones in JavaScript, so asking for
+ * one project's report cost exactly what asking for all of them did -- on a
+ * four-way join with no LIMIT, which is the expensive read here.
  */
-export const activeBetween = (userId: number, from: string, to: string) =>
+export const activeBetween = (
+  userId: number,
+  from: string,
+  to: string,
+  projectId?: number,
+) =>
   all<Task>(
     `SELECT DISTINCT t.* FROM tasks t
      JOIN projects p ON p.id = t.project_id
@@ -141,12 +169,25 @@ export const activeBetween = (userId: number, from: string, to: string) =>
      LEFT JOIN entries e     ON e.task_id = t.id AND e.created_at >= ? AND e.created_at < ?
      LEFT JOIN task_events v ON v.task_id = t.id AND v.at         >= ? AND v.at         < ?
       WHERE (p.user_id = ? OR pm.user_id IS NOT NULL)
+        ${projectId === undefined ? "" : "AND t.project_id = ?"}
         AND ((t.created_at >= ? AND t.created_at < ?)
          OR (t.closed_at   >= ? AND t.closed_at  < ?)
          OR e.id IS NOT NULL
          OR v.id IS NOT NULL)
      ORDER BY t.updated_at DESC`,
-    [userId, from, to, from, to, userId, from, to, from, to],
+    [
+      userId,
+      from,
+      to,
+      from,
+      to,
+      userId,
+      ...(projectId === undefined ? [] : [projectId]),
+      from,
+      to,
+      from,
+      to,
+    ],
   );
 
 /**

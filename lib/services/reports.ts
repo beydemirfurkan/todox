@@ -183,15 +183,14 @@ export async function activityReport(
   period: Period,
   opts: { projectId?: number } = {},
 ): Promise<ActivityReport> {
-  const [projectRows, candidatesAll] = await Promise.all([
+  const [projectRows, candidates] = await Promise.all([
     projectsRepo.list(userId, true),
-    tasksRepo.activeBetween(userId, period.from, period.to),
+    // Narrowed in the query. This filtered the result in JavaScript, so scoping
+    // a report to one project reduced what came back and not what was read.
+    tasksRepo.activeBetween(userId, period.from, period.to, opts.projectId),
   ]);
 
   const projects = new Map(projectRows.map((p) => [p.id, p]));
-  const candidates = candidatesAll.filter((t) =>
-    opts.projectId ? t.project_id === opts.projectId : true,
-  );
   const ids = candidates.map((t) => t.id);
 
   // Three queries total, whatever the window contains. Loading the log and the
