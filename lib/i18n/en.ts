@@ -47,7 +47,7 @@ export const en = {
   forAgents: "Are you an agent? Read /llms.txt.",
   privacyLastUpdated: "Last updated: 12 August 2026.",
   privacyWhatWeStore: "What we store",
-  privacyStore1: "Your account: email, username, display name, and a password hash. The hash is bcrypt and we cannot read your password.",
+  privacyStore1: "Your account: email, username, display name, and a password hash. The hash is scrypt and we cannot read your password.",
   privacyStore2: "Your projects, tasks, log entries, context notes, and project memberships — the data you put into todox.",
   privacyStore3: "Session cookies that keep you signed in. They are HTTP-only, signed, and expire when you sign out or after 30 days of inactivity.",
   privacyStore4: "Server logs with your IP address and request path, kept for 30 days for abuse detection and debugging.",

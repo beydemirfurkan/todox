@@ -45,7 +45,7 @@ export const tr: Record<Key, string> = {
   forAgents: "Ajan mısın? /llms.txt dosyasını oku.",
   privacyLastUpdated: "Son güncelleme: 12 Ağustos 2026.",
   privacyWhatWeStore: "Neleri saklıyoruz",
-  privacyStore1: "Hesabın: e-posta, kullanıcı adı, görünür ad ve şifrenin hash'i. Hash bcrypt'tir; şifreni okuyamayız.",
+  privacyStore1: "Hesabın: e-posta, kullanıcı adı, görünür ad ve şifrenin hash'i. Hash scrypt'tir; şifreni okuyamayız.",
   privacyStore2: "Projelerin, görevlerin, günlük girdilerin, bağlam notların ve proje üyeliklerin — todox'a sen koyarsın.",
   privacyStore3: "Oturumunu açık tutan çerezler. HTTP-only, imzalı; çıkış yaptığında ya da 30 gün hareketsizlikten sonra süreleri dolar.",
   privacyStore4: "IP adresini ve istek yolunu içeren sunucu logları; kötüye kullanım tespiti ve hata ayıklama için 30 gün saklanır.",

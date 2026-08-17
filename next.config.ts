@@ -30,9 +30,19 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      // Next.js inlines a small boot script and the RSC payload; both carry
-      // their own nonces at runtime, so `'self'` covers them. `'unsafe-eval'`
-      // is left out — production never needs it.
+      // `'unsafe-inline'` is live, and this said otherwise: the claim was that
+      // Next's boot script and RSC payload "carry their own nonces at runtime,
+      // so 'self' covers them". Nothing here emits a nonce -- check the header
+      // on a response and there is no `nonce-` in it -- so the directive means
+      // what it says, which is that any inline script runs. It was listed *and*
+      // explained away in the same breath, which is the worst of both: the hole
+      // is open and a reader is told it is closed.
+      //
+      // Closing it properly means minting a nonce per request in `proxy.ts` and
+      // letting Next pick it up, which changes how every page's scripts load
+      // and needs verifying in a real browser rather than in a header diff.
+      // Until then this is a known gap, and SECURITY.md says so.
+      // `'unsafe-eval'` is left out — production never needs it.
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
