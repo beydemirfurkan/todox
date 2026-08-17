@@ -382,6 +382,10 @@ export const en = {
   sharedReadOnly: "Read-only shared view",
   sharedIntro: "A public snapshot of this project's task list.",
   sharedNoLog: "The log is not part of this share.",
+  sharedAndMore: "{n} more, not shown. A share is a snapshot, not the whole project.",
+  sharedBusyTitle: "Too many requests",
+  sharedBusyBody:
+    "This link has been opened a lot from your address in the last few minutes. Try again in about {n} minutes — nothing is wrong with the project.",
 
   /* task page */
   task: "task",

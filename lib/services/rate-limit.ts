@@ -40,6 +40,17 @@ export const POLICIES = {
    * its rails.
    */
   agentPerToken: { limit: 600, windowMs: 15 * MINUTE },
+  /**
+   * Views of a share link, per address.
+   *
+   * The only page that answers without a session, and it reads a project's
+   * tasks and their log on every hit. The lists are capped now, but a capped
+   * read is still a read, and nothing was counting them -- a crawler that
+   * ignores the noindex, or anyone who kept the URL, could ask as often as it
+   * liked. Set high enough that a person reading a shared project and following
+   * its links never notices.
+   */
+  sharePerIp: { limit: 120, windowMs: 15 * MINUTE },
 } as const;
 
 export type PolicyName = keyof typeof POLICIES;

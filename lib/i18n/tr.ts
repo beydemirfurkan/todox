@@ -372,6 +372,11 @@ export const tr: Record<Key, string> = {
   sharedReadOnly: "Salt okunur paylaşım görünümü",
   sharedIntro: "Bu projenin görev listesinin herkese açık anlık görüntüsü.",
   sharedNoLog: "Kayıt bu paylaşıma dahil değil.",
+  sharedAndMore:
+    "{n} tane daha var, gösterilmedi. Paylaşım bir anlık görüntüdür, projenin tamamı değil.",
+  sharedBusyTitle: "Çok fazla istek",
+  sharedBusyBody:
+    "Bu bağlantı son birkaç dakikada senin adresinden çok kez açıldı. Yaklaşık {n} dakika sonra tekrar dene — projede bir sorun yok.",
 
   task: "görev",
   theLog: "Kayıt",
