@@ -23,16 +23,40 @@ import type { Project, Task } from "../types";
  */
 const BRIEFING_TASKS = 50;
 
+/**
+ * The kinds a briefing reads, and how many of each it carries per task.
+ *
+ * The task list was capped and the log under it was not, so fifty tasks could
+ * still answer with every entry ever written on any of them -- tens of MB on
+ * the call every session opens with, which is the failure `BRIEFING_TASKS` was
+ * added to prevent, fixed on one axis only.
+ *
+ * Notes are absent on purpose: nothing below reads one. They were loaded across
+ * the network so that `.length` could count them, and `entry_count` now comes
+ * from a COUNT in the database instead.
+ *
+ * Three is small because these are summaries of a summary. What falls off is
+ * the oldest of that kind, and `log_omitted` says how much -- an agent that
+ * needs the rest calls `get_task`.
+ */
+const BRIEFING_KINDS = ["handoff", "decision", "dead_end", "question"] as const;
+const PER_KIND = 3;
+
 export async function briefing(userId: number, project: Project) {
   // Cut in SQL rather than after the fact. This read every open task and then
   // took fifty, on the first query of every session.
   const { rows: open, total } = await tasks.pageByProject(project.id, "open", BRIEFING_TASKS);
   const ids = open.map((t) => t.id);
 
-  const [globalContext, projectContext, logs, files] = await Promise.all([
+  const [globalContext, projectContext, logs, counts, files] = await Promise.all([
     contexts.listByProject(userId, null),
     contexts.listByProject(userId, project.id),
-    entries.listByTasks(ids),
+    entries.listByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
+    // The honest total, and what the caps dropped. Counting in the database is
+    // what lets the log above be cut without `entry_count` starting to lie --
+    // and a number that lies about how much it is hiding is worse here than a
+    // big payload, because the agent stops knowing to go and look.
+    entries.countsByTasks(ids),
     refs.listByTasks(ids),
   ]);
 
@@ -50,8 +74,23 @@ export async function briefing(userId: number, project: Project) {
       checked_at: r.checked_at,
     }));
     // A cold agent needs the shape of the work, not every keystroke: the last
-    // handoff, every decision, and every dead end (the expensive ones).
+    // handoff, the recent decisions, and the dead ends (the expensive ones).
     const handoff = [...log].reverse().find((e) => e.kind === "handoff");
+    const bodies = (kind: string) => log.filter((e) => e.kind === kind).map((e) => e.body);
+    const decisions = bodies("decision");
+    const dead_ends = bodies("dead_end");
+    const open_questions = bodies("question");
+
+    const count = counts.get(t.id);
+    // Only the three lists below are capped, so only they can hide anything.
+    // The handoff cannot: there is one shown and one wanted.
+    const omitted = count
+      ? count.decisions -
+        decisions.length +
+        (count.dead_ends - dead_ends.length) +
+        (count.questions - open_questions.length)
+      : 0;
+
     return {
       id: t.id,
       title: t.title,
@@ -60,11 +99,12 @@ export async function briefing(userId: number, project: Project) {
       body: t.body,
       updated_at: t.updated_at,
       last_handoff: handoff?.body ?? null,
-      decisions: log.filter((e) => e.kind === "decision").map((e) => e.body),
-      dead_ends: log.filter((e) => e.kind === "dead_end").map((e) => e.body),
-      open_questions: log.filter((e) => e.kind === "question").map((e) => e.body),
+      decisions,
+      dead_ends,
+      open_questions,
       files: linked,
-      entry_count: log.length,
+      entry_count: count?.total ?? 0,
+      log_omitted: omitted,
     };
   });
 
