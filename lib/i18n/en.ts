@@ -190,6 +190,8 @@ export const en = {
   revokeAllNote:
     "Tokens do not expire and each one carries the whole account. If you think one has leaked and cannot tell which, end all of them.",
   tokenOnce: "Copy it now — it is never shown again.",
+  tokenTooMany:
+    "That is a lot of tokens for one day. Try again in about {n} minutes — or revoke the ones you are no longer using, below.",
   setupPromptTitle: "Paste this to your agent",
   setupPromptTemplate: [
     "Add todox as an MCP server. It is a remote (HTTP) server, so there is",

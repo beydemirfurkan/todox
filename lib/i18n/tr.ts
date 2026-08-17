@@ -183,6 +183,8 @@ export const tr: Record<Key, string> = {
   revokeAllNote:
     "Token'ların son kullanma tarihi yok ve her biri hesabın tamamını taşıyor. Biri sızdıysa ve hangisi olduğunu bilmiyorsan hepsini birden bitir.",
   tokenOnce: "Şimdi kopyala — bir daha gösterilmeyecek.",
+  tokenTooMany:
+    "Bir gün için bu kadar token çok. Yaklaşık {n} dakika sonra tekrar dene — ya da aşağıdan artık kullanmadıklarını iptal et.",
   setupPromptTitle: "Ajanına yapıştır",
   setupPromptTemplate: [
     "todox'u MCP sunucusu olarak ekle. Uzak (HTTP) bir sunucu, kurulacak bir",

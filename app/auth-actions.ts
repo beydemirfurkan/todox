@@ -30,11 +30,19 @@ const inviteNext = (fd: FormData) => {
 export type AuthState = { errors: auth.FieldError[] } | null;
 
 /**
- * Kept apart from `AuthState`: creating a token has no failure a field could
+ * Kept apart from `AuthState`: creating a token has no failure a *field* could
  * carry, and folding it in would hand the token form the "no errors means it
  * worked" success banner the auth forms rely on.
+ *
+ * It does have one failure now. Minting is metered, and a refusal that returned
+ * `null` would be indistinguishable from never having submitted -- the button
+ * would settle and nothing would appear, which is the silent no-op this
+ * codebase keeps finding. So the refusal is a state of its own.
  */
-export type TokenState = { token: string } | null;
+export type TokenState =
+  | { token: string }
+  | { tooManyMinutes: number }
+  | null;
 
 const tooMany = (retryAfterSec: number): AuthState => ({
   errors: [
@@ -302,6 +310,11 @@ export async function createTokenAction(
   fd: FormData,
 ): Promise<TokenState> {
   const user = await requireUser();
+  // Nothing counted these. They never expire and each one carries the whole
+  // account, so an unmetered mint is an unmetered supply of long-lived
+  // credentials -- the one thing on this page worth a ceiling.
+  const gate = await limit.consume("tokenPerUser", String(user.id));
+  if (!gate.allowed) return { tooManyMinutes: Math.ceil(gate.retryAfterSec / 60) };
   const name = str(fd, "name") || "mcp";
   const { token } = await auth.createApiToken(user.id, name);
   // Without this the new row is missing from the list until something else
