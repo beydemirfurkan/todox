@@ -155,13 +155,35 @@ describe("loginAction", () => {
     expect(mocks.setSessionCookie).toHaveBeenCalledWith("session-token");
   });
 
-  it("takes the left-most forwarded hop as the address", async () => {
+  it("ignores a forged left-most hop and meters the address a proxy appended", async () => {
+    // This asserted the left-most entry, which is the end of the list the
+    // caller writes: one made-up header per request bought a fresh bucket, and
+    // `loginPerIp` is enforced nowhere else. The right-hand end is ours --
+    // `lib/server/client-ip.ts` counts back one hop per proxy we run behind.
     mocks.headerValues.set("x-forwarded-for", "203.0.113.7, 10.0.0.1, 10.0.0.2");
     mocks.login.mockResolvedValue({ ok: false, errors: [] });
 
     await outcome(() => actions.loginAction(null, creds));
 
-    expect(mocks.check).toHaveBeenCalledWith("loginPerIp", "203.0.113.7");
+    expect(mocks.check).toHaveBeenCalledWith("loginPerIp", "10.0.0.2");
+    expect(mocks.check).not.toHaveBeenCalledWith("loginPerIp", "203.0.113.7");
+  });
+
+  it("puts two requests that differ only in a forged hop in one bucket", async () => {
+    // The property that actually matters, and the one the old assertion made
+    // impossible: an attacker rotating the part of the chain they control must
+    // not be able to widen the limit.
+    mocks.login.mockResolvedValue({ ok: false, errors: [] });
+
+    mocks.headerValues.set("x-forwarded-for", "198.51.100.1, 10.0.0.2");
+    await outcome(() => actions.loginAction(null, creds));
+    mocks.headerValues.set("x-forwarded-for", "198.51.100.99, 10.0.0.2");
+    await outcome(() => actions.loginAction(null, creds));
+
+    const buckets = mocks.check.mock.calls
+      .filter(([policy]) => policy === "loginPerIp")
+      .map(([, subject]) => subject);
+    expect(new Set(buckets)).toEqual(new Set(["10.0.0.2"]));
   });
 
   it("falls back to a shared bucket rather than to no limit", async () => {

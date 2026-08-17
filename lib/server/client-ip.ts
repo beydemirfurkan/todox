@@ -50,7 +50,15 @@ function trustedHops(): number {
   return configured;
 }
 
-export function clientIp(headers: Headers): string {
+/**
+ * Only `get` is read here, and the callers do not agree on a type: a route
+ * handler has a real `Headers`, `next/headers` hands back a read-only view of
+ * one. Asking for the narrowest thing this needs lets both pass without an
+ * assertion at either call site.
+ */
+type Readable = Pick<Headers, "get">;
+
+export function clientIp(headers: Readable): string {
   const hops = trustedHops();
   // Nothing in front of us: every forwarding header is the caller's to write,
   // so there is no address here to tell anyone apart by.
