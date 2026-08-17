@@ -349,6 +349,7 @@ export const tr: Record<Key, string> = {
   staleTitleMany: "{n} not sana yalan söylüyor olabilir",
   staleBody:
     "Bunların arkasındaki dosyalar yazıldıklarından beri değişti. Bayat bağlam, hiç bağlam olmamasından beterdir.",
+  staleAndMore: "ve {n} tane daha; görevlerin kendi sayfalarında listeli.",
   inLog: "kayıt",
   deadEndCount: "çıkmaz",
   deadEndCountPlural: "çıkmaz",

@@ -358,6 +358,7 @@ export const en = {
   staleTitleMany: "{n} notes may be lying to you",
   staleBody:
     "The files behind these have changed since they were written. Stale context is worse than none.",
+  staleAndMore: "and {n} more, listed on the tasks themselves.",
   inLog: "in log",
   deadEndCount: "dead end",
   deadEndCountPlural: "dead ends",

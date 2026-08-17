@@ -57,6 +57,15 @@ export function Picker({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listId = useId();
 
+  /**
+   * Focus never leaves the trigger, so the browser cannot announce the option
+   * the arrow keys are on -- it was tracked by `data-active` alone, which is a
+   * paint. `aria-activedescendant` is the half of the pattern that tells a
+   * screen reader where it is, and without it arrowing through this control was
+   * silent until something was picked.
+   */
+  const optionId = (i: number) => `${listId}-o${i}`;
+
   // The server re-renders this row with a new value after a submit, and the
   // local copy has to follow. Adjusted during render rather than in an effect:
   // an effect would paint the stale value first and then correct it.
@@ -124,9 +133,19 @@ export function Picker({
           ref={triggerRef}
           type="button"
           className="user-menu-trigger picker-trigger"
+          // `combobox`, not the implicit `button`. It carries `aria-expanded`,
+          // `aria-controls` and now `aria-activedescendant`, and a plain button
+          // supports none of the three -- eslint's `role-supports-aria-props`
+          // says so, and it is right: the attributes were describing a listbox
+          // relationship that the element's own role did not claim to have. The
+          // accessible name comes from the `sr-only` label inside.
+          role="combobox"
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-controls={listId}
+          // Only while open: pointing at an option in a closed list describes a
+          // position the reader cannot be in.
+          aria-activedescendant={open ? optionId(active) : undefined}
           onClick={() => {
             setActive(Math.max(0, options.findIndex((o) => o.value === chosen)));
             setOpen((v) => !v);
@@ -148,6 +167,7 @@ export function Picker({
           {options.map((o, i) => (
             <button
               key={o.value}
+              id={optionId(i)}
               type="button"
               role="option"
               aria-selected={o.value === chosen}

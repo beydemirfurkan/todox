@@ -1445,3 +1445,50 @@ pre {
     min-height: 44px;
   }
 }
+
+/* ------------------------------------------------- forced colours */
+
+/* Windows High Contrast and anything else that sets `forced-colors: active`.
+   The whole visual language here is a marker fill applied inline --
+   `style={{ background: "var(--k-…)" }}` on every status dot, kind marker and
+   chip -- and this mode replaces each of those with one of a handful of system
+   colours. So the colours that tell a `decision` from a `dead_end` all collapse
+   into the same one.
+
+   Nothing loses its *meaning*, and that is not luck: every dot carries an
+   `sr-only` label and every chip carries real text, because colour never
+   carries meaning alone. What does break is the shape -- a card's fill and the
+   page's fill become the same colour, so the outlines are the only thing left
+   holding the layout apart, and 1.5px of `var(--line)` is exactly what the mode
+   throws away. These restate the borders in system colours so structure
+   survives.
+
+   `forced-color-adjust: none` is deliberately absent. Painting our palette back
+   over a user's own contrast setting is the thing this mode exists to stop, and
+   the text equivalents mean we do not need to. */
+@media (forced-colors: active) {
+  .sticker,
+  .sticker-flat,
+  .searchbox,
+  .pill,
+  .btn,
+  .btn-quiet {
+    border: 1.5px solid CanvasText;
+  }
+
+  /* The status dots and kind markers: a round `aria-hidden` span whose only
+     paint is an inline background, which this mode forces to Canvas -- the same
+     colour as what is behind them. Without a ring they stop being on the page at
+     all. Scoped to the round decorative spans rather than to `[aria-hidden]`,
+     which would also catch every mascot and rule. */
+  span[aria-hidden="true"].rounded-full {
+    border-color: CanvasText;
+  }
+
+  /* A hard offset shadow is part of how a raised surface reads here, and it is
+     dropped in this mode; the border above is doing that job instead. */
+  .sticker,
+  .lift:hover {
+    box-shadow: none;
+  }
+}

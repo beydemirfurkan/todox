@@ -63,6 +63,16 @@ export const dynamic = "force-dynamic";
  * rather than two.
  */
 const currentUser = cache(requireUser);
+
+/**
+ * Stale-file lines printed in the banner.
+ *
+ * There was no ceiling, and a project with hundreds of moved files rendered one
+ * `<li>` for each inside what was then a live region. The count in the heading
+ * stays the true one; the point of the banner is that something has drifted, and
+ * which files is a question the tasks themselves answer.
+ */
+const STALE_SHOWN = 8;
 const projectBySlug = cache((userId: number, slug: string) => projects.bySlug(userId, slug));
 
 /**
@@ -307,8 +317,13 @@ export default async function ProjectPage({
       </header>
 
       {stale.length > 0 && (
-        <div
-          role="status"
+        // A labelled region, not `role="status"`. This is server-rendered and
+        // present on load, and `role="status"` carries an implicit polite live
+        // region -- so a screen reader queued the whole banner, including one
+        // line per stale file with no ceiling on them. `aria-live` is for
+        // something that changes without a navigation; this changes with one.
+        <section
+          aria-labelledby="stale-heading"
           className="on-fill sticker pop flex items-start gap-3.5 p-4"
           style={{ background: "var(--k-question)", animationDelay: "40ms" }}
         >
@@ -320,21 +335,29 @@ export default async function ProjectPage({
             className="shrink-0"
           />
           <div className="min-w-0">
-            <p className="display text-[17px] font-bold">
+            {/* A real heading, so the banner is something you can navigate to
+                rather than a bold paragraph that only looks like a title. The
+                count is the true one, whatever the list below shows. */}
+            <h2 id="stale-heading" className="display text-[17px] font-bold">
               {stale.length === 1
                 ? t("staleTitleOne")
                 : t("staleTitleMany", { n: stale.length })}
-            </p>
+            </h2>
             <p className="mt-0.5 text-[14px]">{t("staleBody")}</p>
             <ul className="mono mt-2 space-y-0.5 text-[12px]">
-              {stale.map((s) => (
+              {stale.slice(0, STALE_SHOWN).map((s) => (
                 <li key={s} className="break-all">
                   · {s}
                 </li>
               ))}
             </ul>
+            {stale.length > STALE_SHOWN && (
+              <p className="mt-1.5 text-[13px]">
+                {t("staleAndMore", { n: stale.length - STALE_SHOWN })}
+              </p>
+            )}
           </div>
-        </div>
+        </section>
       )}
 
       {/* The rail is fixed-width and sticks, so it cannot stretch the page the
