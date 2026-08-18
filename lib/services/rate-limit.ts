@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import * as repo from "../repositories/rate-limits";
+import { logWarn } from "../server/log";
 
 /**
  * Rate limiting policy, in one table so the numbers can be argued about
@@ -81,12 +82,29 @@ export type Verdict = { allowed: true } | { allowed: false; retryAfterSec: numbe
 const key = (policy: PolicyName, subject: string) =>
   `${policy}:${createHash("sha256").update(subject.toLowerCase()).digest("base64url").slice(0, 22)}`;
 
+/**
+ * Every refusal, named by policy and never by subject.
+ *
+ * These were silent. A limit nobody can see firing is indistinguishable from a
+ * limit that never fires, which means neither an attack nor a limit set too low
+ * leaves a trace -- and the second is the likelier one to matter first, because
+ * it looks to a user like the app is broken.
+ *
+ * The subject is deliberately absent: it is an address, an email or an account,
+ * and the whole point of hashing it into the key was to keep it out of the
+ * table. Putting it in the log instead would undo that.
+ */
+const refused = (policy: PolicyName, retryAfterSec: number): Verdict => {
+  logWarn("rate_limit.refused", { policy, retryAfterSec });
+  return { allowed: false, retryAfterSec };
+};
+
 /** Check-and-count. Call before doing the work. */
 export async function consume(policy: PolicyName, subject: string): Promise<Verdict> {
   const { limit, windowMs } = POLICIES[policy];
   const w = await repo.bump(key(policy, subject), windowMs);
   if (Number(w.count) <= limit) return { allowed: true };
-  return { allowed: false, retryAfterSec: retryIn(w.reset_at) };
+  return refused(policy, retryIn(w.reset_at));
 }
 
 /** Check without counting. Use when only failures should count. */
@@ -94,7 +112,7 @@ export async function check(policy: PolicyName, subject: string): Promise<Verdic
   const { limit } = POLICIES[policy];
   const w = await repo.peek(key(policy, subject));
   if (!w || Number(w.count) < limit) return { allowed: true };
-  return { allowed: false, retryAfterSec: retryIn(w.reset_at) };
+  return refused(policy, retryIn(w.reset_at));
 }
 
 export const penalise = (policy: PolicyName, subject: string) =>

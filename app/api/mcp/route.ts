@@ -4,7 +4,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { instructions, registerTools, type Workspace } from "@/mcp/tools";
 import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
-import { logError } from "@/lib/server/log";
+import { logError, newRequestId } from "@/lib/server/log";
 import { normalise, record } from "@/lib/server/client-info";
 import { userForApiToken } from "@/lib/services/auth";
 import { BadRequest } from "@/lib/services/errors";
@@ -42,6 +42,20 @@ function json(body: unknown, status: number, headers?: HeadersInit) {
     headers: { "content-type": "application/json", ...headers },
   });
 }
+
+/**
+ * The id goes on every reply, including the one the MCP SDK builds.
+ *
+ * `/api/rpc` has had a request id since it was written and this route had
+ * none -- and this is the surface almost everyone connects through, so a
+ * report of "it failed at about three" was uncorrelatable with anything in the
+ * log. The transport's response is constructed inside the SDK, so the header
+ * is added on the way out rather than passed in.
+ */
+const withId = (res: Response, requestId: string) => {
+  res.headers.set("x-request-id", requestId);
+  return res;
+};
 
 /**
  * Records the MCP client identity announced in the `initialize` JSON-RPC
@@ -87,18 +101,25 @@ const unauthorised = (error: string) =>
  * catch without indenting the whole route a level.
  */
 export async function POST(req: Request): Promise<Response> {
+  const requestId = newRequestId();
   try {
-    return await answer(req);
+    return withId(await answer(req, requestId), requestId);
   } catch (e) {
-    logError("mcp.failed", e);
-    return json(
-      { jsonrpc: "2.0", error: { code: -32603, message: "the server could not complete that call" } },
-      500,
+    logError("mcp.failed", e, { requestId });
+    return withId(
+      json(
+        {
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "the server could not complete that call", requestId },
+        },
+        500,
+      ),
+      requestId,
     );
   }
 }
 
-async function answer(req: Request): Promise<Response> {
+async function answer(req: Request, requestId: string): Promise<Response> {
   const ip = clientIp(req.headers);
 
   const auth = req.headers.get("authorization") ?? "";
@@ -182,7 +203,7 @@ async function answer(req: Request): Promise<Response> {
       // `NotYours` is already worded for that.
       if (e instanceof BadRequest || e instanceof NotYours) throw e;
       // The method, never the params: those carry task bodies and notes.
-      logError("mcp.tool", e, { method });
+      logError("mcp.tool", e, { method, requestId });
       throw new Error("the server could not complete that call");
     }
   };

@@ -85,25 +85,32 @@ describe("transport with no SMTP configured", () => {
 
   it("says so once, not once per message", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    // Both streams: the logger sends warnings to stdout and failures to stderr,
+    // which is what lets a runtime separate "look at this" from "act on this".
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const { send } = await freshMailer();
 
     await send(RESET_MAIL);
     await send(RESET_MAIL);
 
-    // Matched on the remedy, not on "SMTP is not configured": the refusal
-    // error says that too, and it is supposed to be logged once per message.
-    const configWarnings = error.mock.calls
-      .flat()
-      .map(String)
-      .filter((line) => line.includes("Set SMTP_HOST"));
+    // Parsed rather than matched on a substring. These lines used to be prose
+    // built from template strings, which is fine to read over a shoulder and
+    // useless to anything else — and SECURITY.md says this failure "shows up
+    // only in the log", so the log is the whole story. Asserting the shape is
+    // asserting that a collector can still find it.
+    const emitted = (spy: typeof log) =>
+      spy.mock.calls.flat().map(String).map((line) => JSON.parse(line) as Record<string, unknown>);
+
+    const configWarnings = emitted(log).filter((l) => l.event === "mail.notConfigured");
     expect(configWarnings).toHaveLength(1);
 
-    const refusals = error.mock.calls
-      .flat()
-      .map(String)
-      .filter((line) => line.includes("transport=refusing"));
+    const refusals = emitted(error).filter((l) => l.event === "mail.deliveryFailed");
     expect(refusals).toHaveLength(2);
+    expect(refusals[0]!.transport).toBe("refusing");
+    // The address is masked and the body never travels: a log is a place
+    // secrets are kept for a long time in plain text.
+    expect(JSON.stringify(refusals)).not.toContain("super-secret-value");
   });
 });
 

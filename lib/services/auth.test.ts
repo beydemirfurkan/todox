@@ -79,10 +79,22 @@ describe("publicUser", () => {
 
   it("is what the session and token lookups return", async () => {
     sessionsRepo.userForToken.mockResolvedValue(USER);
-    apiTokensRepo.userForToken.mockResolvedValue(USER);
+    // The agent lookup answers with the use alongside the row, so the caller
+    // can record whether a token is being used for the first time or has come
+    // back. What leaves this module is still only the public user.
+    apiTokensRepo.userForToken.mockResolvedValue({ user: USER, tokenId: 3, use: "same-day" });
 
     expect(await auth.userForSession("t")).not.toHaveProperty("password_hash");
     expect(await auth.userForApiToken("todox_x")).not.toHaveProperty("password_hash");
+  });
+
+  it("hands out the account and never the token id it looked it up by", async () => {
+    // The id is for the log line, not for the caller.
+    apiTokensRepo.userForToken.mockResolvedValue({ user: USER, tokenId: 3, use: "first" });
+    const shown = (await auth.userForApiToken("todox_x")) as Record<string, unknown>;
+    expect(shown.username).toBe("bob");
+    expect(shown).not.toHaveProperty("tokenId");
+    expect(shown).not.toHaveProperty("use");
   });
 
   it("answers undefined rather than throwing when there is no row", async () => {
