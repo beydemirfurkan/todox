@@ -21,7 +21,8 @@
     "db:import-sqlite": "tsx scripts/import-sqlite.ts",
     "install:mcp": "tsx scripts/install-mcp/index.ts",
     "mcp:doctor": "tsx scripts/install-mcp/doctor.ts",
-    "og": "tsx scripts/make-og.tsx"
+    "og": "tsx scripts/make-og.tsx",
+    "pack:mcp": "tsx scripts/pack-mcp.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -48,5 +49,6 @@
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.0",
+  "license": "MIT"
 }

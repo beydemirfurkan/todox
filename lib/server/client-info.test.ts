@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clientFamily, normalise } from "./client-info";
+import { clientFamily, normalise } from "../client-identity";
 
 vi.mock("../repositories/api-tokens", () => ({
   recordClientUse: vi.fn().mockResolvedValue(undefined),

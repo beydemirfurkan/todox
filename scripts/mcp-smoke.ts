@@ -82,19 +82,37 @@ const MODES: Mode[] = [
       new StdioClientTransport({
         command: "pnpm",
         args: ["exec", "tsx", join(__dirname, "..", "mcp", "server.ts")],
-        env: { ...process.env, TODOX_TOKEN: token, TODOX_URL: URL_BASE } as Record<
-          string,
-          string
-        >,
+        // The client name reaches this process through its environment, the
+        // way a real agent launcher passes it. Over HTTP the same fact arrives
+        // in the `initialize` handshake instead — one fact, two channels, which
+        // is the difference the assertion below exists to catch.
+        env: {
+          ...process.env,
+          TODOX_TOKEN: token,
+          TODOX_URL: URL_BASE,
+          TODOX_CLIENT_NAME: CLIENT_NAME,
+          TODOX_CLIENT_VERSION: "smoke",
+        } as Record<string, string>,
       }),
   },
 ];
+
+/**
+ * What the smoke announces itself as, on both ways in.
+ *
+ * It has to map to a real client family or `notesFor` has nothing specific to
+ * say, and it has to be recognisable as the smoke in a database somebody is
+ * looking at. Over HTTP it travels in the `initialize` handshake; on stdio it
+ * travels in the environment. One name, two channels — which is exactly the
+ * difference worth asserting.
+ */
+const CLIENT_NAME = "claude-code-smoke";
 
 /** The same run through whichever way in it was handed. */
 async function runSuite(mode: Mode, token: string) {
   console.log(`\n=========== ${mode.label} ===========`);
 
-  const client = new Client({ name: "smoke", version: "0" });
+  const client = new Client({ name: CLIENT_NAME, version: "0" });
   await client.connect(mode.transport(token));
 
   const tools = await client.listTools();
@@ -333,6 +351,25 @@ async function runSuite(mode: Mode, token: string) {
 
   const a = JSON.parse(await text("get_context", { cwd: SCRATCH }));
   const b = JSON.parse(await text("get_context", { cwd: OTHER }));
+
+  // The briefing says which client it is talking to, and hands it advice for
+  // that client. This was dead on stdio: that side was given the bearer token
+  // and told to look the answer up in Postgres, which it cannot reach, so the
+  // lookup threw on every call and the notes silently never appeared. The notes
+  // exist because connecting a server is not the same as using it, so losing
+  // them locally was losing the fix. Each side now answers from what it has —
+  // the row over HTTP, the launching environment on stdio — and this asserts
+  // the answer rather than the mechanism, so it holds for both.
+  console.log("\n--- the briefing knows which client it is talking to ---");
+  if (a.client !== CLIENT_NAME)
+    throw new Error(
+      `briefing reported client ${JSON.stringify(a.client)}, not ${JSON.stringify(CLIENT_NAME)}`,
+    );
+  if (!Array.isArray(a.notes) || a.notes.length === 0)
+    throw new Error("briefing carried no client-specific notes");
+  if (!a.notes.join("\n").includes("CLAUDE.md"))
+    throw new Error(`notes did not mention the memory file: ${JSON.stringify(a.notes)}`);
+  console.log(`client: ${a.client} · ${a.notes.length} note(s)`);
 
   if (a.project.slug === b.project.slug)
     throw new Error(`two working directories resolved to one project: ${a.project.slug}`);

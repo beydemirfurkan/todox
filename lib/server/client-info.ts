@@ -8,26 +8,15 @@
  * would then depend on which instance the agent happened to reach. The
  * trade-off is a round-trip per request on the `get_context` path; acceptable
  * because that is also the path that needs the data.
+ *
+ * Only the storage lives here. The shape and the family mapping are pure and
+ * live in `lib/client-identity.ts`, because `mcp/tools.ts` needs them on a side
+ * that has no database.
  */
 
+import type { ClientInfo } from "../client-identity";
 import { lastClientUse, recordClientUse } from "../repositories/api-tokens";
 import { hashToken } from "../util/tokens";
-
-export type ClientInfo = {
-  name: string;
-  version: string;
-  capturedAt: number;
-};
-
-/** Coerce an unknown clientInfo payload into a usable record, or null. */
-export function normalise(raw: { name?: unknown; version?: unknown }): ClientInfo | null {
-  if (typeof raw.name !== "string" || raw.name.length === 0) return null;
-  return {
-    name: raw.name,
-    version: typeof raw.version === "string" ? raw.version : "unknown",
-    capturedAt: Date.now(),
-  };
-}
 
 export async function record(token: string, info: ClientInfo): Promise<void> {
   await recordClientUse(hashToken(token), {
@@ -53,27 +42,4 @@ export async function lookup(token: string): Promise<ClientInfo | null> {
   const seenAt = Date.parse(use.seenAt);
   if (!Number.isFinite(seenAt)) return null;
   return { name: use.name, version: use.version, capturedAt: seenAt };
-}
-
-export type ClientFamily =
-  | "claude-code"
-  | "codex"
-  | "cursor"
-  | "vscode"
-  | "opencode"
-  | "unknown";
-
-/**
- * Map a captured client name onto a client family. Loose on purpose -- a new
- * Claude Code build that announces itself as "claude-code-experimental" still
- * routes to the same advice.
- */
-export function clientFamily(name: string): ClientFamily {
-  const n = name.toLowerCase();
-  if (n.includes("claude")) return "claude-code";
-  if (n.includes("codex")) return "codex";
-  if (n.includes("cursor")) return "cursor";
-  if (n.includes("vscode") || n.includes("copilot")) return "vscode";
-  if (n.includes("opencode")) return "opencode";
-  return "unknown";
 }

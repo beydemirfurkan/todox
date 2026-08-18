@@ -3,7 +3,7 @@ import {
   MEMORY_FILE_NAME,
   type McpClientId,
 } from "../lib/mcp-clients";
-import type { ClientFamily } from "../lib/server/client-info";
+import type { ClientFamily } from "../lib/client-identity";
 
 /**
  * Client-specific guidance the agent hears inside `get_context`.

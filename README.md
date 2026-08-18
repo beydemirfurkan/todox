@@ -225,11 +225,35 @@ it finds afterwards, so staleness works over HTTP like anywhere else.
 
 The stdio server does that part itself rather than asking. Worth running if you
 would rather not spend an agent's attention on it, or want the hashing to
-happen even when the agent forgets:
+happen even when the agent forgets. There is nothing to clone:
 
 ```bash
-TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev pnpm -C /path/to/todox mcp
+TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev npx todox-mcp
 ```
+
+Or as an MCP config, which is the form an agent wants:
+
+```json
+{
+  "mcpServers": {
+    "todox": {
+      "command": "npx",
+      "args": ["todox-mcp"],
+      "env": { "TODOX_TOKEN": "todox_…", "TODOX_URL": "https://www.todox.dev" }
+    }
+  }
+}
+```
+
+`todox-mcp` rather than `todox`, because that name has belonged to somebody
+else on npm since 2018. It is a different package from this repository and
+carries only what the stdio server actually loads — no Next, no React, no
+Postgres driver, because it talks to the API over HTTP and never opens a
+database. `pnpm pack:mcp` builds it, and fails the build if anything
+server-side ever finds its way into the tool surface again.
+
+From a clone, `pnpm -C /path/to/todox mcp` still works and is what to use when
+you are changing the tools themselves.
 
 ### Tools
 
@@ -271,9 +295,18 @@ anything:
 
 ## Deploying
 
-A container and a Postgres beside it. The `Dockerfile` at the root builds the
-app; todox.dev runs both on one host, on a private Docker network, so the
-database publishes no port at all.
+A container and a Postgres beside it. `docker-compose.yml` at the root is that,
+assembled — the database publishes no port at all and is reachable only over
+the compose network:
+
+```bash
+cp .env.example .env       # set POSTGRES_PASSWORD and TODOX_PUBLIC_URL
+docker compose up -d --build
+docker compose exec app pnpm db:migrate
+```
+
+The migration is a separate line on purpose; see the note at the end of this
+section. todox.dev itself runs the same two containers on one host.
 
 | variable | why |
 | --- | --- |

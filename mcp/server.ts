@@ -14,6 +14,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
+import { normalise, type ClientInfo } from "../lib/client-identity";
 import type { MethodName } from "../lib/services/rpc-schemas";
 import { isAbsolutePath } from "../lib/util/paths";
 import { createClient, readConfig } from "./rpc-client";
@@ -21,15 +22,30 @@ import { instructions, registerTools, type Workspace } from "./tools";
 import { checkRefs, findProjectRoot, gitRemote, hashFile } from "./workspace";
 
 /**
- * Read by `localWorkspace.bearerToken`. Set inside `main`; undefined at import.
+ * The client that launched this process, read from its environment.
  *
- * Declared here rather than at the foot of the file: `main()` is called on the
- * last line and assigns this synchronously, so a `let` below that call is still
- * in its temporal dead zone when the assignment runs. Every stdio session died
- * on startup with "Cannot access 'currentToken' before initialization" -- the
+ * This side used to hand `tools.ts` the bearer token so it could look the same
+ * thing up in Postgres — which this process cannot reach, so the lookup threw
+ * on every call and the client-specific notes never appeared locally at all.
+ * They are the notes that exist because connecting a server is not the same as
+ * using it, so losing them on the local transport was losing the fix.
+ *
+ * The value was here the whole time: the parent sets TODOX_CLIENT_NAME when it
+ * launches us, and `main` already sends it to the server. It is read back from
+ * the environment rather than from the write.
+ *
+ * Declared above `localWorkspace` rather than at the foot of the file: `main()`
+ * is called on the last line, so a `let` below that call is still in its
+ * temporal dead zone when the assignment runs. Every stdio session once died on
+ * startup with "Cannot access 'currentToken' before initialization" -- the
  * hosted transport was unaffected, which is why it survived.
  */
-let currentToken: string | undefined;
+function envClient(): ClientInfo | null {
+  return normalise({
+    name: process.env.TODOX_CLIENT_NAME,
+    version: process.env.TODOX_CLIENT_VERSION,
+  });
+}
 
 /** The half of todox that has a filesystem, because it runs where the code is. */
 const localWorkspace: Workspace = {
@@ -42,10 +58,7 @@ const localWorkspace: Workspace = {
   repoUrl: (path) => (isAbsolutePath(path) ? gitRemote(findProjectRoot(path)) : undefined),
   hash: hashFile,
   checkRefs,
-  // Filled in by `main` once `readConfig` has resolved the token. The workspace
-  // object is captured by `registerTools` at registration time, but it points
-  // at the `currentToken` slot, so updating the slot updates every call.
-  bearerToken: () => currentToken,
+  clientInfo: async () => envClient(),
 };
 
 /**
@@ -56,7 +69,6 @@ const localWorkspace: Workspace = {
  */
 async function main() {
   const { token, url } = readConfig();
-  currentToken = token;
   const call = createClient(url, token);
 
   // The MCP SDK consumes `initialize` before any tool callback runs, so we
