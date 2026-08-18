@@ -25,6 +25,10 @@ const eslintConfig = defineConfig([
     // Not ours: `pnpm test:coverage` writes a bundled HTML report here, and
     // linting somebody else's minified viewer says nothing about this code.
     "coverage/**",
+    // Build output, not source: `pnpm pack:mcp` emits CommonJS here, and the
+    // rule against `require` is a rule about what we write, not about what the
+    // compiler produces from it.
+    "dist-npm/**",
   ]),
 ]);
 
