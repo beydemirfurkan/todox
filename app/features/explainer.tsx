@@ -58,6 +58,44 @@ export function Explainer({ t }: { t: T }) {
   );
 }
 
+/**
+ * The three things todox does that a note in a file does not.
+ *
+ * The landing page said what the product *is* — a memory, a log — which is what
+ * every other tool in this category says too. It never said the parts that are
+ * actually arguable: that a failed approach is worth its own kind of entry,
+ * that a note is checked rather than trusted, and that the report is read from
+ * the log rather than reconstructed. Those are the claims; they belong where
+ * somebody deciding can read them.
+ */
+export function Differences({ t }: { t: T }) {
+  const claims = [
+    { title: t("diff1Title"), body: t("diff1Body"), fill: "var(--k-dead_end)" },
+    { title: t("diff2Title"), body: t("diff2Body"), fill: "var(--k-question)" },
+    { title: t("diff3Title"), body: t("diff3Body"), fill: "var(--ok)" },
+  ];
+
+  return (
+    <section className="space-y-3">
+      <h2 className="display text-[19px] font-bold">{t("diffTitle")}</h2>
+      <ul className="grid gap-3 sm:grid-cols-3">
+        {claims.map((c, i) => (
+          <li key={c.title} className="sticker pop p-3.5" style={{ animationDelay: `${140 + i * 60}ms` }}>
+            {/* A colour and a heading, never a colour alone. */}
+            <span
+              aria-hidden="true"
+              className="block h-1.5 w-9 rounded-full border-[1.5px] border-line"
+              style={{ background: c.fill, borderColor: "var(--edge-dark)" }}
+            />
+            <h3 className="display mt-2 text-[15.5px] leading-snug font-bold">{c.title}</h3>
+            <p className="mt-1.5 text-[14px] leading-snug text-muted">{c.body}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function FirstRun({ t }: { t: T }) {
   return (
     <div className="sticker pop flex flex-col items-center gap-3 p-8 text-center">

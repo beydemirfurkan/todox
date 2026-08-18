@@ -13,9 +13,12 @@ Every visible string comes from `lib/i18n/`. There is no library and no
 - `lib/i18n/en.ts` is the source. Its keys are the type `Key`.
 - `lib/i18n/tr.ts` is `Record<Key, string>`, so **a missing translation fails
   the build.** Add to both, in the same commit.
-- **Turkish is the default language** (`DEFAULT_LANG` in `lib/i18n/index.ts`)
-  and this is a Turkish developer's tool first. Write the Turkish properly —
-  full orthography, real diacritics. Do not machine-translate it.
+- **English is the default** (`DEFAULT_LANG` in `lib/i18n/index.ts`), and only
+  because a caller that states no preference is usually not a person —
+  Googlebot and every link-preview fetcher send no `Accept-Language`. A Turkish
+  browser sends `tr` and is negotiated to Turkish. Write the Turkish properly —
+  full orthography, real diacritics. Do not machine-translate it: it is a
+  first-class language here, not a translation of the English.
 - Keep a new key next to the ones it belongs with; both files are grouped by
   area (`/* chrome */`, `/* auth */`, …) and in the same order.
 

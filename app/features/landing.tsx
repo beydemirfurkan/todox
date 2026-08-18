@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import type { T } from "@/lib/i18n";
 import { Blob } from "../components";
-import { Explainer } from "./explainer";
+import { BriefingPreview } from "./briefing-preview";
+import { Differences, Explainer } from "./explainer";
 
 /**
  * What somebody sees at todox.dev before they have an account.
@@ -59,6 +60,13 @@ export function Landing({ t }: { t: T }) {
       {/* The same three steps the dashboard shows. Somebody deciding whether to
           sign up needs them more than somebody who already has. */}
       <Explainer t={t} />
+
+      {/* Then the arguable part, and then the evidence for it. In that order:
+          the claims are worth nothing to somebody who has not seen the payload,
+          and the payload is unreadable to somebody who has not been told what
+          to look for in it. */}
+      <Differences t={t} />
+      <BriefingPreview t={t} />
 
       <section className="sticker pop p-5" style={{ animationDelay: "300ms" }}>
         <div className="flex items-start gap-4">

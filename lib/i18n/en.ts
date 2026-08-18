@@ -269,7 +269,6 @@ export const en = {
   append: "append",
   apply: "apply",
   title: "title",
-  optional: "optional",
   none: "none",
 
   /* home */
@@ -328,7 +327,6 @@ export const en = {
   projectRepoPh: "git@github.com:you/repo.git (optional)",
   projectRepoNote:
     "How todox recognises this repo on another machine. Without it, opening the same project on a second computer registers a duplicate and the history splits in two.",
-  projectDetailsSaved: "Saved.",
   allClear: "All clear.",
   tasks: "tasks",
   taskFilterLabel: "Filter by status",
@@ -336,7 +334,6 @@ export const en = {
   noTasksHere: "Nothing with this status.",
   andMore: "{n} more, not shown. Narrow it with the filters above.",
   projectSettings: "Project settings",
-  collaborators: "Collaborators",
   team: "Team",
   teamOwner: "owner",
   teamYou: "you",
@@ -446,7 +443,6 @@ export const en = {
   noActivity: "Nothing happened in this window.",
   leadTime: "start to finish",
   activeTime: "worked",
-  approxLabel: "approximate",
   approxWhy:
     "approximate — this task was backfilled, or it closed without ever being marked in flight, so the time worked is not a measurement",
   importance: "importance",
@@ -517,8 +513,25 @@ export const en = {
   landingConnectTitle: "Works with the agent you already use",
   landingConnectBody:
     "One URL and a token. No package to install, no local process to keep running — anything that speaks MCP can connect: Claude Code, Codex, Cursor, VS Code.",
+  /* the three claims the product actually makes, and the payload behind them */
+  diffTitle: "Why the log is worth trusting",
+  diff1Title: "Dead ends are a kind of entry",
+  diff1Body:
+    "Most notes record what worked. The expensive knowledge is what did not: the approach that looked right, cost an afternoon and failed for a reason nobody writes down. That one has its own kind here, because it is the entry that stops the next session repeating it.",
+  diff2Title: "A stale note says so",
+  diff2Body:
+    "Every linked file is hashed by the side that can see it — your agent — and checked again later. When the code moves on, the note is flagged as possibly lying. Until somebody has actually looked, it says \"not checked\" rather than claiming to be fresh: context that lies is worse than none, and that includes lying about how sure it is.",
+  diff3Title: "The report is a query, not archaeology",
+  diff3Body:
+    "Every status change is an event, so what got finished today, how long it took and which model did it are read from the log rather than reconstructed from commits.",
+  briefingTitle: "What your agent reads, in one call",
+  briefingBody:
+    "This is the shape of `get_context` — the first call every session makes. Not a summary of the product: the payload.",
+  briefingCaption: "Trimmed for width. The real one carries every open task.",
+
   landingOpenSource: "Open source, MIT. Read the code, or run your own.",
-  landingHonest: "A small personal deployment. No uptime promise, and no charge.",
+  landingHonest:
+    "Free, and hosted on one small server. Nothing here is locked in: the whole thing is MIT, so if the log matters to you, run it yourself.",
 
   verifyConfirmTitle: "One click to go",
   verifyConfirmBody:
