@@ -7,8 +7,20 @@ export type { Key };
 export const LANGS = ["tr", "en"] as const;
 export type Lang = (typeof LANGS)[number];
 
-/** Turkish is the default: this is a Turkish developer's tool first. */
-export const DEFAULT_LANG: Lang = "tr";
+/**
+ * What a caller gets when it expresses no preference.
+ *
+ * This was Turkish, on the reasoning that todox is a Turkish developer's tool
+ * first — which is true of the author and not of the visitor. The clients that
+ * send no `Accept-Language` are almost never people: Googlebot, every
+ * link-preview fetcher, every directory crawler. So the Turkish default was not
+ * serving Turkish readers, who send `tr` and are negotiated to it either way.
+ * It was serving Turkish to the search index and to every link anybody pasted.
+ *
+ * `LANGS` still leads with `tr` — the switcher's order is a separate thing from
+ * the fallback, and Turkish stays first there.
+ */
+export const DEFAULT_LANG: Lang = "en";
 
 export const LANG_NAME: Record<Lang, string> = { en: "English", tr: "Türkçe" };
 

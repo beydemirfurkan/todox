@@ -106,8 +106,13 @@ coverage or error paths half-done. "Good enough for now" is a pre-AI reflex.
 - **Load in batches.** The database is over the network. A per-row query in a
   list is a per-row round trip; use the `listByTasks`-style helpers.
 - **Both dictionaries stay in sync.** `lib/i18n/tr.ts` is typed against the
-  keys of `en.ts`, so a missing translation fails the build. Turkish is the
-  default language; write it properly rather than machine-translating.
+  keys of `en.ts`, so a missing translation fails the build. English is the
+  default only because a client that states no preference is usually not a
+  person: Googlebot and every link-preview fetcher send no `Accept-Language`,
+  so a Turkish default meant every search result and every pasted link was
+  Turkish. A Turkish browser sends `tr` and still gets Turkish. Write the
+  Turkish properly rather than machine-translating it — it is a first-class
+  language here, not a translation of the English.
 - **No `?` inside SQL string literals.** `lib/db/client.ts` rewrites `?` to
   `$n` positionally and does not parse strings.
 - **Writes that must agree run in one transaction.** `tx()` in

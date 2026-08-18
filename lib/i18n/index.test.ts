@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { en } from "./en";
 import { tr } from "./tr";
-import { ago, duration, isLang, translator, type Key, type Lang } from "./index";
+import { ago, DEFAULT_LANG, duration, isLang, translator, type Key, type Lang } from "./index";
+
+/** The dictionary the fallback should land in, whichever language that is. */
+const DICT_FOR_DEFAULT = DEFAULT_LANG === "tr" ? tr : en;
 
 describe("isLang", () => {
   it("accepts the languages that exist", () => {
@@ -25,8 +28,12 @@ describe("translator", () => {
   });
 
   it("falls back to the default language for one that does not exist", () => {
+    // Asserted against `DEFAULT_LANG` rather than against Turkish by name: the
+    // property is "an unknown language lands on the default", and writing the
+    // current default in by hand is what made this fail the day it changed
+    // rather than the day it broke.
     const t = translator("de" as Lang);
-    expect(t("signOut")).toBe(tr.signOut);
+    expect(t("signOut")).toBe(DICT_FOR_DEFAULT.signOut);
   });
 
   it("gives back the key itself when nothing has it", () => {
