@@ -262,7 +262,6 @@ export const tr: Record<Key, string> = {
   append: "ekle",
   apply: "uygula",
   title: "başlık",
-  optional: "isteğe bağlı",
   none: "yok",
 
   heroTitle: "Sana ve ajanlarına ait bir hafıza",
@@ -319,7 +318,6 @@ export const tr: Record<Key, string> = {
   projectRepoPh: "git@github.com:sen/repo.git (isteğe bağlı)",
   projectRepoNote:
     "todox bu repoyu başka bir makinede bununla tanıyor. Olmazsa aynı projeyi ikinci bir bilgisayarda açmak ikinci bir kayıt oluşturur ve geçmiş ikiye bölünür.",
-  projectDetailsSaved: "Kaydedildi.",
   allClear: "Her şey temiz.",
   tasks: "görev",
   taskFilterLabel: "Duruma göre filtrele",
@@ -327,7 +325,6 @@ export const tr: Record<Key, string> = {
   noTasksHere: "Bu durumda görev yok.",
   andMore: "{n} tane daha var, gösterilmedi. Yukarıdaki filtrelerle daralt.",
   projectSettings: "Proje ayarları",
-  collaborators: "Ekip arkadaşları",
   team: "Ekip",
   teamOwner: "sahibi",
   teamYou: "sen",
@@ -434,7 +431,6 @@ export const tr: Record<Key, string> = {
   noActivity: "Bu aralıkta hiçbir şey olmamış.",
   leadTime: "baştan sona",
   activeTime: "çalışılan",
-  approxLabel: "yaklaşık",
   approxWhy:
     "yaklaşık — bu görev sonradan aktarıldı ya da hiç \u201Cyapılıyor\u201D işaretlenmeden kapandı, dolayısıyla çalışılan süre bir ölçüm değil",
   importance: "önem",
@@ -501,8 +497,25 @@ export const tr: Record<Key, string> = {
   landingConnectTitle: "Hâlihazırda kullandığın ajanla çalışır",
   landingConnectBody:
     "Tek bir adres ve bir token. Kurulacak paket yok, ayakta tutulacak yerel süreç yok — MCP konuşan her şey bağlanır: Claude Code, Codex, Cursor, VS Code.",
+  /* ürünün gerçekten ileri sürdüğü üç iddia ve arkasındaki yük */
+  diffTitle: "Kayda neden güvenilir",
+  diff1Title: "Çıkmaz sokak bir kayıt türü",
+  diff1Body:
+    "Notların çoğu neyin işe yaradığını yazar. Pahalı bilgi ise işe yaramayanıdır: doğru görünen, bir öğleden sonrayı yiyen ve kimsenin yazmadığı bir sebeple çöken yaklaşım. Burada onun kendi türü var, çünkü bir sonraki oturumun aynı duvara toslamasını durduran kayıt odur.",
+  diff2Title: "Bayat not bunu kendisi söyler",
+  diff2Body:
+    "Bağlı her dosya, onu görebilen taraf — yani ajanın — tarafından hash'lenir ve sonra yeniden bakılır. Kod ilerlediyse not \"yalan söylüyor olabilir\" diye işaretlenir. Biri gerçekten bakana kadar da \"kontrol edilmedi\" der, taze olduğunu iddia etmez: yalan söyleyen bağlam hiç bağlam olmamasından beterdir, ve buna ne kadar emin olduğu konusunda yalan söylemek de dahildir.",
+  diff3Title: "Rapor bir sorgudur, kazı değil",
+  diff3Body:
+    "Her durum değişikliği bir olaydır; bugün ne bitti, ne kadar sürdü ve hangi model yaptı sorularının cevabı commit'lerden çıkarılmaz, kayıttan okunur.",
+  briefingTitle: "Ajanın tek çağrıda okuduğu şey",
+  briefingBody:
+    "Bu, `get_context`'in şekli — her oturumun yaptığı ilk çağrı. Ürünün özeti değil: yükün kendisi.",
+  briefingCaption: "Ekrana sığsın diye kısaltıldı. Gerçeği açık olan her görevi taşır.",
+
   landingOpenSource: "Açık kaynak, MIT. Kodu oku, ya da kendi kurulumunu çalıştır.",
-  landingHonest: "Küçük, kişisel bir kurulum. Ne çalışma süresi sözü var ne de ücret.",
+  landingHonest:
+    "Ücretsiz, ve tek küçük bir sunucuda duruyor. Hiçbir şey kilitli değil: tamamı MIT, yani kayıt senin için önemliyse kendin çalıştır.",
 
   verifyConfirmTitle: "Tek tık kaldı",
   verifyConfirmBody:

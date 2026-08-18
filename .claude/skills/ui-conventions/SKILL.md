@@ -61,7 +61,20 @@ To check a page, at 320px and 390px:
 [...document.querySelectorAll('*')].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 1)
 ```
 
-It should be empty.
+It should be empty — with one exception, so nobody "fixes" a correct one.
+
+A deliberately scrollable block (a code sample, a wide table) sits inside an
+`overflow-x: auto` box, and the check reports its *content*, because the
+content's own rectangle really does reach past the viewport. The box is what
+has to stay inside it. When something shows up, measure the wrapper:
+
+```js
+const w = el.closest('[class*="overflow-x-auto"]') ?? el.parentElement;
+w.getBoundingClientRect().right <= document.documentElement.clientWidth + 1  // in bounds
+w.scrollWidth > w.clientWidth                                                // and scrolling
+```
+
+Both true means it is working as intended. Either one false is the bug.
 
 ## Accessibility
 
