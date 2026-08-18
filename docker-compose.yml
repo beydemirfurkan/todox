@@ -1,0 +1,74 @@
+# Running your own todox: the app, and a Postgres beside it.
+#
+# README described this in prose and left assembling it to the reader, which is
+# a strange thing to ask of the audience the project points at self-hosting.
+#
+#   cp .env.example .env
+#   # set POSTGRES_PASSWORD and TODOX_PUBLIC_URL in .env
+#   docker compose up -d --build
+#   docker compose exec app pnpm db:migrate
+#
+# That last line is deliberately not automatic, and not a step anybody forgot to
+# add here. Applying DDL is a decision: the schema is idempotent precisely so it
+# can be made after a deploy rather than during one, and DDL racing between two
+# instances of a rolling restart is a bad way to discover lock contention.
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-todox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-todox}
+    volumes:
+      # `/var/lib/postgresql`, not `/var/lib/postgresql/data`. From 18 the image
+      # keeps its data in a major-version subdirectory so `pg_upgrade --link`
+      # can work across a single mount point, and it refuses to start when it
+      # finds data at the old path. Mounted one level down, the container comes
+      # up unhealthy on the very first `docker compose up` — which is a bad
+      # first five minutes for somebody who was told to run their own.
+      - todox-db:/var/lib/postgresql
+    # No `ports`. The database is reachable from the app over the compose
+    # network and from nowhere else; publishing 5432 to the host is how a
+    # development database ends up on the internet.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todox} -d ${POSTGRES_DB:-todox}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        # `service_started` would let the app open its pool against a database
+        # still replaying WAL, which fails the first request rather than
+        # waiting for the second.
+        condition: service_healthy
+    environment:
+      # The service name is the host: no certificate, no public port, no
+      # connection string anybody outside this network could use.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-todox}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-todox}
+      # Verification links, reset links and the agent setup snippet are built
+      # from this. Get it wrong and people — and their agents — land on the
+      # wrong host, which is the one misconfiguration that looks like it worked.
+      TODOX_PUBLIC_URL: ${TODOX_PUBLIC_URL:?set TODOX_PUBLIC_URL in .env}
+      # Optional, and all four or none: a half-configured transport looks like
+      # mail should be going out. Unset, mail is refused and said so in the log.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      # How many proxies sit in front of this. Behind one reverse proxy it is 1;
+      # add a CDN in front and it becomes 2. Too high reaches into the part of
+      # `x-forwarded-for` the caller writes, which is what the rate limits are
+      # counted from.
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
+    ports:
+      - "${TODOX_PORT:-3000}:3000"
+
+volumes:
+  todox-db:
