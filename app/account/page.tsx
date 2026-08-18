@@ -435,6 +435,20 @@ export default async function AccountPage({
           field in it — a full-width bar 11 times wider than the Save button
           beside it, which made destroying the account the largest thing on the
           page. `w-fit` so the disclosure is as wide as its own label. */}
+      {/* Above the delete block on purpose: its own warning says "export
+          anything you want to keep first", and for a long time there was
+          nothing to click when you read that. */}
+      <section className="sticker-flat mt-8 max-w-xl p-4">
+        <h2 className="display text-[15px] font-bold">{t("exportTitle")}</h2>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-muted">{t("exportBody")}</p>
+        {/* A plain link, not a form: it is a GET that answers with a file, so
+            it needs no JavaScript and survives a middle-click. `download` is a
+            hint; the route sends Content-Disposition either way. */}
+        <a href="/api/export" download className="btn mt-3 inline-flex">
+          {t("exportCta")}
+        </a>
+      </section>
+
       <details
         className="sticker-flat mt-8 w-fit overflow-hidden"
         style={{ borderColor: "var(--k-dead_end)" }}

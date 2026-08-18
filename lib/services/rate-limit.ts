@@ -72,6 +72,15 @@ export const POLICIES = {
    * where you actually want to start again.
    */
   tokenPerUser: { limit: 12, windowMs: 24 * HOUR },
+  /**
+   * Whole-account exports, per account.
+   *
+   * The most expensive read the app can be asked for — every project, task,
+   * entry and event in one response — and nobody needs it more than a handful
+   * of times a day. Its own policy rather than the agent ceiling, because 600
+   * of these is a different proposition from 600 `get_context` calls.
+   */
+  exportPerUser: { limit: 6, windowMs: HOUR },
 } as const;
 
 export type PolicyName = keyof typeof POLICIES;
