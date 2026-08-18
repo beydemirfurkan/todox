@@ -1,0 +1,41 @@
+name: An idea, or something that got in your way
+description: A change worth arguing about, or friction that is not quite a bug.
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `CONTRIBUTING.md` ends with the one thing worth arguing about here: the
+        product's claim is that the log is worth trusting, and anything that
+        lets a note go stale quietly, or makes the agent's write path more
+        expensive than the human's, is working against that. If your idea
+        touches either, say so — that is the interesting part, not a problem
+        with the idea.
+
+  - type: textarea
+    id: friction
+    attributes:
+      label: What were you trying to do?
+      description: |
+        The situation rather than the solution. "I wanted my agent to X and had
+        to Y" says more than "add a Z", and usually leads somewhere different.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you do about it?
+      description: If you have something in mind. It is fine to leave this empty.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Does this need the agent surface?
+      description: |
+        Tools live in one place and are registered by both transports, so a new
+        one is a six-file change and a decision rather than an addition.
+      options:
+        - "No — it is the website or the docs"
+        - "Yes — an agent would call it"
+        - "Not sure"
