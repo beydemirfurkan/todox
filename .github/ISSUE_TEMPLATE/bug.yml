@@ -1,0 +1,74 @@
+name: Something is wrong
+description: A thing that behaves differently from what it says it does.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One question below matters more than the rest, so it is first: **which
+        way in**. Nearly every bug this project has had behaved differently on
+        the hosted endpoint than on the local process — the server has no
+        filesystem and the local one has no database, so "it does not work" has
+        two different causes depending on where you hit it.
+
+        If it is a security problem, please do not open an issue: `SECURITY.md`
+        has the private route.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did you hit it?
+      options:
+        - The website (todox.dev)
+        - The hosted MCP endpoint (/api/mcp)
+        - The local stdio server (npx todox-mcp, or pnpm mcp)
+        - An instance I run myself
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: client
+    attributes:
+      label: Which agent, if an agent was involved?
+      description: Claude Code, Codex, Cursor, VS Code, OpenCode — and the version if you have it.
+      placeholder: Claude Code 2.1.0
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+      description: |
+        Both halves, please. Half the value of a report is the expectation: this
+        codebase has shipped several things that worked exactly as written and
+        not at all as anybody assumed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How would somebody else see it?
+      description: |
+        The shortest path you know of. A tool call with its arguments, a URL, or
+        the commands you ran.
+      render: shell
+
+  - type: input
+    id: request_id
+    attributes:
+      label: Request id, if you saw one
+      description: |
+        Every reply from `/api/rpc` and `/api/mcp` carries `x-request-id`, and a
+        500 mentions one. It is the only thing that ties your report to a line
+        in the server log.
+      placeholder: 6e51f294
+
+  - type: textarea
+    id: anything_else
+    attributes:
+      label: Anything else
+      description: |
+        Please leave out your agent token. It is in the config file you pasted
+        from, and it grants full access to your account — revoke it on the
+        Account page if it has already been somewhere it should not.

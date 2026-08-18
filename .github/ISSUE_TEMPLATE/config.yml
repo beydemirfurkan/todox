@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem
+    url: https://github.com/beydemirfurkan/todox/security/policy
+    about: Please report it privately. SECURITY.md has the process and an honest list of what todox does not protect against.
+  - name: Setting it up with your agent
+    url: https://github.com/beydemirfurkan/todox#connect-an-agent
+    about: The config key and the `type` value differ per client and the wrong combination is silently ignored — the README has the table.
