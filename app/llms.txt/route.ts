@@ -24,7 +24,9 @@ todox is a small, opinionated workspace for a developer and the agents they work
 - https://www.todox.dev/register — create an account.
 - https://www.todox.dev/forgot — request a password-reset link.
 
-Authenticated routes (/p/*, /s/*, /account, /report, /search) are not listed here. They return 404 to anybody who is not signed in, so links into them will not work without a session cookie.
+Authenticated routes (/p/*, /account, /report, /search) are not listed here. Without a session cookie they redirect to /login, so a link into one will not show you anything.
+
+/s/<token> is the exception and is deliberately public: it is an unlisted read-only snapshot of one project, shown to anybody holding the link. It is noindex, and the token is the only thing protecting it.
 
 ## Agent surface
 
@@ -36,7 +38,7 @@ Authenticated routes (/p/*, /s/*, /account, /report, /search) are not listed her
 
 - Repository: https://github.com/beydemirfurkan/todox
 - License: MIT
-- Language: Turkish first (DEFAULT_LANG in lib/i18n/index.ts), English second.
+- Language: English and Turkish. The page you get is negotiated from Accept-Language; send none and you get English (DEFAULT_LANG in lib/i18n/index.ts). ?lang=en and ?lang=tr set the preference and redirect to the clean URL, so there is one address per page rather than one per language.
 
 ## Contact
 
