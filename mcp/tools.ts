@@ -18,7 +18,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import { translator, type Lang } from "../lib/i18n";
-import { clientFamily, lookup } from "../lib/server/client-info";
+import { clientFamily, type ClientInfo } from "../lib/client-identity";
 import { logError } from "../lib/server/log";
 import { renderMarkdown } from "../lib/services/report-markdown";
 import type { ActivityReport } from "../lib/services/reports";
@@ -39,10 +39,16 @@ export type Workspace = {
   hash(path: string): string | null;
   /** null means this side has no filesystem, so staleness cannot be judged here. */
   checkRefs(refs: RefLike[]): { checked: Checked[]; seen: { id: number; hash: string | null }[] } | null;
-  /** Bearer token of the request that triggered this tool call; used to look up
-   *  which MCP client opened the session so the briefing can give client-
-   *  specific advice. undefined when the call did not carry one. */
-  bearerToken(): string | undefined;
+  /** Which MCP client opened this session, so the briefing can give
+   *  client-specific advice. null when this side cannot tell.
+   *
+   *  A capability rather than the bearer token it used to hand over. The token
+   *  was passed in so this module could do the database lookup itself, which
+   *  meant the shared tool surface imported a Postgres driver — and the stdio
+   *  process, which has no database, therefore never got the notes at all. It
+   *  knows its own client from the environment that launched it; the hosted
+   *  route reads the row. Same answer, each side asked the way it can. */
+  clientInfo(): Promise<ClientInfo | null>;
 };
 
 /** Calls a todox RPC method: over HTTP from the laptop, in-process on the server. */
@@ -201,11 +207,9 @@ const READ_ONLY = { readOnlyHint: true, idempotentHint: true } as const;
  */
 async function appendClientNotes(ws: Workspace, result: unknown): Promise<unknown> {
   if (!result || typeof result !== "object") return result;
-  const token = ws.bearerToken();
-  if (!token) return result;
   let info;
   try {
-    info = await lookup(token);
+    info = await ws.clientInfo();
   } catch (e) {
     logError("mcp.clientInfoLookup", e);
     return result;

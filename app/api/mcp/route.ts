@@ -5,7 +5,8 @@ import { instructions, registerTools, type Workspace } from "@/mcp/tools";
 import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, newRequestId } from "@/lib/server/log";
-import { normalise, record } from "@/lib/server/client-info";
+import { normalise } from "@/lib/client-identity";
+import { lookup, record } from "@/lib/server/client-info";
 import { userForApiToken } from "@/lib/services/auth";
 import { BadRequest } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
@@ -32,7 +33,9 @@ function buildRemoteWorkspace(token: string): Workspace {
     repoUrl: () => undefined,
     hash: () => null,
     checkRefs: () => null,
-    bearerToken: () => token,
+    // Stateless: consecutive requests land on different instances, so the
+    // row is the only place this can be read from.
+    clientInfo: () => lookup(token),
   };
 }
 
