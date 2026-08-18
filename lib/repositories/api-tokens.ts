@@ -22,19 +22,42 @@ export async function create(input: {
 }
 
 /** Resolves a bearer token to its owner and records that it was used. */
-export async function userForToken(token: string): Promise<User | undefined> {
-  const row = await one<User & { token_id: number }>(
-    `SELECT u.*, t.id AS token_id FROM api_tokens t
+/**
+ * The account behind an agent token, and how this call sits in that token's
+ * history.
+ *
+ * `use` is the activation signal, and it costs nothing: the row is already
+ * being read and `last_used_at` already being written, so the value it is about
+ * to overwrite is the one piece of evidence for whether anybody actually
+ * *uses* todox after connecting it. "first" is the tool working once; "return"
+ * is a token that came back on a later day, which is the only one of the two
+ * that means the habit stuck.
+ */
+export type TokenUse = "first" | "return" | "same-day";
+
+export async function userForToken(
+  token: string,
+): Promise<{ user: User; tokenId: number; use: TokenUse } | undefined> {
+  const row = await one<User & { token_id: number; last_used_at: string | null }>(
+    `SELECT u.*, t.id AS token_id, t.last_used_at FROM api_tokens t
      JOIN users u ON u.id = t.user_id
      WHERE t.token_hash = ?`,
     [hashToken(token)],
   );
   if (!row) return undefined;
 
-  await run("UPDATE api_tokens SET last_used_at = ? WHERE id = ?", [now(), row.token_id]);
+  const at = now();
+  // Compared as dates rather than as a duration: "came back the next day" is
+  // the question, and an hour either side of midnight should not change the
+  // answer the way a 24-hour window would.
+  const previous = row.last_used_at;
+  const use: TokenUse =
+    previous === null ? "first" : previous.slice(0, 10) === at.slice(0, 10) ? "same-day" : "return";
 
-  const { token_id: _omit, ...user } = row;
-  return user;
+  await run("UPDATE api_tokens SET last_used_at = ? WHERE id = ?", [at, row.token_id]);
+
+  const { token_id, last_used_at: _omit, ...user } = row;
+  return { user, tokenId: token_id, use };
 }
 
 export const remove = (id: number, userId: number) =>

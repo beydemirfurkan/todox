@@ -2,6 +2,7 @@ import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
+import { logInfo } from "../server/log";
 import type { ApiToken, PublicUser, User } from "../types";
 import { hashPassword, verifyPassword } from "../util/password";
 import { SESSION_DAYS, newApiToken, newSessionToken, tokenPreview } from "../util/tokens";
@@ -59,6 +60,10 @@ export async function register(input: {
     password_hash: await hashPassword(input.password),
   });
 
+  // The top of the funnel. Nothing recorded a signup, so "did anyone arrive
+  // this week" needed psql -- and every measurement of whether the next change
+  // helped starts here.
+  logInfo("account.registered", { userId: user.id });
   return { ok: true, value: { user: publicUser(user) } };
 }
 
@@ -229,6 +234,10 @@ export async function changeName(userId: number, name: string): Promise<Result<t
 export async function createApiToken(userId: number, name: string) {
   const token = newApiToken();
   const row = await apiTokens.create({ user_id: userId, name, token });
+  // Second step of the funnel: an account that never mints one never connected
+  // an agent, and that is a different problem from one that connected and
+  // stopped.
+  logInfo("agent.token.created", { userId, tokenId: row.id });
   // The only moment the plaintext exists. It is never recoverable afterwards.
   return { row, token, preview: tokenPreview(token) };
 }
@@ -246,7 +255,24 @@ export const revokeApiToken = (id: number, userId: number) =>
  */
 export const revokeAllApiTokens = (userId: number) => apiTokens.destroyAllFor(userId);
 
+/**
+ * The account behind an agent token.
+ *
+ * The log line is the point of the extra call here. Connecting todox and
+ * *using* it are different things -- a server can be configured, listed and
+ * never called -- and nothing recorded the difference, so the only way to ask
+ * "did anybody's agent come back the next day" was to open psql. `first` is the
+ * tool working once; `return` is the habit sticking. Ids only: no token, no
+ * address, nothing a log should not keep for a long time.
+ */
 export async function userForApiToken(token: string): Promise<PublicUser | undefined> {
-  const u = await apiTokens.userForToken(token);
-  return u ? publicUser(u) : undefined;
+  const found = await apiTokens.userForToken(token);
+  if (!found) return undefined;
+  if (found.use !== "same-day")
+    logInfo("agent.token.used", {
+      use: found.use,
+      userId: found.user.id,
+      tokenId: found.tokenId,
+    });
+  return publicUser(found.user);
 }
