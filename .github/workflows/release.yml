@@ -1,0 +1,104 @@
+# Cutting a release, without anybody having to think about npm.
+#
+#   git tag v0.1.1 && git push origin v0.1.1
+#
+# That is the whole procedure. This builds the stdio package, attaches the
+# tarball to a GitHub Release, and publishes to npm — but only if an NPM_TOKEN
+# secret exists.
+#
+# The order matters and is the point: the Release is unconditional and needs no
+# account, no token and no decision, so `npx <tarball url>` works from the day
+# the first tag is pushed. npm is the nicer front door (`npx todox-mcp`) and is
+# strictly optional; add the secret whenever, or never, and nothing here breaks
+# either way. A release step that can only run once somebody has gone and
+# created a credential is a release step that does not run.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+# `contents: write` to create the Release; `id-token: write` so npm can record
+# provenance when it does run, which is what lets anybody verify the tarball was
+# built from this commit rather than from somebody's laptop.
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      # The tag is the claim; package.json is the fact. `server-json.test.ts`
+      # already pins the MCP registry entry to the same number, so all three
+      # move together or the tag is wrong — and a release whose tag disagrees
+      # with what it publishes is the kind of thing nobody notices until they
+      # are trying to work out which version is live.
+      - name: the tag and the version agree
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "tag $GITHUB_REF_NAME says $tag, package.json says $pkg" >&2
+            exit 1
+          fi
+          echo "releasing $pkg"
+          echo "version=$pkg" >> "$GITHUB_OUTPUT"
+
+      # Not a shortcut around CI: this is a tag, so nothing has necessarily run
+      # against this exact tree. The pack step itself also fails if anything
+      # server-side has reached the stdio surface.
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm pack:mcp
+
+      - name: build the tarball
+        run: |
+          cd dist-npm
+          npm pack
+          ls -l ./*.tgz
+
+      # Unconditional, and the reason this workflow is useful with no secrets at
+      # all: the tarball is a URL `npx` accepts.
+      - name: attach it to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-npm/*.tgz
+          generate_release_notes: true
+          body: |
+            Install the stdio MCP server without cloning anything:
+
+            ```bash
+            npx todox-mcp                       # once this is on npm
+            npx https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/todox-mcp-${{ steps.version.outputs.version }}.tgz
+            ```
+
+            The hosted server needs none of this — point any MCP client at
+            https://www.todox.dev/api/mcp with a token. The local package exists
+            for the one thing a remote server cannot do, which is read your disk.
+
+      # Optional by design. `secrets` cannot be read in a job-level `if`, so the
+      # check happens here and the step no-ops loudly rather than failing the
+      # release.
+      - name: publish to npm, if a token was ever added
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "no NPM_TOKEN secret; the GitHub Release above is the whole release."
+            echo "add one at Settings > Secrets > Actions to publish todox-mcp as well."
+            exit 0
+          fi
+          npm publish dist-npm --provenance --access public

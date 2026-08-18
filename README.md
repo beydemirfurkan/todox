@@ -375,6 +375,25 @@ Details, and an honest list of what is **not** covered, in
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.
 
+## Cutting a release
+
+```bash
+git tag v0.1.1 && git push origin v0.1.1
+```
+
+That is the procedure. The workflow checks the tag against `package.json`,
+runs the checks, builds the stdio package and attaches the tarball to a GitHub
+Release — no account and no credential involved, so `npx <that tarball url>`
+works from the first tag.
+
+Publishing to npm as `todox-mcp` is optional and off unless an `NPM_TOKEN`
+secret exists; the step says so and skips rather than failing. Add the secret if
+and when the nicer `npx todox-mcp` is worth it.
+
+`server.json` pins the MCP registry entry to the same version and
+`server-json.test.ts` holds it there, so the tag, the package and the registry
+move together or the release stops.
+
 ## Contributing
 
 The rules the codebase actually follows, and how to run the checks:
