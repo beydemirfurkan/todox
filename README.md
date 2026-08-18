@@ -329,6 +329,26 @@ That is also why the image keeps its dev dependencies instead of using Next's
 `scripts/`, and a database that is deliberately unreachable from the internet
 can only be migrated from something already inside the network.
 
+## Taking your data with you
+
+The Account page has a **Download my data** button, and `/api/export` answers
+the same file to a bearer token — so an agent can write the backup without the
+result passing through a model. It carries every project you own with its
+tasks, log, context notes and file hashes, and nothing about anybody else: no
+credential, no collaborator, no share token, and no projects that were shared
+*with* you, which belong to whoever made them.
+
+Loading one into an instance you run:
+
+```bash
+pnpm db:import ./todox-export-2026-08-18.json your-username
+```
+
+Additive, never destructive: nothing is deleted or overwritten, and a project
+whose slug is taken arrives under the next free one. Task events come across
+too, so durations in a report on the restored copy say what they said on the
+original.
+
 Coming from the old SQLite version? `pnpm db:import-sqlite [path]` copies a
 `~/.todox/todox.db` across.
 
