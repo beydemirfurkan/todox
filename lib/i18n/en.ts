@@ -47,7 +47,7 @@ export const en = {
   forAgents: "Are you an agent? Read /llms.txt.",
   privacyLastUpdated: "Last updated: 12 August 2026.",
   privacyWhatWeStore: "What we store",
-  privacyStore1: "Your account: email, username, display name, and a password hash. The hash is bcrypt and we cannot read your password.",
+  privacyStore1: "Your account: email, username, display name, and a password hash. The hash is scrypt and we cannot read your password.",
   privacyStore2: "Your projects, tasks, log entries, context notes, and project memberships — the data you put into todox.",
   privacyStore3: "Session cookies that keep you signed in. They are HTTP-only, signed, and expire when you sign out or after 30 days of inactivity.",
   privacyStore4: "Server logs with your IP address and request path, kept for 30 days for abuse detection and debugging.",
@@ -190,6 +190,8 @@ export const en = {
   revokeAllNote:
     "Tokens do not expire and each one carries the whole account. If you think one has leaked and cannot tell which, end all of them.",
   tokenOnce: "Copy it now — it is never shown again.",
+  tokenTooMany:
+    "That is a lot of tokens for one day. Try again in about {n} minutes — or revoke the ones you are no longer using, below.",
   setupPromptTitle: "Paste this to your agent",
   setupPromptTemplate: [
     "Add todox as an MCP server. It is a remote (HTTP) server, so there is",
@@ -358,6 +360,7 @@ export const en = {
   staleTitleMany: "{n} notes may be lying to you",
   staleBody:
     "The files behind these have changed since they were written. Stale context is worse than none.",
+  staleAndMore: "and {n} more, listed on the tasks themselves.",
   inLog: "in log",
   deadEndCount: "dead end",
   deadEndCountPlural: "dead ends",
@@ -382,6 +385,10 @@ export const en = {
   sharedReadOnly: "Read-only shared view",
   sharedIntro: "A public snapshot of this project's task list.",
   sharedNoLog: "The log is not part of this share.",
+  sharedAndMore: "{n} more, not shown. A share is a snapshot, not the whole project.",
+  sharedBusyTitle: "Too many requests",
+  sharedBusyBody:
+    "This link has been opened a lot from your address in the last few minutes. Try again in about {n} minutes — nothing is wrong with the project.",
 
   /* task page */
   task: "task",

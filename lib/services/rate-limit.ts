@@ -40,6 +40,37 @@ export const POLICIES = {
    * its rails.
    */
   agentPerToken: { limit: 600, windowMs: 15 * MINUTE },
+  /**
+   * Views of a share link, per address.
+   *
+   * The only page that answers without a session, and it reads a project's
+   * tasks and their log on every hit. The lists are capped now, but a capped
+   * read is still a read, and nothing was counting them -- a crawler that
+   * ignores the noindex, or anyone who kept the URL, could ask as often as it
+   * liked. Set high enough that a person reading a shared project and following
+   * its links never notices.
+   */
+  sharePerIp: { limit: 120, windowMs: 15 * MINUTE },
+  /**
+   * Writes from a signed-in browser, per account.
+   *
+   * The agent surface has been metered per token since it existed; every server
+   * action was not metered at all, so the same account could write as fast as it
+   * could post — and a session cookie is as scriptable as a bearer token. Set
+   * for the same purpose as `agentPerToken` and read the same way: far above
+   * real work, so it should only ever be met by something that has come off its
+   * rails.
+   */
+  webWritePerUser: { limit: 300, windowMs: 15 * MINUTE },
+  /**
+   * Agent tokens minted per account.
+   *
+   * They never expire and each one carries the whole account, so an unbounded
+   * supply is an unbounded supply of long-lived credentials. Nobody needs a
+   * dozen a day; the Account page has a "revoke every token" button for the case
+   * where you actually want to start again.
+   */
+  tokenPerUser: { limit: 12, windowMs: 24 * HOUR },
 } as const;
 
 export type PolicyName = keyof typeof POLICIES;

@@ -1,5 +1,6 @@
 import { tx } from "../db/client";
 import type { Lang } from "../i18n";
+import { logError } from "../server/log";
 import { publicUrl } from "../public-url";
 import * as invitations from "../repositories/project-invitations";
 import * as memberships from "../repositories/project-memberships";
@@ -230,7 +231,12 @@ async function announce(
       to: owner.email,
       ...templates.invitationAccepted({ who, projectName, url: publicUrl(), lang }),
     });
-  } catch {
-    // Nothing to recover: the join happened either way.
+  } catch (error) {
+    // Nothing to recover -- the join happened either way, and failing the
+    // request over a notification would undo work that succeeded. But an empty
+    // catch means the owner is simply never told and nobody ever finds out why,
+    // and `send` swallows its own failures, so reaching here at all is already
+    // something unexpected.
+    logError("invitation.accepted.notify_failed", error);
   }
 }

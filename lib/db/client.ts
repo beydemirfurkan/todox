@@ -41,9 +41,19 @@ function db(): Pool {
   pool ??= new Pool({
     connectionString: connectionString(),
     max: Number(process.env.DATABASE_POOL_MAX ?? 10),
-    // A statement that has not answered in 30s is not going to; failing the
+    // A statement that has not answered in 25s is not going to; failing the
     // request beats holding a connection that the next one needs.
-    statement_timeout: 30_000,
+    //
+    // Under `maxDuration` on the agent routes (30s), deliberately. At 30 both
+    // ended at the same instant, so the platform killed the function while
+    // Postgres was still running the query and the connection stayed checked
+    // out until the server got round to it. Ten of those exhaust a pool of ten
+    // -- and `/api/health` takes a connection too, so the health check began
+    // failing at exactly the moment the pool did, which reads to an
+    // orchestrator as an unhealthy container and restarts a process that was
+    // fine. The statement has to lose the race for the request to be the thing
+    // that fails.
+    statement_timeout: 25_000,
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,
   });

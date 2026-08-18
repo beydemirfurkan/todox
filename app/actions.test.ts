@@ -20,6 +20,7 @@ const USER = { id: 7, email: "a@b.c", email_verified_at: "2026-01-01" };
 
 const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
+  consume: vi.fn(),
   assertTask: vi.fn(),
   assertEntry: vi.fn(),
   assertRef: vi.fn(),
@@ -47,6 +48,7 @@ vi.mock("@/lib/session", () => ({
   setSessionCookie: vi.fn(),
 }));
 vi.mock("@/lib/lang", () => ({ LANG_COOKIE: "lang", getLang: async () => "en" }));
+vi.mock("@/lib/services/rate-limit", () => ({ consume: mocks.consume }));
 vi.mock("@/lib/services/ownership", () => ({
   assertTask: mocks.assertTask,
   assertEntry: mocks.assertEntry,
@@ -106,6 +108,7 @@ class Denied extends Error {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.requireUser.mockResolvedValue(USER);
+  mocks.consume.mockResolvedValue({ allowed: true });
 });
 
 /**
@@ -226,8 +229,13 @@ describe("every exported action", () => {
   for (const [name, body] of bodies) {
     if (NO_ACCOUNT.has(name)) continue;
 
-    it(`${name} resolves the account from the session`, () => {
-      expect(body).toContain("requireUser()");
+    it(`${name} resolves the account from the session, and counts the write`, () => {
+      // `writingUser()` is `requireUser()` plus the meter. Naming only the
+      // helper is what keeps the two from drifting apart: an action that
+      // reaches for `requireUser()` directly is authenticated and unmetered,
+      // which is exactly the state this whole surface was in.
+      expect(body).toContain("writingUser()");
+      expect(body).not.toContain("requireUser()");
     });
 
     it(`${name} passes that account into whatever it calls`, () => {
@@ -282,4 +290,34 @@ describe("a project saved from the web is stored the way an agent would store it
     expect(patch.root_path).toBeNull();
     expect(patch.repo_url).toBeNull();
   });
+});
+
+describe("the ceiling on writes from a browser", () => {
+  /**
+   * The agent surface has been metered per token since it existed and this one
+   * was not metered at all — a session cookie is every bit as scriptable as a
+   * bearer token, so the same account could write as fast as it could post.
+   */
+  it("counts the write against the account, not the form", async () => {
+    await actions.createProjectAction(form({ name: "todox" }));
+    expect(mocks.consume).toHaveBeenCalledWith("webWritePerUser", String(USER.id));
+  });
+
+  it("counts before it writes, so a refusal costs nothing downstream", async () => {
+    mocks.consume.mockResolvedValue({ allowed: false, retryAfterSec: 300 });
+    await expect(actions.createProjectAction(form({ name: "todox" }))).rejects.toThrow(
+      /too many writes/,
+    );
+    expect(mocks.projectsCreate).not.toHaveBeenCalled();
+  });
+
+  it("refuses loudly rather than returning as though it had worked", async () => {
+    // The failure this codebase keeps finding: the caller is told nothing and
+    // the work simply did not happen. A form that settles with no row and no
+    // message is indistinguishable from one that succeeded.
+    mocks.consume.mockResolvedValue({ allowed: false, retryAfterSec: 300 });
+    await expect(actions.deleteEntryAction(form({ entry_id: "1" }))).rejects.toThrow();
+    expect(mocks.entriesRemove).not.toHaveBeenCalled();
+  });
+
 });

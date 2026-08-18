@@ -291,6 +291,7 @@ export default async function AccountPage({
             submitLabel={t("createToken")}
             pendingLabel={t("tokenCreating")}
             onceLabel={t("tokenOnce")}
+            tooManyTemplate={t("tokenTooMany")}
             setup={{
               promptTitle: t("setupPromptTitle"),
               promptWarning: t("setupPromptWarning"),

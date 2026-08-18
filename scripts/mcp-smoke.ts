@@ -482,7 +482,21 @@ async function main() {
     method: "getTask",
     params: { task_id: anyTask.id },
   });
-  console.log(denied.status, (await denied.json()).error);
+  const deniedBody = await denied.json();
+  // This printed the status and moved on, which is not the same as checking it:
+  // remove `assertTask` from `getTask` and the old version stayed green while
+  // handing one account another's work. 404 rather than 403, because the answer
+  // must not tell the caller that the id exists.
+  if (denied.status !== 404)
+    throw new Error(
+      `getTask answered ${denied.status} to a foreign token, not 404: ${JSON.stringify(deniedBody)}`,
+    );
+  // And the status alone is not enough -- a body carrying the task next to a
+  // 404 would still be the leak. Nothing of the owner's may come back.
+  const leaked = JSON.stringify(deniedBody);
+  if (leaked.includes(anyTask.title))
+    throw new Error(`getTask refused with 404 and returned the task anyway: ${leaked}`);
+  console.log(denied.status, deniedBody.error, "· nothing of the task came back");
 
   // The methods that remove somebody's work take an id and nothing else, and
   // the repository call underneath takes no account id at all -- `remove(id)`
@@ -528,7 +542,16 @@ async function main() {
 
   console.log("\n--- an unauthenticated call is refused, on both surfaces ---");
   const anon = await rpc(null, { method: "listProjects" });
-  console.log("/api/rpc:", anon.status, (await anon.json()).error);
+  const anonBody = await anon.json();
+  // Printed and unchecked before this, on the one guarantee the header of this
+  // file claims: no token, no access.
+  if (anon.status !== 401)
+    throw new Error(
+      `/api/rpc answered ${anon.status} without a token, not 401: ${JSON.stringify(anonBody)}`,
+    );
+  if (anonBody.projects !== undefined)
+    throw new Error("/api/rpc refused an anonymous call and listed projects anyway");
+  console.log("/api/rpc:", anon.status, anonBody.error);
 
   const anonMcp = await fetch(new URL("/api/mcp", URL_BASE), {
     method: "POST",

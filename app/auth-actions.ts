@@ -15,6 +15,7 @@ import {
 } from "@/lib/services/account-recovery";
 import * as auth from "@/lib/services/auth";
 import * as limit from "@/lib/services/rate-limit";
+import { clientIp as addressOf } from "@/lib/server/client-ip";
 import { clearSessionCookie, requireUser, setSessionCookie } from "@/lib/session";
 
 const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ?? "";
@@ -29,11 +30,19 @@ const inviteNext = (fd: FormData) => {
 export type AuthState = { errors: auth.FieldError[] } | null;
 
 /**
- * Kept apart from `AuthState`: creating a token has no failure a field could
+ * Kept apart from `AuthState`: creating a token has no failure a *field* could
  * carry, and folding it in would hand the token form the "no errors means it
  * worked" success banner the auth forms rely on.
+ *
+ * It does have one failure now. Minting is metered, and a refusal that returned
+ * `null` would be indistinguishable from never having submitted -- the button
+ * would settle and nothing would appear, which is the silent no-op this
+ * codebase keeps finding. So the refusal is a state of its own.
  */
-export type TokenState = { token: string } | null;
+export type TokenState =
+  | { token: string }
+  | { tooManyMinutes: number }
+  | null;
 
 const tooMany = (retryAfterSec: number): AuthState => ({
   errors: [
@@ -46,14 +55,21 @@ const tooMany = (retryAfterSec: number): AuthState => ({
 });
 
 /**
- * Behind a proxy the socket address is the proxy's. Trust the left-most
- * forwarded hop when one is present, and fall back to a constant so a missing
- * header degrades into a shared bucket rather than into no limit at all.
+ * Who to meter this request against.
+ *
+ * This used to read `x-forwarded-for`'s left-most hop itself, which is the end
+ * of the list the caller writes: one forged header per request put every
+ * attempt in a fresh bucket, and `loginPerIp` / `registerPerIp` / `resetPerIp`
+ * are enforced nowhere else. `lib/server/client-ip.ts` was written to close
+ * exactly that -- its own comment names these limits -- and was wired into the
+ * two agent routes but never into here.
+ *
+ * So there is no local reading of the header any more. Counting from the right
+ * belongs in one place, because the number of hops to trust is a fact about
+ * the deployment and cannot be re-derived correctly twice.
  */
 async function clientIp() {
-  const h = await headers();
-  const fwd = h.get("x-forwarded-for");
-  return fwd?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  return addressOf(await headers());
 }
 
 async function startSession(userId: number) {
@@ -294,6 +310,11 @@ export async function createTokenAction(
   fd: FormData,
 ): Promise<TokenState> {
   const user = await requireUser();
+  // Nothing counted these. They never expire and each one carries the whole
+  // account, so an unmetered mint is an unmetered supply of long-lived
+  // credentials -- the one thing on this page worth a ceiling.
+  const gate = await limit.consume("tokenPerUser", String(user.id));
+  if (!gate.allowed) return { tooManyMinutes: Math.ceil(gate.retryAfterSec / 60) };
   const name = str(fd, "name") || "mcp";
   const { token } = await auth.createApiToken(user.id, name);
   // Without this the new row is missing from the list until something else

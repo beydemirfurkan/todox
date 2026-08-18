@@ -119,8 +119,10 @@ export const acceptSeen = (id: number) =>
  * The web UI cannot check for itself, so this is how it ever has an answer --
  * and why the answer is always reported with `checked_at` beside it.
  */
-export async function recordCheck(seen: { id: number; hash: string | null }[]) {
-  if (!seen.length) return;
+export async function recordCheck(
+  seen: { id: number; hash: string | null }[],
+): Promise<number> {
+  if (!seen.length) return 0;
   const ts = now();
 
   // One statement, for the same reason `link` above is one: over HTTP each row
@@ -136,7 +138,12 @@ export async function recordCheck(seen: { id: number; hash: string | null }[]) {
     return "(?::int, ?::text)";
   });
 
-  await run(
+  // The count comes back rather than being dropped. A ref deleted between the
+  // ownership check and this statement matches nothing, and the caller used to
+  // answer with the number it was *sent* -- so an agent could be told its
+  // staleness report was recorded when none of it was. `unlink`, `acceptSeen`
+  // and their siblings all check what they wrote; this was the one that did not.
+  return run(
     // COALESCE gives a baseline to rows linked from the web form, where the
     // browser cannot hash a path on the developer's machine. The first time
     // an agent looks, what it finds becomes the reference; without this those

@@ -45,7 +45,7 @@ export const tr: Record<Key, string> = {
   forAgents: "Ajan mısın? /llms.txt dosyasını oku.",
   privacyLastUpdated: "Son güncelleme: 12 Ağustos 2026.",
   privacyWhatWeStore: "Neleri saklıyoruz",
-  privacyStore1: "Hesabın: e-posta, kullanıcı adı, görünür ad ve şifrenin hash'i. Hash bcrypt'tir; şifreni okuyamayız.",
+  privacyStore1: "Hesabın: e-posta, kullanıcı adı, görünür ad ve şifrenin hash'i. Hash scrypt'tir; şifreni okuyamayız.",
   privacyStore2: "Projelerin, görevlerin, günlük girdilerin, bağlam notların ve proje üyeliklerin — todox'a sen koyarsın.",
   privacyStore3: "Oturumunu açık tutan çerezler. HTTP-only, imzalı; çıkış yaptığında ya da 30 gün hareketsizlikten sonra süreleri dolar.",
   privacyStore4: "IP adresini ve istek yolunu içeren sunucu logları; kötüye kullanım tespiti ve hata ayıklama için 30 gün saklanır.",
@@ -183,6 +183,8 @@ export const tr: Record<Key, string> = {
   revokeAllNote:
     "Token'ların son kullanma tarihi yok ve her biri hesabın tamamını taşıyor. Biri sızdıysa ve hangisi olduğunu bilmiyorsan hepsini birden bitir.",
   tokenOnce: "Şimdi kopyala — bir daha gösterilmeyecek.",
+  tokenTooMany:
+    "Bir gün için bu kadar token çok. Yaklaşık {n} dakika sonra tekrar dene — ya da aşağıdan artık kullanmadıklarını iptal et.",
   setupPromptTitle: "Ajanına yapıştır",
   setupPromptTemplate: [
     "todox'u MCP sunucusu olarak ekle. Uzak (HTTP) bir sunucu, kurulacak bir",
@@ -349,6 +351,7 @@ export const tr: Record<Key, string> = {
   staleTitleMany: "{n} not sana yalan söylüyor olabilir",
   staleBody:
     "Bunların arkasındaki dosyalar yazıldıklarından beri değişti. Bayat bağlam, hiç bağlam olmamasından beterdir.",
+  staleAndMore: "ve {n} tane daha; görevlerin kendi sayfalarında listeli.",
   inLog: "kayıt",
   deadEndCount: "çıkmaz",
   deadEndCountPlural: "çıkmaz",
@@ -372,6 +375,11 @@ export const tr: Record<Key, string> = {
   sharedReadOnly: "Salt okunur paylaşım görünümü",
   sharedIntro: "Bu projenin görev listesinin herkese açık anlık görüntüsü.",
   sharedNoLog: "Kayıt bu paylaşıma dahil değil.",
+  sharedAndMore:
+    "{n} tane daha var, gösterilmedi. Paylaşım bir anlık görüntüdür, projenin tamamı değil.",
+  sharedBusyTitle: "Çok fazla istek",
+  sharedBusyBody:
+    "Bu bağlantı son birkaç dakikada senin adresinden çok kez açıldı. Yaklaşık {n} dakika sonra tekrar dene — projede bir sorun yok.",
 
   task: "görev",
   theLog: "Kayıt",

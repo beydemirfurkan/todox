@@ -21,6 +21,7 @@ export function TokenForm({
   submitLabel,
   pendingLabel,
   onceLabel,
+  tooManyTemplate,
   setup,
 }: {
   /** Where this instance answers; the snippets are built from it. */
@@ -31,13 +32,28 @@ export function TokenForm({
   submitLabel: string;
   pendingLabel: string;
   onceLabel: string;
+  /** Still carrying {n}: the wait is only known once the action has answered. */
+  tooManyTemplate: string;
   setup: AgentSetupLabels;
 }) {
   const [state, formAction, pending] = useActionState(createTokenAction, null);
 
   return (
     <>
-      {state && (
+      {state && "tooManyMinutes" in state && (
+        // A live region, because nothing else changes: the form stays where it
+        // is and a refusal that only settled the button would look like a
+        // submit that quietly did nothing.
+        <p
+          role="status"
+          aria-live="polite"
+          className="sticker-flat mt-4 p-3 text-[14px] leading-relaxed"
+        >
+          {tooManyTemplate.replace("{n}", String(state.tooManyMinutes))}
+        </p>
+      )}
+
+      {state && "token" in state && (
         <div
           className="sticker-flat mt-4 space-y-3 p-3"
           style={{ borderColor: "var(--accent)" }}

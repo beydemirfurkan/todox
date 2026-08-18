@@ -73,6 +73,18 @@ const NO_STORE = new Set([
 const SHORT_CACHE = new Set(["/sitemap.xml", "/robots.txt", "/llms.txt"]);
 
 /**
+ * A share link, cached in the reader's own browser for a minute.
+ *
+ * Every view reads the project's tasks and their log, and this is the page
+ * people paste somewhere and then reload. `private`, not `public`: the render
+ * depends on the language cookie, so a shared cache keyed on the URL alone
+ * would hand one reader another's language. That makes this a small win rather
+ * than a defence -- the ceiling on what it reads and `sharePerIp` are the
+ * defence -- but a refresh should not be a second full read.
+ */
+const SHORT_CACHE_PREFIX = "/s/";
+
+/**
  * `?lang=en` — a link that arrives in the language it promises.
  *
  * Negotiation covers the browser that asks, but a launch post, a directory
@@ -98,27 +110,8 @@ function claimedLang(req: NextRequest): NextResponse | undefined {
   return res;
 }
 
-export default function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  // Before everything: it applies to any page, and the redirect it returns is
-  // what the rules below should be deciding about.
-  const claimed = claimedLang(req);
-  if (claimed) return claimed;
-
-  if (NO_STORE.has(pathname)) {
-    const res = NextResponse.next();
-    res.headers.set("Cache-Control", "private, no-store");
-    return res;
-  }
-
-  if (SHORT_CACHE.has(pathname)) {
-    const res = NextResponse.next();
-    res.headers.set("Cache-Control", "public, max-age=300, must-revalidate");
-    res.headers.set("Last-Modified", new Date().toUTCString());
-    return res;
-  }
-
+/** Serve it, or send a visitor with no cookie to the login form. */
+function gate(req: NextRequest, pathname: string): NextResponse {
   if (PUBLIC_EXACT.includes(pathname)) return NextResponse.next();
   if (PUBLIC.some((p) => pathname === p || pathname.startsWith(p)))
     return NextResponse.next();
@@ -130,6 +123,36 @@ export default function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
   return NextResponse.next();
+}
+
+/** Decorate a decision that has already been made. */
+function cached(pathname: string, res: NextResponse): NextResponse {
+  if (NO_STORE.has(pathname)) res.headers.set("Cache-Control", "private, no-store");
+  else if (SHORT_CACHE.has(pathname)) {
+    res.headers.set("Cache-Control", "public, max-age=300, must-revalidate");
+    res.headers.set("Last-Modified", new Date().toUTCString());
+  } else if (pathname.startsWith(SHORT_CACHE_PREFIX))
+    res.headers.set("Cache-Control", "private, max-age=60");
+  return res;
+}
+
+export default function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Before everything: it applies to any page, and the redirect it returns is
+  // what the rules below should be deciding about.
+  const claimed = claimedLang(req);
+  if (claimed) return claimed;
+
+  // The gate decides, then the headers decorate. Each cache rule used to
+  // `return` its own fresh response, which meant a path in `NO_STORE` never
+  // reached the gate at all -- `/account`, `/report` and `/search` are all in
+  // that set, so the redirect below was dead for exactly the three pages it was
+  // most obviously for. Nothing was reachable that should not have been, because
+  // `requireUser()` is the real check and redirects on its own; what was broken
+  // was the guarantee, and the trap it left. Adding a page to `NO_STORE` looks
+  // like adding a header and silently removed it from the gate.
+  return cached(pathname, gate(req, pathname));
 }
 
 export const config = {

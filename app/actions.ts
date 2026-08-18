@@ -28,6 +28,7 @@ import {
   assertRef,
   assertTask,
 } from "@/lib/services/ownership";
+import * as limit from "@/lib/services/rate-limit";
 import * as sharing from "@/lib/services/sharing";
 import * as taskService from "@/lib/services/task-service";
 import { accept, acceptWithNewAccount, invite } from "@/lib/services/project-invitations";
@@ -59,6 +60,32 @@ const priorityOf = (fd: FormData): number | null | undefined => {
   return isPriority(value) ? value : null;
 };
 
+/**
+ * Identify whoever is writing, and count the write.
+ *
+ * Every action below opened with a bare `requireUser()`, so the browser path
+ * was the one surface with no ceiling on it at all: the agent surface has been
+ * metered per token since it existed, and a session cookie is every bit as
+ * scriptable as a bearer token. One account could write as fast as it could
+ * post, and `MAX.text` is a per-field cap with no row cap behind it -- so the
+ * database was the quota.
+ *
+ * Reads keep using `requireUser()`. Only a write is worth counting, and a
+ * limiter on a read is a write nobody asked for.
+ *
+ * It throws rather than returning quietly. A silent no-op on a form is the
+ * failure this codebase keeps finding -- the caller is told nothing and the
+ * work simply did not happen -- and the ceiling is set where a person cannot
+ * reach it, so arriving here means something is looping.
+ */
+async function writingUser() {
+  const user = await requireUser();
+  const gate = await limit.consume("webWritePerUser", String(user.id));
+  if (!gate.allowed)
+    throw new Error(`too many writes; try again in ${Math.ceil(gate.retryAfterSec / 60)} minutes`);
+  return user;
+}
+
 /* -------------------------------------------------------------- language */
 
 /** The only action that does not need an account: it just sets a cookie. */
@@ -87,14 +114,14 @@ export async function setLangAction(fd: FormData) {
  * re-rendering the layout underneath an open menu would close it.
  */
 export async function markNotificationsReadAction() {
-  const user = await requireUser();
+  const user = await writingUser();
   await notificationService.markAllRead(user.id);
 }
 
 /* --------------------------------------------------------------- sharing */
 
 export async function setSharingAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "project_id");
   await assertProject(user.id, id);
   // Publishing is the one outward-facing action, so it is the one gated on a
@@ -109,7 +136,7 @@ export async function setSharingAction(fd: FormData) {
 }
 
 export async function rotateShareAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "project_id");
   await assertProject(user.id, id);
   await sharing.rotate(user.id, id);
@@ -119,7 +146,7 @@ export async function rotateShareAction(fd: FormData) {
 /* -------------------------------------------------------------- projects */
 
 export async function createProjectAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const name = str(fd, "name");
   if (!name) return;
   const path = str(fd, "root_path");
@@ -135,7 +162,7 @@ export async function createProjectAction(fd: FormData) {
 }
 
 export async function updateProjectAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "id");
   await assertProject(user.id, id);
   const path = str(fd, "root_path");
@@ -165,7 +192,7 @@ export async function deleteProjectAction(
   _prev: AuthState,
   fd: FormData,
 ): Promise<AuthState> {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "project_id");
   await assertProject(user.id, id);
 
@@ -182,7 +209,7 @@ export async function deleteProjectAction(
 }
 
 export async function inviteProjectAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   await invite({
     userId: user.id,
     projectId: num(fd, "project_id"),
@@ -194,14 +221,14 @@ export async function inviteProjectAction(fd: FormData) {
 }
 
 export async function revokeProjectInviteAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   await invitations.revokeOwned(user.id, num(fd, "invitation_id"), new Date().toISOString());
   revalidatePath("/account");
   revalidatePath("/", "layout");
 }
 
 export async function removeProjectMemberAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   // Through the service: the person being removed has to be told, and their
   // id only exists on the row that is about to disappear.
   await collaboration.removeMember(user.id, num(fd, "membership_id"));
@@ -210,7 +237,7 @@ export async function removeProjectMemberAction(fd: FormData) {
 }
 
 export async function acceptProjectInviteAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   // The token when the link supplied one, the id when it came from the list on
   // the account page. `accept` decides what each is worth.
   const slug = await accept({
@@ -238,7 +265,7 @@ export async function acceptNewAccountInviteAction(fd: FormData) {
 /* ----------------------------------------------------------------- tasks */
 
 export async function createTaskAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const slug = str(fd, "slug");
   const project = await projects.bySlug(user.id, slug);
   const title = str(fd, "title");
@@ -256,7 +283,7 @@ export async function createTaskAction(fd: FormData) {
 }
 
 export async function setStatusAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "task_id");
   await assertTask(user.id, id);
   const status = str(fd, "status");
@@ -275,7 +302,7 @@ export async function setStatusAction(fd: FormData) {
  * can reach it.
  */
 export async function updateTaskAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "task_id");
   await assertTask(user.id, id);
 
@@ -295,7 +322,7 @@ export async function updateTaskAction(fd: FormData) {
 /* --------------------------------------------------------------- entries */
 
 export async function addEntryAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const taskId = num(fd, "task_id");
   await assertTask(user.id, taskId);
   const body = str(fd, "body");
@@ -312,7 +339,7 @@ export async function addEntryAction(fd: FormData) {
 }
 
 export async function deleteEntryAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "entry_id");
   await assertEntry(user.id, id);
   await entries.remove(id);
@@ -322,7 +349,7 @@ export async function deleteEntryAction(fd: FormData) {
 /* -------------------------------------------------------------- contexts */
 
 export async function addContextAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const slug = str(fd, "slug");
   const project = slug ? await projects.bySlug(user.id, slug) : null;
   if (slug && !project) return;
@@ -341,7 +368,7 @@ export async function addContextAction(fd: FormData) {
 }
 
 export async function deleteContextAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "context_id");
   await assertContext(user.id, id);
   await contexts.remove(id);
@@ -351,7 +378,7 @@ export async function deleteContextAction(fd: FormData) {
 /* ------------------------------------------------------------------ refs */
 
 export async function linkFileAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const taskId = num(fd, "task_id");
   await assertTask(user.id, taskId);
   const path = str(fd, "path");
@@ -361,7 +388,7 @@ export async function linkFileAction(fd: FormData) {
 }
 
 export async function acceptRefAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "ref_id");
   await assertRef(user.id, id);
   await refs.acceptSeen(id);
@@ -369,7 +396,7 @@ export async function acceptRefAction(fd: FormData) {
 }
 
 export async function unlinkRefAction(fd: FormData) {
-  const user = await requireUser();
+  const user = await writingUser();
   const id = num(fd, "ref_id");
   await assertRef(user.id, id);
   await refs.unlink(id);

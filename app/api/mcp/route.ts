@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
 import { instructions, registerTools, type Workspace } from "@/mcp/tools";
+import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError } from "@/lib/server/log";
 import { normalise, record } from "@/lib/server/client-info";
@@ -128,6 +129,17 @@ async function answer(req: Request): Promise<Response> {
       { jsonrpc: "2.0", error: { code: -32000, message: "too many calls; slow down" } },
       429,
       { "retry-after": String(pace.retryAfterSec) },
+    );
+
+  // Before the parse, because the parse is what costs. The JSON-RPC envelope
+  // has no code for "too big", so it carries the transport status instead.
+  if (bodyTooLarge(req.headers))
+    return json(
+      {
+        jsonrpc: "2.0",
+        error: { code: -32600, message: `body must be under ${MAX_BODY_BYTES} bytes` },
+      },
+      413,
     );
 
   let body: unknown;

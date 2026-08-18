@@ -68,6 +68,12 @@ These are known and documented, not oversights:
 - If the mail provider's sending limit is reached, messages are dropped. It
   cannot leak whether an address is registered — the response is identical
   either way — but the only place it shows up is the server log.
+- The Content-Security-Policy allows inline scripts (`script-src` carries
+  `'unsafe-inline'`). Nothing in the app emits a nonce, so that directive means
+  what it says and the CSP is not a second line of defence against an injected
+  script — escaping and `react-markdown`'s `skipHtml` are the first and, for
+  now, only one. Closing it means minting a nonce per request in `proxy.ts`,
+  which changes how every page loads its scripts and is not done yet.
 
 ## Running it yourself
 

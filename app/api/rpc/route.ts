@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, newRequestId } from "@/lib/server/log";
 import { userForApiToken } from "@/lib/services/auth";
@@ -58,6 +59,11 @@ export async function POST(req: NextRequest) {
         { ok: false, error: "too many calls; slow down" },
         { status: 429, headers: { "retry-after": String(pace.retryAfterSec), ...idHeader(requestId) } },
       );
+
+    // Before the parse, because the parse is what costs. 413 rather than 400:
+    // the request is well formed, there is just too much of it.
+    if (bodyTooLarge(req.headers))
+      return fail(413, `body must be under ${MAX_BODY_BYTES} bytes`, requestId);
 
     let payload: { method?: unknown; params?: unknown };
     try {

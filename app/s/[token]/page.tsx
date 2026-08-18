@@ -1,18 +1,33 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { OPEN_STATUSES } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import * as entriesRepo from "@/lib/repositories/entries";
 import * as tasksRepo from "@/lib/repositories/tasks";
+import { clientIp } from "@/lib/server/client-ip";
+import * as limit from "@/lib/services/rate-limit";
 import { bySharedToken } from "@/lib/services/sharing";
 import { pageOpenGraph } from "../../metadata-shared";
 import { KIND_COLOR, kindLabel, statusLabel } from "../../kinds";
 import { Blob, Chip, Counter, Empty, Panel, StatusDot } from "../../components";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * What one view of a share link may read.
+ *
+ * The private project page has capped its list since it was written; this one,
+ * which anybody with the URL can open, had no ceiling on the open tasks and no
+ * ceiling on their log. The numbers are smaller than the signed-in page's on
+ * purpose: this is a summary somebody pasted into a pull request, not a
+ * workspace, and every request for it is unauthenticated.
+ */
+const SHARED_TASKS = 40;
+const SHARED_CLOSED = 40;
+const SHARED_ENTRIES = 5;
 
 /**
  * `generateMetadata` and the render both need this row, and the page is
@@ -56,15 +71,41 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
   const project = await projectForToken(token);
   if (!project) notFound();
 
-  const all = await tasksRepo.listByProject(project.id, "all");
-  const open = all.filter((x) => OPEN_STATUSES.includes(x.status));
-  const closed = all.filter((x) => !OPEN_STATUSES.includes(x.status));
+  // Counted before the reads below, which are the expensive part. Nothing metered
+  // this page at all, and it is the one surface that answers without a session:
+  // whoever holds the URL -- or a crawler that ignored the noindex -- could ask
+  // for a project's tasks and log as fast as it could open connections.
+  const gate = await limit.consume("sharePerIp", clientIp(await headers()));
+  if (!gate.allowed) {
+    return (
+      <div className="sticker pop space-y-2 p-5">
+        <h1 className="display text-[20px] font-bold">{t("sharedBusyTitle")}</h1>
+        <p className="text-[14.5px] leading-relaxed text-muted">
+          {t("sharedBusyBody", { n: Math.ceil(gate.retryAfterSec / 60) })}
+        </p>
+      </div>
+    );
+  }
+
+  // Bounded, and bounded in SQL. This read every task in the project and every
+  // entry of every open one, then rendered the open list with no cut at all --
+  // on the only page in the app that answers without a session. A crawler
+  // ignoring the noindex was enough to turn a share link into an amplifier.
+  const [openPage, closedPage] = await Promise.all([
+    tasksRepo.pageByProject(project.id, "open", SHARED_TASKS),
+    tasksRepo.pageByProject(project.id, "closed", SHARED_CLOSED),
+  ]);
+  const open = openPage.rows;
+  const closed = closedPage.rows;
   const withLog = project.share_log === 1;
 
   // Only the log is optional here; file paths and project context are never
   // included in a share, whatever the owner picked.
   const logs = withLog
-    ? await entriesRepo.listByTasks(open.map((x) => x.id))
+    ? await entriesRepo.listByTasksNewest(
+        open.map((x) => x.id),
+        SHARED_ENTRIES,
+      )
     : new Map<number, never[]>();
 
   return (
@@ -85,7 +126,9 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
       <Panel
         delay={60}
         title={t("queued")}
-        right={<Counter n={open.length} label={t("queued")} />}
+        // The real number, not the number shown: a count that quietly became
+        // "forty" would make the cut below invisible.
+        right={<Counter n={openPage.total} label={t("queued")} />}
       >
         <ul className="space-y-2">
           {open.length === 0 && <Empty mood="happy">{t("allClear")}</Empty>}
@@ -140,16 +183,21 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
             );
           })}
         </ul>
+        {openPage.total > open.length && (
+          <p className="mt-3 text-[13px] text-muted">
+            {t("sharedAndMore", { n: openPage.total - open.length })}
+          </p>
+        )}
       </Panel>
 
       {closed.length > 0 && (
         <Panel
           delay={120}
           title={t("doneDropped")}
-          right={<Counter n={closed.length} label={t("doneDropped")} />}
+          right={<Counter n={closedPage.total} label={t("doneDropped")} />}
         >
           <ul className="space-y-1">
-            {closed.slice(0, 40).map((task) => (
+            {closed.map((task) => (
               <li
                 key={task.id}
                 className="flex items-center gap-2.5 px-1.5 py-1 text-[14px] text-muted"

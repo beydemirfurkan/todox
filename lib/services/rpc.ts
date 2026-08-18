@@ -187,20 +187,18 @@ export const methods = {
 
   getTask: async ({ userId }, p: { task_id: number }) => {
     await assertTask(userId, p.task_id);
-    const [task, entries, refs] = await Promise.all([
+    const [task, log, refs] = await Promise.all([
       tasksRepo.byId(p.task_id),
-      entriesRepo.listByTask(p.task_id),
+      // The newest end of a long log is the useful end; the rest is history the
+      // handoff already summarises. Cut in SQL: the slice was applied to a read
+      // of the whole log, so the ceiling bounded the answer and not the cost.
+      entriesRepo.pageByTask(p.task_id, PAGE),
       refsRepo.listByTask(p.task_id),
     ]);
-    // The newest end of a long log is the useful end; the rest is history the
-    // handoff already summarises.
-    const shown = entries.slice(-PAGE);
     return {
       ...task!,
-      entries: shown,
-      ...(shown.length < entries.length
-        ? { entries_omitted: entries.length - shown.length }
-        : {}),
+      entries: log.rows,
+      ...(log.rows.length < log.total ? { entries_omitted: log.total - log.rows.length } : {}),
       files: refs.map((r) => ({
         id: r.id,
         path: r.path,
@@ -299,8 +297,11 @@ export const methods = {
     // per call, and one join each is five hundred of them at once against a
     // pool of ten.
     await assertRefs(userId, p.refs.map((r) => r.id));
-    await refsRepo.recordCheck(p.refs);
-    return { recorded: p.refs.length };
+    // What was written, not what was sent. A ref unlinked between the check
+    // above and the write matches nothing, and reporting the caller's own count
+    // told an agent its staleness report had landed when it had not.
+    const recorded = await refsRepo.recordCheck(p.refs);
+    return { recorded };
   },
 
   unlinkRef: async ({ userId }, p: { ref_id: number }) => {

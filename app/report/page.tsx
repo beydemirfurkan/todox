@@ -24,8 +24,22 @@ export const dynamic = "force-dynamic";
 
 const PERIODS: PeriodName[] = ["today", "yesterday", "week", "last_week", "month"];
 
+/**
+ * The pills, and nothing else.
+ *
+ * `"all"` used to be accepted here while being left out of `PERIODS`, so it had
+ * no button and was still one URL edit away. `resolvePeriod` turns it into
+ * `new Date(0)`, and the read behind it is a four-way join with no LIMIT whose
+ * every decision, dead end and question body then goes into the response --
+ * an account's entire history, on a `force-dynamic` page, out of a pool of ten.
+ *
+ * Not capped instead, deliberately: a report's numbers have to be right, and a
+ * truncated input makes "you closed five tasks" a guess. The window is the
+ * thing to bound, so an unbounded one is simply not offered. `activity_report`
+ * still takes `all` for an agent that asks for it on purpose.
+ */
 const isPeriod = (v: unknown): v is PeriodName =>
-  typeof v === "string" && (PERIODS as string[]).concat("all").includes(v);
+  typeof v === "string" && (PERIODS as string[]).includes(v);
 
 export default async function ReportPage({ searchParams }: PageProps<"/report">) {
   const user = await requireUser();
