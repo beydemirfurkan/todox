@@ -15,6 +15,8 @@
  */
 import nodemailer from "nodemailer";
 
+import { logError, logWarn } from "../server/log";
+
 /**
  * `text` is required and `html` is not, which is the right way round.
  *
@@ -129,7 +131,7 @@ function build(): Transport {
   const configured = Number(process.env.SMTP_PORT ?? 587);
   const port = Number.isFinite(configured) && configured > 0 ? configured : 587;
   if (port !== configured && process.env.SMTP_PORT !== undefined) {
-    console.warn(`[todox] SMTP_PORT is not a number; using ${port}.`);
+    logWarn("mail.badPort", { configured: process.env.SMTP_PORT, using: port });
   }
 
   // All four or none. A half-configured transport is worse than an unconfigured
@@ -143,10 +145,9 @@ function build(): Transport {
   if (process.env.NODE_ENV === "production") {
     if (!warned) {
       warned = true;
-      console.error(
-        "[todox] SMTP is not configured; mail is refused, not sent. " +
-          "Set SMTP_HOST, SMTP_USER, SMTP_PASS and MAIL_FROM.",
-      );
+      logWarn("mail.notConfigured", {
+        detail: "set SMTP_HOST, SMTP_USER, SMTP_PASS and MAIL_FROM; mail is refused, not sent",
+      });
     }
     return refusingTransport;
   }
@@ -171,9 +172,14 @@ export async function send(mail: Mail): Promise<void> {
   try {
     await t.send(mail);
   } catch (e) {
-    console.error(
-      `[todox] mail delivery failed (transport=${t.name}, to=${maskEmail(mail.to)}, ` +
-        `subject=${JSON.stringify(mail.subject)}): ${(e as Error).message}`,
-    );
+    // This is the one failure SECURITY.md says "shows up only in the log", so
+    // the log had better be something a collector can read. The address is
+    // masked and the body never appears: a log is a place secrets are kept for
+    // a long time in plain text.
+    logError("mail.deliveryFailed", e, {
+      transport: t.name,
+      to: maskEmail(mail.to),
+      subject: mail.subject,
+    });
   }
 }
