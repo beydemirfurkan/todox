@@ -23,6 +23,11 @@ const PUBLIC = [
   // rather than as a refusal.
   "/api/rpc",
   "/api/mcp",
+  // Same reason, and the same trap: an export can be fetched with a bearer
+  // token by a process acting for its owner, and that request carries no
+  // cookie. Left out, the gate would answer an agent with an HTML login page
+  // instead of the file. The route authenticates for itself, both ways.
+  "/api/export",
   // The container's own liveness check, which has no cookie and never will.
   // Redirected, it answers 307 to a runtime that only asked whether this
   // process can serve anything -- and a redirect is a perfectly healthy

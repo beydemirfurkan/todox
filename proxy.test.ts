@@ -67,7 +67,7 @@ describe("what stays reachable without a session", () => {
     },
   );
 
-  it.each(["/api/rpc", "/api/mcp"])(
+  it.each(["/api/rpc", "/api/mcp", "/api/export"])(
     "lets %s answer for itself rather than redirecting it",
     (path) => {
       // Both carry a bearer token and never a cookie. Redirected, an agent gets

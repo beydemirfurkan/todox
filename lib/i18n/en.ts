@@ -243,6 +243,10 @@ export const en = {
   tokenColumnActivity: "Activity",
   tokenColumnCreated: "Created",
   tokenColumnActions: "Actions",
+  exportTitle: "Export your data",
+  exportBody:
+    "Every project you own, with its tasks, log, context notes and linked-file hashes, as one JSON file. Nothing about anybody else: projects shared with you belong to whoever made them, and no collaborator, invitation or credential is in the file.",
+  exportCta: "Download my data",
   deleteAccount: "Delete account",
   deleteAccountNote:
     "Ends the account and takes every project, task and log entry with it. There is no copy and no undo — export anything you want to keep first.",
@@ -501,7 +505,7 @@ export const en = {
 
   deleteProject: "Delete this project",
   deleteProjectNote:
-    "Removes the project and everything in it: {n} tasks with their whole log, the notes and the file links. There is no undo, and no export first.",
+    "Removes the project and everything in it: {n} tasks with their whole log, the notes and the file links. There is no undo — download your data from the Account page first if you want to keep any of it.",
   deleteProjectConfirm: "Type {slug} to confirm",
   deleteProjectSubmit: "Delete it and everything in it",
 

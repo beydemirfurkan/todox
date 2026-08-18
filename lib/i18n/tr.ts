@@ -237,6 +237,10 @@ export const tr: Record<Key, string> = {
   tokenColumnActivity: "Kullanım",
   tokenColumnCreated: "Oluşturulma",
   tokenColumnActions: "İşlemler",
+  exportTitle: "Verilerini dışa aktar",
+  exportBody:
+    "Sahibi olduğun her proje; görevleri, kaydı, bağlam notları ve bağlı dosya hash'leriyle birlikte tek bir JSON dosyası. Başkasına ait hiçbir şey yok: seninle paylaşılan projeler onları açan kişinindir, ve dosyada hiçbir ekip arkadaşı, davet ya da kimlik bilgisi bulunmaz.",
+  exportCta: "Verilerimi indir",
   deleteAccount: "Hesabı sil",
   deleteAccountNote:
     "Hesabı kapatır; bütün projeleri, görevleri ve kayıt girdilerini de birlikte götürür. Kopyası yok, geri alınamaz — saklamak istediğin ne varsa önce dışarı aktar.",
@@ -486,7 +490,7 @@ export const tr: Record<Key, string> = {
 
   deleteProject: "Bu projeyi sil",
   deleteProjectNote:
-    "Projeyi ve içindeki her şeyi siler: {n} görev, hepsinin kaydı, notlar ve dosya bağlantıları. Geri alma yok, önce dışa aktarma da yok.",
+    "Projeyi ve içindeki her şeyi siler: {n} görev, hepsinin kaydı, notlar ve dosya bağlantıları. Geri alma yok — bir kısmını saklamak istiyorsan önce Hesap sayfasından verilerini indir.",
   deleteProjectConfirm: "Onaylamak için {slug} yaz",
   deleteProjectSubmit: "Sil, içindekilerle birlikte",
 
