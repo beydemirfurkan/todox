@@ -61,6 +61,12 @@ jobs:
       # server-side has reached the stdio surface.
       - run: pnpm lint
       - run: pnpm test
+      # `pnpm build` before `tsc`, and not for the build's own sake: PageProps
+      # and LayoutProps are globals Next generates into .next/types, so a
+      # typecheck without one fails on every page in app/. ci.yml already runs
+      # them in this order; this job did not, and a tag is the only thing that
+      # runs it — so the first tag is where that showed.
+      - run: pnpm build
       - run: pnpm exec tsc --noEmit
       - run: pnpm pack:mcp
 
