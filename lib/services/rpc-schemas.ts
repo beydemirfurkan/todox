@@ -289,8 +289,19 @@ export const SHAPES = {
     model,
   },
 
+  /**
+   * Either half of the link. `task_id` is the common one; `context_id` makes a
+   * standing rule about a file findable *from* that file, which is what
+   * `get_file_context` reads back. The column, its unique index and the
+   * ownership join all existed already -- no surface could reach them.
+   */
   linkFiles: {
-    task_id: z.number().int(),
+    task_id: z.number().int().optional(),
+    context_id: z
+      .number()
+      .int()
+      .optional()
+      .describe("Attach the files to a context note instead of a task. Pass one or the other."),
     paths: z
       .array(
         z.object({
@@ -364,6 +375,24 @@ export const SHAPES = {
       .describe(
         "From the `id` of a note in get_context's global_context or project_context, or from a search hit of type 'context'.",
       ),
+    model,
+  },
+
+  /**
+   * The path is folded to its repo-relative form before anything is matched,
+   * so `cwd` or `project` is not optional decoration -- it is what says which
+   * roots to fold against.
+   */
+  getFileContext: {
+    path: z
+      .string()
+      .min(1)
+      .max(MAX.path)
+      .describe(
+        "The file to ask about: an absolute path, or one relative to the repository root. Both resolve to the same answer on any machine.",
+      ),
+    project: ref.optional().describe("Slug, name, or a path inside the project"),
+    cwd: ref.optional().describe("Absolute working directory, used if project is omitted"),
     model,
   },
 
@@ -485,6 +514,21 @@ const OBJECTS: Record<string, z.ZodType> = {
       { message: "pass at least one of kind, title or body" },
     ),
 
+  /**
+   * One end or the other, never both and never neither.
+   *
+   * `refs` hangs off a task or a context, and the two partial unique indexes
+   * that keep a path from being linked twice each lead on one of those
+   * columns -- a row with both set would satisfy both indexes separately and
+   * be de-duplicated against neither.
+   */
+  linkFiles: z
+    .object(SHAPES.linkFiles)
+    .strict()
+    .refine((p) => (p.task_id === undefined) !== (p.context_id === undefined), {
+      message: "pass exactly one of `task_id` or `context_id`",
+    }),
+
   updateProject: z
     .object(SHAPES.updateProject)
     .strict()
@@ -501,7 +545,7 @@ const OBJECTS: Record<string, z.ZodType> = {
   // the right place to say. It used to be a runtime throw halfway through the
   // handler, so the tool advertised a call it would always refuse.
   ...Object.fromEntries(
-    (["getContext", "listTasks"] as const).map((name) => [
+    (["getContext", "listTasks", "getFileContext"] as const).map((name) => [
       name,
       z
         .object(SHAPES[name])

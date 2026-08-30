@@ -40,6 +40,11 @@ Two things fall out of treating the log as the product:
 - **Reports come from the log, not from commits.** Every status change is an
   event, so *what did I finish today, how long did it take, which model did it*
   is a query rather than archaeology.
+- **A file can be asked what is known about it.** The same links that carry the
+  hashes are readable from the other end: `get_file_context` takes a path and
+  answers with the tasks that touched it, their dead ends, and any standing
+  note attached to it. Paths are folded to their repo-relative form, so a link
+  made on one machine is found from another.
 
 ## Try it
 
@@ -275,11 +280,12 @@ you are changing the tools themselves.
 | `log_entry` | Append one of the five kinds. |
 | `delete_entry` | For an entry that was wrong when it was written. One overtaken by later work is history, not an error — append instead. |
 | `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
-| `link_files` | Attach paths with their hashes. Safe to call again for the same file. |
+| `link_files` | Attach paths with their hashes to a task or a context note. Safe to call again for the same file. |
 | `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
 | `accept_file_change` · `unlink_file` | Clear a stale warning once you have read the change, or drop a link that has stopped meaning anything. Nothing else can clear it — the server never sees the file. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
 | `get_context_note` | One note in full, for the ones whose body the briefing capped and for reading past a search snippet. |
+| `get_file_context` | What is known about one file: the tasks that touched it with their dead ends, and the notes attached to it. Absolute or repo-relative; both find a link made on another machine. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
 | `search` | Across all your projects. A literal substring, so a distinctive term or an exact phrase finds what a sentence will not. |
 | `get_task` | One task with its log and linked files. |

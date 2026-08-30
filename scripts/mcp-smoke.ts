@@ -260,6 +260,50 @@ async function runSuite(mode: Mode, token: string) {
   });
   const linked = JSON.parse(await text("get_task", { task_id: taskId }));
   const refId = linked.files[0].id;
+
+  // The other end of the same link. `refs.path` was write-only until now:
+  // every read went in by task id, so the one question a coding agent actually
+  // asks -- what do we already know about the file I am about to edit -- had
+  // no answer over data todox had all along.
+  console.log("\n--- and the file can be asked what is known about it ---");
+  const known = JSON.parse(await text("get_file_context", { path: marker, cwd: SCRATCH }));
+  if (!known.tasks.some((t: { id: number }) => t.id === taskId))
+    throw new Error(`get_file_context did not find task #${taskId} on ${marker}`);
+  if (known.path !== "package.json")
+    throw new Error(`expected the repo-relative path, got ${JSON.stringify(known.path)}`);
+  // The claim that makes this survive a second computer: the same file asked
+  // for by the name it has *inside* the repo, with no absolute path at all.
+  const byRelative = JSON.parse(
+    await text("get_file_context", { path: "package.json", cwd: SCRATCH }),
+  );
+  if (!byRelative.tasks.some((t: { id: number }) => t.id === taskId))
+    throw new Error("a relative path found nothing, so a second machine would not either");
+  console.log(
+    `by absolute and by relative: task #${taskId}, dead ends: ${known.tasks[0].dead_ends.length}`,
+  );
+
+  // A standing rule about a file, findable from the file. The column and its
+  // unique index existed; no surface could write one.
+  const fileNote = JSON.parse(
+    await text("add_context", {
+      cwd: SCRATCH,
+      kind: "convention",
+      title: "SMOKE-FILE-RULE",
+      body: "Whatever this file is for, this is the rule about it.",
+      ...(mode.local ? {} : { repo_root: SCRATCH }),
+    }),
+  );
+  await text("link_files", {
+    context_id: fileNote.id,
+    paths: [{ path: marker, ...(mode.local ? {} : { hash: sha256(marker) }) }],
+  });
+  const withNote = JSON.parse(await text("get_file_context", { path: marker, cwd: SCRATCH }));
+  const rule = withNote.notes.find((n: { title: string }) => n.title === "SMOKE-FILE-RULE");
+  if (!rule) throw new Error("a note linked to the file did not come back from the file");
+  if (!rule.body.includes("this is the rule about it"))
+    throw new Error("the note came back without its body");
+  console.log("note reached the file:", rule.title);
+  await text("delete_context", { context_id: fileNote.id });
   const status = linked.files[0].status;
 
   // Locally the process reads the file on the way through, so the answer is

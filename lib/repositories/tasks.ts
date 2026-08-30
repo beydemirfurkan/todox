@@ -141,6 +141,19 @@ async function countByProject(projectId: number, status: StatusFilter): Promise<
 
 export const byId = (id: number) => one<Task>("SELECT * FROM tasks WHERE id = ?", [id]);
 
+/** The same read for a handful of ids, so a list does not become a round trip
+ *  each. Order follows the ids given, because the caller has already decided
+ *  what order means here. */
+export async function byIds(ids: number[]): Promise<Task[]> {
+  if (!ids.length) return [];
+  const rows = await all<Task>(
+    `SELECT * FROM tasks WHERE id IN (${ids.map(() => "?").join(",")})`,
+    ids,
+  );
+  const found = new Map(rows.map((r) => [r.id, r]));
+  return ids.map((id) => found.get(id)).filter((t): t is Task => Boolean(t));
+}
+
 /**
  * Everything created, closed or touched inside a window -- the report's raw input.
  *

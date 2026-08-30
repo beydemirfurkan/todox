@@ -110,6 +110,18 @@ export async function pageByProject(
 export const byId = (id: number) =>
   one<Context>("SELECT * FROM contexts WHERE id = ?", [id]);
 
+/** Batched `byId`, for a caller holding a set of ids from somewhere else --
+ *  the refs on one file, say. It does no scoping: `contexts` has no project
+ *  column it could scope by on its own, and the caller is the side that knows
+ *  which account is asking. */
+export async function byIds(ids: number[]): Promise<Context[]> {
+  if (!ids.length) return [];
+  return all<Context>(
+    `SELECT * FROM contexts WHERE id IN (${ids.map(() => "?").join(",")})`,
+    ids,
+  );
+}
+
 export async function create(input: NewContext): Promise<Context> {
   const ts = now();
   const row = await one<Context>(
