@@ -21,7 +21,7 @@ body:
       options:
         - The website (todox.dev)
         - The hosted MCP endpoint (/api/mcp)
-        - The local stdio server (npx todox-mcp, or pnpm mcp)
+        - The local stdio server (npx <release tarball>, or pnpm mcp)
         - An instance I run myself
         - Not sure
     validations:

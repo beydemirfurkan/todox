@@ -1,29 +1,33 @@
-# Cutting a release, without anybody having to think about npm.
+# Cutting a release, without an npm account.
 #
-#   git tag v0.1.1 && git push origin v0.1.1
+#   git tag v0.1.2 && git push origin v0.1.2
 #
-# That is the whole procedure. This builds the stdio package, attaches the
-# tarball to a GitHub Release, and publishes to npm — but only if an NPM_TOKEN
-# secret exists.
+# That is the whole procedure. This builds the stdio package and attaches it to
+# a GitHub Release, which is the entire distribution — there is deliberately no
+# npm publish. `npx <tarball url>` needs no account, no token and no decision,
+# and a release step that can only run once somebody has created a credential
+# is a release step that does not run.
 #
-# The order matters and is the point: the Release is unconditional and needs no
-# account, no token and no decision, so `npx <tarball url>` works from the day
-# the first tag is pushed. npm is the nicer front door (`npx todox-mcp`) and is
-# strictly optional; add the secret whenever, or never, and nothing here breaks
-# either way. A release step that can only run once somebody has gone and
-# created a credential is a release step that does not run.
+# Two names go up, and the second is the reason this is not just a copy:
+#
+#   todox-mcp-<version>.tgz   pins a version, and is what an MCP config should
+#                             point at if you want to choose when to move
+#   todox-mcp.tgz             same bytes under a stable name, so
+#                             /releases/latest/download/todox-mcp.tgz always
+#                             resolves to the newest release
+#
+# Without npm, that second URL is the closest thing there is to `npx todox-mcp`,
+# and a documented address that never goes stale is worth three lines here.
 name: release
 
 on:
   push:
     tags: ["v*"]
 
-# `contents: write` to create the Release; `id-token: write` so npm can record
-# provenance when it does run, which is what lets anybody verify the tarball was
-# built from this commit rather than from somebody's laptop.
+# `contents: write` to create the Release. Nothing else is published, so
+# nothing else needs a permission.
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   release:
@@ -35,7 +39,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          registry-url: https://registry.npmjs.org
 
       - run: pnpm install --frozen-lockfile
 
@@ -70,10 +73,15 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm pack:mcp
 
-      - name: build the tarball
+      - name: build the tarball, under both names
         run: |
           cd dist-npm
           npm pack
+          # A byte-identical copy under a name with no version in it. That is
+          # what makes /releases/latest/download/todox-mcp.tgz a URL somebody
+          # can put in an MCP config once and never revisit; the versioned name
+          # stays for anybody who would rather pin.
+          cp "todox-mcp-${{ steps.version.outputs.version }}.tgz" todox-mcp.tgz
           ls -l ./*.tgz
 
       # Unconditional, and the reason this workflow is useful with no secrets at
@@ -84,27 +92,17 @@ jobs:
           files: dist-npm/*.tgz
           generate_release_notes: true
           body: |
-            Install the stdio MCP server without cloning anything:
+            Install the stdio MCP server without cloning anything. There is no
+            npm package; these URLs are the distribution.
 
             ```bash
-            npx todox-mcp                       # once this is on npm
+            # always the newest release
+            npx https://github.com/${{ github.repository }}/releases/latest/download/todox-mcp.tgz
+
+            # or pin this one
             npx https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/todox-mcp-${{ steps.version.outputs.version }}.tgz
             ```
 
             The hosted server needs none of this — point any MCP client at
             https://www.todox.dev/api/mcp with a token. The local package exists
             for the one thing a remote server cannot do, which is read your disk.
-
-      # Optional by design. `secrets` cannot be read in a job-level `if`, so the
-      # check happens here and the step no-ops loudly rather than failing the
-      # release.
-      - name: publish to npm, if a token was ever added
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "${NODE_AUTH_TOKEN}" ]; then
-            echo "no NPM_TOKEN secret; the GitHub Release above is the whole release."
-            echo "add one at Settings > Secrets > Actions to publish todox-mcp as well."
-            exit 0
-          fi
-          npm publish dist-npm --provenance --access public

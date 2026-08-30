@@ -1,16 +1,19 @@
 /**
  * Builds the publishable stdio server into `dist-npm/`.
  *
- * `npx todox-mcp` is the whole point: the README promises there is nothing to
- * install and no repository to clone, and until now the local mode needed both.
- * The package name is `todox-mcp` because `todox` on npm has belonged to
- * somebody else since 2018.
+ * Running it without a clone is the whole point: the README promises there is
+ * nothing to install and no repository to fetch, and the local mode used to
+ * need both. The tarball this produces is attached to a GitHub Release and
+ * `npx` takes that URL directly, so there is no npm package and no account
+ * anywhere in the path. The name stays `todox-mcp` because `todox` on npm has
+ * belonged to somebody else since 2018, and a tarball still has to be called
+ * something.
  *
- * What makes this a separate build rather than `npm publish` at the root: the
- * app depends on Next, React, `pg` and nodemailer, and the stdio server depends
- * on none of them — it talks to the hosted API over HTTP and never opens a
- * database. Publishing the root manifest would make `npx todox-mcp` install a
- * web framework and a Postgres driver to run a program that cannot use either.
+ * What makes this a separate build rather than packing the root: the app
+ * depends on Next, React, `pg` and nodemailer, and the stdio server depends on
+ * none of them — it talks to the hosted API over HTTP and never opens a
+ * database. Shipping the root manifest would install a web framework and a
+ * Postgres driver to run a program that cannot use either.
  *
  * So the dependency list is not written by hand. It is read out of the compiled
  * output by walking the actual `require` graph from the entry point, and the
