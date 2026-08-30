@@ -278,7 +278,7 @@ you are changing the tools themselves.
 | `accept_file_change` · `unlink_file` | Clear a stale warning once you have read the change, or drop a link that has stopped meaning anything. Nothing else can clear it — the server never sees the file. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
-| `search` | Across all your projects — *have I solved this before?* |
+| `search` | Across all your projects. A literal substring, so a distinctive term or an exact phrase finds what a sentence will not. |
 | `get_task` | One task with its log and linked files. |
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |
 | `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. |
