@@ -80,7 +80,10 @@ const BASE = [
   "",
   "LOOKING THINGS UP: search covers every project you have. Reach for it when",
   "the question is 'have I hit this before?' or 'where did we decide X?' --",
-  "the answer is often in a project other than this one.",
+  "the answer is often in a project other than this one. But it matches a",
+  "literal substring rather than meaning, so do not send the question itself:",
+  "search a distinctive term or an exact phrase, and run a few short ones",
+  "rather than one long one. A sentence matches nothing.",
   "",
   "WHAT NOT TO READ: list_tasks with status:'all' and activity_report with",
   "period:'all' return everything there has ever been, bodies included. They",
@@ -734,10 +737,22 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
 
   /* -------------------------------------------------------------- search */
 
+  /**
+   * The description says "literal substring" because that is what the code
+   * does, and the old one said "full-text-ish", which is what an agent then
+   * assumed. The two failures compound: a model reads "use it to answer 'have
+   * I solved this before?'", sends that sentence, matches nothing, and
+   * concludes todox is empty -- the shape gotcha #13 is about, except here the
+   * tool is not broken, its own description asked for the query that fails.
+   *
+   * `README.md` has said "Search is `ILIKE`, not full-text" in its known-gaps
+   * list the whole time. Honest to the human, overselling to the agent, and
+   * the agent is the one making the call.
+   */
   tool("search", "search", {
     title: "Search across every project",
     description:
-      "Full-text-ish search over task titles/bodies, log entries and context notes, across ALL of your projects. Use it to answer 'have I solved this before?' and 'where did I decide X?'. Returns at most `limit` hits in total (default 30).",
+      "Literal substring match, not full-text search, over task titles and bodies, log entry bodies, and context note titles and bodies, across ALL of your projects. The whole query must appear verbatim in one field, so send one distinctive term or an exact phrase -- 'scrypt', 'ERR_PNPM_BROKEN_LOCKFILE', 'setClause' -- and not a whole question: 'why did the deploy fail' matches nothing at all. Two words match only where they sit adjacent in that order, so several short searches beat one long one. Case-insensitive. Not searched: entry and note kinds, file paths, project names. Returns at most `limit` hits in total (default 30), ordered newest first rather than by relevance.",
     annotations: READ_ONLY,
   });
 

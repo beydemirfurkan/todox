@@ -320,4 +320,68 @@ describe("instructions", () => {
     // literally failed on its first call.
     expect(instructions({ local: true })).toContain("`cwd`");
   });
+
+  it("does not tell an agent to search a whole question", () => {
+    // The instructions name the two moments to reach for search -- 'have I hit
+    // this before?' and 'where did we decide X?' -- and those are the right
+    // moments. What they used to leave out is that the query is not phrased
+    // that way, so an agent followed them literally and searched the sentence.
+    for (const local of [true, false]) {
+      const text = instructions({ local });
+      expect(text).toContain("literal substring");
+      expect(text).toMatch(/do not send the question itself/);
+    }
+  });
+});
+
+/**
+ * What the search tool promises.
+ *
+ * `lib/services/search.ts` is three `ILIKE '%q%'` scans merged and sorted by
+ * `created_at` -- no index, no ranking, no stemming. The description called
+ * that "Full-text-ish search" and invited exactly the query it cannot answer,
+ * so a model asked its question in a sentence, got `[]`, and had no way to
+ * tell an empty log from an unusable query.
+ *
+ * These assertions are here rather than in `search.test.ts` because the defect
+ * was never in the SQL: the SQL does what it says it does. The gap was between
+ * the implementation and the sentence an agent reads before calling it, and a
+ * sentence drifts back the moment somebody improves the wording. Assert the
+ * claim, not the prose around it -- restoring "full-text" has to fail here.
+ */
+describe("the search tool's description", () => {
+  const searchDescription = () => harness(remoteWs).tools.get("search")!.config.description!;
+
+  it("says what the match actually is", () => {
+    expect(searchDescription()).toContain("Literal substring match");
+  });
+
+  it("does not claim full-text search", () => {
+    // The mutation this exists to catch. `not full-text search` is allowed --
+    // it is the correction -- so match the claim rather than the two words.
+    expect(searchDescription()).not.toMatch(/full-text-ish/i);
+    expect(searchDescription()).toMatch(/not full-text search/i);
+  });
+
+  it("tells the caller how to phrase a query that can match", () => {
+    const text = searchDescription();
+    expect(text).toMatch(/exact phrase/i);
+    // The non-obvious rule: two words match only where they are adjacent, so
+    // an agent that does not know this writes a two-word query and reads the
+    // empty answer as "nothing was ever recorded".
+    expect(text).toMatch(/adjacent/i);
+  });
+
+  it("warns that the order is recency, not relevance", () => {
+    // Otherwise the first hit reads as the best answer, and it is only the
+    // newest one -- the merge sorts on `created_at`, nothing scores.
+    expect(searchDescription()).toMatch(/newest first rather than by relevance/i);
+  });
+
+  it("is offered on both transports, and identically", () => {
+    // It touches no filesystem, so there is no reason for it to differ -- and
+    // if it ever does, the agent surface has stopped being defined once.
+    const local = harness(localWs).tools.get("search")!.config.description;
+    expect(local).toBe(searchDescription());
+  });
 });

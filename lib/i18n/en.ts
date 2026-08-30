@@ -413,8 +413,9 @@ export const en = {
   /* search */
   searchTitle: "Search",
   searchIntro:
-    "Every project at once — tasks, log entries, context notes. This is the answer to “have I already solved this somewhere?”",
-  searchNoResults: "Nothing matched.",
+    "Every project at once — tasks, log entries, context notes. It matches your text exactly as typed, so one distinctive word or an exact phrase finds what a whole question will not.",
+  searchNoResults:
+    "Nothing matched. The text has to appear exactly, so try something shorter or more distinctive.",
   searchPrompt: "Type a query up top.",
   resultsCount: "results",
   hit_task: "task",
