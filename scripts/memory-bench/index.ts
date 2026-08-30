@@ -26,7 +26,7 @@ import { briefing } from "../../lib/services/briefing";
 import { search } from "../../lib/services/search";
 import * as taskService from "../../lib/services/task-service";
 import { hashPassword } from "../../lib/util/password";
-import { filler, NOTES, QUESTIONS, TASKS, type Question } from "./corpus";
+import { filler, NOTES, QUESTIONS, TASKS, UNANSWERABLE, type Question } from "./corpus";
 import { approxTokens, bytes, kb, reachableWithin, recallAt, score, type Hit } from "./measure";
 
 const USERNAME = "memory-bench";
@@ -164,6 +164,26 @@ async function reportRecall(userId: number, answers: Map<string, Hit>) {
   console.log(row("asked as a question", `${score(askedExact)}${score(askedNear)}`));
   console.log(row("asked as a distinctive term", `${score(termExact)}${score(termNear)}`));
 
+  // Both columns name what they missed. The question column is the one that
+  // moves when the query parser changes, so a run that drops one has to say
+  // which -- a score that only goes down by a number cannot be argued with.
+  // The other half of the number. Recall says the right row came back; this says
+  // how much came with it, and a log that answers a question it has never heard
+  // of is worse than one that says nothing -- the agent has no way to tell the
+  // difference and every reason to trust it.
+  const noise = await Promise.all(UNANSWERABLE.map((q) => search(userId, q, 30)));
+  const total = noise.reduce((n, hits) => n + hits.length, 0);
+  console.log(
+    row(
+      "questions it cannot answer",
+      `${total} hits / ${UNANSWERABLE.length} asked`,
+    ),
+  );
+
+  if (askedNear.missed.length) {
+    console.log("\n  not reachable when asked as a question:");
+    for (const q of askedNear.missed) console.log(`    · ${q}`);
+  }
   if (termNear.missed.length) {
     console.log("\n  not found even as a term, by any route:");
     for (const q of termNear.missed) console.log(`    · ${q}`);

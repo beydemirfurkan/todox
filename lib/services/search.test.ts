@@ -131,3 +131,36 @@ describe("both arms are scoped to the reader", () => {
     }
   });
 });
+
+/**
+ * Matching and ranking read different columns, and it is not an accident.
+ *
+ * `en`/`tr` come from the stopword-stripped query and decide whether a row is
+ * a hit; `en_all`/`tr_all` come from what the caller actually typed and decide
+ * where it sorts. Collapsing them back to one pair is the obvious tidy-up and
+ * it costs one of two things depending on which pair survives: the stripped one
+ * shuffles the ranking and drops a question out of the top five, and the raw
+ * one brings back the defect this split exists for -- five questions the corpus
+ * cannot answer returning 107 records between them, every one matched on the
+ * word "a". Neither failure is visible in a passing test suite, so this is the
+ * guard.
+ */
+describe("the query it matches on is not the query it ranks by", () => {
+  for (const table of TABLES) {
+    it(`${table}: matches on the stripped query, ranks on the whole one`, () => {
+      expect(QUERIES[table]).toMatch(/@@ q\.en\b/);
+      expect(QUERIES[table]).toMatch(/@@ q\.tr\b/);
+      expect(QUERIES[table]).toContain("q.en_all");
+      expect(QUERIES[table]).toContain("q.tr_all");
+      // The match must never read the unstripped query.
+      expect(QUERIES[table]).not.toMatch(/@@ q\.(en|tr)_all/);
+    });
+
+    it(`${table}: strips the stopwords before either is built`, () => {
+      // Without this the two pairs are the same query twice over.
+      expect(QUERIES[table]).toContain("ts_debug('english'");
+      expect(QUERIES[table]).toContain("ts_debug('turkish'");
+      expect(QUERIES[table]).toContain("WITH ORDINALITY");
+    });
+  }
+});

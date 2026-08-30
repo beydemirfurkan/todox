@@ -1,6 +1,6 @@
 import type { ContextKind } from "../constants";
 import { all, one, run, setClause, type Statement } from "../db/client";
-import { document, rank, TSQUERY } from "../db/fts";
+import { document, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
 import type { Context } from "../types";
 import { now } from "../util/time";
 
@@ -112,16 +112,12 @@ export async function pageByProject(
   // per session and only when a focus was sent.
   //
   // The obvious fix -- find the matching notes through the GIN index first and
-  // rank only those -- was written, measured, and is NOT here: it was twice as
-  // slow (759ms -> 1554ms), because the index goes unused and every note
-  // matches anyway. `websearch_to_tsquery('turkish', …)` keeps `why`, `is`,
-  // `on` and `a` as lexemes, since they are not Turkish stopwords, and the
-  // conjunction-to-disjunction rewrite then makes any document containing the
-  // word "a" a match. Ranking still orders them correctly, which is why search
-  // recall went up rather than down -- it is the *cost* that the stopwords
-  // decide, not the answer. Fixing that is the lever for both this and search,
-  // and it is its own piece of work.
-  const relevance = focus ? `WITH q AS (SELECT ${TSQUERY}),` : `WITH`;
+  // rank only those -- was written, measured at twice as slow (759ms ->
+  // 1554ms), and reverted, because at the time every note matched anyway and
+  // the pre-filter filtered nothing. `db/fts.ts` has since made the match
+  // selective, so that idea is now worth retrying; it is not done here because
+  // the numbers above were taken before it and re-taking them is the work.
+  const relevance = focus ? `WITH q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),` : `WITH`;
   const order = focus
     ? `${rank(doc)} DESC, c.updated_at DESC, c.id DESC`
     : `c.updated_at DESC, c.id DESC`;

@@ -1,5 +1,5 @@
 import { all } from "../db/client";
-import { document, matches, rank, TSQUERY } from "../db/fts";
+import { document, matches, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
 
 export type SearchHit = {
   type: "task" | "entry" | "context";
@@ -63,6 +63,7 @@ const BINDINGS = `WITH q AS (
   SELECT ?::int  AS uid,
          ?::text AS pat,
          ${TSQUERY}
+         ${TSQUERY_FROM}
 )`;
 
 /**

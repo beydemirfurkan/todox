@@ -287,7 +287,7 @@ you are changing the tools themselves.
 | `get_context_note` | One note in full, for the ones whose body the briefing capped and for reading past a search snippet. |
 | `get_file_context` | What is known about one file: the tasks that touched it with their dead ends, and the notes attached to it. Absolute or repo-relative; both find a link made on another machine. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
-| `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier. |
+| `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier.  Words that only one of the two languages treats as noise are dropped, so a question does not match every record containing the word "a".|
 | `get_task` | One task with its log and linked files. |
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |
 | `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. |

@@ -541,3 +541,27 @@ export const filler = (n: number): Note => {
       `a week because the totals were only wrong on days a batch had failed.`,
   };
 };
+
+/**
+ * Questions this corpus cannot answer, for measuring what search returns when
+ * the honest answer is nothing.
+ *
+ * Recall says whether the right row came back and is silent about how much came
+ * with it. That silence hid a real defect: because a stopword in one language is
+ * a content word in the other, asking `websearch_to_tsquery('turkish', …)` an
+ * English question kept `why`, `is`, `on` and `a` as search terms, and every
+ * document containing the word "a" matched. Recall never noticed -- the right
+ * row was still in the top five -- while a question about a subject the log had
+ * never heard of came back with thirty confident records.
+ *
+ * Deliberately about a domain nothing here touches, and phrased the way an
+ * agent would ask, stopwords and all: the failure only appears in natural
+ * language, which is exactly the shape the tool description asks for.
+ */
+export const UNANSWERABLE = [
+  "how do we handle refunds for a cancelled subscription?",
+  "what is the retention policy on the audio recordings?",
+  "why is the mobile app asking for camera permissions?",
+  "which vendor did we pick for the payroll integration?",
+  "kargo firması değişince adres formatı nasıl eşleniyor?",
+];
