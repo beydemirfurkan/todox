@@ -63,15 +63,15 @@ const PER_KIND = 3;
  */
 const BRIEFING_NOTES = 60;
 
-export async function briefing(userId: number, project: Project) {
+export async function briefing(userId: number, project: Project, focus?: string) {
   // Cut in SQL rather than after the fact. This read every open task and then
   // took fifty, on the first query of every session.
   const { rows: open, total } = await tasks.pageByProject(project.id, "open", BRIEFING_TASKS);
   const ids = open.map((t) => t.id);
 
   const [globalContext, projectContext, logs, counts, files] = await Promise.all([
-    contexts.pageByProject(userId, null, BRIEFING_NOTES),
-    contexts.pageByProject(userId, project.id, BRIEFING_NOTES),
+    contexts.pageByProject(userId, null, BRIEFING_NOTES, focus),
+    contexts.pageByProject(userId, project.id, BRIEFING_NOTES, focus),
     entries.listByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
     // The honest total, and what the caps dropped. Counting in the database is
     // what lets the log above be cut without `entry_count` starting to lie --
@@ -148,6 +148,11 @@ export async function briefing(userId: number, project: Project) {
     // looking, and which of the two lists a title sits in is already visible
     // from the lists themselves.
     context_omitted: globalContext.omitted + projectContext.omitted,
+    // Which of the two orderings the notes above came back in, because the
+    // agent cannot tell by looking and the answer changes what a missing body
+    // means. Ranked: what you asked about is at the top and the rest is the
+    // newest. Recent: nobody said what this session is about.
+    context_ranked_by: focus ? "focus" : "recency",
     open_tasks: openTasks,
     open_tasks_omitted: total - open.length,
     stale_refs: stale,

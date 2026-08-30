@@ -152,6 +152,7 @@ export const methods = {
       project?: string;
       cwd?: string;
       create_if_missing?: boolean;
+      focus?: string;
       repo_root?: string;
       repo_url?: string;
     },
@@ -171,10 +172,10 @@ export const methods = {
       return {
         project_created: created,
         ...(warning ? { warning } : {}),
-        ...(await briefing(userId, project)),
+        ...(await briefing(userId, project, p.focus)),
       };
     }
-    return briefing(userId, await mustResolve(userId, which, hints));
+    return briefing(userId, await mustResolve(userId, which, hints), p.focus);
   },
 
   listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {

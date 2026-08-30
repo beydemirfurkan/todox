@@ -1,5 +1,5 @@
 import { all } from "../db/client";
-import { document, vector } from "../db/fts";
+import { document, matches, rank, TSQUERY } from "../db/fts";
 
 export type SearchHit = {
   type: "task" | "entry" | "context";
@@ -54,36 +54,16 @@ export const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
  * projects p ON …` -- parses as `t, (q JOIN p)` and fails with "invalid
  * reference to FROM-clause entry", which reads as though it should have worked.
  *
- * On the query itself: `websearch_to_tsquery` is the parser that understands
- * what a person types -- quoted phrases, `or`, a leading minus -- and never
- * raises on malformed input, which `to_tsquery` does. A search box that can be
- * made to 500 is a search box that will be.
- *
- * What it does not do is answer a question. It joins every term with AND, so
- * "why did we choose scrypt instead of bcrypt" only matches a document holding
- * *all* of `choos`, `scrypt`, `instead`, `bcrypt` -- and the note that answers
- * it contains two of them. Measured: 2 of 24 questions. So the conjunctions are
- * rewritten to disjunctions and `ts_rank` is left to do the ordering, which is
- * what it is for. Phrase operators from quoted input are `<->` and are
- * untouched, so "an exact phrase" still means one.
- *
- * Rewritten through `::text` because tsquery has no operator-swapping function.
- * It is a narrow trick and it is safe here: the value being rewritten is the
- * *parser's own output*, not the caller's string, so nothing user-supplied can
- * change the shape of what comes back.
+ * `TSQUERY` supplies the other two columns and carries the reasoning about how
+ * the query itself is parsed. It lives in `db/fts.ts` because the briefing asks
+ * the same question of the same documents, and one of the two would otherwise
+ * drift.
  */
 const BINDINGS = `WITH q AS (
   SELECT ?::int  AS uid,
          ?::text AS pat,
-         replace(websearch_to_tsquery('english', ?)::text, ' & ', ' | ')::tsquery AS en,
-         replace(websearch_to_tsquery('turkish', ?)::text, ' & ', ' | ')::tsquery AS tr
+         ${TSQUERY}
 )`;
-
-const MATCHES = (doc: string) =>
-  `(${vector("english", doc)} @@ q.en OR ${vector("turkish", doc)} @@ q.tr)`;
-
-const RANK = (doc: string) =>
-  `greatest(ts_rank(${vector("english", doc)}, q.en), ts_rank(${vector("turkish", doc)}, q.tr))`;
 
 /**
  * How a match is shown: the part of the document the query actually hit.
@@ -151,7 +131,7 @@ function buildQuery(t: Searchable): string {
     `SELECT ${t.carried}, ${score} AS rank ${t.scoped} AND ${predicate}`;
 
   return `${BINDINGS}, hit AS (
-      ${arm(RANK(t.doc), MATCHES(t.doc))}
+      ${arm(rank(t.doc), matches(t.doc))}
       UNION ALL
       ${arm("0::real", `(${t.substring})`)}
     ), top AS (

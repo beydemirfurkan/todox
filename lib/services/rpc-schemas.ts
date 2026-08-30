@@ -201,6 +201,13 @@ export const SHAPES = {
       .describe(
         "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call.",
       ),
+    focus: z
+      .string()
+      .max(MAX.line)
+      .optional()
+      .describe(
+        "What this session is about, in a sentence -- the bug, the feature, the file. Standing notes are ranked against it, so the ones that matter are the ones that come back with a body instead of whichever were written most recently. Send it whenever you know; it can only move a note up the list, never drop one.",
+      ),
     repo_root: repoRoot,
     repo_url: repoIdentity,
     model,

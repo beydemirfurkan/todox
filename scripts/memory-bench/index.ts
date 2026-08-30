@@ -26,7 +26,7 @@ import { briefing } from "../../lib/services/briefing";
 import { search } from "../../lib/services/search";
 import * as taskService from "../../lib/services/task-service";
 import { hashPassword } from "../../lib/util/password";
-import { NOTES, QUESTIONS, TASKS, type Question } from "./corpus";
+import { filler, NOTES, QUESTIONS, TASKS, type Question } from "./corpus";
 import { approxTokens, bytes, kb, reachableWithin, recallAt, score, type Hit } from "./measure";
 
 const USERNAME = "memory-bench";
@@ -171,6 +171,74 @@ async function reportRecall(userId: number, answers: Map<string, Hit>) {
   return { askedExact, termNear };
 }
 
+/**
+ * The other half of what the briefing costs: not how big it is, but whether
+ * what it spent the budget on was the right thing.
+ *
+ * The ceiling keeps every note's title and the newest `BRIEFING_NOTES` bodies.
+ * Recency is a guess about relevance and it is a bad one — a standing rule
+ * written a year ago is exactly the kind of thing that matters and exactly the
+ * kind of thing recency buries. This measures the guess by asking, for each
+ * question the corpus can answer, whether the briefing actually carried the
+ * body that answers it.
+ *
+ * Below the ceiling both orderings score the same and must: nothing is being
+ * cut, so nothing can be cut wrongly. The number only means something once
+ * there are more notes than budget, which is what the filler is for.
+ */
+async function reportFocus(userId: number, project: Awaited<ReturnType<typeof seed>>["project"]) {
+  // Only the questions a note answers. A task's body is not on this budget.
+  const asked = QUESTIONS.filter((q) => q.answerType === "context");
+
+  console.log("\nFOCUS  —  did the briefing carry the body that answers the question?\n");
+  console.log(row("notes in the project", "  recency   with focus"));
+
+  const carriedBody = (brief: Awaited<ReturnType<typeof briefing>>, title: string) =>
+    [...brief.global_context, ...brief.project_context].some(
+      (n) => n.title === title && n.body !== null,
+    );
+
+  // Everything this function adds, so it can put the project back as it found
+  // it. `reportGrowth` measures bytes on the same project and would otherwise
+  // start from a corpus this one had already tripled.
+  const added: number[] = [];
+  let missed: string[] = [];
+
+  for (const target of [18, 90]) {
+    const have = (await contextsRepo.listByProject(userId, project.id)).length;
+    for (let i = have; i < target; i++)
+      added.push(
+        (await contextsRepo.create({ user_id: userId, project_id: project.id, ...filler(i) })).id,
+      );
+
+    // One briefing serves every question when nobody said what the session is
+    // about; with a focus each question is its own session, so each gets one.
+    const byRecency = await briefing(userId, project);
+    const recency = asked.filter((q) => carriedBody(byRecency, q.answer)).length;
+
+    const focused = await Promise.all(
+      asked.map(async (q) => ({
+        q,
+        hit: carriedBody(await briefing(userId, project, q.asked), q.answer),
+      })),
+    );
+    missed = focused.filter((f) => !f.hit).map((f) => f.q.asked);
+
+    const pct = (n: number) =>
+      `${String(n).padStart(2)}/${asked.length} (${String(Math.round((n / asked.length) * 100)).padStart(3)}%)`;
+    console.log(row(`${target}`, `${pct(recency)} ${pct(asked.length - missed.length)}`));
+  }
+
+  if (missed.length) {
+    // Focus inherits whatever `ts_rank` does not reach, which is the same limit
+    // the SEARCH block above reports -- not a separate defect.
+    console.log("\n  still past the ceiling even with a focus:");
+    for (const q of missed) console.log(`    · ${q}`);
+  }
+
+  for (const id of added) await contextsRepo.remove(id);
+}
+
 async function main() {
   const { user, project } = await seed();
   try {
@@ -191,6 +259,10 @@ async function main() {
 
     await reportBriefing(user.id, project);
     await reportRecall(user.id, answers);
+    // Both of these grow the project's notes, so they run last and in this
+    // order: recall needs filler that answers nothing, growth wants realistic
+    // bodies, and neither can be measured after the other has seeded.
+    await reportFocus(user.id, project);
     await reportGrowth(user.id, project);
     console.log("\ndone. Nothing here is a threshold; both numbers are for comparing two runs.\n");
   } finally {
