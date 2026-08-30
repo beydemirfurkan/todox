@@ -42,6 +42,27 @@ const BRIEFING_TASKS = 50;
 const BRIEFING_KINDS = ["handoff", "decision", "dead_end", "question"] as const;
 const PER_KIND = 3;
 
+/**
+ * Context note bodies carried per scope -- account-wide and project each.
+ *
+ * The task list was capped, the log under it was capped, and the notes above
+ * both were not: `listByProject` has no LIMIT, so every note this account has
+ * ever written came back in full on the call every session opens with. Fifteen
+ * notes and two open tasks measured around 39 KB, and nothing in that number
+ * grows slower than the log does.
+ *
+ * The bodies are what cost, so the bodies are what is capped -- every note's
+ * title comes back either way, and `context_omitted` counts the ones whose
+ * body did not. Deliberately not a truncation: cutting a decision off
+ * mid-sentence loses the reasoning that is the whole point of keeping it, and
+ * leaves the agent unable to tell a short note from a shortened one. A title
+ * with no body is honestly incomplete; half a paragraph is misleading.
+ *
+ * Sixty rather than fifty: notes are the standing rules, they outlive every
+ * task, and there are usually fewer of them than there are open tasks.
+ */
+const BRIEFING_NOTES = 60;
+
 export async function briefing(userId: number, project: Project) {
   // Cut in SQL rather than after the fact. This read every open task and then
   // took fifty, on the first query of every session.
@@ -49,8 +70,8 @@ export async function briefing(userId: number, project: Project) {
   const ids = open.map((t) => t.id);
 
   const [globalContext, projectContext, logs, counts, files] = await Promise.all([
-    contexts.listByProject(userId, null),
-    contexts.listByProject(userId, project.id),
+    contexts.pageByProject(userId, null, BRIEFING_NOTES),
+    contexts.pageByProject(userId, project.id, BRIEFING_NOTES),
     entries.listByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
     // The honest total, and what the caps dropped. Counting in the database is
     // what lets the log above be cut without `entry_count` starting to lie --
@@ -121,8 +142,12 @@ export async function briefing(userId: number, project: Project) {
       root_path: project.root_path,
       summary: project.summary,
     },
-    global_context: globalContext.map(strip),
-    project_context: projectContext.map(strip),
+    global_context: globalContext.rows,
+    project_context: projectContext.rows,
+    // One number for both scopes: an agent reads it to decide whether to go
+    // looking, and which of the two lists a title sits in is already visible
+    // from the lists themselves.
+    context_omitted: globalContext.omitted + projectContext.omitted,
     open_tasks: openTasks,
     open_tasks_omitted: total - open.length,
     stale_refs: stale,
@@ -131,13 +156,6 @@ export async function briefing(userId: number, project: Project) {
       "and record dead ends so the next session does not repeat them.",
   };
 }
-
-const strip = (c: { id: number; kind: string; title: string; body: string }) => ({
-  id: c.id,
-  kind: c.kind,
-  title: c.title,
-  body: c.body,
-});
 
 /**
  * Just the staleness lines, for the banner on the project page.

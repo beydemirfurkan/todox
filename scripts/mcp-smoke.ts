@@ -442,6 +442,22 @@ async function runSuite(mode: Mode, token: string) {
     throw new Error("the correction never reached the briefing");
   console.log("corrected in place:", noteIn(corrected)?.body);
 
+  // The briefing caps note bodies, so a note it did not pay for comes back as
+  // a title and an id with `body: null`. That is only honest if the id can be
+  // spent -- and `get_context_note` is the whole reason the cap is a budget
+  // rather than a loss. Read this one back through it and check the body is
+  // the corrected one, not the original.
+  const wholeNote = JSON.parse(await text("get_context_note", { context_id: note.id }));
+  if (wholeNote.id !== note.id)
+    throw new Error(`get_context_note returned #${wholeNote.id}, asked for #${note.id}`);
+  if (!wholeNote.body?.includes("RIGHT"))
+    throw new Error(`get_context_note gave back ${JSON.stringify(wholeNote.body)}`);
+  // The briefing hands out four fields; this hands out the row, timestamps
+  // included -- that is the difference worth having between them.
+  if (!wholeNote.updated_at) throw new Error("get_context_note dropped the timestamps");
+  console.log("read back in full:", wholeNote.title, "· updated_at present");
+
+
   // An entry that was wrong when it was written, rather than overtaken.
   const slip = JSON.parse(
     await text("log_entry", {
@@ -564,6 +580,21 @@ async function main() {
     title: "SMOKE-VICTIM",
     body: "Belongs to the owner. An intruder must not be able to remove it.",
   });
+  // Reading is the same exposure as deleting: `contexts.byId` takes no account
+  // id either, so `getContextNote` is one missing assert away from handing an
+  // intruder the note it was told not to delete.
+  console.log("\n--- and cannot read somebody else's note ---");
+  const peek = await rpc(intruderToken, {
+    method: "getContextNote",
+    params: { context_id: victimNote!.id },
+  });
+  const peekBody = await peek.json();
+  if (peek.status !== 404)
+    throw new Error(`getContextNote answered ${peek.status} to a foreign token, not 404`);
+  if (JSON.stringify(peekBody).includes("Belongs to the owner"))
+    throw new Error("getContextNote refused with 404 and returned the note anyway");
+  console.log(peek.status, peekBody.error, "· nothing of the note came back");
+
   const victimEntry = (await entriesRepo.listByTask(anyTask.id))[0];
   for (const [label, method, params, stillThere] of [
     [

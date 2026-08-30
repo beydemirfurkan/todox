@@ -14,8 +14,10 @@ with a human reading over its shoulder. Every task carries the decisions behind
 it, the approaches that failed, the questions still open, and the note the last
 session left behind.
 
-A fresh agent calls `get_context`, reads all of that, and starts where the last
-one stopped — without walking into a wall somebody already hit.
+A fresh agent calls `get_context`, reads that, and starts where the last one
+stopped — without walking into a wall somebody already hit. The briefing is
+capped rather than unbounded, and it reports what the caps left out instead of
+trimming in silence.
 
 ## What goes in a log
 
@@ -267,7 +269,7 @@ you are changing the tools themselves.
 
 | tool | what it does |
 | --- | --- |
-| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. |
+| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped so it cannot grow without bound, and it says what it left out. |
 | `create_task` | Capture work. Pass `cwd` and it finds the project, **registering one for that repo if it has never seen it** — so the agent never stops to ask. |
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. |
@@ -277,6 +279,7 @@ you are changing the tools themselves.
 | `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
 | `accept_file_change` · `unlink_file` | Clear a stale warning once you have read the change, or drop a link that has stopped meaning anything. Nothing else can clear it — the server never sees the file. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
+| `get_context_note` | One note in full, for the ones whose body the briefing capped and for reading past a search snippet. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
 | `search` | Across all your projects — *have I solved this before?* |
 | `get_task` | One task with its log and linked files. |

@@ -326,6 +326,14 @@ export const methods = {
         };
   },
 
+  getContextNote: async ({ userId }, p: { context_id: number }) => {
+    // Same guard as the write paths, for the same reason: `contexts.byId`
+    // takes no user id, so this is the only thing between an id off the wire
+    // and somebody else's note. A foreign one answers 404, never 403.
+    await assertContext(userId, p.context_id);
+    return contextsRepo.byId(p.context_id);
+  },
+
   addContext: async (
     { userId },
     p: { project?: string; cwd?: string; kind: ContextKind; title: string; body: string },

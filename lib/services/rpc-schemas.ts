@@ -347,6 +347,26 @@ export const SHAPES = {
     model,
   },
 
+  /**
+   * The read the briefing's ceiling made necessary.
+   *
+   * `get_context` carries every note's title and only the newest sixty
+   * bodies, so past that a note is a title and an id. Without a way to spend
+   * one call on the one that looks relevant, the cap would be a silent loss
+   * rather than a budget -- and `search` cannot stand in for it: it matches a
+   * literal substring and returns 240 characters of the body, which is a
+   * snippet, not the note.
+   */
+  getContextNote: {
+    context_id: z
+      .number()
+      .int()
+      .describe(
+        "From the `id` of a note in get_context's global_context or project_context, or from a search hit of type 'context'.",
+      ),
+    model,
+  },
+
   addContext: {
     project: ref.optional().describe("Omit to apply across every project in your account"),
     cwd: ref.optional().describe("Absolute working directory, used if project is omitted"),

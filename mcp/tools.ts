@@ -571,7 +571,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       // shows them -- a tool description is the one place an agent always
       // looks.
       description:
-        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`.",
+        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`. It is capped so it cannot grow without bound: fifty open tasks, three log entries per kind per task, and sixty context-note bodies per scope. Every note's title comes back regardless — a `body` of null means that note was past the ceiling, not that it is empty, and `get_context_note` reads it. `open_tasks_omitted`, `log_omitted` and `context_omitted` say how much was left out.",
       annotations: READ_ONLY,
     },
     {
@@ -713,6 +713,13 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     });
 
   /* -------------------------------------------------- durable knowledge */
+
+  tool("get_context_note", "getContextNote", {
+    title: "Read one context note in full",
+    description:
+      "The whole body of a single context note. get_context carries every note's title but only the newest sixty bodies per scope, and reports the rest as `context_omitted`; this is how you read one of those, or how you read past the 240-character snippet a search hit gives you. A body of null in a briefing means the note was past that ceiling, never that it is empty.",
+    annotations: READ_ONLY,
+  });
 
   tool("add_context", "addContext", {
     title: "Record durable knowledge",

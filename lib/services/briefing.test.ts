@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 const mocks = vi.hoisted(() => ({
   pageByProject: vi.fn(),
-  listContexts: vi.fn(),
+  pageNotes: vi.fn(),
   listByTasksPerKind: vi.fn(),
   countsByTasks: vi.fn(),
   listRefs: vi.fn(),
@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../repositories/tasks", () => ({ pageByProject: mocks.pageByProject }));
-vi.mock("../repositories/contexts", () => ({ listByProject: mocks.listContexts }));
+vi.mock("../repositories/contexts", () => ({ pageByProject: mocks.pageNotes }));
 vi.mock("../repositories/entries", () => ({
   listByTasksPerKind: mocks.listByTasksPerKind,
   countsByTasks: mocks.countsByTasks,
@@ -64,7 +64,7 @@ const counts = (over: Partial<Record<string, number>> = {}) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
-  mocks.listContexts.mockResolvedValue([]);
+  mocks.pageNotes.mockResolvedValue({ rows: [], omitted: 0 });
   mocks.listByTasksPerKind.mockResolvedValue(new Map());
   mocks.countsByTasks.mockResolvedValue(counts());
   mocks.listRefs.mockResolvedValue(new Map());
@@ -242,20 +242,55 @@ describe("linked files", () => {
 });
 
 describe("context notes", () => {
+  const note = (id: number, body: string | null = "b") => ({
+    id,
+    kind: "gotcha",
+    title: `note ${id}`,
+    body,
+  });
+
   it("asks for the account-wide ones and the project's separately", async () => {
     await brief();
-    expect(mocks.listContexts).toHaveBeenCalledWith(7, null);
-    expect(mocks.listContexts).toHaveBeenCalledWith(7, PROJECT.id);
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 60);
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, PROJECT.id, 60);
+  });
+
+  it("asks the database for the ceiling rather than slicing after the fact", async () => {
+    // The whole point of the cap is the bytes that never cross the network.
+    // Trimming here would leave the cost exactly where it was.
+    await brief();
+    for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(60);
   });
 
   it("hands back only the four fields a reader needs", async () => {
     // The row carries timestamps and a user id; a briefing is spent context
     // and none of that is worth any of it.
-    mocks.listContexts.mockResolvedValue([
-      { id: 1, kind: "gotcha", title: "t", body: "b", user_id: 7, created_at: "x" },
-    ]);
+    mocks.pageNotes.mockResolvedValue({ rows: [note(1)], omitted: 0 });
     const out = await brief();
     expect(Object.keys(out.global_context[0]!).sort()).toEqual(["body", "id", "kind", "title"]);
+  });
+
+  it("keeps the title of a note whose body it could not afford", async () => {
+    // A capped note is still a note the agent should know exists. Dropping the
+    // row would make the ceiling invisible; the title plus the id is what lets
+    // it decide whether to spend a get_context_note call on this one.
+    mocks.pageNotes.mockResolvedValue({ rows: [note(1), note(2, null)], omitted: 1 });
+    const out = await brief();
+    expect(out.global_context).toHaveLength(2);
+    expect(out.global_context[1]).toMatchObject({ id: 2, title: "note 2", body: null });
+  });
+
+  it("adds up what both scopes left out", async () => {
+    // One number for two calls. Reported separately it would read as two
+    // different ceilings, and there is only one.
+    mocks.pageNotes
+      .mockResolvedValueOnce({ rows: [note(1, null)], omitted: 1 })
+      .mockResolvedValueOnce({ rows: [note(2, null), note(3, null)], omitted: 2 });
+    expect((await brief()).context_omitted).toBe(3);
+  });
+
+  it("reports nothing omitted when nothing was", async () => {
+    expect((await brief()).context_omitted).toBe(0);
   });
 });
 
