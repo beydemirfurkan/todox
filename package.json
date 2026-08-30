@@ -23,6 +23,7 @@
     "install:mcp": "tsx scripts/install-mcp/index.ts",
     "mcp:doctor": "tsx scripts/install-mcp/doctor.ts",
     "og": "tsx scripts/make-og.tsx",
+    "favicon": "tsx scripts/make-favicon.tsx",
     "pack:mcp": "tsx scripts/pack-mcp.ts"
   },
   "dependencies": {
