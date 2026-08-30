@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 
 import { logError } from "../server/log";
+import { TooSlow } from "../services/errors";
 
 /**
  * Postgres over a socket pool.
@@ -83,9 +84,42 @@ function positional(text: string): string {
 
 export type Params = readonly unknown[];
 
+/**
+ * SQLSTATE `57014` is `query_canceled`, which under the `statement_timeout` set
+ * above is what a statement that will not finish comes back as.
+ *
+ * Narrow on purpose, and exported so a test can hold it to that: the failure
+ * mode of a translation like this one is widening, and a unique-violation that
+ * starts reading as "your question was too big" sends the caller to fix the
+ * wrong thing.
+ */
+export const isTimeout = (e: unknown): boolean =>
+  typeof e === "object" && e !== null && (e as { code?: unknown }).code === "57014";
+
+/**
+ * Re-throws, naming the one failure a caller can do something about.
+ *
+ * The message is written for the agent that receives it, because both
+ * transports hand it straight back. `search` over a whole log and
+ * `activity_report` with no window are the two calls that reach 25 seconds, and
+ * both have a smaller version of the same question.
+ */
+function rethrow(e: unknown): never {
+  if (!isTimeout(e)) throw e;
+  throw new TooSlow(
+    "that query ran longer than the server allows and was stopped. The same call " +
+      "will time out again -- ask a smaller question instead: a more specific search " +
+      "term, a shorter report period, or a lower limit.",
+  );
+}
+
 export async function all<T>(text: string, params: Params = []): Promise<T[]> {
-  const result = await db().query(positional(text), params as unknown[]);
-  return result.rows as T[];
+  try {
+    const result = await db().query(positional(text), params as unknown[]);
+    return result.rows as T[];
+  } catch (e) {
+    rethrow(e);
+  }
 }
 
 export async function one<T>(text: string, params: Params = []): Promise<T | undefined> {
@@ -110,8 +144,12 @@ export async function one<T>(text: string, params: Params = []): Promise<T | und
  * and is checked before the write -- this is the second line, not the first.
  */
 export async function run(text: string, params: Params = []): Promise<number> {
-  const result = await db().query(positional(text), params as unknown[]);
-  return result.rowCount ?? 0;
+  try {
+    const result = await db().query(positional(text), params as unknown[]);
+    return result.rowCount ?? 0;
+  } catch (e) {
+    rethrow(e);
+  }
 }
 
 /**
@@ -190,7 +228,7 @@ export async function tx<T = unknown>(
     await client
       .query("ROLLBACK")
       .catch((rollbackError) => logError("db.rollbackFailed", rollbackError));
-    throw error;
+    rethrow(error);
   } finally {
     client.release();
   }
