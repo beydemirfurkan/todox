@@ -265,11 +265,11 @@ describe("context notes", () => {
    */
   it("passes the focus to both scopes, or neither", async () => {
     await brief(7, "why is login redirecting in a loop");
-    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 60, "why is login redirecting in a loop");
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 25, "why is login redirecting in a loop");
     expect(mocks.pageNotes).toHaveBeenCalledWith(
       7,
       PROJECT.id,
-      60,
+      25,
       "why is login redirecting in a loop",
     );
   });
@@ -286,6 +286,20 @@ describe("context notes", () => {
     // Trimming here would leave the cost exactly where it was.
     await brief();
     for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(60);
+  });
+
+  /**
+   * A lower ceiling is only safe because the budget is being aimed. Sending a
+   * focus therefore buys fewer bodies, not the same number reordered -- and
+   * *not* sending one must keep the old, wider guess, since nothing else is
+   * left to choose by.
+   */
+  it("spends less when it knows what to spend it on", async () => {
+    await brief();
+    for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(60);
+    mocks.pageNotes.mockClear();
+    await brief(7, "the login redirect loop");
+    for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(25);
   });
 
   it("hands back only the four fields a reader needs", async () => {

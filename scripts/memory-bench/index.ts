@@ -236,6 +236,35 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
     for (const q of missed) console.log(`    · ${q}`);
   }
 
+  // What the ceiling could be, now that the budget is spent on purpose.
+  //
+  // Ranking better is only half an answer: it makes the same payload more
+  // useful without making it smaller. The number worth knowing is how far the
+  // ceiling can come down before recall starts paying for it, and that is a
+  // curve rather than an opinion. Measured against the repository directly,
+  // because the briefing's own ceiling is a constant and the point here is to
+  // vary it.
+  console.log("\n  what the ceiling costs, at 90 notes and with a focus:\n");
+  console.log(row("  bodies carried", "recall     note bytes"));
+
+  for (const budget of [60, 40, 25, 15, 8]) {
+    const pages = await Promise.all(
+      asked.map((q) => contextsRepo.pageByProject(userId, project.id, budget, q.asked)),
+    );
+    const found = pages.filter((page, i) =>
+      page.rows.some((n) => n.title === asked[i].answer && n.body !== null),
+    ).length;
+    // One question's payload, since each is its own session. The median rather
+    // than the mean: one very long note should not describe the typical cost.
+    const sizes = pages.map((p) => bytes(p.rows)).sort((a, b) => a - b);
+    console.log(
+      row(
+        `  ${budget}`,
+        `${String(found).padStart(2)}/${asked.length} (${String(Math.round((found / asked.length) * 100)).padStart(3)}%) ${kb(sizes[Math.floor(sizes.length / 2)])}`,
+      ),
+    );
+  }
+
   for (const id of added) await contextsRepo.remove(id);
 }
 
