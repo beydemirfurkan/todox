@@ -160,6 +160,22 @@ export function instructions(ws: { local: boolean }) {
   return [...BASE, ...(ws.local ? LOCAL_NOTE : REMOTE_NOTE)].join("\n");
 }
 
+/**
+ * What both transports answer `initialize` with. Here rather than at each
+ * `new McpServer(...)` for the same reason the tools are: there is one agent
+ * surface, and a client that connects to the hosted endpoint and a client that
+ * spawns the stdio process must not be told they reached different servers.
+ *
+ * The version is a literal and not `package.json`'s, because the stdio package
+ * is a pruned tree whose require graph is walked by `scripts/pack-mcp.ts` --
+ * that walk resolves `.js` and `index.js` only, so a `.json` require reads as a
+ * missing file and fails the build. `server-json.test.ts` holds this literal
+ * against `package.json` instead, next to the assertion that already holds
+ * `server.json` there. Three files, one release, one test that fails when
+ * somebody bumps only two of them.
+ */
+export const SERVER_INFO = { name: "todox", version: "0.1.0" } as const;
+
 const ok = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
 });

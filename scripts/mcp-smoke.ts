@@ -32,6 +32,7 @@ import * as usersRepo from "../lib/repositories/users";
 import { createApiToken } from "../lib/services/auth";
 import { hashPassword } from "../lib/util/password";
 import { normalisePath } from "../lib/util/paths";
+import { SERVER_INFO } from "../mcp/tools";
 
 /** A throwaway repo the agent has never heard of, to prove auto-registration. */
 const SCRATCH = join(tmpdir(), "todox-smoke-repo");
@@ -114,6 +115,18 @@ async function runSuite(mode: Mode, token: string) {
 
   const client = new Client({ name: CLIENT_NAME, version: "0" });
   await client.connect(mode.transport(token));
+
+  // The handshake, not the constant: this is the one fact a client learns
+  // before it learns anything else, and both ways in have to answer it the
+  // same. It said "1.0.0" on both for as long as there was no release to
+  // disagree with, and the first tag is what made that a lie.
+  const announced = client.getServerVersion();
+  if (announced?.name !== SERVER_INFO.name || announced?.version !== SERVER_INFO.version) {
+    throw new Error(
+      `initialize announced ${announced?.name}@${announced?.version}, expected ${SERVER_INFO.name}@${SERVER_INFO.version}`,
+    );
+  }
+  console.log("announced:", `${announced.name}@${announced.version}`);
 
   const tools = await client.listTools();
   console.log("tools:", tools.tools.map((t) => t.name).join(", "));
