@@ -11,6 +11,21 @@ export type NewContext = {
   body: string;
 };
 
+/**
+ * A note as the briefing carries it.
+ *
+ * `body` is null when the note was past the briefing's ceiling -- not when the
+ * note is empty, which cannot happen: `addContext` and `updateContext` both
+ * require at least one character. So null means "ask for it", and it is the
+ * only thing it can mean.
+ */
+export type BriefingNote = {
+  id: number;
+  kind: ContextKind;
+  title: string;
+  body: string | null;
+};
+
 /** `null` means the account-wide scope, which is a real scope here, not "no
  *  filter" -- one person's global notes must never leak into another's. */
 export const listByProject = (userId: number, projectId: number | null) =>
@@ -28,6 +43,69 @@ export const listByProject = (userId: number, projectId: number | null) =>
          ORDER BY kind, updated_at DESC`,
         [userId, projectId, userId],
       );
+
+/**
+ * The briefing's read: every note's title, but only the newest `limit` bodies.
+ *
+ * `listByProject` above has no ceiling and must not get one -- `project-merge`
+ * reads it to move a project's notes, and a LIMIT there would drop rows during
+ * a merge, silently and permanently. So this is a second function rather than
+ * a parameter, the same split `tasks` already makes between `listByProject`
+ * and `pageByProject`.
+ *
+ * Titles come back for all of them and bodies for some, rather than a page and
+ * a number. A count would tell an agent that notes exist and leave it no way
+ * to name or fetch one: nothing lists context notes, so `open_tasks_omitted`'s
+ * trick of pointing at `list_tasks` has no equivalent here. A title plus an id
+ * is the smallest thing that stays honest -- the agent can see what it was not
+ * given and ask for it by id with `get_context_note`.
+ *
+ * Ordered by `updated_at` rather than the shared function's `kind, updated_at`.
+ * Sorting a knowledge base alphabetically by kind is arbitrary at the best of
+ * times; it is actively wrong once there is a cut, because what falls off the
+ * end is then whatever sorts last (`preference`) rather than whatever has gone
+ * longest without being touched. The web pages keep the grouped order, which
+ * is what they render.
+ *
+ * `id` breaks the tie, and it is not decoration: notes written in the same
+ * second sort arbitrarily without it, so which of them keeps its body would
+ * change between two calls that read the same rows.
+ */
+export async function pageByProject(
+  userId: number,
+  projectId: number | null,
+  limit: number,
+): Promise<{ rows: BriefingNote[]; omitted: number }> {
+  const rows =
+    projectId === null
+      ? await all<BriefingNote>(
+          `WITH ranked AS (
+             SELECT c.id, c.kind, c.title, c.body,
+                    row_number() OVER (ORDER BY c.updated_at DESC, c.id DESC) AS rn
+               FROM contexts c
+              WHERE c.user_id = ? AND c.project_id IS NULL
+           )
+           SELECT id, kind, title, CASE WHEN rn <= ? THEN body END AS body
+             FROM ranked ORDER BY rn`,
+          [userId, limit],
+        )
+      : await all<BriefingNote>(
+          `WITH ranked AS (
+             SELECT c.id, c.kind, c.title, c.body,
+                    row_number() OVER (ORDER BY c.updated_at DESC, c.id DESC) AS rn
+               FROM contexts c
+               JOIN projects p ON p.id = c.project_id
+               LEFT JOIN project_memberships pm
+                      ON pm.project_id = p.id AND pm.user_id = ?
+              WHERE c.project_id = ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)
+           )
+           SELECT id, kind, title, CASE WHEN rn <= ? THEN body END AS body
+             FROM ranked ORDER BY rn`,
+          [userId, projectId, userId, limit],
+        );
+
+  return { rows, omitted: rows.filter((r) => r.body === null).length };
+}
 
 export const byId = (id: number) =>
   one<Context>("SELECT * FROM contexts WHERE id = ?", [id]);

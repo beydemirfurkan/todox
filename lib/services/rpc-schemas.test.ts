@@ -51,12 +51,21 @@ describe("update refinements cover every field they gate", () => {
  * are the calls where a coerced one would remove a row or silence a warning
  * on somebody else's.
  */
-describe("the corrections an agent can make", () => {
+/**
+ * Every method whose whole shape is one id.
+ *
+ * Mostly corrections, and `getContextNote` besides -- a read, but the same
+ * shape and the same exposure: an integer straight off the wire, handed to a
+ * repository function that takes no user id and is guarded only by the
+ * `assert*` call above it.
+ */
+describe("the methods that take nothing but an id", () => {
   const ID_ONLY = [
     ["deleteContext", "context_id"],
     ["deleteEntry", "entry_id"],
     ["unlinkRef", "ref_id"],
     ["acceptRef", "ref_id"],
+    ["getContextNote", "context_id"],
   ] as const;
 
   for (const [method, field] of ID_ONLY) {
@@ -183,6 +192,7 @@ describe("model field round-trips through parseParams on every method", () => {
     addContext: { kind: "convention", title: "x", body: "x" },
     updateContext: { context_id: 1, body: "x" },
     deleteContext: { context_id: 1 },
+    getContextNote: { context_id: 1 },
     search: { query: "x" },
     activityReport: { period: "today" },
     recordClientInfo: { name: "claude-code" },
