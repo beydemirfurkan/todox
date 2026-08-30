@@ -10,7 +10,23 @@
 
 FROM node:24-slim AS base
 ENV PNPM_HOME="/pnpm" PATH="/pnpm:$PATH"
-RUN corepack enable
+# `corepack enable` only installs the shims. The pnpm named by `packageManager`
+# is fetched from registry.npmjs.org on the first `pnpm` call -- which used to
+# be `pnpm install` in the build stage, so the download shared a layer with the
+# dependency install and every lockfile change re-fetched it. A deploy died on
+# exactly that: the transfer was cut off 2.7 MB in and the build failed at
+# `pnpm install --frozen-lockfile` with UND_ERR_SOCKET, which reads like a
+# dependency problem and is not one.
+#
+# Fetching it here puts it in a layer whose only cache key is the base image,
+# so application changes and lockfile changes both reuse it.
+#
+# The version is written out rather than read from `package.json`, which would
+# put this layer behind a file that changes on every release. `dockerfile.test.ts`
+# holds the two together instead: resolving a lockfile with one pnpm and
+# installing it with another is the kind of difference that does not announce
+# itself.
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 
 FROM base AS build
