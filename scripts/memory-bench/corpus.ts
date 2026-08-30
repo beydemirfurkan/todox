@@ -30,12 +30,15 @@ export type Task = {
  * exact phrase, which is what the corrected description now asks for. Running
  * both against the same corpus is how the difference stops being an opinion.
  *
- * One question is expected to miss under both phrasings and is kept on purpose:
- * "a tool returns an empty object" is answered by a note written in Turkish,
- * and the term anybody would reach for is English. No substring search finds
- * that, and neither will a `simple` full-text configuration — stemming does not
- * translate. It is the honest ceiling on a bilingual log searched lexically,
- * and a run that hid it would be measuring a corpus nobody has.
+ * The corpus holds two shapes on purpose that a single strategy cannot cover.
+ * One is cross-language: "a tool returns an empty object" is answered by a note
+ * written in Turkish, and the term anybody reaches for is English — which
+ * substring search never found, and full-text only finds because the Turkish
+ * note happens to contain the English loanword. The other is the middle of an
+ * identifier: `FileSync` inside `readFileSync`, which full-text cannot reach at
+ * all because it tokenises on word boundaries, and which the ILIKE arm under
+ * the index is there for. Removing that arm takes the term column from 24/24
+ * to 23/24, which is the measurement that keeps it.
  */
 export type Question = {
   asked: string;
@@ -475,6 +478,24 @@ export const QUESTIONS: Question[] = [
     asked: "why does the export refuse instead of cutting the file short?",
     term: "200,000 rows",
     answer: "Export everything an account owns",
+    answerType: "task",
+  },
+  // The two below are the case full-text search cannot reach on its own: half
+  // of what gets searched in an engineering log is an identifier, and
+  // `to_tsvector` treats `setClause` and `readFileSync` as single tokens. A
+  // search for the middle of one is a substring search or it is nothing, which
+  // is why the ILIKE arm stays underneath the index rather than being replaced
+  // by it. Remove that arm and these are the questions that stop working.
+  {
+    asked: "how do I build an update statement without splicing column names?",
+    term: "Clause",
+    answer: "Never build a SET clause by hand",
+    answerType: "context",
+  },
+  {
+    asked: "what was the risk in the server reading a caller's path?",
+    term: "FileSync",
+    answer: "Move hashing to the machine that has the files",
     answerType: "task",
   },
 ];

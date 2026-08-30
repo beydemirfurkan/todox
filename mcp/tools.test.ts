@@ -321,15 +321,15 @@ describe("instructions", () => {
     expect(instructions({ local: true })).toContain("`cwd`");
   });
 
-  it("does not tell an agent to search a whole question", () => {
+  it("tells an agent how the query is actually read", () => {
     // The instructions name the two moments to reach for search -- 'have I hit
     // this before?' and 'where did we decide X?' -- and those are the right
     // moments. What they used to leave out is that the query is not phrased
     // that way, so an agent followed them literally and searched the sentence.
     for (const local of [true, false]) {
       const text = instructions({ local });
-      expect(text).toContain("literal substring");
-      expect(text).toMatch(/do not send the question itself/);
+      expect(text).toMatch(/Ask it in words/);
+      expect(text).toMatch(/parsed and ranked/);
     }
   });
 });
@@ -353,29 +353,33 @@ describe("the search tool's description", () => {
   const searchDescription = () => harness(remoteWs).tools.get("search")!.config.description!;
 
   it("says what the match actually is", () => {
-    expect(searchDescription()).toContain("Literal substring match");
+    expect(searchDescription()).toMatch(/Full-text search/i);
   });
 
-  it("does not claim full-text search", () => {
-    // The mutation this exists to catch. `not full-text search` is allowed --
-    // it is the correction -- so match the claim rather than the two words.
+  it("never claims to be full-text-ish", () => {
+    // The word this file was created for. It described three ILIKE scans, and
+    // a model reading it wrote the question out and got nothing back.
     expect(searchDescription()).not.toMatch(/full-text-ish/i);
-    expect(searchDescription()).toMatch(/not full-text search/i);
   });
 
-  it("tells the caller how to phrase a query that can match", () => {
+  it("tells the caller a whole question is the right shape", () => {
+    // The previous description said the opposite, correctly at the time, and
+    // an agent that keeps following it narrows every query for no reason.
     const text = searchDescription();
-    expect(text).toMatch(/exact phrase/i);
-    // The non-obvious rule: two words match only where they are adjacent, so
-    // an agent that does not know this writes a two-word query and reads the
-    // empty answer as "nothing was ever recorded".
-    expect(text).toMatch(/adjacent/i);
+    expect(text).toMatch(/in words/i);
+    expect(text).toMatch(/phrase/i);
   });
 
-  it("warns that the order is recency, not relevance", () => {
-    // Otherwise the first hit reads as the best answer, and it is only the
-    // newest one -- the merge sorts on `created_at`, nothing scores.
-    expect(searchDescription()).toMatch(/newest first rather than by relevance/i);
+  it("says the order is relevance", () => {
+    // Otherwise the first hit reads as merely the newest, which is what it
+    // used to be.
+    expect(searchDescription()).toMatch(/ranked by relevance/i);
+  });
+
+  it("still promises the substring case, which is the arm under the index", () => {
+    // Removing the ILIKE fallback takes the bench from 24/24 to 23/24, and it
+    // is the only thing that finds the middle of an identifier.
+    expect(searchDescription()).toMatch(/substring/i);
   });
 
   it("is offered on both transports, and identically", () => {

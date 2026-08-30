@@ -287,7 +287,7 @@ you are changing the tools themselves.
 | `get_context_note` | One note in full, for the ones whose body the briefing capped and for reading past a search snippet. |
 | `get_file_context` | What is known about one file: the tasks that touched it with their dead ends, and the notes attached to it. Absolute or repo-relative; both find a link made on another machine. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
-| `search` | Across all your projects. A literal substring, so a distinctive term or an exact phrase finds what a sentence will not. |
+| `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier. |
 | `get_task` | One task with its log and linked files. |
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |
 | `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. |
@@ -381,7 +381,9 @@ Details, and an honest list of what is **not** covered, in
 
 ## Known gaps
 
-- Search is `ILIKE`, not full-text.
+- Search is full-text and ranked, but not indexed: the substring fallback sits
+  in the same `OR`, which makes the whole condition non-indexable. Fixing that
+  means splitting the two into a union.
 - Staleness is per-file hash; per-symbol would be the honest version. Hosted,
   it depends on the agent actually sending hashes — the instructions ask, and
   nothing can make it.

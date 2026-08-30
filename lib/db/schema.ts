@@ -245,6 +245,7 @@ CREATE INDEX IF NOT EXISTS idx_refs_context ON refs (context_id);
 -- slower, which is the only thing an index may ever be allowed to change.
 CREATE INDEX IF NOT EXISTS idx_refs_path ON refs (path);
 
+
 -- Existing installs predate the two columns above. Postgres makes this
 -- idempotent, so it belongs inline rather than in a migration history.
 -- A project used to be identified by where it sat on one laptop, which means
@@ -338,7 +339,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_context ON refs (context_id, path)
  * partial run simply resumes on the next attempt.
  *
  * Safe to split naively on `;` because none of the statements above contain a
- * semicolon inside a string literal.
+ * semicolon inside a string literal — and none of the *comments* do either,
+ * which matters just as much: `--` lines are stripped after the split, not
+ * before, so a semicolon in prose cuts the comment in half and the tail of the
+ * sentence arrives at Postgres as the start of a statement. That is a syntax
+ * error at position 1 on a word from the middle of an explanation, which is a
+ * confusing way to spend ten minutes.
  */
 export function statements(): string[] {
   return SCHEMA.split(";")
