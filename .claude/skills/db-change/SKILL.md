@@ -51,6 +51,28 @@ round trip — use the `listByTasks`-style helpers.
   lock contention.
 - Nothing queries the database at build time — every page is `force-dynamic`,
   which is what keeps CI free of secrets.
+- `statements()` splits `SCHEMA` on `;` and strips `--` comments **after** the
+  split. So a semicolon inside a comment cuts it in half and the rest of the
+  sentence arrives as a statement, and a `DO $$ … $$` block cannot be expressed
+  here at all — its body has semicolons in it.
+
+## An index nothing uses fails silently
+
+The two full-text rules that have already cost a day between them:
+
+- **An expression index is used only when the query's expression matches it
+  character for character.** A mismatch is not an error and not a warning — the
+  index is ignored, the answer is identical, and search is just slow again.
+  `lib/db/fts.ts` is the single definition both `schema.ts` and
+  `services/search.ts` build from, and `search.test.ts` asserts they agree.
+  Do not hand-write a `to_tsvector` on either side.
+- **Postgres cannot use an index for an `OR` unless it can use one for every
+  branch.** Search asks its full-text and `ILIKE` questions as two separate
+  `SELECT`s unioned by id, and that is not a style choice: putting them back in
+  one `WHERE` un-indexes the full-text half without failing anything. Ownership
+  is repeated in both arms for the same reason — dropping it from one leaks
+  nothing, so no test of the results would notice, and every account's search
+  starts scanning every other account's rows.
 
 ## The server has no filesystem
 
