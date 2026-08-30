@@ -80,10 +80,9 @@ const BASE = [
   "",
   "LOOKING THINGS UP: search covers every project you have. Reach for it when",
   "the question is 'have I hit this before?' or 'where did we decide X?' --",
-  "the answer is often in a project other than this one. But it matches a",
-  "literal substring rather than meaning, so do not send the question itself:",
-  "search a distinctive term or an exact phrase, and run a few short ones",
-  "rather than one long one. A sentence matches nothing.",
+  "the answer is often in a project other than this one. Ask it in words: the",
+  "query is parsed and ranked, so a whole question works and the record that",
+  "answers most of it comes back first. Quote a phrase to require it exactly.",
   "",
   "BEFORE YOU EDIT A FILE: get_file_context takes a path and answers with the",
   "tasks that touched it, their dead ends, and any standing note attached to",
@@ -771,7 +770,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("search", "search", {
     title: "Search across every project",
     description:
-      "Literal substring match, not full-text search, over task titles and bodies, log entry bodies, and context note titles and bodies, across ALL of your projects. The whole query must appear verbatim in one field, so send one distinctive term or an exact phrase -- 'scrypt', 'ERR_PNPM_BROKEN_LOCKFILE', 'setClause' -- and not a whole question: 'why did the deploy fail' matches nothing at all. Two words match only where they sit adjacent in that order, so several short searches beat one long one. Case-insensitive. Not searched: entry and note kinds, file paths, project names. Returns at most `limit` hits in total (default 30), ordered newest first rather than by relevance.",
+      "Full-text search over task titles and bodies, log entry bodies, and context note titles and bodies, across ALL of your projects, ranked by relevance. Ask it the question in words -- 'why did we choose scrypt over bcrypt' -- and it will find the note that answers it; the terms are matched independently and a record matching more of them ranks higher, so a whole sentence works and does not need narrowing. Quote a phrase to require it exactly. Stemming is applied in English and in Turkish, and a literal substring match runs underneath, so the middle of an identifier ('FileSync' inside readFileSync) is found too. Each hit carries a snippet taken from the part that matched, not from the top of the body. Not searched: entry and note kinds, file paths, project names. Returns at most `limit` hits in total (default 30).",
     annotations: READ_ONLY,
   });
 

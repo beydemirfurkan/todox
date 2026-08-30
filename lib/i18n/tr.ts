@@ -402,9 +402,8 @@ export const tr: Record<Key, string> = {
 
   searchTitle: "Arama",
   searchIntro:
-    "Tüm projeler birden — görevler, kayıt girdileri, bağlam notları. Yazdığını birebir arar; ayırt edici tek bir kelime ya da tam bir ifade, koca bir sorunun bulamayacağını bulur.",
-  searchNoResults:
-    "Eşleşen bir şey yok. Metnin birebir geçmesi gerekiyor, daha kısa ya da daha ayırt edici bir şey dene.",
+    "Tüm projeler birden — görevler, kayıt girdileri, bağlam notları. Cümleyle sor, en yakın cevap başa gelsin; tam geçmesini istediğin ifadeyi tırnak içine al.",
+  searchNoResults: "Eşleşen bir şey yok. Daha az kelime dene, ya da aradığın şeyde geçtiğini bildiğin bir terim.",
   searchPrompt: "Yukarıdaki kutuya bir şey yaz.",
   resultsCount: "sonuç",
   hit_task: "görev",

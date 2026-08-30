@@ -501,6 +501,27 @@ async function runSuite(mode: Mode, token: string) {
   if (!wholeNote.updated_at) throw new Error("get_context_note dropped the timestamps");
   console.log("read back in full:", wholeNote.title, "· updated_at present");
 
+  // `search` was in none of the four smoke suites, which is how it kept a
+  // description promising full-text over three ILIKE scans. Now that it parses
+  // the query, the assertion worth making is the one that used to fail: a
+  // question, in words, finding the note that answers it.
+  console.log("\n--- and a question, in words, finds the note ---");
+  const found = JSON.parse(
+    await text("search", { query: "what did this session turn out to be right about?" }),
+  );
+  const hitIds = (found as { type: string; id: number }[]).map((h) => `${h.type}#${h.id}`);
+  if (!hitIds.includes(`context#${note.id}`))
+    throw new Error(`a natural-language search missed the note; got ${hitIds.join(", ") || "nothing"}`);
+
+  // And the snippet points at the match rather than at the top of the body,
+  // which is what makes a hit readable without a second call.
+  const hit = (found as { id: number; type: string; snippet: string }[]).find(
+    (h) => h.type === "context" && h.id === note.id,
+  )!;
+  if (!/right/i.test(hit.snippet))
+    throw new Error(`the snippet does not contain the match: ${JSON.stringify(hit.snippet)}`);
+  console.log("found by question, snippet carries the match");
+
 
   // An entry that was wrong when it was written, rather than overtaken.
   const slip = JSON.parse(
