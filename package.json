@@ -24,7 +24,8 @@
     "mcp:doctor": "tsx scripts/install-mcp/doctor.ts",
     "og": "tsx scripts/make-og.tsx",
     "favicon": "tsx scripts/make-favicon.tsx",
-    "pack:mcp": "tsx scripts/pack-mcp.ts"
+    "pack:mcp": "tsx scripts/pack-mcp.ts",
+    "bench:memory": "tsx scripts/memory-bench/index.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

@@ -39,6 +39,13 @@ windows, duration replay.
 purpose: a number becomes the target, and this one is misleading in both
 directions.
 
+`pnpm bench:memory` needs a `DATABASE_URL` and answers two questions the rest
+of the suite cannot: what the session-start briefing costs in bytes, and
+whether `search` finds the thing that answers a question. It seeds its own
+fixed corpus and removes it, so it runs anywhere and two runs compare. No
+threshold here either, for the same reason — the numbers are for putting a
+before beside an after.
+
 ## The rules the codebase actually follows
 
 These are not style preferences; breaking them causes bugs that are hard to
