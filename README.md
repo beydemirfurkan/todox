@@ -228,7 +228,8 @@ would rather not spend an agent's attention on it, or want the hashing to
 happen even when the agent forgets. There is nothing to clone:
 
 ```bash
-TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev npx todox-mcp
+TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev \
+  npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz
 ```
 
 Or as an MCP config, which is the form an agent wants:
@@ -238,16 +239,23 @@ Or as an MCP config, which is the form an agent wants:
   "mcpServers": {
     "todox": {
       "command": "npx",
-      "args": ["todox-mcp"],
+      "args": [
+        "-y",
+        "https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz"
+      ],
       "env": { "TODOX_TOKEN": "todox_…", "TODOX_URL": "https://www.todox.dev" }
     }
   }
 }
 ```
 
-`todox-mcp` rather than `todox`, because that name has belonged to somebody
-else on npm since 2018. It is a different package from this repository and
-carries only what the stdio server actually loads — no Next, no React, no
+**There is no npm package, and that is a decision rather than a to-do.** A
+GitHub Release needs no account and no token to publish or to install from, so
+the tarball is the whole distribution and `npx` takes its URL directly. The URL
+above always resolves to the newest release; every release also carries a
+`todox-mcp-<version>.tgz` if you would rather pin and choose when to move.
+
+It carries only what the stdio server actually loads — no Next, no React, no
 Postgres driver, because it talks to the API over HTTP and never opens a
 database. `pnpm pack:mcp` builds it, and fails the build if anything
 server-side ever finds its way into the tool surface again.
@@ -382,13 +390,14 @@ git tag v0.1.1 && git push origin v0.1.1
 ```
 
 That is the procedure. The workflow checks the tag against `package.json`,
-runs the checks, builds the stdio package and attaches the tarball to a GitHub
-Release — no account and no credential involved, so `npx <that tarball url>`
-works from the first tag.
+runs the checks, builds the stdio package and attaches it to a GitHub Release —
+no account and no credential involved, so `npx <that tarball url>` works from
+the first tag.
 
-Publishing to npm as `todox-mcp` is optional and off unless an `NPM_TOKEN`
-secret exists; the step says so and skips rather than failing. Add the secret if
-and when the nicer `npx todox-mcp` is worth it.
+Two names go up: `todox-mcp-<version>.tgz`, and the same bytes as
+`todox-mcp.tgz` so that `/releases/latest/download/todox-mcp.tgz` is an address
+worth writing into a config once. Nothing is published to npm, on purpose — see
+the local-mode section above.
 
 `server.json` pins the MCP registry entry to the same version and
 `server-json.test.ts` holds it there, so the tag, the package and the registry
