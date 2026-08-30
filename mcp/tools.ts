@@ -174,7 +174,7 @@ export function instructions(ws: { local: boolean }) {
  * `server.json` there. Three files, one release, one test that fails when
  * somebody bumps only two of them.
  */
-export const SERVER_INFO = { name: "todox", version: "0.1.0" } as const;
+export const SERVER_INFO = { name: "todox", version: "0.1.1" } as const;
 
 const ok = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
