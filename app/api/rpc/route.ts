@@ -4,7 +4,7 @@ import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, newRequestId } from "@/lib/server/log";
 import { userForApiToken } from "@/lib/services/auth";
-import { BadRequest } from "@/lib/services/errors";
+import { BadRequest, TooSlow } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
 import { invoke } from "@/lib/services/rpc";
@@ -80,6 +80,12 @@ export async function POST(req: NextRequest) {
     // Ownership failures are the caller's problem, not a server fault, and
     // they must not reveal whether the id exists for somebody else.
     if (e instanceof NotYours) return fail(404, e.message, requestId);
+
+    // A statement that ran out of time. 504 rather than 500 so a dashboard can
+    // tell "we are broken" from "that question was too big", and so an HTTP
+    // retry layer that treats every 500 as transient does not sit in a loop
+    // asking the same unanswerable question.
+    if (e instanceof TooSlow) return fail(504, e.message, requestId);
 
     // Things the agent can fix get the real message. Anything else is ours:
     // returning the raw text handed a caller Postgres' own parse errors, which

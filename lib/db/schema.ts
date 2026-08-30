@@ -1,4 +1,5 @@
 import { exec } from "./client";
+import { FTS_INDEXES } from "./fts";
 
 /**
  * One idempotent schema, applied by `pnpm db:migrate`.
@@ -331,6 +332,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_task ON refs (task_id, path)
 -- backfill for databases that predate them.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_context ON refs (context_id, path)
   WHERE context_id IS NOT NULL;
+
+-- What search reads, and the reason it can afford to.
+--
+-- These were written once before and taken straight back out, because
+-- \`EXPLAIN\` showed a sequential scan with them in place: the substring arm of
+-- the search sat in the same \`OR\` as the full-text one, and a single
+-- non-indexable branch makes the whole disjunction non-indexable. The indexes
+-- were right and the query was wrong. \`services/search.ts\` now asks the two
+-- questions separately and unions the ids, which is what lets these be used --
+-- so the shape of that query is not a style choice, and changing it back
+-- silently un-indexes search without failing anything.
+--
+-- Built from \`db/fts.ts\`, which \`search.ts\` also builds its \`WHERE\` from.
+-- An expression index that does not match the query character for character is
+-- ignored in silence, so the expression has exactly one definition.
+${FTS_INDEXES}
 `;
 
 /**

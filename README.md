@@ -381,9 +381,12 @@ Details, and an honest list of what is **not** covered, in
 
 ## Known gaps
 
-- Search is full-text and ranked, but not indexed: the substring fallback sits
-  in the same `OR`, which makes the whole condition non-indexable. Fixing that
-  means splitting the two into a union.
+- Search's full-text half is indexed; its substring half is not. The two are
+  asked separately and merged, which is what lets the first one use an index at
+  all — measured on 110k rows, a search went from 5.7s to 0.16s. What is left is
+  one sequential scan for the `ILIKE` arm that finds identifiers full-text
+  cannot, and indexing that needs `pg_trgm`, which needs a `CREATE EXTENSION`
+  this project cannot assume it is allowed to run.
 - Staleness is per-file hash; per-symbol would be the honest version. Hosted,
   it depends on the agent actually sending hashes — the instructions ask, and
   nothing can make it.
