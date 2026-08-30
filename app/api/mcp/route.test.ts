@@ -36,6 +36,11 @@ vi.mock("@/lib/server/client-info", () => ({
 vi.mock("@/mcp/tools", () => ({
   instructions: () => "instructions",
   registerTools: mocks.registerTools,
+  // Stood in rather than passed through, like `instructions` above: what this
+  // file tests is the route's behaviour around the server, not the identity it
+  // announces. That identity is held against package.json in
+  // server-json.test.ts and against the live handshake in smoke:mcp.
+  SERVER_INFO: { name: "todox", version: "0.0.0-test" },
 }));
 vi.mock("@modelcontextprotocol/sdk/server/mcp.js", () => ({
   McpServer: class {

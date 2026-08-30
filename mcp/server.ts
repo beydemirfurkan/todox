@@ -18,7 +18,7 @@ import { normalise, type ClientInfo } from "../lib/client-identity";
 import type { MethodName } from "../lib/services/rpc-schemas";
 import { isAbsolutePath } from "../lib/util/paths";
 import { createClient, readConfig } from "./rpc-client";
-import { instructions, registerTools, type Workspace } from "./tools";
+import { instructions, registerTools, SERVER_INFO, type Workspace } from "./tools";
 import { checkRefs, findProjectRoot, gitRemote, hashFile } from "./workspace";
 
 /**
@@ -88,10 +88,9 @@ async function main() {
     }
   }
 
-  const server = new McpServer(
-    { name: "todox", version: "1.0.0" },
-    { instructions: instructions({ local: true }) },
-  );
+  const server = new McpServer(SERVER_INFO, {
+    instructions: instructions({ local: true }),
+  });
 
   registerTools(server, (method: MethodName, params) => call(method, params), localWorkspace);
 

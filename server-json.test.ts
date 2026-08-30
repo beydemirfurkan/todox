@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SERVER_INFO } from "./mcp/tools";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,6 +59,20 @@ describe("the registry entry", () => {
     // Two files, one release. They drift the first time somebody bumps one,
     // and the registry then advertises a version that never existed.
     expect(server.version).toBe(pkg.version);
+  });
+
+  it("agrees with the version both MCP transports announce", () => {
+    // The third copy, and the one a client actually sees: SERVER_INFO is what
+    // `initialize` answers with on both the hosted endpoint and the stdio
+    // process. It said "1.0.0" from before there was a release, so the first
+    // tag shipped a server introducing itself as a version that did not exist
+    // -- found by installing the v0.1.0 tarball and reading the handshake.
+    //
+    // It is a literal rather than a read of package.json because the stdio
+    // package is a pruned tree and `scripts/pack-mcp.ts` walks its require
+    // graph resolving `.js` and `index.js` only. This assertion is what stops
+    // the literal drifting instead.
+    expect(SERVER_INFO.version).toBe(pkg.version);
   });
 
   it("points at the hosted endpoint over streamable-http", () => {

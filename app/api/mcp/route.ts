@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
-import { instructions, registerTools, type Workspace } from "@/mcp/tools";
+import { instructions, registerTools, SERVER_INFO, type Workspace } from "@/mcp/tools";
 import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, newRequestId } from "@/lib/server/log";
@@ -182,10 +182,9 @@ async function answer(req: Request, requestId: string): Promise<Response> {
   // helper then belongs to.
   await captureClientInfo(token, body);
 
-  const server = new McpServer(
-    { name: "todox", version: "1.0.0" },
-    { instructions: instructions({ local: false }) },
-  );
+  const server = new McpServer(SERVER_INFO, {
+    instructions: instructions({ local: false }),
+  });
   // In-process rather than a fetch back to /api/rpc: a request to our own
   // domain is a second billed invocation and a second cold start, and it is
   // the thing that breaks first behind deployment protection. `invoke` already
