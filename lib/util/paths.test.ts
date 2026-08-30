@@ -5,6 +5,7 @@ import {
   isInside,
   lastSegment,
   normalisePath,
+  relativeTo,
   repoKey,
   repoLabel,
   repoLink,
@@ -269,5 +270,56 @@ describe("normalisePath", () => {
   it("drops a trailing separator, either kind", () => {
     expect(normalisePath("C:\\Users\\me\\repo\\")).toBe("C:/Users/me/repo");
     expect(normalisePath("/src/todox/")).toBe("/src/todox");
+  });
+});
+
+/**
+ * The name a file has on every machine at once.
+ *
+ * `refs` stores the absolute path the agent that linked it was looking at, so
+ * matching that string answers nothing the first time a repo is opened on a
+ * second computer. Folding to the repo-relative form is what makes the lookup
+ * survive the move, and it is the same argument `repo_url` wins on one level up.
+ */
+describe("relativeTo", () => {
+  it("cuts the root off", () => {
+    expect(relativeTo("/repo/lib/auth.ts", "/repo")).toBe("lib/auth.ts");
+  });
+
+  it("answers empty for the root itself, which is not the same as no match", () => {
+    // "" is falsy, so a caller testing truthiness would read the root as
+    // outside itself. The caller checks for null.
+    expect(relativeTo("/repo", "/repo")).toBe("");
+  });
+
+  it("refuses a path that is not below the root", () => {
+    expect(relativeTo("/elsewhere/lib/auth.ts", "/repo")).toBeNull();
+  });
+
+  it("does not treat a sibling with a shared prefix as inside", () => {
+    // `/src/todox-old` is not in `/src/todox`, and a plain startsWith says it is.
+    expect(relativeTo("/src/todox-old/a.ts", "/src/todox")).toBeNull();
+  });
+
+  it("folds separators, so a Windows agent and a stored path agree", () => {
+    expect(relativeTo("C:\\work\\repo\\lib\\auth.ts", "C:/work/repo")).toBe("lib/auth.ts");
+  });
+
+  it("compares Windows roots case-insensitively", () => {
+    expect(relativeTo("c:/work/repo/lib/auth.ts", "C:/work/repo")).toBe("lib/auth.ts");
+  });
+
+  it("keeps the capitalisation the caller sent, having folded only to compare", () => {
+    // Slicing the lowercased copy would hand back a path that no longer names
+    // the file on disk, which is worse than not answering at all.
+    expect(relativeTo("C:/Work/Repo/lib/Auth.ts", "c:/work/repo")).toBe("lib/Auth.ts");
+  });
+
+  it("is not fooled by a trailing slash on the root", () => {
+    expect(relativeTo("/repo/lib/auth.ts", "/repo/")).toBe("lib/auth.ts");
+  });
+
+  it("is case-sensitive on posix, where the filesystem is", () => {
+    expect(relativeTo("/Repo/lib/auth.ts", "/repo")).toBeNull();
   });
 });

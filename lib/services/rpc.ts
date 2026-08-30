@@ -6,6 +6,7 @@ import * as projectsRepo from "../repositories/projects";
 import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
+import { fileContext } from "./file-context";
 import { BadRequest } from "./errors";
 import {
   assertContext,
@@ -284,10 +285,20 @@ export const methods = {
 
   linkFiles: async (
     { userId },
-    p: { task_id: number; paths: { path: string; note?: string; hash?: string | null }[] },
+    p: {
+      task_id?: number;
+      context_id?: number;
+      paths: { path: string; note?: string; hash?: string | null }[];
+    },
   ) => {
-    await assertTask(userId, p.task_id);
-    return refsRepo.link({ task_id: p.task_id, paths: p.paths });
+    // The schema guarantees exactly one, so the branch is which assert to run
+    // rather than whether to run one. Both repository calls take no account id.
+    if (p.task_id !== undefined) {
+      await assertTask(userId, p.task_id);
+      return refsRepo.link({ task_id: p.task_id, paths: p.paths });
+    }
+    await assertContext(userId, p.context_id!);
+    return refsRepo.link({ context_id: p.context_id, paths: p.paths });
   },
 
   reportRefs: async ({ userId }, p: { refs: { id: number; hash: string | null }[] }) => {
@@ -324,6 +335,14 @@ export const methods = {
           reason:
             "nothing has been reported for this file yet, so there is no state to accept — hash it and send report_file_hashes first",
         };
+  },
+
+  getFileContext: async ({ userId }, p: { path: string; project?: string; cwd?: string }) => {
+    // Resolution, not creation: asking what is known about a file in a repo
+    // todox has never seen is a question with an answer -- nothing -- and
+    // registering a project as a side effect of a read would be a surprise.
+    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }));
+    return fileContext(userId, project, p.path);
   },
 
   getContextNote: async ({ userId }, p: { context_id: number }) => {

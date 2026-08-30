@@ -85,6 +85,11 @@ const BASE = [
   "search a distinctive term or an exact phrase, and run a few short ones",
   "rather than one long one. A sentence matches nothing.",
   "",
+  "BEFORE YOU EDIT A FILE: get_file_context takes a path and answers with the",
+  "tasks that touched it, their dead ends, and any standing note attached to",
+  "it. This is the cheapest call here and the one most worth making unasked --",
+  "the whole cost of a dead end is paid by the session that does not read it.",
+  "",
   "WHAT NOT TO READ: list_tasks with status:'all' and activity_report with",
   "period:'all' return everything there has ever been, bodies included. They",
   "will fill your context with a backlog instead of the work in front of you.",
@@ -587,6 +592,13 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     },
   );
 
+  tool("get_file_context", "getFileContext", {
+    title: "What is known about one file",
+    description:
+      "Everything todox has recorded against a file: the tasks that touched it with their dead ends and decisions, and the context notes attached to it in full. Ask before editing a file you have not seen this session — a dead end costs nothing to read and an afternoon to rediscover. The path may be absolute or relative to the repository root; both fold to the same answer, so a note linked on one machine is found from another. Pass `cwd` or `project` to say which repository is being asked about.",
+    annotations: READ_ONLY,
+  });
+
   /* --------------------------------------------------------------- tasks */
 
   tool("list_tasks", "listTasks", {
@@ -662,9 +674,9 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     "link_files",
     "linkFiles",
     {
-      title: "Link files to a task",
+      title: "Link files to a task or a note",
       description:
-        "Attach file paths to a task and hash them now, so todox can later warn that a note describes code that has since changed.",
+        "Attach file paths to a task (`task_id`) or to a context note (`context_id`) — one or the other — and hash them now. Two things follow: todox can warn later that a note describes code which has since changed, and `get_file_context` can answer what is known about that file from the file's own name. Linking a standing rule to the files it governs is what makes it findable by the session that opens one of them.",
     },
     local
       ? {

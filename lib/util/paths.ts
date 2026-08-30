@@ -202,3 +202,23 @@ export function isInside(child: string, root: string) {
   const r = norm(root);
   return c === r || c.startsWith(`${r}/`);
 }
+
+/**
+ * The part of `child` below `root`, or null when it is not below it.
+ *
+ * The repo-relative path is the only name a file has that means the same thing
+ * on two machines, which is the same argument `repo_url` wins on for projects:
+ * `/Users/me/todox/lib/auth.ts` and `C:/work/todox/lib/auth.ts` are one file,
+ * and `lib/auth.ts` is what they agree on.
+ *
+ * Cut from the *un-folded* string even when the comparison folded case, so a
+ * Windows path comes back with the capitalisation it was stored with. Slicing
+ * the lowercased copy would hand back a path that no longer matches the one on
+ * disk, which is worse than not answering.
+ */
+export function relativeTo(child: string, root: string): string | null {
+  if (!isInside(child, root)) return null;
+  const c = normalisePath(child);
+  const r = normalisePath(root);
+  return c.length === r.length ? "" : c.slice(r.length + 1);
+}

@@ -193,6 +193,7 @@ describe("model field round-trips through parseParams on every method", () => {
     updateContext: { context_id: 1, body: "x" },
     deleteContext: { context_id: 1 },
     getContextNote: { context_id: 1 },
+    getFileContext: { path: "lib/auth.ts", cwd: "/repo" },
     search: { query: "x" },
     activityReport: { period: "today" },
     recordClientInfo: { name: "claude-code" },
@@ -233,6 +234,49 @@ describe("repo_url reaches the resolver", () => {
     expect(
       parseParams("createTask", { title: "x", repo_url: "https://github.com/me/repo" }).repo_url,
     ).toBe("https://github.com/me/repo");
+  });
+});
+
+describe("linkFiles takes one end or the other", () => {
+  const paths = [{ path: "/repo/lib/auth.ts" }];
+
+  it("accepts a task", () => {
+    expect(() => parseParams("linkFiles", { task_id: 1, paths })).not.toThrow();
+  });
+
+  it("accepts a context note", () => {
+    expect(() => parseParams("linkFiles", { context_id: 1, paths })).not.toThrow();
+  });
+
+  it("refuses both, because no unique index would de-duplicate such a row", () => {
+    expect(() => parseParams("linkFiles", { task_id: 1, context_id: 1, paths })).toThrow(
+      /exactly one/,
+    );
+  });
+
+  it("refuses neither, rather than writing an orphan", () => {
+    expect(() => parseParams("linkFiles", { paths })).toThrow(/exactly one/);
+  });
+});
+
+describe("getFileContext", () => {
+  it("needs a project or a cwd to fold the path against", () => {
+    // Without one there is no set of roots, so an absolute path could not be
+    // reduced to the name it shares with the same file on another machine.
+    expect(() => parseParams("getFileContext", { path: "lib/auth.ts" })).toThrow(
+      /either `project` or `cwd`/,
+    );
+  });
+
+  it("takes a relative path as readily as an absolute one", () => {
+    for (const path of ["lib/auth.ts", "/repo/lib/auth.ts", "C:/work/repo/lib/auth.ts"])
+      expect(() => parseParams("getFileContext", { path, cwd: "/repo" })).not.toThrow();
+  });
+
+  it("refuses an empty path instead of matching everything", () => {
+    expect(() => parseParams("getFileContext", { path: "", cwd: "/repo" })).toThrow(
+      /invalid params/,
+    );
   });
 });
 

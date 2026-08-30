@@ -232,6 +232,18 @@ CREATE TABLE IF NOT EXISTS refs (
 );
 CREATE INDEX IF NOT EXISTS idx_refs_task ON refs (task_id);
 CREATE INDEX IF NOT EXISTS idx_refs_context ON refs (context_id);
+-- \`path\` was write-only: every read went in by task_id, context_id or id, and
+-- the two unique indexes below lead on those columns, so neither can serve a
+-- lookup that starts from the path. That left the one question a coding agent
+-- actually asks -- "what do we already know about the file I am editing?" --
+-- unanswerable over data todox had all along.
+-- A plain btree, and equality is all it needs: \`get_file_context\` folds a path
+-- to its repo-relative form and expands it back across every root the project
+-- is known by, so the comparison is \`= ANY(...)\` rather than a prefix or a
+-- LIKE. Nothing depends on it existing -- a migration is a separate deploy step
+-- (see \`db:migrate\` above), so until it runs the same query is correct and
+-- slower, which is the only thing an index may ever be allowed to change.
+CREATE INDEX IF NOT EXISTS idx_refs_path ON refs (path);
 
 -- Existing installs predate the two columns above. Postgres makes this
 -- idempotent, so it belongs inline rather than in a migration history.

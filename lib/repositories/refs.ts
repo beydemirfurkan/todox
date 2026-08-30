@@ -19,6 +19,29 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, Ref[]>
 export const listByContext = (contextId: number) =>
   all<Ref>("SELECT * FROM refs WHERE context_id = ? ORDER BY path", [contextId]);
 
+/**
+ * Every link on any of these exact paths.
+ *
+ * Plural because one file has as many absolute paths as it has machines, and
+ * the caller expands the repo-relative form back across the project's known
+ * roots before asking. Equality rather than a suffix match: `LIKE '%/auth.ts'`
+ * cannot use an index and would answer `vendor/lib/auth.ts` to a question
+ * about `lib/auth.ts`, which is the kind of wrong that reads as right.
+ *
+ * Unscoped by project on purpose -- this table has no project column, and
+ * reaching into `tasks` and `contexts` for one would make a repository do
+ * cross-table work. The caller narrows it, and the caller is the only side
+ * that has already proved what the account may see.
+ */
+export const listByPaths = (paths: string[]): Promise<Ref[]> =>
+  paths.length
+    ? all<Ref>(
+        `SELECT * FROM refs WHERE path IN (${paths.map(() => "?").join(",")})
+         ORDER BY linked_at DESC, id DESC`,
+        paths,
+      )
+    : Promise.resolve([]);
+
 export const byId = (id: number) => one<Ref>("SELECT * FROM refs WHERE id = ?", [id]);
 
 /**
