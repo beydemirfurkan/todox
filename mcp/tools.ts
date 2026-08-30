@@ -78,6 +78,14 @@ const BASE = [
   "this before planning any non-trivial work. Prefer it to list_tasks: it is",
   "one call and it carries the reasoning as well as the list.",
   "",
+  "Send `focus` with it whenever the developer has said what they want --",
+  "'fix the login redirect loop', 'speed up search'. The briefing has a budget",
+  "and without a focus it spends it on the newest notes, which is a guess; with",
+  "one it spends it on the notes about what you are here to do. A standing rule",
+  "written a year ago can be the one that matters, and recency will never find",
+  "it. A focus that matches nothing changes nothing, so there is no cost to",
+  "sending it and no reason to leave it out.",
+  "",
   "LOOKING THINGS UP: search covers every project you have. Reach for it when",
   "the question is 'have I hit this before?' or 'where did we decide X?' --",
   "the answer is often in a project other than this one. Ask it in words: the",
@@ -578,7 +586,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       // shows them -- a tool description is the one place an agent always
       // looks.
       description:
-        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`. It is capped so it cannot grow without bound: fifty open tasks, three log entries per kind per task, and sixty context-note bodies per scope. Every note's title comes back regardless — a `body` of null means that note was past the ceiling, not that it is empty, and `get_context_note` reads it. `open_tasks_omitted`, `log_omitted` and `context_omitted` say how much was left out.",
+        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`. It is capped so it cannot grow without bound: fifty open tasks, three log entries per kind per task, and sixty context-note bodies per scope — twenty-five when you send a `focus`, because those twenty-five are the ones about what you asked. Every note's title comes back regardless — a `body` of null means that note was past the ceiling, not that it is empty, and `get_context_note` reads it. `open_tasks_omitted`, `log_omitted` and `context_omitted` say how much was left out. Pass `focus` — one sentence about what this session is for — and the notes that keep their bodies are the ones relevant to it rather than the ones written most recently; `context_ranked_by` tells you which of the two you got.",
       annotations: READ_ONLY,
     },
     {

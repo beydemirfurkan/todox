@@ -274,7 +274,7 @@ you are changing the tools themselves.
 
 | tool | what it does |
 | --- | --- |
-| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped so it cannot grow without bound, and it says what it left out. |
+| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped so it cannot grow without bound, and it says what it left out. Pass `focus` — a sentence about what the session is for — and the budget is spent on the notes that answer it rather than the newest ones — which is what lets it be a smaller budget. |
 | `create_task` | Capture work. Pass `cwd` and it finds the project, **registering one for that repo if it has never seen it** — so the agent never stops to ask. |
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. |

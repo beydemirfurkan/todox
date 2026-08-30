@@ -1,5 +1,6 @@
 import type { ContextKind } from "../constants";
 import { all, one, run, setClause, type Statement } from "../db/client";
+import { document, rank, TSQUERY } from "../db/fts";
 import type { Context } from "../types";
 import { now } from "../util/time";
 
@@ -70,39 +71,73 @@ export const listByProject = (userId: number, projectId: number | null) =>
  * `id` breaks the tie, and it is not decoration: notes written in the same
  * second sort arbitrarily without it, so which of them keeps its body would
  * change between two calls that read the same rows.
+ *
+ * `focus` is what the session is about, and it decides which notes the body
+ * budget is spent on rather than how many. Without it the ceiling keeps the
+ * newest, which is a guess -- a standing rule written a year ago can be the one
+ * that matters and recency will never surface it. With it, relevance sorts
+ * first and recency still breaks the tie, so a note that matches nothing lands
+ * exactly where it would have anyway.
+ *
+ * That fallback is the property worth keeping: `ts_rank` is 0 for a document
+ * the query does not touch, so a focus that matches nothing produces the
+ * identical order. Passing one can move a note up; it can never lose one.
  */
 export async function pageByProject(
   userId: number,
   projectId: number | null,
   limit: number,
+  focus?: string,
 ): Promise<{ rows: BriefingNote[]; omitted: number }> {
-  const rows =
+  // Account-wide notes are owned by the row; a project's are owned through the
+  // project. One string each, because the focus query below repeats whichever
+  // it is -- ownership belongs in both halves, for the same reason it belongs
+  // in both arms of `search`.
+  const joins =
     projectId === null
-      ? await all<BriefingNote>(
-          `WITH ranked AS (
-             SELECT c.id, c.kind, c.title, c.body,
-                    row_number() OVER (ORDER BY c.updated_at DESC, c.id DESC) AS rn
-               FROM contexts c
-              WHERE c.user_id = ? AND c.project_id IS NULL
-           )
-           SELECT id, kind, title, CASE WHEN rn <= ? THEN body END AS body
-             FROM ranked ORDER BY rn`,
-          [userId, limit],
-        )
-      : await all<BriefingNote>(
-          `WITH ranked AS (
-             SELECT c.id, c.kind, c.title, c.body,
-                    row_number() OVER (ORDER BY c.updated_at DESC, c.id DESC) AS rn
-               FROM contexts c
-               JOIN projects p ON p.id = c.project_id
-               LEFT JOIN project_memberships pm
-                      ON pm.project_id = p.id AND pm.user_id = ?
-              WHERE c.project_id = ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)
-           )
-           SELECT id, kind, title, CASE WHEN rn <= ? THEN body END AS body
-             FROM ranked ORDER BY rn`,
-          [userId, projectId, userId, limit],
-        );
+      ? ``
+      : `JOIN projects p ON p.id = c.project_id
+         LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?`;
+  const where =
+    projectId === null
+      ? `c.user_id = ? AND c.project_id IS NULL`
+      : `c.project_id = ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)`;
+  const scope = projectId === null ? [userId] : [userId, projectId, userId];
+
+  const doc = document("contexts", "c");
+
+  // `ts_rank` straight in the window's ORDER BY, which does mean two tsvectors
+  // per note in the project on the call every session opens with. Measured:
+  // 2ms -> 17ms at 100 notes, 5 -> 142 at 1,000, 27 -> 759 at 5,000. Paid once
+  // per session and only when a focus was sent.
+  //
+  // The obvious fix -- find the matching notes through the GIN index first and
+  // rank only those -- was written, measured, and is NOT here: it was twice as
+  // slow (759ms -> 1554ms), because the index goes unused and every note
+  // matches anyway. `websearch_to_tsquery('turkish', …)` keeps `why`, `is`,
+  // `on` and `a` as lexemes, since they are not Turkish stopwords, and the
+  // conjunction-to-disjunction rewrite then makes any document containing the
+  // word "a" a match. Ranking still orders them correctly, which is why search
+  // recall went up rather than down -- it is the *cost* that the stopwords
+  // decide, not the answer. Fixing that is the lever for both this and search,
+  // and it is its own piece of work.
+  const relevance = focus ? `WITH q AS (SELECT ${TSQUERY}),` : `WITH`;
+  const order = focus
+    ? `${rank(doc)} DESC, c.updated_at DESC, c.id DESC`
+    : `c.updated_at DESC, c.id DESC`;
+
+  const rows = await all<BriefingNote>(
+    `${relevance} ranked AS (
+       SELECT c.id, c.kind, c.title, c.body,
+              row_number() OVER (ORDER BY ${order}) AS rn
+         FROM ${focus ? `q CROSS JOIN contexts c` : `contexts c`}
+         ${joins}
+        WHERE ${where}
+     )
+     SELECT id, kind, title, CASE WHEN rn <= ? THEN body END AS body
+       FROM ranked ORDER BY rn`,
+    [...(focus ? [focus, focus] : []), ...scope, limit],
+  );
 
   return { rows, omitted: rows.filter((r) => r.body === null).length };
 }

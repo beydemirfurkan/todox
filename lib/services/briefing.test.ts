@@ -41,7 +41,7 @@ const PROJECT = {
   summary: "s",
 };
 
-const brief = (userId = 7) => briefing(userId, PROJECT as never);
+const brief = (userId = 7, focus?: string) => briefing(userId, PROJECT as never, focus);
 
 const task = (id: number, over: Record<string, unknown> = {}) => ({
   id,
@@ -251,8 +251,34 @@ describe("context notes", () => {
 
   it("asks for the account-wide ones and the project's separately", async () => {
     await brief();
-    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 60);
-    expect(mocks.pageNotes).toHaveBeenCalledWith(7, PROJECT.id, 60);
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 60, undefined);
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, PROJECT.id, 60, undefined);
+  });
+
+  /**
+   * A focus reorders which notes keep a body; it never changes how many.
+   *
+   * Both scopes get it, because a standing rule that applies to every project
+   * is the kind most likely to be old -- and therefore the kind recency buries
+   * first. Reaching only the project's own notes would leave exactly the wrong
+   * half on the guess.
+   */
+  it("passes the focus to both scopes, or neither", async () => {
+    await brief(7, "why is login redirecting in a loop");
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 25, "why is login redirecting in a loop");
+    expect(mocks.pageNotes).toHaveBeenCalledWith(
+      7,
+      PROJECT.id,
+      25,
+      "why is login redirecting in a loop",
+    );
+  });
+
+  it("says which of the two orderings the notes came back in", async () => {
+    // The agent cannot tell by looking, and it changes what a null body means:
+    // ranked, it was judged irrelevant; recent, nobody said what to judge by.
+    expect((await brief()).context_ranked_by).toBe("recency");
+    expect((await brief(7, "anything at all")).context_ranked_by).toBe("focus");
   });
 
   it("asks the database for the ceiling rather than slicing after the fact", async () => {
@@ -260,6 +286,20 @@ describe("context notes", () => {
     // Trimming here would leave the cost exactly where it was.
     await brief();
     for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(60);
+  });
+
+  /**
+   * A lower ceiling is only safe because the budget is being aimed. Sending a
+   * focus therefore buys fewer bodies, not the same number reordered -- and
+   * *not* sending one must keep the old, wider guess, since nothing else is
+   * left to choose by.
+   */
+  it("spends less when it knows what to spend it on", async () => {
+    await brief();
+    for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(60);
+    mocks.pageNotes.mockClear();
+    await brief(7, "the login redirect loop");
+    for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(25);
   });
 
   it("hands back only the four fields a reader needs", async () => {

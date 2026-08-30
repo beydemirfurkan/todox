@@ -499,3 +499,45 @@ export const QUESTIONS: Question[] = [
     answerType: "task",
   },
 ];
+
+/**
+ * Notes that answer none of the questions above, for measuring what the
+ * briefing's body ceiling actually costs.
+ *
+ * Filler rather than duplicated corpus notes, and that distinction is the whole
+ * measurement. `reportGrowth` reuses real bodies because it is weighing bytes
+ * and wants realistic sizes; recall cannot, because a duplicate of the note
+ * that answers a question competes with it for the same budget on identical
+ * text — so the run would score a miss where the agent in fact received the
+ * answer, and the number would be wrong in the direction that flatters the
+ * change being tested.
+ *
+ * Written to be plausible and to be about a subsystem the questions never
+ * mention, at roughly the length a real note runs to. `n` varies the subject so
+ * a hundred of them are not one note a hundred times, which would let a single
+ * relevance hit stand in for all of them.
+ */
+const FILLER_SUBJECTS = [
+  "the invoice export worker",
+  "the nightly currency sync",
+  "the warehouse label printer",
+  "the fleet telemetry poller",
+  "the seating chart renderer",
+  "the payroll rounding rules",
+];
+
+export const filler = (n: number): Note => {
+  const subject = FILLER_SUBJECTS[n % FILLER_SUBJECTS.length];
+  return {
+    kind: (["convention", "decision", "gotcha", "preference"] as const)[n % 4],
+    title: `Batch ${n} handling in ${subject}`,
+    body:
+      `${subject} processes its queue in batches of ${100 + n}, and the size is not arbitrary: ` +
+      `below that the per-batch overhead dominates and above it a single retry replays too much ` +
+      `work. The retry is at-least-once, so every handler downstream has to tolerate seeing the ` +
+      `same item twice — the ledger writer does this by keying on the item's own identifier ` +
+      `rather than on the position in the batch. An earlier version keyed on position and ` +
+      `double-counted anything that arrived after a partial failure, which nobody noticed for ` +
+      `a week because the totals were only wrong on days a batch had failed.`,
+  };
+};

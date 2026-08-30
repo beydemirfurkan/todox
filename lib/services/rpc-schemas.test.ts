@@ -292,3 +292,37 @@ describe("mergeProjects", () => {
     expect(() => parseParams("mergeProjects", { from: "a", into: "b", confirm: true })).toThrow();
   });
 });
+
+/**
+ * The briefing's relevance signal.
+ *
+ * It only ever reorders, so a bad value cannot produce a wrong answer — which
+ * is exactly why it needs a test: nothing downstream would notice if it stopped
+ * being accepted, and the tool would go on quietly ranking by recency.
+ */
+describe("getContext focus", () => {
+  it("takes a sentence", () => {
+    expect(() =>
+      parseParams("getContext", { cwd: "/repo", focus: "fix the login redirect loop" }),
+    ).not.toThrow();
+  });
+
+  it("is optional, because a session may not know yet", () => {
+    expect(() => parseParams("getContext", { cwd: "/repo" })).not.toThrow();
+  });
+
+  it("refuses a whole essay, and anything that is not a string", () => {
+    expect(() => parseParams("getContext", { cwd: "/repo", focus: "x".repeat(5000) })).toThrow(
+      /invalid params/,
+    );
+    expect(() => parseParams("getContext", { cwd: "/repo", focus: ["a", "b"] })).toThrow(
+      /invalid params/,
+    );
+  });
+
+  it("still refuses an unknown key beside it", () => {
+    expect(() => parseParams("getContext", { cwd: "/repo", focuss: "typo" })).toThrow(
+      /invalid params/,
+    );
+  });
+});

@@ -501,6 +501,31 @@ async function runSuite(mode: Mode, token: string) {
   if (!wholeNote.updated_at) throw new Error("get_context_note dropped the timestamps");
   console.log("read back in full:", wholeNote.title, "· updated_at present");
 
+  // A focus reorders which notes keep their bodies. Two things have to hold and
+  // neither is visible from the payload alone: the ranking actually ran, and it
+  // did not lose a note. `context_ranked_by` reports the first; comparing the
+  // two title sets reports the second, which is the property that lets the
+  // instructions tell an agent there is no cost to sending one.
+  console.log("\n--- and a focus reorders the notes without dropping any ---");
+  const ranked = JSON.parse(
+    await text("get_context", {
+      cwd: SCRATCH,
+      focus: "a note this session corrected in place",
+      ...(mode.local ? {} : { repo_root: SCRATCH }),
+    }),
+  );
+  if (ranked.context_ranked_by !== "focus")
+    throw new Error(`focus was ignored: context_ranked_by=${ranked.context_ranked_by}`);
+  if (corrected.context_ranked_by !== "recency")
+    throw new Error("a briefing with no focus claimed to be ranked by one");
+  const titles = (b: { project_context: { title: string }[] }) =>
+    b.project_context.map((c) => c.title).sort().join("|");
+  if (titles(ranked) !== titles(corrected))
+    throw new Error("ranking by focus changed which notes came back, not just their order");
+  if (!ranked.project_context.some((c: { title: string }) => c.title === "SMOKE-CORRECTION"))
+    throw new Error("the note the focus described is not in the briefing at all");
+  console.log("ranked_by:", ranked.context_ranked_by, "· same notes, reordered");
+
   // `search` was in none of the four smoke suites, which is how it kept a
   // description promising full-text over three ILIKE scans. Now that it parses
   // the query, the assertion worth making is the one that used to fail: a
