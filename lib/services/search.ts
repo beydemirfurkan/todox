@@ -60,8 +60,10 @@ export const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
  * drift.
  */
 const BINDINGS = `WITH q AS (
-  SELECT ?::int  AS uid,
-         ?::text AS pat,
+  SELECT ?::int    AS uid,
+         ?::int    AS project,
+         ?::text[] AS kinds,
+         ?::text   AS pat,
          ${TSQUERY}
          ${TSQUERY_FROM}
 )`;
@@ -159,7 +161,9 @@ const TASKS: Searchable = {
              CROSS JOIN tasks t
              JOIN projects p ON p.id = t.project_id
              LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = q.uid
-            WHERE (p.user_id = q.uid OR pm.user_id IS NOT NULL)`,
+            WHERE (p.user_id = q.uid OR pm.user_id IS NOT NULL)
+              AND (q.project IS NULL OR t.project_id = q.project)
+              AND q.kinds IS NULL`,
   doc: document("tasks", "t"),
   substring: `t.title ILIKE q.pat OR t.body ILIKE q.pat`,
   carried: `t.id, t.updated_at AS sort_key, ${SLUG} AS project_slug`,
@@ -173,7 +177,9 @@ const ENTRIES: Searchable = {
              JOIN tasks t ON t.id = e.task_id
              JOIN projects p ON p.id = t.project_id
              LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = q.uid
-            WHERE (p.user_id = q.uid OR pm.user_id IS NOT NULL)`,
+            WHERE (p.user_id = q.uid OR pm.user_id IS NOT NULL)
+              AND (q.project IS NULL OR p.id = q.project)
+              AND (q.kinds IS NULL OR e.kind = ANY(q.kinds))`,
   doc: document("entries", "e"),
   substring: `e.body ILIKE q.pat`,
   carried: `e.id, e.created_at AS sort_key, ${SLUG} AS project_slug`,
@@ -192,7 +198,12 @@ const CONTEXTS: Searchable = {
              LEFT JOIN projects p ON p.id = c.project_id
              LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = q.uid
             WHERE (c.project_id IS NULL AND c.user_id = q.uid
-                OR c.project_id IS NOT NULL AND (p.user_id = q.uid OR pm.user_id IS NOT NULL))`,
+                OR c.project_id IS NOT NULL AND (p.user_id = q.uid OR pm.user_id IS NOT NULL))
+              -- An account-wide note survives a project filter: a standing rule
+              -- that applies to every project applies to the one being asked
+              -- about, and the briefing already merges the two scopes.
+              AND (q.project IS NULL OR c.project_id = q.project OR c.project_id IS NULL)
+              AND (q.kinds IS NULL OR c.kind = ANY(q.kinds))`,
   doc: document("contexts", "c"),
   substring: `c.title ILIKE q.pat OR c.body ILIKE q.pat`,
   carried: `c.id, c.updated_at AS sort_key, ${SLUG} AS project_slug`,
@@ -212,12 +223,44 @@ export const QUERIES = {
   contexts: buildQuery(CONTEXTS),
 };
 
-export async function search(userId: number, query: string, limit = 30): Promise<SearchHit[]> {
+/**
+ * Narrowing, and why both of these are bound rather than built into the SQL.
+ *
+ * A filter that changed the *shape* of the query would give the three tables
+ * different placeholder counts, and they share one parameter array -- which
+ * `lib/db/client.ts` rewrites positionally. Binding them as columns of `q`
+ * instead means null is a real value meaning "no filter", every query takes
+ * the same eight parameters in the same order, and the planner still sees a
+ * constant it can fold.
+ */
+export type SearchFilters = {
+  /** Already resolved to an id: `search` does not know how to read a slug. */
+  projectId?: number | null;
+  /** Entry and note kinds. Tasks have none, so any value here excludes them. */
+  kinds?: string[] | null;
+};
+
+export async function search(
+  userId: number,
+  query: string,
+  limit = 30,
+  filters: SearchFilters = {},
+): Promise<SearchHit[]> {
   // The order is the order the placeholders appear in, which is the same for
   // all three because `BINDINGS` is the same for all three. Everything after
-  // the CTE reads `q.uid` and `q.pat`; the two loose ones are the limit inside
-  // `top` and the query the headline is highlighted against.
-  const params = [userId, `%${escapeLike(query)}%`, query, query, limit, query];
+  // the CTE reads `q.uid`, `q.pat`, `q.project` and `q.kinds`; the two loose
+  // ones are the limit inside `top` and the query the headline is highlighted
+  // against.
+  const params = [
+    userId,
+    filters.projectId ?? null,
+    filters.kinds?.length ? filters.kinds : null,
+    `%${escapeLike(query)}%`,
+    query,
+    query,
+    limit,
+    query,
+  ];
 
   const [taskRows, entryRows, contextRows] = await Promise.all([
     all<TaskRow>(QUERIES.tasks, params),
