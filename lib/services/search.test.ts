@@ -96,8 +96,8 @@ describe("the index and the query ask for the same expression", () => {
 describe("all three queries take the same parameters", () => {
   const placeholders = (sql: string) => (sql.match(/\?/g) ?? []).length;
 
-  it("six, in the same order, everywhere", () => {
-    for (const table of TABLES) expect(placeholders(QUERIES[table])).toBe(6);
+  it("eight, in the same order, everywhere", () => {
+    for (const table of TABLES) expect(placeholders(QUERIES[table])).toBe(8);
   });
 });
 

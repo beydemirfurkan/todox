@@ -91,6 +91,9 @@ const BASE = [
   "the answer is often in a project other than this one. Ask it in words: the",
   "query is parsed and ranked, so a whole question works and the record that",
   "answers most of it comes back first. Quote a phrase to require it exactly.",
+  "Narrow with kinds when the question has a shape: kinds:['dead_end'] for",
+  "'has this been tried?', kinds:['decision'] for 'why is it like this?'. Pass",
+  "project only when you mean to stop looking elsewhere.",
   "",
   "BEFORE YOU EDIT A FILE: get_file_context takes a path and answers with the",
   "tasks that touched it, their dead ends, and any standing note attached to",
@@ -785,7 +788,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("search", "search", {
     title: "Search across every project",
     description:
-      "Full-text search over task titles and bodies, log entry bodies, and context note titles and bodies, across ALL of your projects, ranked by relevance. Ask it the question in words -- 'why did we choose scrypt over bcrypt' -- and it will find the note that answers it; the terms are matched independently and a record matching more of them ranks higher, so a whole sentence works and does not need narrowing. Quote a phrase to require it exactly. Stemming is applied in English and in Turkish, and a literal substring match runs underneath, so the middle of an identifier ('FileSync' inside readFileSync) is found too. Each hit carries a snippet taken from the part that matched, not from the top of the body. Not searched: entry and note kinds, file paths, project names. Returns at most `limit` hits in total (default 30).",
+      "Full-text search over task titles and bodies, log entry bodies, and context note titles and bodies, across ALL of your projects, ranked by relevance. Ask it the question in words -- 'why did we choose scrypt over bcrypt' -- and it will find the note that answers it; the terms are matched independently and a record matching more of them ranks higher, so a whole sentence works and does not need narrowing. Quote a phrase to require it exactly. Stemming is applied in English and in Turkish, and a literal substring match runs underneath, so the middle of an identifier ('FileSync' inside readFileSync) is found too. Each hit carries a snippet taken from the part that matched, not from the top of the body. Two optional filters, both narrowing rather than searching: `kinds` keeps only records of those kinds -- ['dead_end'] answers 'has this been tried?', ['decision'] answers 'why is it like this?' -- and since tasks have no kind, asking for any leaves the log and the notes; `project` (a slug, a name, or a path inside it) stops it looking anywhere else, though account-wide notes still come back because a rule that applies everywhere applies here. Leave both out unless the question has a shape: searching everything is usually the point. Not searched as text: kinds, file paths, project names. Returns at most `limit` hits in total (default 30).",
     annotations: READ_ONLY,
   });
 

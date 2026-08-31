@@ -606,6 +606,47 @@ async function runSuite(mode: Mode, token: string) {
   // description promising full-text over three ILIKE scans. Now that it parses
   // the query, the assertion worth making is the one that used to fail: a
   // question, in words, finding the note that answers it.
+  // Filters narrow; they must not quietly do nothing. A filter that is ignored
+  // searches everything and looks exactly like one that worked, so each of
+  // these asserts a hit that should survive *and* one that should not.
+  console.log("\n--- and the search can be narrowed ---");
+  const hits = async (args: Record<string, unknown>) =>
+    JSON.parse(await text("search", args)) as {
+      type: string;
+      title: string;
+      project_slug: string | null;
+    }[];
+
+  const onlyNotes = await hits({ query: "SMOKE", kinds: ["preference"] });
+  if (!onlyNotes.length) throw new Error("kinds filtered everything away");
+  if (onlyNotes.some((h) => h.type !== "context"))
+    throw new Error(`a kind filter let a ${onlyNotes.find((h) => h.type !== "context")?.type} through`);
+
+  // Tasks have no kind, so any kind filter must exclude them -- and without one
+  // they have to come back, or the assertion above proves nothing.
+  const everything = await hits({ query: "SMOKE" });
+  if (!everything.some((h) => h.type === "task"))
+    throw new Error("an unfiltered search returned no tasks, so the filter test is vacuous");
+  console.log(`kinds: ${onlyNotes.length} note(s), unfiltered: ${everything.length} hit(s)`);
+
+  // The account holds two projects here, which is what makes this test mean
+  // something: the second one's records have to be in the unfiltered answer and
+  // out of the filtered one. Asserting only that the filter "returned fewer"
+  // would pass on a filter that dropped rows at random.
+  if (!everything.some((h) => h.project_slug === b.project.slug))
+    throw new Error("the other project is not in the unfiltered answer, so nothing is being tested");
+
+  const scoped = await hits({ query: "SMOKE", project: a.project.slug });
+  if (!scoped.length) throw new Error("a project filter returned nothing at all");
+  const strays = scoped.filter(
+    // null is an account-wide note, which survives on purpose: a rule that
+    // applies to every project applies to the one being asked about.
+    (h) => h.project_slug !== null && h.project_slug !== a.project.slug,
+  );
+  if (strays.length)
+    throw new Error(`the project filter let ${strays[0].project_slug} through`);
+  console.log(`project ${a.project.slug}: ${scoped.length} of ${everything.length}`);
+
   console.log("\n--- and a question, in words, finds the note ---");
   const found = JSON.parse(
     await text("search", { query: "what did this session turn out to be right about?" }),
@@ -681,6 +722,12 @@ async function main() {
 
   const user = await ensureUser("smoke-agent", "Smoke");
   const { token } = await createApiToken(user.id, "mcp-smoke");
+
+  // Before, as well as after. See `removeRows`: a run that fails leaves its
+  // project behind, and the next one then seeds a second copy of everything and
+  // fails in an assertion that has nothing to do with what broke. Rows only --
+  // the directories above are this run's, not the last one's.
+  await removeRows(user.id);
 
   for (const mode of MODES) await runSuite(mode, token);
 
@@ -813,27 +860,52 @@ async function main() {
     throw new Error(`/api/mcp answered ${anonMcp.status} as ${ct}; is it in proxy.ts PUBLIC?`);
   console.log("/api/mcp:", anonMcp.status, (await anonMcp.json()).error?.message);
 
-  // leave no trace. Paths are compared normalised because that is how they
-  // were stored -- a Windows agent's separators are folded on the way in.
-  // ELSEWHERE should never become a project's `root_path` -- that is the whole
-  // point, it joins SCRATCH's -- but it is listed anyway. A run that fails
-  // between the two leaves the row behind, and the next run then matches it by
-  // remote and fails somewhere far less obvious.
+  await removeRows(user.id);
+  removeDirs();
+
+  console.log("\nOK (cleaned up)");
+}
+
+/**
+ * Leave no trace in the database -- and run it before the suite as well as
+ * after it.
+ *
+ * Only running it at the end is fine right up until a run fails, and then the
+ * next one seeds on top of what was left: two notes with the same title, two of
+ * every record a count is taken of. What that produces is not a clean failure
+ * but a confusing one, in an assertion that has nothing to do with whatever
+ * actually broke -- "a deleted note is still in the briefing", when what
+ * happened is that there were two.
+ *
+ * Paths are compared normalised because that is how they were stored -- a
+ * Windows agent's separators are folded on the way in. ELSEWHERE should never
+ * become a project's `root_path` -- that is the whole point, it joins
+ * SCRATCH's -- but it is listed anyway: a run that fails between the two leaves
+ * the row behind, and the next one then matches it by remote and fails
+ * somewhere far less obvious.
+ */
+async function removeRows(userId: number) {
   const ours = new Set([
     normalisePath(SCRATCH),
     normalisePath(OTHER),
     normalisePath(ELSEWHERE),
   ]);
-  for (const p of await projectsRepo.list(user.id, true)) {
+  for (const p of await projectsRepo.list(userId, true)) {
     for (const t of await tasksRepo.listByProject(p.id, "all"))
       if (t.title.startsWith("SMOKE:")) await tasksRepo.remove(t.id);
     if (p.root_path && ours.has(normalisePath(p.root_path)))
-      await projectsRepo.remove(user.id, p.id);
+      await projectsRepo.remove(userId, p.id);
   }
+}
+
+/**
+ * The other half, and separate from it because only one of the two may run
+ * before the suite: the rows are stale and have to go, while the directories
+ * are the ones `main` has just built and git-initialised.
+ */
+function removeDirs() {
   for (const dir of [SCRATCH, OTHER, ELSEWHERE])
     rmSync(dir, { recursive: true, force: true });
-
-  console.log("\nOK (cleaned up)");
 }
 
 main().catch((e) => {

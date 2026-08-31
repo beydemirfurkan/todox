@@ -358,3 +358,43 @@ describe("logEntry answers_entry_id", () => {
     );
   });
 });
+
+/**
+ * The two ways to narrow a search.
+ *
+ * Both are optional and both are meant to be left out most of the time, which
+ * is exactly why the schema has to be strict about them: a filter that is
+ * quietly ignored searches everything and looks like it worked.
+ */
+describe("search filters", () => {
+  it("takes a project ref and a list of kinds", () => {
+    expect(() =>
+      parseParams("search", { query: "scrypt", project: "todox", kinds: ["dead_end"] }),
+    ).not.toThrow();
+  });
+
+  it("still works with neither, which is the common case", () => {
+    expect(() => parseParams("search", { query: "scrypt" })).not.toThrow();
+  });
+
+  it("refuses a kind that is not one", () => {
+    // The union spans entry kinds and note kinds; anything else would filter
+    // every row out and read as "nothing recorded".
+    expect(() => parseParams("search", { query: "x", kinds: ["dead-end"] })).toThrow(
+      /invalid params/,
+    );
+    expect(() => parseParams("search", { query: "x", kinds: ["task"] })).toThrow(/invalid params/);
+  });
+
+  it("refuses an empty kinds list rather than treating it as no filter", () => {
+    expect(() => parseParams("search", { query: "x", kinds: [] })).toThrow(/invalid params/);
+  });
+
+  it("takes kinds from both vocabularies", () => {
+    // `gotcha` is a note kind and `handoff` is an entry kind; one list covers
+    // both because the caller is asking about records, not about tables.
+    expect(() =>
+      parseParams("search", { query: "x", kinds: ["gotcha", "handoff", "decision"] }),
+    ).not.toThrow();
+  });
+});

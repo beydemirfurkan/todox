@@ -446,6 +446,18 @@ export const SHAPES = {
 
   search: {
     query: z.string().min(1).max(MAX.query),
+    project: ref
+      .optional()
+      .describe(
+        "Narrow to one project — a slug, a name, or any absolute path inside it. Leave it out to search everything, which is usually right: the answer to 'have I hit this before?' is often in a different repository. Account-wide notes come back either way, because a standing rule that applies to every project applies to this one.",
+      ),
+    kinds: z
+      .array(z.enum([...new Set([...ENTRY_KINDS, ...CONTEXT_KINDS])] as [string, ...string[]]))
+      .min(1)
+      .optional()
+      .describe(
+        "Only these kinds of record: 'dead_end' for 'has this been tried?', 'decision' for 'why is it like this?', 'gotcha' for 'what will bite me?'. Tasks have no kind, so asking for any excludes them and leaves the log and the notes.",
+      ),
     // Unbounded, this is three unindexed ILIKE scans with no ceiling.
     limit: z.number().int().min(1).max(100).optional(),
     model,

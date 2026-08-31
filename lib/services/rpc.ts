@@ -405,8 +405,16 @@ export const methods = {
     return { deleted: removed > 0 };
   },
 
-  search: ({ userId }, p: { query: string; limit?: number }) =>
-    search(userId, p.query, p.limit ?? 30),
+  search: async (
+    { userId },
+    p: { query: string; project?: string; kinds?: string[]; limit?: number },
+  ) => {
+    // Resolved here rather than inside `search`, which takes ids: a slug that
+    // matches nothing must answer 404 rather than quietly searching everything,
+    // which is what an unresolved filter would do.
+    const projectId = p.project ? (await mustResolve(userId, p.project)).id : null;
+    return search(userId, p.query, p.limit ?? 30, { projectId, kinds: p.kinds });
+  },
 
   activityReport: async (
     { userId },
