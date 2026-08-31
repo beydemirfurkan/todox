@@ -1,5 +1,6 @@
 import { isClosedStatus } from "../constants";
 import { tx } from "../db/client";
+import { BadRequest } from "./errors";
 import * as entries from "../repositories/entries";
 import * as events from "../repositories/events";
 import * as refs from "../repositories/refs";
@@ -96,7 +97,35 @@ export async function update(
  * which is the failure this codebase keeps finding -- a write that half
  * happened and reads as if it fully did.
  */
+/**
+ * What `answers_entry_id` is allowed to point at.
+ *
+ * Ownership is not asked here -- `assertTask` at the RPC boundary has already
+ * established that this caller may write to this task, and requiring the target
+ * to be *on that task* is what makes that check cover the target too. It also
+ * keeps the read the briefing does simple: a question and the thing that closes
+ * it are always in the same log.
+ *
+ * `question` specifically, because the field means "this is no longer open" and
+ * that only means anything for the kind that can be open. Pointing it at a
+ * decision would quietly hide the decision from every briefing.
+ */
+async function assertAnswerable(taskId: number, entryId: number): Promise<void> {
+  const target = await entries.byId(entryId);
+  // Same message for "no such entry" and "not on this task" on purpose: the
+  // reply must not tell a caller that an id exists somewhere else.
+  if (!target || target.task_id !== taskId)
+    throw new BadRequest(`entry #${entryId} is not on task #${taskId}`);
+  if (target.kind !== "question")
+    throw new BadRequest(
+      `entry #${entryId} is a ${target.kind}, and only a question can be answered`,
+    );
+}
+
 export async function addEntry(input: entries.NewEntry): Promise<Entry> {
+  if (input.answers_entry_id != null)
+    await assertAnswerable(input.task_id, input.answers_entry_id);
+
   const [rows] = await tx<Entry>([
     entries.createStmt(input),
     tasks.touchStmt(input.task_id),

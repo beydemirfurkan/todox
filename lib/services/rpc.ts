@@ -278,7 +278,14 @@ export const methods = {
 
   logEntry: async (
     { userId },
-    p: { task_id: number; kind: EntryKind; body: string; author?: string; model?: string },
+    p: {
+      task_id: number;
+      kind: EntryKind;
+      body: string;
+      author?: string;
+      answers_entry_id?: number;
+      model?: string;
+    },
   ) => {
     await assertTask(userId, p.task_id);
     return taskService.addEntry({ ...p, user_id: userId });

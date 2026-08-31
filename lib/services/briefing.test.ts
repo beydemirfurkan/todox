@@ -164,13 +164,37 @@ describe("what each task carries", () => {
   it("carries every dead end", async () => {
     // The highest-value entry there is: it is what stops the repeat.
     const out = await brief();
-    expect(out.open_tasks[0]!.dead_ends).toEqual(["the cron did not work"]);
+    expect(out.open_tasks[0]!.dead_ends).toEqual([
+      { id: expect.any(Number), body: "the cron did not work" },
+    ]);
   });
 
   it("carries the decisions and the open questions apart", async () => {
     const out = await brief();
-    expect(out.open_tasks[0]!.decisions).toEqual(["chose the CTE"]);
-    expect(out.open_tasks[0]!.open_questions).toEqual(["which timezone?"]);
+    expect(out.open_tasks[0]!.decisions).toEqual([
+      { id: expect.any(Number), body: "chose the CTE" },
+    ]);
+    expect(out.open_tasks[0]!.open_questions).toEqual([
+      { id: expect.any(Number), body: "which timezone?" },
+    ]);
+  });
+
+  /**
+   * The id is the point of the shape, not decoration.
+   *
+   * A briefing that hands back bare strings is reading matter: an agent that
+   * has just worked out the answer to an open question cannot say *which*
+   * question it answered without a second `get_task`, and that call returns the
+   * whole log to recover a number this payload already had.
+   */
+  it("names every record it hands back, so the agent can act on one", async () => {
+    const out = await brief();
+    for (const list of [
+      out.open_tasks[0]!.decisions,
+      out.open_tasks[0]!.dead_ends,
+      out.open_tasks[0]!.open_questions,
+    ])
+      for (const record of list) expect(typeof record.id).toBe("number");
   });
 
   it("counts the whole log, including the kinds it never asked for", async () => {

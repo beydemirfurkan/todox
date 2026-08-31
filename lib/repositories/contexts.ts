@@ -25,6 +25,17 @@ export type BriefingNote = {
   kind: ContextKind;
   title: string;
   body: string | null;
+  /**
+   * When it was written and when it was last touched.
+   *
+   * Carried because `update_context` asks the agent to arbitrate between notes
+   * that contradict each other, and age is most of the evidence for that: a
+   * gotcha from last week and one from two years ago are not equally likely to
+   * still be true. Asking for a judgement while withholding what it turns on is
+   * the kind of thing that produces a confident wrong answer.
+   */
+  created_at: string;
+  updated_at: string;
 };
 
 /** `null` means the account-wide scope, which is a real scope here, not "no
@@ -124,13 +135,14 @@ export async function pageByProject(
 
   const rows = await all<BriefingNote>(
     `${relevance} ranked AS (
-       SELECT c.id, c.kind, c.title, c.body,
+       SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at,
               row_number() OVER (ORDER BY ${order}) AS rn
          FROM ${focus ? `q CROSS JOIN contexts c` : `contexts c`}
          ${joins}
         WHERE ${where}
      )
-     SELECT id, kind, title, CASE WHEN rn <= ? THEN body END AS body
+     SELECT id, kind, title, created_at, updated_at,
+            CASE WHEN rn <= ? THEN body END AS body
        FROM ranked ORDER BY rn`,
     [...(focus ? [focus, focus] : []), ...scope, limit],
   );

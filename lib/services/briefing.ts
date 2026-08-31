@@ -123,7 +123,13 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // A cold agent needs the shape of the work, not every keystroke: the last
     // handoff, the recent decisions, and the dead ends (the expensive ones).
     const handoff = [...log].reverse().find((e) => e.kind === "handoff");
-    const bodies = (kind: string) => log.filter((e) => e.kind === kind).map((e) => e.body);
+    // With the id, because an agent that reads a record and then wants to do
+    // something about it -- answer the question, correct the entry -- could not
+    // name it. Notes kept their id and entries did not, so acting on one meant a
+    // second `get_task` that returns the whole log to find a number the briefing
+    // already had in hand.
+    const bodies = (kind: string) =>
+      log.filter((e) => e.kind === kind).map((e) => ({ id: e.id, body: e.body }));
     const decisions = bodies("decision");
     const dead_ends = bodies("dead_end");
     const open_questions = bodies("question");

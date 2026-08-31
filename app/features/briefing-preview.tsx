@@ -10,6 +10,11 @@ import type { T } from "@/lib/i18n";
  * fields that are the whole argument (`dead_ends`, and a linked file that says
  * it may be lying) sitting in it rather than being claimed above it.
  *
+ * Every record carries its id, and so does the real payload: that is what lets
+ * an agent answer the open question it was just shown rather than only read it.
+ * Trimming a sample for width is fair; showing a shape the API does not return
+ * is the dishonesty this file's own caption warns about.
+ *
  * Hand-written rather than generated from a live account: it has to be legible
  * at this width, and a real briefing is not. `briefingCaption` says so — a
  * trimmed sample presented as the whole thing would be the same dishonesty the
@@ -59,11 +64,18 @@ const SAMPLE = `{
       "status": "doing",
       "last_handoff": "auth bypass closed; briefing capped per kind.
                        Left: a byte budget, which is its own decision.",
-      "decisions":  ["Capped per kind, not per task — a flat cut drops
-                      the two old dead ends under thirty notes."],
-      "dead_ends":  ["1 MB body ceiling. The schema allows link_files
-                      up to ~2.4 MB, so it refused legal calls."],
-      "open_questions": [],
+      "decisions": [
+        { "id": 812, "body": "Capped per kind, not per task — a flat
+                              cut drops the two old dead ends." }
+      ],
+      "dead_ends": [
+        { "id": 806, "body": "1 MB body ceiling. The schema allows
+                              link_files up to ~2.4 MB, so it
+                              refused legal calls." }
+      ],
+      "open_questions": [
+        { "id": 819, "body": "Cap by bytes or by count?" }
+      ],
       "files": [
         { "path": "lib/services/briefing.ts", "status": "changed" },
         { "path": "proxy.ts",                 "status": "not checked" }

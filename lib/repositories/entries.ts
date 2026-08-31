@@ -11,6 +11,14 @@ export type NewEntry = {
   model?: string | null;
   /** Resolved from the session or the token, never from the caller. */
   user_id?: number | null;
+  /**
+   * The question this entry settles, if it settles one.
+   *
+   * Checked at the RPC boundary rather than here: it has to be a `question`, on
+   * this task, belonging to this caller, and a repository cannot ask any of
+   * those without reading a second table.
+   */
+  answers_entry_id?: number | null;
 };
 
 /**
@@ -113,6 +121,13 @@ export async function listByTasksPerKind(
          LEFT JOIN users u ON u.id = e.user_id
         WHERE e.task_id IN (${taskIds.map(() => "?").join(",")})
           AND e.kind IN (${kinds.map(() => "?").join(",")})
+          -- A question that something answers is no longer open, and this is
+          -- the one place that has to know it. Filtering after the read would
+          -- let three answered questions push the open one past the per-kind
+          -- ceiling, which is the cut this window is applying -- and no
+          -- backtick may appear in this comment, because the whole query is a
+          -- template literal and a backtick ends it.
+          AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)
      ) ranked
      WHERE rank <= ?
      ORDER BY task_id, id`,
@@ -232,8 +247,8 @@ export const byId = (id: number) =>
  * with the table that owns it; see the transaction rule in CONTRIBUTING.md.
  */
 export const createStmt = (input: NewEntry): Statement => ({
-  text: `INSERT INTO entries (task_id, kind, body, author, model, user_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+  text: `INSERT INTO entries (task_id, kind, body, author, model, user_id, answers_entry_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
   params: [
     input.task_id,
     input.kind,
@@ -241,6 +256,7 @@ export const createStmt = (input: NewEntry): Statement => ({
     input.author ?? "agent",
     input.model ?? null,
     input.user_id ?? null,
+    input.answers_entry_id ?? null,
     now(),
   ],
 });
