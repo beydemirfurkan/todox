@@ -282,6 +282,13 @@ export const SHAPES = {
       .max(MAX.text)
       .describe("Write for a stranger, not for yourself"),
     author: z.enum(["agent", "human"]).optional(),
+    answers_entry_id: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        "The id of a `question` entry on this same task that this entry settles. A question with an answer stops being open: it drops out of the briefing and out of report windows, while both it and the answer stay readable through get_task. Use it whenever you resolve something a previous session had to ask about — it is the only way a question ever closes.",
+      ),
     model,
   },
 

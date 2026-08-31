@@ -394,12 +394,86 @@ async function runSuite(mode: Mode, token: string) {
       ...(mode.local ? {} : { repo_root: SCRATCH }),
     }),
   ).task.id;
+  // The id is kept because the question-closing check below needs an entry that
+  // is *not* a question, to prove the field refuses one.
+  const openADeadEnd = JSON.parse(
+    await text("log_entry", {
+      task_id: openA,
+      kind: "dead_end",
+      body: "SMOKE-A-ONLY: this belongs to the first repo and must not surface in the second.",
+      model: MODEL,
+    }),
+  ).id;
+  // A question is the only kind that can be open, and until now it was the only
+  // kind that could never stop being open. Two things have to hold: the id has
+  // to reach the agent in the first place (the briefing used to hand back bare
+  // strings, so there was nothing to point at), and answering it has to take it
+  // out of the briefing without taking it out of the log.
+  console.log("\n--- a question closes, and only by being answered ---");
   await text("log_entry", {
     task_id: openA,
-    kind: "dead_end",
-    body: "SMOKE-A-ONLY: this belongs to the first repo and must not surface in the second.",
+    kind: "question",
+    body: "SMOKE-QUESTION: which timezone should the report window use?",
     model: MODEL,
   });
+
+  const withQuestion = JSON.parse(
+    await text("get_context", { cwd: SCRATCH, ...(mode.local ? {} : { repo_root: SCRATCH }) }),
+  );
+  const askedOn = withQuestion.open_tasks.find((t: { id: number }) => t.id === openA);
+  const question = askedOn?.open_questions?.find((q: { body: string }) =>
+    q.body.includes("SMOKE-QUESTION"),
+  );
+  if (!question) throw new Error("the question never reached the briefing");
+  if (typeof question.id !== "number")
+    throw new Error(`the briefing handed back a question with no id: ${JSON.stringify(question)}`);
+  console.log("asked, and nameable: #" + question.id);
+
+  // Two refusals. `text` hands a tool error back as its text rather than
+  // throwing, which is how the agent sees it too -- so this reads the answer.
+  //
+  // The id that does not exist and the id that belongs elsewhere must be
+  // refused in the *same* words: a message that distinguished them would tell a
+  // caller which numbers are real on somebody else's task.
+  const refused = async (why: string, answers_entry_id: number, expected: RegExp) => {
+    const answer = await text("log_entry", {
+      task_id: openA,
+      kind: "decision",
+      body: `SMOKE-REJECT: ${why}`,
+      answers_entry_id,
+      model: MODEL,
+    });
+    if (!expected.test(answer)) throw new Error(`log_entry accepted ${why}: ${answer}`);
+    console.log(`refused ${why}`);
+  };
+
+  await refused("an id on no task of ours", 999_999, /not on task/);
+  // The answer itself is a decision, so pointing at it is the wrong-kind case.
+  await refused("an entry that is not a question", openADeadEnd, /only a question/);
+
+  await text("log_entry", {
+    task_id: openA,
+    kind: "decision",
+    body: "SMOKE-ANSWER: UTC, and the report says so when it cannot determine a zone.",
+    answers_entry_id: question.id,
+    model: MODEL,
+  });
+
+  const answered = JSON.parse(
+    await text("get_context", { cwd: SCRATCH, ...(mode.local ? {} : { repo_root: SCRATCH }) }),
+  );
+  const closedOn = answered.open_tasks.find((t: { id: number }) => t.id === openA);
+  if (closedOn?.open_questions?.some((q: { body: string }) => q.body.includes("SMOKE-QUESTION")))
+    throw new Error("an answered question is still open in the briefing");
+  // Closed, not deleted: the log is the product and the pair is the point.
+  const whole = JSON.parse(await text("get_task", { task_id: openA }));
+  const kinds = whole.entries.filter((e: { body: string }) =>
+    e.body.includes("SMOKE-QUESTION") || e.body.includes("SMOKE-ANSWER"),
+  );
+  if (kinds.length !== 2)
+    throw new Error(`the question and its answer should both survive; found ${kinds.length}`);
+  console.log("answered: out of the briefing, still in the log");
+
   await text("add_context", {
     kind: "preference",
     title: "SMOKE-EVERYWHERE",
@@ -431,8 +505,10 @@ async function runSuite(mode: Mode, token: string) {
   if (a.project.slug === b.project.slug)
     throw new Error(`two working directories resolved to one project: ${a.project.slug}`);
 
-  const deadEnds = (brief: { open_tasks: { dead_ends: string[] }[] }) =>
-    brief.open_tasks.flatMap((t) => t.dead_ends).join("\n");
+  // `{ id, body }` rather than a bare string since the briefing started naming
+  // what it hands back, so that an agent can answer a question it was shown.
+  const deadEnds = (brief: { open_tasks: { dead_ends: { body: string }[] }[] }) =>
+    brief.open_tasks.flatMap((t) => t.dead_ends.map((d) => d.body)).join("\n");
   if (!deadEnds(a).includes("SMOKE-A-ONLY"))
     throw new Error("the first project lost its own dead end");
   if (deadEnds(b).includes("SMOKE-A-ONLY"))

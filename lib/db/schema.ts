@@ -185,6 +185,30 @@ CREATE TABLE IF NOT EXISTS entries (
 CREATE INDEX IF NOT EXISTS idx_entries_task ON entries (task_id, id);
 CREATE INDEX IF NOT EXISTS idx_entries_created ON entries (created_at);
 
+-- How a question stops being open.
+--
+-- \`question\` had no way to close. It came back in every briefing and every
+-- report window for ever, and the three ways out were all bad: delete_entry is
+-- forbidden by its own description, closing the task hides it as a side effect
+-- rather than a mechanism, and writing the answer beside it left both in every
+-- briefing with nothing connecting them.
+--
+-- A column on the *answer* rather than a status on the question, because this
+-- table is the append-only half of todox and a resolved_at would have been the
+-- first mutation in it. Nothing is rewritten: a new row says what settled an
+-- older one, which also keeps the pairing that until now existed only in the
+-- prose of two entries that happened to sit near each other.
+--
+-- SET NULL rather than CASCADE: deleting an answer must not delete the
+-- question, it must reopen it.
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS answers_entry_id INTEGER
+  REFERENCES entries(id) ON DELETE SET NULL;
+
+-- The briefing asks "does anything answer this?" once per open task, so the
+-- lookup goes the other way round from every other index on this table.
+CREATE INDEX IF NOT EXISTS idx_entries_answers ON entries (answers_entry_id)
+  WHERE answers_entry_id IS NOT NULL;
+
 -- Every status transition, so reports can answer "how long did this take"
 -- without guessing from updated_at.
 CREATE TABLE IF NOT EXISTS task_events (

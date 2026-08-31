@@ -147,6 +147,14 @@ function reportFor(
   const counts = EMPTY_COUNTS();
   for (const e of log) counts[e.kind] += 1;
 
+  // A question with an answer is not an open question. Computed from the task's
+  // whole log rather than from the period, because the answer may have been
+  // written long after the question and a report that reopens it sends somebody
+  // to solve a solved problem.
+  const answered = new Set(
+    log.map((e) => e.answers_entry_id).filter((id): id is number => id != null),
+  );
+
   const models = [
     ...new Set([...log, ...events].map((x) => x.model).filter((m): m is string => !!m)),
   ];
@@ -167,7 +175,9 @@ function reportFor(
     entry_counts: counts,
     decisions: log.filter((e) => e.kind === "decision").map((e) => e.body),
     dead_ends: log.filter((e) => e.kind === "dead_end").map((e) => e.body),
-    open_questions: log.filter((e) => e.kind === "question").map((e) => e.body),
+    open_questions: log
+      .filter((e) => e.kind === "question" && !answered.has(e.id))
+      .map((e) => e.body),
     last_handoff: handoff?.body ?? null,
     ...timingFor(task, events),
     // Both figures, because they answer different questions and mixing them up
@@ -218,8 +228,19 @@ export async function activityReport(
   const titles = new Map(reports.map((r) => [r.id, r.title]));
   const titleOf = (taskId: number) => titles.get(taskId) ?? `#${taskId}`;
 
+  // Answered anywhere, not just inside the window: a question closed last month
+  // is not an open question this week, and a report that says otherwise sends
+  // somebody to re-answer it.
+  const answered = new Set(
+    [...logs.values()]
+      .flat()
+      .map((e) => e.answers_entry_id)
+      .filter((id): id is number => id != null),
+  );
+
   const pick = (kind: EntryKind) =>
     periodEntries
+      .filter((e) => e.kind !== "question" || !answered.has(e.id))
       .filter((e) => e.kind === kind)
       .map((e) => ({
         task_id: e.task_id,

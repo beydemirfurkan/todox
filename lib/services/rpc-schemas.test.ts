@@ -326,3 +326,35 @@ describe("getContext focus", () => {
     );
   });
 });
+
+/**
+ * The only way a question ever closes.
+ *
+ * Everything about this field is a rejection: the wrong type, the wrong task,
+ * the wrong kind. The schema can only catch the first, and the other two live
+ * in `task-service` because they need to read the row — but an id that is not
+ * an integer must never reach that far, because what it reaches is a lookup.
+ */
+describe("logEntry answers_entry_id", () => {
+  const base = { task_id: 1, kind: "decision", body: "settled it" };
+
+  it("takes an integer id", () => {
+    expect(() => parseParams("logEntry", { ...base, answers_entry_id: 118 })).not.toThrow();
+  });
+
+  it("is optional, because most entries answer nothing", () => {
+    expect(() => parseParams("logEntry", base)).not.toThrow();
+  });
+
+  it("refuses anything that is not an integer", () => {
+    expect(() => parseParams("logEntry", { ...base, answers_entry_id: "118 OR 1=1" })).toThrow(
+      /invalid params/,
+    );
+    expect(() => parseParams("logEntry", { ...base, answers_entry_id: "118" })).toThrow(
+      /invalid params/,
+    );
+    expect(() => parseParams("logEntry", { ...base, answers_entry_id: 1.5 })).toThrow(
+      /invalid params/,
+    );
+  });
+});

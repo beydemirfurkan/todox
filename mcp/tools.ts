@@ -102,6 +102,13 @@ const BASE = [
   "will fill your context with a backlog instead of the work in front of you.",
   "Ask for the window you actually need.",
   "",
+  "ANSWERING WHAT WAS ASKED: a briefing hands you open_questions with their",
+  "ids. If you work one of them out -- or the developer tells you -- log the",
+  "answer with answers_entry_id set to that question. Until something does,",
+  "that question comes back in every briefing and every report for ever, and a",
+  "list of questions nobody can close stops being read. This is the cheapest",
+  "way to make the next session's briefing shorter and truer than yours was.",
+  "",
   "CAPTURING WORK: whenever the developer mentions something that will not be",
   "finished in this session -- a follow-up, a deferred fix, a known rough",
   "edge -- call create_task. Pass `cwd` and todox will find the right project,",
@@ -668,7 +675,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("log_entry", "logEntry", {
     title: "Append to a task's log",
     description:
-      "Append one entry. kinds: 'decision' (what was chosen and why), 'dead_end' (approach tried that did NOT work -- highest value, prevents repeats), 'question' (needs the human), 'note', 'handoff' (state at end of session: what is done, what is next, what to watch out for).",
+      "Append one entry. kinds: 'decision' (what was chosen and why), 'dead_end' (approach tried that did NOT work -- highest value, prevents repeats), 'question' (needs the human), 'note', 'handoff' (state at end of session: what is done, what is next, what to watch out for). When what you are writing settles a question an earlier session asked, pass its id as `answers_entry_id`: the question stops being open and stops arriving in every briefing, while both it and your answer stay readable through get_task. Nothing else closes a question.",
   });
 
   tool("delete_entry", "deleteEntry", {

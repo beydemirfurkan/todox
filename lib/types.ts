@@ -113,6 +113,15 @@ export type Entry = {
   /** Null on everything written before the column existed, and on rows whose
    *  author has since deleted their account. `author` still answers. */
   user_id: number | null;
+  /**
+   * The `question` this entry settles, and the only way one ever closes.
+   *
+   * On the answer rather than the question, because this table is the
+   * append-only half of todox: nothing is rewritten, a later row simply says
+   * what an earlier one resolved. Null on every entry that answers nothing,
+   * which is nearly all of them.
+   */
+  answers_entry_id: number | null;
   created_at: string;
 };
 
