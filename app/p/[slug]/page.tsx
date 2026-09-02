@@ -13,6 +13,7 @@ import * as entriesRepo from "@/lib/repositories/entries";
 import * as projects from "@/lib/repositories/projects";
 import * as invitationsRepo from "@/lib/repositories/project-invitations";
 import * as membershipsRepo from "@/lib/repositories/project-memberships";
+import * as observationsRepo from "@/lib/repositories/observations";
 import * as tasksRepo from "@/lib/repositories/tasks";
 import { staleRefs } from "@/lib/services/briefing";
 import { repoLabel, repoLink } from "@/lib/util/paths";
@@ -73,6 +74,16 @@ const currentUser = cache(requireUser);
  * which files is a question the tasks themselves answer.
  */
 const STALE_SHOWN = 8;
+
+/**
+ * Observations shown to a person.
+ *
+ * Fewer than the briefing gives an agent, and for a different reason than the
+ * ceiling there. An agent reads these to work out what it is walking into; a
+ * person looking at their own project mostly wants to know that something
+ * happened and roughly when, and the rest is in git.
+ */
+const OBSERVATIONS_SHOWN = 5;
 const projectBySlug = cache((userId: number, slug: string) => projects.bySlug(userId, slug));
 
 /**
@@ -122,11 +133,15 @@ export default async function ProjectPage({
   // Both depend on the list above, so they wait for it -- but they wait
   // together. `staleRefs` used to fetch the project's open tasks for itself,
   // which queried the same table this render had already read in full.
-  const [counts, stale] = await Promise.all([
+  const [counts, stale, observed] = await Promise.all([
     // Counted in the database. This used to load every entry of every task to
     // render three badges a row.
     entriesRepo.countsByTasks(all.map((x) => x.id)),
     staleRefs(open),
+    // Fewer than the briefing carries. An agent reads these to work out what it
+    // is walking into; a person reading their own project mostly wants to know
+    // that something happened and roughly when.
+    observationsRepo.pageByProject(project.id, OBSERVATIONS_SHOWN),
   ]);
 
   const closed = all.filter((x) => isClosed(x.status));
@@ -357,6 +372,65 @@ export default async function ProjectPage({
               </p>
             )}
           </div>
+        </section>
+      )}
+
+      {observed.rows.length > 0 && (
+        // Deliberately plain, and below the stale banner rather than beside it.
+        // Nobody wrote any of this: it is what a process saw in git while an
+        // earlier session ran, so it gets less weight on the page than anything
+        // somebody chose to record. The body says so in words rather than
+        // leaving the styling to imply it.
+        <section aria-labelledby="observations-heading" className="sticker pop p-4">
+          <h2 id="observations-heading" className="display text-[17px] font-bold">
+            {t("observationsTitle")}
+          </h2>
+          <p className="prose mt-0.5 text-[14px] text-faint">{t("observationsBody")}</p>
+
+          <ul className="mt-3 space-y-2.5">
+            {observed.rows.map((o) => {
+              const subjects = (o.commit_subjects ?? "").split("\n").filter(Boolean);
+              return (
+                <li key={o.id} className="border-l-2 border-line pl-3">
+                  {/* Four items, so it wraps: on a phone this row is wider than
+                      the viewport without it. */}
+                  <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-[13px]">
+                    <span className="mono break-all">
+                      {o.branch
+                        ? t("observationsBranch", { branch: o.branch })
+                        : t("observationsNoBranch")}
+                    </span>
+                    <span>
+                      {o.commits === 1
+                        ? t("observationsCommitOne")
+                        : t("observationsCommitMany", { n: o.commits })}
+                    </span>
+                    <span>
+                      {o.files_changed === 1
+                        ? t("observationsFileOne")
+                        : t("observationsFileMany", { n: o.files_changed })}
+                    </span>
+                    <span className="text-[12px] text-faint">{ago(o.observed_at, t)}</span>
+                  </div>
+                  {subjects.length > 0 && (
+                    <ul className="mono mt-1 space-y-0.5 text-[12px] text-faint">
+                      {subjects.map((s, i) => (
+                        <li key={i} className="break-words">
+                          · {s}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          {observed.omitted > 0 && (
+            <p className="mt-2.5 text-[13px] text-faint">
+              {t("observationsAndMore", { n: observed.omitted })}
+            </p>
+          )}
         </section>
       )}
 

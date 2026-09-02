@@ -44,6 +44,22 @@ export type ExportBundle = {
   task_events: unknown[];
   contexts: unknown[];
   refs: unknown[];
+  /**
+   * `observations` is absent on purpose, and this is the note that says so
+   * rather than leaving it looking forgotten.
+   *
+   * Everything else here is somebody's writing and cannot be reconstructed;
+   * observations are derived, unverified, and deleted after two weeks anyway.
+   * The git history they describe is still in git, which is a better copy than
+   * this file would be. Carrying them would grow the one read that is allowed
+   * to refuse for being too big, in exchange for rows whose value has an
+   * expiry date on it.
+   *
+   * The moment that stops being true is when an observation can be promoted
+   * into a record and that record refers back to it. It cannot today -- a
+   * promotion copies nothing and keeps no pointer -- so nothing in an export
+   * is left dangling by their absence.
+   */
 };
 
 /**

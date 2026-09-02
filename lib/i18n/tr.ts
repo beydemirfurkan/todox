@@ -353,6 +353,16 @@ export const tr: Record<Key, string> = {
   staleBody:
     "Bunların arkasındaki dosyalar yazıldıklarından beri değişti. Bayat bağlam, hiç bağlam olmamasından beterdir.",
   staleAndMore: "ve {n} tane daha; görevlerin kendi sayfalarında listeli.",
+  observationsTitle: "Önceki oturumlar ne yaptı",
+  observationsBody:
+    "Oturum sürerken git'ten kaydedildi; kimse yazmadı. Neyin değiştiğini söylerler, neden değiştiğini asla — saklamaya değeni bir ajan gerçek bir nota dönüştürür.",
+  observationsBranch: "{branch} dalında",
+  observationsNoBranch: "dal yok",
+  observationsCommitOne: "1 commit",
+  observationsCommitMany: "{n} commit",
+  observationsFileOne: "1 dosya değişti",
+  observationsFileMany: "{n} dosya değişti",
+  observationsAndMore: "ve {n} tane daha eski; ajan için iki hafta tutuluyor.",
   inLog: "kayıt",
   deadEndCount: "çıkmaz",
   deadEndCountPlural: "çıkmaz",

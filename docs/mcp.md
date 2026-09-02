@@ -80,3 +80,42 @@ install CLI runs the same pass at the end of an `http` install.
 If you install by hand, the JSON / TOML shape per client is documented in
 `scripts/install-mcp/clients/`, and the per-platform paths are in the README's
 "Connect an agent" section.
+
+## What the local process records on its own
+
+The stdio transport does one thing nobody asks it to. While a session runs it
+watches the checkout it was started in and keeps a single row describing what
+that session did to the tree: the branch, where `HEAD` was when it opened and
+where it is now, how many commits landed, the first few subject lines, and how
+many files carry uncommitted changes. `get_context` hands those back to the
+next session in an `observations` section.
+
+The reason is the session that ends without a handoff — the agent stops, or
+the process is killed, and everything about what was in flight is gone. This
+is the part that survives that, because it is written as the work happens
+rather than summarised at the end.
+
+Three properties are worth knowing, because they are what keep it from being
+noise:
+
+- **It is not the log.** Observations live in their own table and their own
+  section of the briefing, labelled unverified. Nothing an agent reads there
+  becomes a decision or a dead end unless an agent decides it should and
+  writes one, in its own words.
+- **A quiet session writes nothing.** No commits and no uncommitted changes
+  means no row at all, and repeated writes during one session replace that
+  row rather than adding to it.
+- **It expires.** Two weeks, unless something promotes it first. The git
+  history it describes is still in git, which is the better copy.
+
+What leaves your machine is a branch name, commit hashes, commit subject lines
+and a count of changed files. No file contents, no diffs, and nothing from the
+conversation. Turn it off with an environment variable on the MCP server entry:
+
+```json
+"env": { "TODOX_TOKEN": "todox_…", "TODOX_OBSERVE": "off" }
+```
+
+Only `off` disables it — an unset variable means on, because a switch that
+needs setting to work is one nobody remembers. The hosted transport never does
+any of this: it has no filesystem, so it has nothing to look at.

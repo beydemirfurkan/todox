@@ -131,6 +131,14 @@ jobs:
       - name: Collaboration guarantees
         run: pnpm smoke:collab
 
+      # Automatic capture: written, read back in a briefing, promoted into the
+      # log, expired. Needs no server of its own, so it runs before the build.
+      # The last assertion in it is a query plan rather than an answer — an
+      # index Postgres cannot use breaks nothing and is invisible to every
+      # other kind of test.
+      - name: Observation guarantees
+        run: pnpm smoke:observe
+
       # The suite that keeps mcp/tools.ts honest as one definition: it runs the
       # same assertions through the hosted endpoint and the stdio process, and
       # a tool that only works one way in fails here. It needs the app running,
