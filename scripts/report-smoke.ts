@@ -4,6 +4,10 @@
  */
 import "./env";
 
+import { localDatabaseOnly } from "./local-only";
+
+localDatabaseOnly("smoke:report");
+
 import { run } from "../lib/db/client";
 import { translator } from "../lib/i18n";
 import * as entriesRepo from "../lib/repositories/entries";

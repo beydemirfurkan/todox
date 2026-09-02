@@ -7,6 +7,10 @@
  */
 import "./env";
 
+import { localDatabaseOnly } from "./local-only";
+
+localDatabaseOnly("smoke:auth");
+
 import { one, run, tx } from "../lib/db/client";
 import * as apiTokensRepo from "../lib/repositories/api-tokens";
 import * as authTokensRepo from "../lib/repositories/auth-tokens";

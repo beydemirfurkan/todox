@@ -15,6 +15,10 @@
  */
 import "./env";
 
+import { localDatabaseOnly } from "./local-only";
+
+localDatabaseOnly("smoke:observe");
+
 import { all, one, run, tx } from "../lib/db/client";
 import * as entriesRepo from "../lib/repositories/entries";
 import * as observationsRepo from "../lib/repositories/observations";
