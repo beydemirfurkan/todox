@@ -71,13 +71,41 @@ const PAGE = 200;
  */
 
 export const methods = {
+  /**
+   * The projects that hold something, and a count of the ones that do not.
+   *
+   * `get_context` registers a project for whatever directory an agent happens
+   * to be working in, which is a deliberate convenience -- it is why capturing
+   * a task works on the first try instead of erroring out. The cost is that a
+   * directory somebody opened an editor in once becomes a row, and in
+   * production 18 of 58 projects had never been given a task or a note. A list
+   * that is two-thirds noise is a list an agent stops reading.
+   *
+   * Nothing is deleted and nothing is hidden from the resolver: an empty
+   * project still answers to its slug and its path, so an agent that lands in
+   * that directory again finds it. What changes is only what a caller asking
+   * "what am I working on" is shown.
+   *
+   * A note without a task still counts as work, which is not a detail -- five
+   * projects were in exactly that state, and they are the ones holding
+   * standing rules the briefing reads. Defining "empty" as "no tasks" would
+   * have hidden the notes along with them.
+   *
+   * Said out loud rather than trimmed in silence, the way `open_tasks_omitted`
+   * and `observations_omitted` are: a caller that cannot see the number cannot
+   * tell an empty account from a filtered one.
+   */
   listProjects: async ({ userId }) => {
-    const [rows, counts] = await Promise.all([
+    const [rows, counts, withNotes] = await Promise.all([
       projectsRepo.list(userId),
       tasksRepo.countsByProject(userId),
+      contextsRepo.projectIdsWithNotes(userId),
     ]);
+
+    const carries = rows.filter((p) => counts.map.has(p.id) || withNotes.has(p.id));
+
     return {
-      projects: rows.map((p) => ({
+      projects: carries.map((p) => ({
         slug: p.slug,
         name: p.name,
         root_path: p.root_path,
@@ -85,6 +113,7 @@ export const methods = {
         shared: Boolean(p.share_token),
         counts: counts.map.get(p.id) ?? counts.empty,
       })),
+      empty_projects_omitted: rows.length - carries.length,
     };
   },
 
