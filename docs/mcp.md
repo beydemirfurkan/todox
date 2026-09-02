@@ -119,3 +119,23 @@ conversation. Turn it off with an environment variable on the MCP server entry:
 Only `off` disables it — an unset variable means on, because a switch that
 needs setting to work is one nobody remembers. The hosted transport never does
 any of this: it has no filesystem, so it has nothing to look at.
+
+## What the server counts
+
+The server keeps a count of which methods were called, per account, per day —
+a method name, how many calls, how many were refused, and the first and last
+time on that day. Nothing else: no parameters, no bodies, no paths, no project
+or task ids. `pnpm usage` reads it back.
+
+It exists because of a question the rest of the measurement cannot answer.
+`pnpm funnel` sees an account arrive, mint a token and come back on a later
+day; what it cannot see is an agent that opens every session, reads the
+briefing and writes nothing — which is the difference between a tool being
+connected and a tool being used, and it is invisible from the outside.
+
+Counts rather than events, and that is the point rather than an optimisation:
+one row per account per method per day is bounded by construction, so there is
+no event log accumulating beside the log you actually keep, and nothing to
+expire. On a self-hosted instance these rows are in your own database like
+everything else, and `TODOX_OBSERVE=off` does not touch them — it is a
+different mechanism, on the client rather than the server.

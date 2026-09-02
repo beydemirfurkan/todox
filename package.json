@@ -13,6 +13,7 @@
     "mcp": "tsx mcp/server.ts",
     "seed": "tsx scripts/seed.ts",
     "funnel": "tsx scripts/funnel.ts",
+    "usage": "tsx scripts/usage.ts",
     "smoke:mcp": "tsx scripts/mcp-smoke.ts",
     "smoke:report": "tsx scripts/report-smoke.ts",
     "smoke:auth": "tsx scripts/auth-smoke.ts",
