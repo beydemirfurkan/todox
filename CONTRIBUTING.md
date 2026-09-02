@@ -130,6 +130,14 @@ see in review.
   chosen by people and two of these messages are security notices.
 - **Colour never carries meaning alone.** Every status, kind and badge has a
   text equivalent, and controls have real labels.
+- **Measurement counts, and never carries content.** `tool_usage` records a
+  method name, a day and two counts; `pnpm funnel` derives its numbers from
+  columns that were already there. Neither stores a parameter, a body, a path
+  or an id, and `docs/mcp.md` states that in the promise it makes to somebody
+  running their own instance. The pressure to add "just the project id, for
+  debugging" is exactly the pressure this rule exists against: a measurement
+  table is the one place where a product about trusting the log can start
+  keeping a second log nobody agreed to.
 - **An observation is not an entry.** Automatic capture writes to
   `observations`, a separate table the briefing returns in its own labelled
   section. Material nobody has vouched for must not be able to reach `entries`:
