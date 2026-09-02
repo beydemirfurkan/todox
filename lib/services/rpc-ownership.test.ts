@@ -25,6 +25,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({ one: vi.fn(), all: vi.fn(), run: vi.fn(), tx: vi.fn() }));
 
 /**
+ * Every write that was reached, except the call counter.
+ *
+ * `invoke` counts refused calls on purpose -- an agent being told no is the
+ * most useful row that table holds -- so `db.run` is no longer silent on a
+ * refusal, and a bare `not.toHaveBeenCalled()` here would fail for a reason
+ * that has nothing to do with ownership. The filter is by table name so the
+ * assertion keeps saying exactly what it said before: the project write was
+ * never reached.
+ */
+const writesReached = () =>
+  db.run.mock.calls.filter(([sql]) => !String(sql).includes("tool_usage"));
+
+/**
  * Only the four functions that reach Postgres are replaced. Swapping the whole
  * module also removes `setClause`, and then `projects.update` dies on a
  * TypeError before it ever gets to the write — which reads as a refusal and
@@ -77,7 +90,7 @@ describe("a member calling a method that writes the project row", () => {
     // nothing while the caller was told otherwise. If the assert is removed,
     // this is the assertion that still notices.
     await expect(invoke(MEMBER, "updateProject", { project: "shared", name: "mine" })).rejects.toThrow();
-    expect(db.run).not.toHaveBeenCalled();
+    expect(writesReached()).toHaveLength(0);
   });
 
   it("delete_project is refused rather than reporting a deletion", async () => {
@@ -90,7 +103,7 @@ describe("a member calling a method that writes the project row", () => {
     await expect(
       invoke(MEMBER, "deleteProject", { project: "shared", confirm: "shared" }),
     ).rejects.toThrow();
-    expect(db.run).not.toHaveBeenCalled();
+    expect(writesReached()).toHaveLength(0);
   });
 
   it("is refused by the gate, not by the confirmation string", async () => {

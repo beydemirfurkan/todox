@@ -6,6 +6,7 @@ import * as observationsRepo from "../repositories/observations";
 import * as projectsRepo from "../repositories/projects";
 import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
+import * as toolUsage from "../repositories/tool-usage";
 import { briefing } from "./briefing";
 import { fileContext } from "./file-context";
 import { BadRequest } from "./errors";
@@ -554,6 +555,29 @@ export type { MethodName };
  */
 export async function invoke(ctx: RpcContext, method: string, params: unknown) {
   if (!isMethod(method)) throw new BadRequest(`unknown method "${method}"`);
-  const clean = parseParams(method, params);
-  return methods[method](ctx, clean as Record<string, never>);
+
+  // Counted here because this is the one place both transports pass through --
+  // the hosted endpoint and the stdio process reach the same function, so a
+  // count taken here cannot describe one of them and miss the other.
+  //
+  // `parseParams` is inside the try on purpose. A rejected call is the most
+  // useful thing this table can hold: an agent asking for something real and
+  // being refused on a shape nobody ever sees. Counting only what succeeded
+  // would hide exactly the failure worth finding.
+  // Guarded here as well as inside the repository, and not out of caution: the
+  // two live in different files and only one of them is on the path of every
+  // tool call. On the failure path it matters twice over -- a counter that
+  // rejected there would replace the error the caller actually needs to see
+  // with one about bookkeeping.
+  const count = (ok: boolean) => toolUsage.record(ctx.userId, method, ok).catch(() => {});
+
+  try {
+    const clean = parseParams(method, params);
+    const result = await methods[method](ctx, clean as Record<string, never>);
+    await count(true);
+    return result;
+  } catch (error) {
+    await count(false);
+    throw error;
+  }
 }
