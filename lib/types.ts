@@ -184,3 +184,71 @@ export type NotificationView = Notification & {
 };
 
 export type RefStatus = "fresh" | "changed" | "missing" | "unknown";
+
+/**
+ * What an agent did, as opposed to what an agent said it did.
+ *
+ * Written by the stdio process from git while the session runs, so a session
+ * that ends without a handoff still leaves the next one something to read.
+ * Never an entry: nobody has vouched for this, and the curated log is the
+ * part of todox whose worth depends on somebody having done so.
+ */
+export type Observation = {
+  id: number;
+  user_id: number;
+  project_id: number;
+  /** Minted by the carrier at startup. One row per session per project. */
+  session_id: string;
+  /** Which carrier saw this: stdio today, a Claude Code hook next. */
+  source: string;
+  client: string | null;
+  branch: string | null;
+  /** Where HEAD was when the session opened, and where it is now. */
+  base_sha: string | null;
+  head_sha: string | null;
+  commits: number;
+  files_changed: number;
+  /** Subject lines, newest first, capped by the writer. */
+  commit_subjects: string | null;
+  started_at: string;
+  observed_at: string;
+  expires_at: string;
+  /** Set once an agent turns this into a real record, and never unset. */
+  promoted_at: string | null;
+  promoted_as: string | null;
+};
+
+/**
+ * What a carrier has to supply, and what it may leave out.
+ *
+ * Only the four that identify the row and carry its point are required. Every
+ * nullable column is optional here rather than "required and nullable": the
+ * caller is a process reading a checkout that may not answer -- a detached
+ * HEAD has no branch, a repository with no origin has no remote -- and making
+ * it spell out five nulls to say "I could not tell" is how a carrier ends up
+ * writing a plausible value instead.
+ *
+ * `expires_at` is absent on purpose and cannot be passed: retention is the
+ * server's to decide, from the server's clock.
+ */
+export type NewObservation = {
+  user_id: number;
+  project_id: number;
+  session_id: string;
+  commits: number;
+  files_changed: number;
+  source?: string;
+  client?: string | null;
+  branch?: string | null;
+  base_sha?: string | null;
+  head_sha?: string | null;
+  commit_subjects?: string | null;
+  started_at?: string;
+  observed_at?: string;
+};
+
+/** The briefing's view: the row without the bookkeeping nobody reading it needs. */
+export type BriefingObservation = Omit<
+  Observation,
+  "user_id" | "project_id" | "session_id" | "expires_at" | "promoted_at" | "promoted_as"
+>;

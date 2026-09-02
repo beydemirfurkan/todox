@@ -39,6 +39,7 @@ const PREDICATES = [
   "ownsEntry",
   "ownsRef",
   "ownsContext",
+  "ownsObservation",
 ] as const;
 
 type Predicate = (typeof PREDICATES)[number];
@@ -144,7 +145,13 @@ describe("owner-only versus shared", () => {
   });
 
   it("accessesProject and the row-level checks admit members", async () => {
-    for (const name of ["accessesProject", "ownsTask", "ownsEntry", "ownsRef"] as const) {
+    for (const name of [
+      "accessesProject",
+      "ownsTask",
+      "ownsEntry",
+      "ownsRef",
+      "ownsObservation",
+    ] as const) {
       const { text } = await statementFor(name);
       expect(text, name).toContain("project_memberships");
     }

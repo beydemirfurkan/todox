@@ -357,6 +357,81 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_task ON refs (task_id, path)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_context ON refs (context_id, path)
   WHERE context_id IS NOT NULL;
 
+-- What an agent did, as opposed to what an agent said it did.
+--
+-- Everything else in this database was written by somebody who chose to write
+-- it. This table is not: the stdio process fills it in from git while the
+-- session runs, so a session that ends without a handoff still leaves the next
+-- one something to read.
+--
+-- A SEPARATE TABLE, and that is the whole design rather than a detail. The
+-- product's claim is that the log is worth trusting, and material nobody has
+-- vouched for cannot be allowed to reach the curated log on its own. So an
+-- observation is never an entry. The briefing carries it in its own section,
+-- labelled unverified, and it becomes a real record only when an agent reads
+-- it and promotes it through from_observation_id -- which is also how it stops
+-- coming back, because a promoted row is filtered out of the read below.
+--
+-- ONE ROW PER SESSION PER PROJECT, upserted on session_id. The alternative was
+-- one row per observation, which would have made the noisiest table in the
+-- database out of the feature most at risk of being noise. A session that
+-- changes nothing writes nothing at all.
+--
+-- The summary an agent reads is NOT stored. Only the scalars are, and the
+-- sentence is built by whoever is reading -- the briefing in English, the web
+-- page through the dictionaries. A rendered string here would be user-facing
+-- text produced outside lib/i18n, and an old client's wording would outlive
+-- the client that wrote it.
+CREATE TABLE IF NOT EXISTS observations (
+  id              SERIAL PRIMARY KEY,
+  user_id         INTEGER NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+  project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  -- Minted by the stdio process at startup. Not a foreign key to anything:
+  -- todox has no sessions table and does not want one, because the only thing
+  -- it would carry is what this row already carries.
+  session_id      TEXT NOT NULL,
+  -- Which carrier saw this. Only the stdio process writes today. Claude Code
+  -- hooks are the next one, and they see what a tool call cannot: the session
+  -- boundary and the reasoning. The column is here so that the briefing can
+  -- tell the reader which of the two it is looking at.
+  source          TEXT NOT NULL DEFAULT 'stdio',
+  client          TEXT,
+  branch          TEXT,
+  -- Where HEAD was when the session opened, and where it is now. The pair is
+  -- what makes the count meaningful, and base_sha is also how the NEXT session
+  -- notices work this one never got to report.
+  base_sha        TEXT,
+  head_sha        TEXT,
+  commits         INTEGER NOT NULL DEFAULT 0,
+  files_changed   INTEGER NOT NULL DEFAULT 0,
+  -- Commit subject lines, newest first, capped by the writer. User data rather
+  -- than interface text, which is why it is stored and the summary is not.
+  commit_subjects TEXT,
+  started_at      TEXT NOT NULL,
+  observed_at     TEXT NOT NULL,
+  -- Observations have their own retention, because they are the one thing here
+  -- that nobody decided to keep. Swept opportunistically on write, the way
+  -- rate_limits and auth_tokens are, since this deployment has no scheduler.
+  expires_at      TEXT NOT NULL,
+  promoted_at     TEXT,
+  promoted_as     TEXT
+);
+
+-- The upsert's target. Without it ON CONFLICT has no inference to make and
+-- every throttled write during one session appends instead of replacing.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_observations_session
+  ON observations (user_id, project_id, session_id);
+
+-- The briefing's read, on the call every session opens with. Partial on
+-- promoted_at because a promoted observation is never read again -- it has
+-- become an entry, and showing it a second time is exactly the noise the two
+-- layers exist to prevent.
+CREATE INDEX IF NOT EXISTS idx_observations_briefing
+  ON observations (project_id, observed_at DESC) WHERE promoted_at IS NULL;
+
+-- The sweep. Cheap, and it runs on a write path rather than a timer.
+CREATE INDEX IF NOT EXISTS idx_observations_expiry ON observations (expires_at);
+
 -- What search reads, and the reason it can afford to.
 --
 -- These were written once before and taken straight back out, because

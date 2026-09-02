@@ -73,6 +73,23 @@ export const ownsContext = (userId: number, id: number) =>
     [userId, id, userId, userId],
   );
 
+/**
+ * Members pass, not only the owner.
+ *
+ * An observation is about a repository rather than about a person: two people
+ * sharing a project are working in the same tree, so a collaborator reading
+ * "seven commits on feat/x" is reading about their own work as much as
+ * anybody's, and has as much standing to promote it into the log.
+ */
+export const ownsObservation = (userId: number, id: number) =>
+  owns(
+    `SELECT 1 AS n FROM observations o
+     JOIN projects p ON p.id = o.project_id
+     LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+     WHERE o.id = ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)`,
+    [userId, id, userId],
+  );
+
 export async function assertTask(userId: number, id: number) {
   if (!(await ownsTask(userId, id))) throw new NotYours("task", id);
 }
@@ -98,6 +115,9 @@ export async function assertRef(userId: number, id: number) {
 }
 export async function assertContext(userId: number, id: number) {
   if (!(await ownsContext(userId, id))) throw new NotYours("context", id);
+}
+export async function assertObservation(userId: number, id: number) {
+  if (!(await ownsObservation(userId, id))) throw new NotYours("observation", id);
 }
 
 /**
