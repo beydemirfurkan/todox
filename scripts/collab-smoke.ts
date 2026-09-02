@@ -8,6 +8,10 @@
  */
 import "./env";
 
+import { localDatabaseOnly } from "./local-only";
+
+localDatabaseOnly("smoke:collab");
+
 import { one, run } from "../lib/db/client";
 import * as entriesRepo from "../lib/repositories/entries";
 import * as invitationsRepo from "../lib/repositories/project-invitations";
