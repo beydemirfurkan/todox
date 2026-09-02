@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseParams, SHAPES } from "./rpc-schemas";
 import type { MethodName } from "./rpc-schemas";
+import { ENTRY_KINDS } from "../constants";
 
 /**
  * Adding a field to a shape whose refinement lists the others by hand is a
@@ -473,4 +474,25 @@ describe("from_observation_id", () => {
       parseParams("logEntry", { task_id: 1, kind: "note", body: "x", from_observation_id: 1.5 }),
     ).toThrow();
   });
+});
+
+/**
+ * The text a model reads while deciding what to write.
+ *
+ * `.describe()` is not documentation for people -- it travels to the model as
+ * part of the tool definition, and it is the closest thing to the decision it
+ * is about to make. `question` went unwritten for three weeks in production
+ * while the closing mechanism shipped for it, and the reason was here: the
+ * schema named the kinds and said nothing about when each one applies.
+ *
+ * A kind added to `ENTRY_KINDS` and left out of the description is the same
+ * failure again, quietly. This is what makes that fail instead.
+ */
+describe("every entry kind says when it applies", () => {
+  const described = SHAPES.logEntry.kind.description ?? "";
+
+  for (const kind of ENTRY_KINDS)
+    it(kind, () => {
+      expect(described).toContain(kind);
+    });
 });

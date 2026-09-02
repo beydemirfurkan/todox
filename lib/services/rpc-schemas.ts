@@ -293,7 +293,11 @@ export const SHAPES = {
 
   logEntry: {
     task_id: z.number().int(),
-    kind: z.enum(ENTRY_KINDS),
+    kind: z
+      .enum(ENTRY_KINDS)
+      .describe(
+        "decision — why it is this way, so nobody re-argues it. dead_end — what was tried and failed, and why; the whole cost of one is paid by the session that does not read it. handoff — the state you are leaving, detailed enough to continue without asking. question — something only the developer can settle that you are leaving open on purpose; not for anything you could look up. note — anything else worth keeping.",
+      ),
     body: z
       .string()
       .min(1)
