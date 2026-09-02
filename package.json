@@ -53,6 +53,12 @@
     "typescript": "^5",
     "vitest": "^4.1.11"
   },
+  "pnpm": {
+    "overrides": {
+      "fast-uri": "^3.1.6",
+      "qs": "^6.16.0"
+    }
+  },
   "packageManager": "pnpm@10.33.0",
   "license": "MIT"
 }
