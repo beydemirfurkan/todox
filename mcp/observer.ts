@@ -82,6 +82,32 @@ export function createObserver(options: ObserverOptions) {
   let lastHead: string | undefined;
   let lastDirty: number | undefined;
 
+  /**
+   * At most one observation in flight, and at most one waiting behind it.
+   *
+   * `notice` is fired with `void` after every tool call, and an agent working
+   * in parallel fires several at once. Two bodies interleaving is not a
+   * tidiness problem. Every decision below reads state that the previous write
+   * was supposed to have set, and none of it is set until that write comes
+   * back: on the first pair `wrote` is still false for both, so both write,
+   * and the throttle that exists to keep this cheap never gets a chance to
+   * say no.
+   *
+   * The widening is the one that actually loses data. One call reads the
+   * server's older baseline, widens the window and rewrites the row; the other
+   * finishes with the narrow window it computed before any of that and
+   * overwrites it -- and `widened` is now true, so nothing tries again. What
+   * is lost is precisely the work a killed session never reported, which is
+   * the reason this file exists.
+   *
+   * The one waiting is coalesced rather than queued. A notice carries no
+   * payload of its own -- it is a nudge to go and look at the checkout -- so
+   * the newest state is the only one worth writing, and a queue that grows
+   * with the agent's tool calls is a queue that outlives the session.
+   */
+  let inFlight: Promise<void> | undefined;
+  let waiting = false;
+
   /** Resolve the repository, from a path a tool offered or from our own cwd. */
   function locate(params: Record<string, unknown>): string | undefined {
     if (root) return root;
@@ -178,6 +204,16 @@ export function createObserver(options: ObserverOptions) {
     await send(dir, previous, head, wider.count, wider.subjects, dirty);
   }
 
+  /** `observe`, with the contract that makes `void notice(...)` safe. */
+  async function observeQuietly(params: Record<string, unknown>): Promise<void> {
+    try {
+      await observe(params);
+    } catch {
+      // Deliberately silent. This runs inside the agent's own tool call, and a
+      // message here would attach a failure to work that did not cause it.
+    }
+  }
+
   return {
     /**
      * Called after every tool call the agent makes. Fire-and-forget by
@@ -186,12 +222,24 @@ export function createObserver(options: ObserverOptions) {
      */
     async notice(params: Record<string, unknown>): Promise<void> {
       if (!enabled) return;
-      try {
-        await observe(params);
-      } catch {
-        // Deliberately silent. This runs inside the agent's own tool call, and
-        // a message here would attach a failure to work that did not cause it.
+
+      if (inFlight) {
+        // Somebody is already lined up to look again once the current write
+        // lands, and they will see this state too. A second waiter would only
+        // write the same row twice.
+        if (waiting) return;
+        waiting = true;
+        // `observeQuietly` never rejects, so there is nothing here to catch.
+        await inFlight;
+        waiting = false;
       }
+
+      // Assigned before anything can yield: `observeQuietly` runs its git
+      // reads synchronously, so no other notice sees an empty `inFlight`.
+      const run = observeQuietly(params);
+      inFlight = run;
+      await run;
+      if (inFlight === run) inFlight = undefined;
     },
   };
 }

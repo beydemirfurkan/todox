@@ -408,3 +408,101 @@ describe("never getting in the way", () => {
     expect(calls).toHaveLength(2);
   });
 });
+
+/**
+ * The agent calls tools in parallel, and `mcp/server.ts` fires `notice` after
+ * every one of them without awaiting it. So two of these bodies running at
+ * once is the normal case rather than the exotic one.
+ *
+ * It matters because every decision in `observe` reads state the *previous*
+ * write was supposed to have set, and none of it is set until that write comes
+ * back. Two calls that overlap therefore both believe they are the first.
+ */
+describe("tool calls that arrive together", () => {
+  it("writes once when two notices land at the same moment", async () => {
+    const h = harness();
+    h.state!.dirty = 1;
+
+    await Promise.all([
+      h.observer.notice({ cwd: `${ROOT}/sub` }),
+      h.observer.notice({ cwd: `${ROOT}/sub` }),
+    ]);
+
+    expect(h.calls).toHaveLength(1);
+  });
+
+  /**
+   * Only one waiter is kept. A third notice arriving while one is already
+   * lined up would write the row the waiter is about to write.
+   */
+  it("coalesces the ones behind the first rather than queueing them", async () => {
+    const h = harness();
+    h.state!.dirty = 1;
+
+    await Promise.all([
+      h.observer.notice({ cwd: `${ROOT}/sub` }),
+      h.observer.notice({ cwd: `${ROOT}/sub` }),
+      h.observer.notice({ cwd: `${ROOT}/sub` }),
+    ]);
+
+    expect(h.calls).toHaveLength(1);
+  });
+
+  /**
+   * The one that loses data rather than just spending it twice.
+   *
+   * The first notice reads the server's older baseline, widens the window and
+   * rewrites the row. A second notice running alongside it computed its window
+   * before any of that, so its write puts the narrow one back -- and `widened`
+   * is already true, so nothing tries again. What is overwritten is exactly
+   * the work a killed session never reported.
+   */
+  it("does not let a second notice undo the correction the first is making", async () => {
+    const older = "0".repeat(40);
+    const { git, state } = fakeGit();
+    state.dirty = 1;
+    state.since.set(HEAD_AT_START, { count: 0, subjects: [] });
+    state.since.set(older, { count: 5, subjects: ["unreported"] });
+
+    const calls: Call[] = [];
+    const observer = createObserver({
+      call: async (method, params) => {
+        calls.push({ method, params });
+        return { ok: true, last_head_sha: older };
+      },
+      git,
+      sessionId: "session-1",
+      cwd: `${ROOT}/sub`,
+      clock: () => 1_000_000,
+    });
+
+    await Promise.all([
+      observer.notice({ cwd: `${ROOT}/sub` }),
+      observer.notice({ cwd: `${ROOT}/sub` }),
+    ]);
+
+    // The write and its correction, and nothing after them.
+    expect(calls).toHaveLength(2);
+    expect(lastWrite(calls)).toMatchObject({ base_sha: older, commits: 5 });
+  });
+
+  it("is still fire-and-forget when notices overlap", async () => {
+    const { git, state } = fakeGit();
+    state.dirty = 1;
+    const observer = createObserver({
+      call: async () => {
+        throw new Error("nope");
+      },
+      git,
+      sessionId: "session-1",
+      cwd: `${ROOT}/sub`,
+    });
+
+    await expect(
+      Promise.all([
+        observer.notice({ cwd: `${ROOT}/sub` }),
+        observer.notice({ cwd: `${ROOT}/sub` }),
+      ]),
+    ).resolves.toBeDefined();
+  });
+});
