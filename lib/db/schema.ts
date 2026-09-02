@@ -432,6 +432,54 @@ CREATE INDEX IF NOT EXISTS idx_observations_briefing
 -- The sweep. Cheap, and it runs on a write path rather than a timer.
 CREATE INDEX IF NOT EXISTS idx_observations_expiry ON observations (expires_at);
 
+-- Which tools an agent actually reached for, and which it never did.
+--
+-- pnpm funnel already measures everything up to the first call: an account
+-- registered, a token minted, the setup working once, the agent coming back on
+-- a later day. What none of it can see is the inside of a session, and that is
+-- where the expensive question lives. Two accounts in production keep calling
+-- the API and have written nothing for weeks. Whether their agent reads the
+-- briefing and stops, or asks for something and gets an error, is not a thing
+-- the database can currently answer.
+--
+-- COUNTS, NOT EVENTS, and that is the whole design rather than an optimisation.
+-- A row per call would make this the largest table here within days -- larger
+-- than the log it is supposed to be measuring -- for a question that only ever
+-- gets asked in aggregate. One row per account per method per day answers
+-- "read 71 times, wrote 0" exactly as well, and is bounded by construction:
+-- the aggregation is the retention policy, which is why this table has none.
+--
+-- WHAT IS NOT HERE is as deliberate as what is. No parameters, no bodies, no
+-- paths, no project or task ids -- a method name, two counts and two
+-- timestamps. The promise in docs/mcp.md is that nothing about the work itself
+-- leaves the machine, and a measurement table is exactly where that promise
+-- gets broken by accident.
+CREATE TABLE IF NOT EXISTS tool_usage (
+  user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- The RPC method, which is the tool name for everything an agent can call.
+  -- Not constrained to the current list: a method that disappears should leave
+  -- its history behind rather than fail the write that records it.
+  method   TEXT NOT NULL,
+  -- The server's date, never the caller's. A machine with a skewed clock would
+  -- otherwise file its calls under a day nobody is looking at.
+  day      TEXT NOT NULL,
+  calls    INTEGER NOT NULL DEFAULT 0,
+  -- Refusals as well as failures: a schema rejection is the single most useful
+  -- thing here, because it is an agent trying to do the right thing and being
+  -- told no in a way nobody ever sees.
+  errors   INTEGER NOT NULL DEFAULT 0,
+  first_at TEXT NOT NULL,
+  last_at  TEXT NOT NULL,
+  -- The bucket is the identity, so it is the key. No serial column, because
+  -- there is nothing here a row needs to be named by, and the primary key is
+  -- also the conflict target the upsert infers on.
+  PRIMARY KEY (user_id, method, day)
+);
+
+-- The read is always a window over time across every account, which the
+-- primary key cannot serve: its leading column is the account.
+CREATE INDEX IF NOT EXISTS idx_tool_usage_day ON tool_usage (day);
+
 -- What search reads, and the reason it can afford to.
 --
 -- These were written once before and taken straight back out, because
