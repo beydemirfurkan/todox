@@ -165,13 +165,21 @@ export async function byIds(ids: number[]): Promise<Context[]> {
   );
 }
 
+/**
+ * Beside `create` because a note written up from an observation has to mark
+ * that observation in the same transaction, and only a service may sequence
+ * the two. The SQL stays with the table that owns it; see the transaction rule
+ * in CONTRIBUTING.md.
+ */
+export const createStmt = (input: NewContext, at = now()): Statement => ({
+  text: `INSERT INTO contexts (user_id, project_id, kind, title, body, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+  params: [input.user_id, input.project_id, input.kind, input.title, input.body, at, at],
+});
+
 export async function create(input: NewContext): Promise<Context> {
-  const ts = now();
-  const row = await one<Context>(
-    `INSERT INTO contexts (user_id, project_id, kind, title, body, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-    [input.user_id, input.project_id, input.kind, input.title, input.body, ts, ts],
-  );
+  const stmt = createStmt(input);
+  const row = await one<Context>(stmt.text, stmt.params);
   return row!;
 }
 

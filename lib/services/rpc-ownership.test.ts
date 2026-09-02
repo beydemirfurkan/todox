@@ -118,3 +118,97 @@ describe("a member calling a method that writes inside the project", () => {
     ).resolves.toBeDefined();
   });
 });
+
+/**
+ * Promotion crosses a boundary the other fields do not.
+ *
+ * `from_observation_id` names a row in a *different* table from the one the
+ * caller proved they could write to: ownership of the task says nothing about
+ * ownership of the observation. Without its own gate, an agent could mark
+ * somebody else's observation handled -- which does not leak its contents, but
+ * does silently remove it from a briefing that was not theirs.
+ *
+ * The refusal has to happen before the transaction, not inside it, because a
+ * `tx` that writes the entry and fails the update would still have written the
+ * entry if the statement order were ever reversed.
+ */
+describe("promoting an observation the caller cannot reach", () => {
+  /** Everything answers as before, except the observations gate. */
+  const withUnreachableObservation = () =>
+    db.one.mockImplementation(async (text: string) => {
+      if (text.includes("FROM observations o")) return undefined;
+      if (text.includes("project_memberships")) return { n: 1 };
+      if (text.includes("FROM projects WHERE id")) return undefined;
+      if (text.includes("INSERT INTO contexts")) return { id: 1, title: "t", body: "b" };
+      return undefined;
+    });
+
+  it("log_entry is refused", async () => {
+    withUnreachableObservation();
+    await expect(
+      invoke(MEMBER, "logEntry", {
+        task_id: 1,
+        kind: "decision",
+        body: "x",
+        from_observation_id: 3,
+      }),
+    ).rejects.toThrow(NotYours);
+  });
+
+  it("log_entry does not reach the write", async () => {
+    withUnreachableObservation();
+    await expect(
+      invoke(MEMBER, "logEntry", {
+        task_id: 1,
+        kind: "decision",
+        body: "x",
+        from_observation_id: 3,
+      }),
+    ).rejects.toThrow();
+    expect(db.tx).not.toHaveBeenCalled();
+  });
+
+  it("add_context is refused", async () => {
+    withUnreachableObservation();
+    await expect(
+      invoke(MEMBER, "addContext", {
+        project: "shared",
+        kind: "gotcha",
+        title: "t",
+        body: "b",
+        from_observation_id: 3,
+      }),
+    ).rejects.toThrow(NotYours);
+  });
+
+  it("add_context does not reach the write", async () => {
+    withUnreachableObservation();
+    await expect(
+      invoke(MEMBER, "addContext", {
+        project: "shared",
+        kind: "gotcha",
+        title: "t",
+        body: "b",
+        from_observation_id: 3,
+      }),
+    ).rejects.toThrow();
+    expect(db.tx).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The one an agent actually does: its own observation, promoted into its own
+   * log. If the gate is too strong this is what stops working, and nothing
+   * else in this file would notice.
+   */
+  it("is allowed when the observation is reachable", async () => {
+    db.tx.mockResolvedValue([[{ id: 900 }]]);
+    await expect(
+      invoke(MEMBER, "logEntry", {
+        task_id: 1,
+        kind: "decision",
+        body: "x",
+        from_observation_id: 3,
+      }),
+    ).resolves.toBeDefined();
+  });
+});

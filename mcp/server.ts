@@ -11,15 +11,27 @@
  * token and calls the HTTP API, so an agent on a laptop and a database on a
  * host stay in step.
  */
+import { randomUUID } from "node:crypto";
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { normalise, type ClientInfo } from "../lib/client-identity";
 import type { MethodName } from "../lib/services/rpc-schemas";
 import { isAbsolutePath } from "../lib/util/paths";
+import { createObserver } from "./observer";
 import { createClient, readConfig } from "./rpc-client";
 import { instructions, registerTools, SERVER_INFO, type Workspace } from "./tools";
-import { checkRefs, findProjectRoot, gitRemote, hashFile } from "./workspace";
+import {
+  checkRefs,
+  findProjectRoot,
+  gitBranch,
+  gitCommitsSince,
+  gitDirtyCount,
+  gitHead,
+  gitRemote,
+  hashFile,
+} from "./workspace";
 
 /**
  * The client that launched this process, read from its environment.
@@ -92,7 +104,50 @@ async function main() {
     instructions: instructions({ local: true }),
   });
 
-  registerTools(server, (method: MethodName, params) => call(method, params), localWorkspace);
+  /**
+   * The automatic half of the log, and the only thing here the model cannot
+   * see.
+   *
+   * This process is the carrier because it is the one that can read the disk
+   * and because it is the one every MCP client starts -- Claude Code hooks
+   * would have been richer and would have worked for one client out of the
+   * five the README names.
+   *
+   * `off` rather than a truthy check: the switch exists to be turned off in a
+   * hurry, and an unset variable has to mean on.
+   */
+  const observer = createObserver({
+    call: (method, params) => call(method as MethodName, params),
+    git: {
+      root: (path) => (isAbsolutePath(path) ? findProjectRoot(path) : undefined),
+      head: gitHead,
+      branch: gitBranch,
+      dirty: gitDirtyCount,
+      since: gitCommitsSince,
+    },
+    // Per process, which is as close to a session boundary as a tool call can
+    // get: a client starts one of these when it opens and kills it when it
+    // closes. What it cannot see is a conversation cleared inside a client
+    // that keeps the process alive, and that is a Claude Code hook's job.
+    sessionId: randomUUID(),
+    cwd: process.cwd(),
+    client: process.env.TODOX_CLIENT_NAME,
+    enabled: process.env.TODOX_OBSERVE !== "off",
+  });
+
+  registerTools(
+    server,
+    async (method: MethodName, params) => {
+      const result = await call(method, params);
+      // Not awaited: the agent's tool call must not wait on bookkeeping, and
+      // `notice` resolves whatever happens -- never rejecting is the contract
+      // that makes this `void` safe. Work lost to a process dying mid-write is
+      // picked up by the next session, which is what the widening is for.
+      void observer.notice(params);
+      return result;
+    },
+    localWorkspace,
+  );
 
   return server.connect(new StdioServerTransport());
 }

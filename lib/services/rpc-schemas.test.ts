@@ -197,6 +197,7 @@ describe("model field round-trips through parseParams on every method", () => {
     search: { query: "x" },
     activityReport: { period: "today" },
     recordClientInfo: { name: "claude-code" },
+    recordObservation: { cwd: "/repo", session_id: "s", commits: 0, files_changed: 0 },
   };
 
   /**
@@ -396,5 +397,80 @@ describe("search filters", () => {
     expect(() =>
       parseParams("search", { query: "x", kinds: ["gotcha", "handoff", "decision"] }),
     ).not.toThrow();
+  });
+});
+
+/**
+ * The write path for automatic capture, and the one method here no agent ever
+ * calls: the stdio process fires it for itself while a session runs. It is not
+ * registered as a tool for the same reason `recordClientInfo` is not -- a
+ * model asked to report what it just did would be reporting on itself, and the
+ * point of an observation is that nobody had to be asked.
+ */
+describe("recordObservation", () => {
+  const base = { cwd: "/repo", session_id: "s", commits: 0, files_changed: 0 };
+
+  it("needs a project or a cwd, like every other path-resolved call", () => {
+    expect(() => parseParams("recordObservation", { ...base, cwd: undefined })).toThrow();
+    expect(() =>
+      parseParams("recordObservation", { ...base, cwd: undefined, project: "todox" }),
+    ).not.toThrow();
+  });
+
+  /**
+   * A count is a count. Postgres would take a negative one happily and the
+   * briefing would render "-3 commits", which reads as a bug in todox rather
+   * than in whatever sent it.
+   */
+  it("refuses a negative count", () => {
+    expect(() => parseParams("recordObservation", { ...base, commits: -1 })).toThrow();
+    expect(() => parseParams("recordObservation", { ...base, files_changed: -1 })).toThrow();
+  });
+
+  it("refuses a fractional count", () => {
+    expect(() => parseParams("recordObservation", { ...base, commits: 1.5 })).toThrow();
+  });
+
+  /**
+   * The session id is the upsert's key. An empty one would collapse every
+   * session in the project onto a single row, which is the opposite of the
+   * bug it exists to prevent.
+   */
+  it("refuses an empty session id", () => {
+    expect(() => parseParams("recordObservation", { ...base, session_id: "" })).toThrow();
+  });
+});
+
+/**
+ * How an observation stops being unverified.
+ *
+ * Not a new tool: promoting is writing a record, and the two methods that
+ * write records already exist. A separate `promote_observation` would have
+ * added a twenty-fourth thing for a model to hold in its head to do something
+ * `log_entry` was already the verb for.
+ */
+describe("from_observation_id", () => {
+  it("is accepted by the two writes that can promote", () => {
+    expect(
+      parseParams("logEntry", { task_id: 1, kind: "decision", body: "x", from_observation_id: 3 })
+        .from_observation_id,
+    ).toBe(3);
+    expect(
+      parseParams("addContext", {
+        kind: "gotcha",
+        title: "x",
+        body: "x",
+        from_observation_id: 4,
+      }).from_observation_id,
+    ).toBe(4);
+  });
+
+  it("must be an integer, because it is a row id", () => {
+    expect(() =>
+      parseParams("logEntry", { task_id: 1, kind: "note", body: "x", from_observation_id: "3" }),
+    ).toThrow();
+    expect(() =>
+      parseParams("logEntry", { task_id: 1, kind: "note", body: "x", from_observation_id: 1.5 }),
+    ).toThrow();
   });
 });

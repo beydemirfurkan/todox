@@ -2,15 +2,18 @@ import type { ContextKind, EntryKind, Status } from "../constants";
 import * as apiTokensRepo from "../repositories/api-tokens";
 import * as contextsRepo from "../repositories/contexts";
 import * as entriesRepo from "../repositories/entries";
+import * as observationsRepo from "../repositories/observations";
 import * as projectsRepo from "../repositories/projects";
 import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import { briefing } from "./briefing";
 import { fileContext } from "./file-context";
 import { BadRequest } from "./errors";
+import { addContext } from "./context-service";
 import {
   assertContext,
   assertEntry,
+  assertObservation,
   assertProject,
   assertProjectAccess,
   assertRef,
@@ -284,10 +287,16 @@ export const methods = {
       body: string;
       author?: string;
       answers_entry_id?: number;
+      from_observation_id?: number;
       model?: string;
     },
   ) => {
     await assertTask(userId, p.task_id);
+    // A second gate, because `from_observation_id` names a row in a different
+    // table: ownership of the task says nothing about ownership of the
+    // observation, and marking somebody else's handled would quietly remove it
+    // from a briefing that was not this caller's.
+    if (p.from_observation_id != null) await assertObservation(userId, p.from_observation_id);
     return taskService.addEntry({ ...p, user_id: userId });
   },
 
@@ -363,7 +372,14 @@ export const methods = {
 
   addContext: async (
     { userId },
-    p: { project?: string; cwd?: string; kind: ContextKind; title: string; body: string },
+    p: {
+      project?: string;
+      cwd?: string;
+      kind: ContextKind;
+      title: string;
+      body: string;
+      from_observation_id?: number;
+    },
   ) => {
     const ref = p.project ?? p.cwd;
     const projectId = ref ? (await mustResolve(userId, ref)).id : null;
@@ -372,12 +388,16 @@ export const methods = {
     // ownership, which left a collaborator able to record work but not what
     // the work decided.
     if (projectId) await assertProjectAccess(userId, projectId);
-    return contextsRepo.create({
+    // The observation is a row in another table, so reaching the project says
+    // nothing about reaching it. See `logEntry` above.
+    if (p.from_observation_id != null) await assertObservation(userId, p.from_observation_id);
+    return addContext({
       user_id: userId,
       project_id: projectId,
       kind: p.kind,
       title: p.title,
       body: p.body,
+      from_observation_id: p.from_observation_id,
     });
   },
 
@@ -445,6 +465,72 @@ export const methods = {
       seenAt: new Date().toISOString(),
     });
     return { ok: true };
+  },
+
+  /**
+   * What a session did to the tree. Written by the process that can see it,
+   * never by the model -- there is no tool for this, for the same reason there
+   * is none for `recordClientInfo`.
+   *
+   * The reply is the interesting half: it hands back the last `head_sha` this
+   * account recorded for the project, so the *next* session can tell what the
+   * last one never got round to reporting. That is the whole crash-recovery
+   * story, and it is deliberately at the start of a session rather than the end
+   * of one -- a process being killed is exactly when a final write does not
+   * happen.
+   *
+   * `mustResolve`, never `resolveOrCreate`: an unregistered directory is one
+   * nobody has asked todox to remember, and registering a project as a *side
+   * effect* of automatic capture would mean opening an editor anywhere quietly
+   * created one. This is the write path with no human in it, so it is the last
+   * one that should be able to create anything. If the project is not there
+   * the call fails, the carrier swallows it, and nothing is observed -- which
+   * is the correct amount of nothing.
+   */
+  recordObservation: async (
+    { userId },
+    p: {
+      project?: string;
+      cwd?: string;
+      session_id: string;
+      client?: string;
+      branch?: string;
+      base_sha?: string;
+      head_sha?: string;
+      commits: number;
+      files_changed: number;
+      commit_subjects?: string;
+      started_at?: string;
+    },
+  ) => {
+    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }));
+    await assertProjectAccess(userId, project.id);
+
+    // Read before the write: afterwards it would answer with the row this call
+    // just wrote, which is this session's own HEAD and tells the next session
+    // nothing.
+    const previous = await observationsRepo.lastHeadFor(userId, project.id);
+
+    await observationsRepo.record({
+      user_id: userId,
+      project_id: project.id,
+      session_id: p.session_id,
+      client: p.client ?? null,
+      branch: p.branch ?? null,
+      base_sha: p.base_sha ?? null,
+      head_sha: p.head_sha ?? null,
+      commits: p.commits,
+      files_changed: p.files_changed,
+      commit_subjects: p.commit_subjects ?? null,
+      started_at: p.started_at,
+    });
+
+    // Retention, swept on a write path because this deployment has no
+    // scheduler -- the same shape `auth.ts` uses to sweep rate limits on
+    // login. This call happens at most a handful of times per session.
+    await observationsRepo.purgeExpired();
+
+    return { ok: true, project: project.slug, last_head_sha: previous };
   },
   // Keyed by MethodName rather than string, so a handler without a schema in
   // rpc-schemas.ts -- or a schema without a handler -- fails to compile. The

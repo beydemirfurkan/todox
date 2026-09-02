@@ -130,6 +130,14 @@ see in review.
   chosen by people and two of these messages are security notices.
 - **Colour never carries meaning alone.** Every status, kind and badge has a
   text equivalent, and controls have real labels.
+- **An observation is not an entry.** Automatic capture writes to
+  `observations`, a separate table the briefing returns in its own labelled
+  section. Material nobody has vouched for must not be able to reach `entries`:
+  the log is worth reading because somebody decided each line belonged there,
+  and folding activity into it buys recall by spending exactly that. The one
+  way across is an agent passing `from_observation_id` to `log_entry` or
+  `add_context`, which writes the agent's own words and marks the observation
+  handled in the same transaction. Unpromoted observations expire on their own.
 
 ## The one thing worth arguing about
 

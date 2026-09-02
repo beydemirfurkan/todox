@@ -393,6 +393,9 @@ Details, and an honest list of what is **not** covered, in
 - Coverage sits around 39%, and the shape matters more than the number: the
   agent surface, the auth boundary and the repositories that answer "is this
   yours" are covered, while much of the UI is not.
+- Observations only see what git can tell them, so they answer "what changed"
+  and never "why". The half that carries reasoning is a transcript, and the
+  only hook API that exposes one belongs to a single client.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

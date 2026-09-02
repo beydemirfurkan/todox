@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   countsByTasks: vi.fn(),
   listRefs: vi.fn(),
   freshness: vi.fn(() => "fresh"),
+  pageObservations: vi.fn(),
 }));
 
 vi.mock("../repositories/tasks", () => ({ pageByProject: mocks.pageByProject }));
@@ -29,6 +30,7 @@ vi.mock("../repositories/refs", () => ({
   listByTasks: mocks.listRefs,
   freshness: mocks.freshness,
 }));
+vi.mock("../repositories/observations", () => ({ pageByProject: mocks.pageObservations }));
 
 const { briefing } = await import("./briefing");
 
@@ -69,6 +71,7 @@ beforeEach(() => {
   mocks.countsByTasks.mockResolvedValue(counts());
   mocks.listRefs.mockResolvedValue(new Map());
   mocks.freshness.mockReturnValue("fresh");
+  mocks.pageObservations.mockResolvedValue({ rows: [], omitted: 0 });
 });
 
 describe("what the briefing costs", () => {
@@ -365,5 +368,83 @@ describe("the closing hint", () => {
     const out = await brief();
     expect(out.hint).toContain("handoff");
     expect(out.hint).toContain("dead ends");
+  });
+});
+
+/**
+ * The automatic half, and the reason it is a separate field rather than more
+ * entries.
+ *
+ * Nobody vouched for any of this: it is what the stdio process saw in git
+ * while the last session ran. Mixing it into the log would buy recall with the
+ * one property the log has that a transcript does not -- that somebody decided
+ * each line was worth keeping. So it arrives beside the log, labelled, capped,
+ * and honest about what it left out.
+ */
+describe("unverified observations", () => {
+  const observation = (id: number, over: Record<string, unknown> = {}) => ({
+    id,
+    source: "stdio",
+    client: "claude-code",
+    branch: "feat/x",
+    base_sha: "aaa",
+    head_sha: "bbb",
+    commits: 3,
+    files_changed: 7,
+    commit_subjects: "fix the thing",
+    started_at: "2026-09-01T09:00:00Z",
+    observed_at: "2026-09-01T11:00:00Z",
+    ...over,
+  });
+
+  it("carries what the session before it did", async () => {
+    mocks.pageObservations.mockResolvedValue({ rows: [observation(1)], omitted: 0 });
+    const out = await brief();
+    expect(out.observations).toHaveLength(1);
+    expect(out.observations[0]).toMatchObject({ id: 1, commits: 3, branch: "feat/x" });
+  });
+
+  /**
+   * A cold agent has to be able to tell "nothing happened" from "this server
+   * does not do that". An absent key reads as the second and is the first.
+   */
+  it("is an empty list rather than absent when there is nothing", async () => {
+    const out = await brief();
+    expect(out.observations).toEqual([]);
+    expect(out.observations_omitted).toBe(0);
+  });
+
+  /**
+   * Ten, and the number is small on purpose: these are the least trustworthy
+   * rows in the payload, and the budget they spend is taken from the notes and
+   * the log, which are the most.
+   */
+  it("asks for six", async () => {
+    await brief();
+    expect(mocks.pageObservations).toHaveBeenCalledWith(PROJECT.id, 6);
+  });
+
+  /**
+   * The same honesty `log_omitted` and `context_omitted` keep. A number that
+   * lies about how much it is hiding is worse than a big payload, because the
+   * agent stops knowing to go and look.
+   */
+  it("says how many it did not show", async () => {
+    mocks.pageObservations.mockResolvedValue({ rows: [observation(1)], omitted: 4 });
+    expect((await brief()).observations_omitted).toBe(4);
+  });
+
+  /**
+   * The two layers, asserted rather than assumed: nothing an observation
+   * carries may appear among the entries a task reports.
+   */
+  it("never reaches the curated log", async () => {
+    mocks.pageObservations.mockResolvedValue({ rows: [observation(1)], omitted: 0 });
+    const out = await brief();
+    for (const t of out.open_tasks) {
+      expect(t.decisions).toEqual([]);
+      expect(t.dead_ends).toEqual([]);
+      expect(t.open_questions).toEqual([]);
+    }
   });
 });

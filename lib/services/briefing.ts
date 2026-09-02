@@ -1,5 +1,6 @@
 import * as contexts from "../repositories/contexts";
 import * as entries from "../repositories/entries";
+import * as observations from "../repositories/observations";
 import * as refs from "../repositories/refs";
 import * as tasks from "../repositories/tasks";
 import type { Project, Task } from "../types";
@@ -87,6 +88,30 @@ const BRIEFING_NOTES = 60;
  */
 const BRIEFING_NOTES_FOCUSED = 25;
 
+/**
+ * Unverified observations carried per briefing.
+ *
+ * Six, and small on purpose. Everything else in this payload is here because
+ * somebody decided it was worth keeping; these are here because a process
+ * watched git while the last session ran. They earn their place by answering
+ * the one question the log cannot when a session ends badly -- what actually
+ * happened to the tree -- and that question is answered by the most recent few
+ * or not at all. Reading further back is what `search` and the git history are
+ * for.
+ *
+ * The number came from a measurement rather than a preference, and the first
+ * one was wrong. At ten observations carrying ten commit subjects each,
+ * `pnpm bench:memory` put the section at 10.2 KB of a 25.0 KB briefing -- the
+ * least trustworthy rows in the payload outweighing both the standing notes
+ * (8.8 KB) and every open task (5.5 KB), which is precisely backwards. Six
+ * observations of three subjects each is 3.2 KB of 18.1 KB.
+ *
+ * The ratio is the thing to hold, not the constant: this is the part of the
+ * briefing nobody asked for, so it has to stay visibly cheaper than the parts
+ * somebody did.
+ */
+const BRIEFING_OBSERVATIONS = 6;
+
 export async function briefing(userId: number, project: Project, focus?: string) {
   const notes = focus ? BRIEFING_NOTES_FOCUSED : BRIEFING_NOTES;
 
@@ -95,7 +120,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const { rows: open, total } = await tasks.pageByProject(project.id, "open", BRIEFING_TASKS);
   const ids = open.map((t) => t.id);
 
-  const [globalContext, projectContext, logs, counts, files] = await Promise.all([
+  const [globalContext, projectContext, logs, counts, files, observed] = await Promise.all([
     contexts.pageByProject(userId, null, notes, focus),
     contexts.pageByProject(userId, project.id, notes, focus),
     entries.listByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
@@ -105,6 +130,9 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // big payload, because the agent stops knowing to go and look.
     entries.countsByTasks(ids),
     refs.listByTasks(ids),
+    // Sixth query, and it rides along rather than costing a round trip of its
+    // own: the page and its honest total come back together.
+    observations.pageByProject(project.id, BRIEFING_OBSERVATIONS),
   ]);
 
   const openTasks = open.map((t) => {
@@ -187,6 +215,18 @@ export async function briefing(userId: number, project: Project, focus?: string)
     context_ranked_by: focus ? "focus" : "recency",
     open_tasks: openTasks,
     open_tasks_omitted: total - open.length,
+    /**
+     * What a process saw, as opposed to what anybody wrote down.
+     *
+     * Its own field rather than more entries, and that separation is the whole
+     * design: the log is worth reading because each line is there on purpose,
+     * and folding automatic material into it would buy recall by spending
+     * exactly that. An agent that finds one of these worth keeping promotes it
+     * with `from_observation_id`, which writes the real record and stops the
+     * observation coming back.
+     */
+    observations: observed.rows,
+    observations_omitted: observed.omitted,
     stale_refs: stale,
     hint:
       "Before you finish, call log_entry(kind:'handoff') on any task you touched, " +

@@ -20,6 +20,7 @@
 import "../env";
 
 import * as contextsRepo from "../../lib/repositories/contexts";
+import * as observationsRepo from "../../lib/repositories/observations";
 import * as projectsRepo from "../../lib/repositories/projects";
 import * as usersRepo from "../../lib/repositories/users";
 import { briefing } from "../../lib/services/briefing";
@@ -32,6 +33,8 @@ import { approxTokens, bytes, kb, reachableWithin, recallAt, score, type Hit } f
 const USERNAME = "memory-bench";
 const SLUG = "memory-bench";
 const AT = 5;
+/** A full briefing of observations, which is what BRIEFING_OBSERVATIONS allows. */
+const OBSERVATIONS = 6;
 
 const row = (label: string, value: string) => `  ${label.padEnd(34)}${value.padStart(12)}`;
 
@@ -73,6 +76,32 @@ async function seed() {
       await taskService.addEntry({ task_id: task.id, kind: e.kind, body: e.body, user_id: user.id });
   }
 
+  /**
+   * A full briefing's worth of unverified observations.
+   *
+   * Seeded at the ceiling rather than at some average, because the number
+   * worth knowing is the worst case: this is the part of the payload nobody
+   * asked for, so what it costs when it is completely full is what decides
+   * whether the ceiling is right. Subjects are the longest the writer allows,
+   * for the same reason.
+   */
+  for (let i = 0; i < OBSERVATIONS; i++)
+    await observationsRepo.record({
+      user_id: user.id,
+      project_id: project.id,
+      session_id: `bench-session-${i}`,
+      client: "claude-code",
+      branch: `feat/branch-name-of-a-realistic-length-${i}`,
+      base_sha: `${i}`.padStart(40, "0"),
+      head_sha: `${i}`.padStart(40, "f"),
+      commits: 3,
+      files_changed: 11,
+      commit_subjects: Array.from(
+        { length: 3 },
+        (_, n) => `fix(scope): a commit subject of the length these actually run to ${i}-${n}`,
+      ).join("\n"),
+    });
+
   return { user, project };
 }
 
@@ -91,6 +120,7 @@ async function reportBriefing(userId: number, project: Awaited<ReturnType<typeof
   console.log(row("  of which last handoffs", kb(sum((t) => t.last_handoff))));
   console.log(row("  of which dead ends", kb(sum((t) => t.dead_ends))));
   console.log(row("  of which decisions", kb(sum((t) => t.decisions))));
+  console.log(row("observations", kb(bytes(brief.observations))));
   console.log(row("stale_refs", kb(bytes(brief.stale_refs))));
   console.log(row("─".repeat(20), ""));
   console.log(row("total", kb(bytes(brief))));

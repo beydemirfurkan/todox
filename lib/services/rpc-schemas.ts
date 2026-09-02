@@ -60,6 +60,24 @@ const projectRef = z
   .describe("Slug, name, or a path inside the project");
 
 /**
+ * How an unverified observation becomes a record somebody stands behind.
+ *
+ * On the two methods that already write records rather than on a tool of its
+ * own: promoting *is* writing an entry or a note, and a separate verb would
+ * have been a twenty-fourth thing for a model to hold in its head to do
+ * something `log_entry` was already the word for. It also stops the
+ * observation coming back in the next briefing, which is half of why an agent
+ * reaches for it.
+ */
+const fromObservation = z
+  .number()
+  .int()
+  .optional()
+  .describe(
+    "The id of an unverified observation from get_context that this record is based on. It marks the observation handled, so it stops appearing in the briefing — use it whenever you write up something an observation told you, and write the body yourself rather than copying the observation.",
+  );
+
+/**
  * Filled in by the MCP server, not by the model. The web host has no checkout,
  * so it cannot find a repository root on its own.
  */
@@ -289,6 +307,7 @@ export const SHAPES = {
       .describe(
         "The id of a `question` entry on this same task that this entry settles. A question with an answer stops being open: it drops out of the briefing and out of report windows, while both it and the answer stay readable through get_task. Use it whenever you resolve something a previous session had to ask about — it is the only way a question ever closes.",
       ),
+    from_observation_id: fromObservation,
     model,
   },
 
@@ -416,6 +435,7 @@ export const SHAPES = {
     kind: z.enum(CONTEXT_KINDS),
     title: z.string().min(1).max(MAX.line),
     body: z.string().min(1).max(MAX.text),
+    from_observation_id: fromObservation,
     model,
   },
 
@@ -503,6 +523,47 @@ export const SHAPES = {
       .describe("Client version; defaults to 'unknown'"),
     model,
   },
+
+  /**
+   * What a session did to the tree, written by the process that can see it.
+   *
+   * Server-side and not agent-facing, for the same reason `recordClientInfo`
+   * is not: the stdio process fires this for itself while the session runs,
+   * and an observation an agent had to be asked for is not an observation. It
+   * is also why there is no tool -- a model that could write these could write
+   * a flattering one.
+   *
+   * Answers with the last `head_sha` this account recorded for the project, so
+   * the next session can tell what the previous one never got round to
+   * reporting. That is the whole of the crash-recovery story: work is picked
+   * up at the *start* of the next session rather than flushed at the end of a
+   * dying one, because a process being killed is exactly when a last write
+   * does not happen.
+   */
+  recordObservation: {
+    project: ref.optional(),
+    cwd: ref
+      .optional()
+      .describe("Absolute working directory, used if project is omitted"),
+    session_id: z
+      .string()
+      .min(1)
+      .max(MAX.line)
+      .describe("Stable id for this session. One row is kept per session per project."),
+    client: z.string().max(MAX.line).optional(),
+    branch: z.string().max(MAX.line).optional(),
+    base_sha: z.string().max(MAX.line).optional().describe("HEAD when the session opened"),
+    head_sha: z.string().max(MAX.line).optional().describe("HEAD now"),
+    commits: z.number().int().min(0),
+    files_changed: z.number().int().min(0),
+    commit_subjects: z
+      .string()
+      .max(MAX.text)
+      .optional()
+      .describe("Subject lines, newest first, capped by the caller"),
+    started_at: z.string().max(MAX.line).optional(),
+    model,
+  },
 } satisfies Record<string, z.ZodRawShape>;
 
 export type MethodName = keyof typeof SHAPES;
@@ -571,7 +632,7 @@ const OBJECTS: Record<string, z.ZodType> = {
   // the right place to say. It used to be a runtime throw halfway through the
   // handler, so the tool advertised a call it would always refuse.
   ...Object.fromEntries(
-    (["getContext", "listTasks", "getFileContext"] as const).map((name) => [
+    (["getContext", "listTasks", "getFileContext", "recordObservation"] as const).map((name) => [
       name,
       z
         .object(SHAPES[name])

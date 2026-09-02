@@ -362,6 +362,16 @@ export const en = {
   staleBody:
     "The files behind these have changed since they were written. Stale context is worse than none.",
   staleAndMore: "and {n} more, listed on the tasks themselves.",
+  observationsTitle: "What earlier sessions did",
+  observationsBody:
+    "Recorded from git while a session ran, not written by anyone. They say what changed, never why — an agent turns one into a real note when it is worth keeping.",
+  observationsBranch: "on {branch}",
+  observationsNoBranch: "no branch",
+  observationsCommitOne: "1 commit",
+  observationsCommitMany: "{n} commits",
+  observationsFileOne: "1 file changed",
+  observationsFileMany: "{n} files changed",
+  observationsAndMore: "and {n} older, kept for the agent for two weeks.",
   inLog: "in log",
   deadEndCount: "dead end",
   deadEndCountPlural: "dead ends",
