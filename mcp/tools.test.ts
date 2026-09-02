@@ -282,18 +282,26 @@ describe("annotations", () => {
  * `reportRefs` is registered as `report_file_hashes`.
  */
 describe("the agent surface covers the method list", () => {
-  /** Server-side only; the agent is the thing it records, so it is not a tool. */
-  const NEVER_A_TOOL = ["recordClientInfo"];
+  /**
+   * Server-side only; the agent is the thing they record, so neither is a tool.
+   *
+   * `recordClientInfo` names the client the model is running inside.
+   * `recordObservation` reports what the session did to the tree, and it is
+   * kept off the surface for a sharper reason than symmetry: an observation a
+   * model could write is an observation a model could flatter. The value of
+   * the row is that nobody had to be asked for it.
+   */
+  const NEVER_A_TOOL = ["recordClientInfo", "recordObservation"];
   /** The local process checks its own files, so hosted is the only one that asks. */
   const HOSTED_ONLY = ["reportRefs"];
 
   const methods = Object.keys(SHAPES).length;
 
-  it("registers every method hosted, bar the server-side one", () => {
+  it("registers every method hosted, bar the server-side ones", () => {
     expect(harness(remoteWs).tools.size).toBe(methods - NEVER_A_TOOL.length);
   });
 
-  it("registers every method locally, bar that one and the hosted-only one", () => {
+  it("registers every method locally, bar those and the hosted-only one", () => {
     expect(harness(localWs).tools.size).toBe(
       methods - NEVER_A_TOOL.length - HOSTED_ONLY.length,
     );

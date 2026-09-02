@@ -3,6 +3,7 @@ import { tx } from "../db/client";
 import { BadRequest } from "./errors";
 import * as entries from "../repositories/entries";
 import * as events from "../repositories/events";
+import * as observations from "../repositories/observations";
 import * as refs from "../repositories/refs";
 import * as tasks from "../repositories/tasks";
 import type { Entry, Task } from "../types";
@@ -122,13 +123,35 @@ async function assertAnswerable(taskId: number, entryId: number): Promise<void> 
     );
 }
 
-export async function addEntry(input: entries.NewEntry): Promise<Entry> {
+export async function addEntry(
+  input: entries.NewEntry & {
+    /**
+     * An unverified observation this entry is written up from.
+     *
+     * Marked in the same transaction as the entry, because the two disagreeing
+     * is worse than neither happening: an entry alone leaves the briefing
+     * showing the same session until it expires, and a mark alone throws the
+     * observation away with nothing written in its place.
+     *
+     * `promoteStmt` deliberately needs nothing from the row being inserted --
+     * `tx()` runs no JavaScript between statements, so a promotion that wanted
+     * the new entry's id would have needed a CTE, and a third exception to
+     * that rule needs a better reason than bookkeeping.
+     */
+    from_observation_id?: number;
+  },
+): Promise<Entry> {
   if (input.answers_entry_id != null)
     await assertAnswerable(input.task_id, input.answers_entry_id);
 
+  const { from_observation_id, ...row } = input;
+
   const [rows] = await tx<Entry>([
-    entries.createStmt(input),
-    tasks.touchStmt(input.task_id),
+    entries.createStmt(row),
+    tasks.touchStmt(row.task_id),
+    ...(from_observation_id == null
+      ? []
+      : [observations.promoteStmt(from_observation_id, row.kind)]),
   ]);
   return rows[0];
 }

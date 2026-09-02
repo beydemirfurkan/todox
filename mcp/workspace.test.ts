@@ -4,7 +4,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { checkRefs, findProjectRoot, gitRemote, hashFile } from "./workspace";
+import {
+  checkRefs,
+  findProjectRoot,
+  gitBranch,
+  gitCommitsSince,
+  gitDirtyCount,
+  gitHead,
+  gitRemote,
+  hashFile,
+} from "./workspace";
 
 const dir = mkdtempSync(join(tmpdir(), "todox-ws-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -167,6 +176,173 @@ describe("gitRemote", () => {
 
     expect(gitRemote(nasty)).toBe("https://example.com/x.git");
     expect(hashFile(sentinel)).toBeNull();
+    rmSync(repo, { recursive: true, force: true });
+  });
+});
+
+/**
+ * What a session did to the tree.
+ *
+ * These are the only thing the observations feature reads, and every one of
+ * them runs on a developer's machine against a directory an agent named. So
+ * the properties that matter are the unglamorous ones: never throw, never
+ * shell out, and answer "I do not know" rather than something plausible --
+ * a wrong commit count in a briefing is worse than an absent one, because the
+ * next session has no way to tell it is wrong.
+ */
+describe("reading the session's git state", () => {
+  const hasGit = spawnSync("git", ["--version"], { stdio: "ignore" }).status === 0;
+
+  /** A real repository, because a guard that returns early proves nothing. */
+  const repoWith = (commits: string[]) => {
+    const repo = mkdtempSync(join(tmpdir(), "todox-obs-"));
+    spawnSync("git", ["-C", repo, "init", "-q", "-b", "main"], { stdio: "ignore" });
+    for (const subject of commits)
+      spawnSync(
+        "git",
+        [
+          "-C", repo,
+          "-c", "user.email=t@example.com",
+          "-c", "user.name=t",
+          "commit", "-q", "--allow-empty", "-m", subject,
+        ],
+        { stdio: "ignore" },
+      );
+    return repo;
+  };
+
+  describe("a directory that is not a checkout", () => {
+    it("answers nothing rather than guessing", () => {
+      expect(gitBranch(dir)).toBeUndefined();
+      expect(gitHead(dir)).toBeUndefined();
+      expect(gitDirtyCount(dir)).toBeUndefined();
+      expect(gitCommitsSince(dir, "abc")).toBeUndefined();
+    });
+  });
+
+  it.runIf(hasGit)("reads the branch and the head", () => {
+    const repo = repoWith(["first"]);
+    expect(gitBranch(repo)).toBe("main");
+    expect(gitHead(repo)).toMatch(/^[a-f0-9]{40}$/);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  /**
+   * A repository with no commits at all. `rev-parse HEAD` fails here, and it
+   * is the state every `git init` starts in -- so it is the first thing an
+   * agent in a fresh directory would hit.
+   */
+  it.runIf(hasGit)("survives a repository with no commits", () => {
+    const repo = repoWith([]);
+    expect(gitHead(repo)).toBeUndefined();
+    expect(gitDirtyCount(repo)).toBe(0);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it.runIf(hasGit)("counts the commits made since a baseline, newest first", () => {
+    const repo = repoWith(["first"]);
+    const base = gitHead(repo)!;
+    for (const subject of ["second", "third"])
+      spawnSync(
+        "git",
+        [
+          "-C", repo,
+          "-c", "user.email=t@example.com",
+          "-c", "user.name=t",
+          "commit", "-q", "--allow-empty", "-m", subject,
+        ],
+        { stdio: "ignore" },
+      );
+
+    const since = gitCommitsSince(repo, base)!;
+    expect(since.count).toBe(2);
+    expect(since.subjects[0]).toBe("third");
+    expect(since.subjects).toContain("second");
+    expect(since.subjects).not.toContain("first");
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it.runIf(hasGit)("counts nothing when the baseline is the head", () => {
+    const repo = repoWith(["only"]);
+    expect(gitCommitsSince(repo, gitHead(repo)!)!.count).toBe(0);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  /**
+   * A baseline that no longer exists -- the sha was rebased away, or the row
+   * came from a different machine's checkout. Answering 0 would be a lie the
+   * briefing would repeat.
+   */
+  it.runIf(hasGit)("answers nothing for a baseline it cannot find", () => {
+    const repo = repoWith(["only"]);
+    expect(gitCommitsSince(repo, "f".repeat(40))).toBeUndefined();
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it.runIf(hasGit)("counts the files with uncommitted changes", () => {
+    const repo = repoWith(["only"]);
+    expect(gitDirtyCount(repo)).toBe(0);
+    writeFileSync(join(repo, "one.ts"), "x");
+    writeFileSync(join(repo, "two.ts"), "y");
+    expect(gitDirtyCount(repo)).toBe(2);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  /**
+   * Detached HEAD is a normal state -- a bisect, a checkout of a tag -- and
+   * `rev-parse --abbrev-ref` answers the literal string "HEAD" for it. Passing
+   * that through would put a branch called HEAD in front of a reader.
+   */
+  it.runIf(hasGit)("reports no branch when HEAD is detached", () => {
+    const repo = repoWith(["first", "second"]);
+    const head = gitHead(repo)!;
+    spawnSync("git", ["-C", repo, "checkout", "-q", head], { stdio: "ignore" });
+    expect(gitBranch(repo)).toBeUndefined();
+    expect(gitHead(repo)).toBe(head);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  /**
+   * The same argv guarantee `gitRemote` is tested for, on the three helpers
+   * that also take a caller-supplied directory.
+   */
+  it.runIf(hasGit)("treats a semicolon in the path as a directory name", () => {
+    const outer = mkdtempSync(join(tmpdir(), "todox-obs-x-"));
+    const sentinel = join(process.cwd(), "todox-observe-sentinel");
+    const nasty = join(outer, "evil; touch todox-observe-sentinel");
+    mkdirSync(nasty);
+    spawnSync("git", ["-C", nasty, "init", "-q", "-b", "main"], { stdio: "ignore" });
+
+    expect(gitBranch(nasty)).toBe("main");
+    expect(gitDirtyCount(nasty)).toBe(0);
+    expect(hashFile(sentinel)).toBeNull();
+    rmSync(outer, { recursive: true, force: true });
+  });
+
+  /**
+   * Subjects are user text from a repository this process does not own. The
+   * cap is what stops one commit message being the whole payload.
+   */
+  it.runIf(hasGit)("caps how much commit text it carries", () => {
+    const repo = repoWith(["x"]);
+    const base = gitHead(repo)!;
+    for (let i = 0; i < 30; i++)
+      spawnSync(
+        "git",
+        [
+          "-C", repo,
+          "-c", "user.email=t@example.com",
+          "-c", "user.name=t",
+          "commit", "-q", "--allow-empty", "-m", `subject ${i} ${"y".repeat(500)}`,
+        ],
+        { stdio: "ignore" },
+      );
+
+    const since = gitCommitsSince(repo, base)!;
+    // The count is honest even though the text is not all carried.
+    expect(since.count).toBe(30);
+    expect(since.subjects.length).toBeLessThanOrEqual(3);
+    for (const s of since.subjects) expect(s.length).toBeLessThanOrEqual(200);
     rmSync(repo, { recursive: true, force: true });
   });
 });
