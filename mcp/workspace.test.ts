@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -343,6 +343,36 @@ describe("reading the session's git state", () => {
     expect(since.count).toBe(30);
     expect(since.subjects.length).toBeLessThanOrEqual(3);
     for (const s of since.subjects) expect(s.length).toBeLessThanOrEqual(200);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  /**
+   * The baseline is the one value in this file that git did not produce.
+   *
+   * It arrives in the reply to `recordObservation` -- whatever string an
+   * earlier client stored in `head_sha` -- and `base..HEAD` is built as a
+   * single argument, so a value beginning with a dash reaches git as an option
+   * rather than a revision. Today `rev-list` rejects the unknown option before
+   * `log` is ever reached, which is an accident of call order rather than a
+   * property: `git log --output=<file>` does write that file. The guard makes
+   * it a property, and this test is what keeps it one if the calls are ever
+   * reordered or the count is dropped.
+   */
+  it.runIf(hasGit)("never hands git a baseline it would read as an option", () => {
+    const repo = repoWith(["only"]);
+    const sentinel = join(repo, "written-by-a-flag");
+
+    expect(gitCommitsSince(repo, `--output=${sentinel}`)).toBeUndefined();
+    // `..HEAD` is appended to whatever is passed, so that is the name git
+    // would have written.
+    expect(existsSync(`${sentinel}..HEAD`)).toBe(false);
+
+    // A ref name is not an object id. git would resolve `main..HEAD` happily,
+    // which is what makes this the assertion that fails if the guard goes.
+    expect(gitCommitsSince(repo, "main")).toBeUndefined();
+
+    // A filter, not a wall: a real baseline still answers.
+    expect(gitCommitsSince(repo, gitHead(repo)!)!.count).toBe(0);
     rmSync(repo, { recursive: true, force: true });
   });
 });

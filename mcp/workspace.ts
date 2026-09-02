@@ -137,6 +137,29 @@ const SUBJECTS = 3;
 const SUBJECT_CHARS = 200;
 
 /**
+ * A commit id, and nothing git would read as something else.
+ *
+ * The baseline arrives from two places. One is git's own `rev-parse`, which
+ * needs no checking. The other is the reply to `recordObservation` -- whatever
+ * string an earlier client stored in `head_sha`, which the schema bounds only
+ * by length -- and `base..HEAD` is built as a single argument, so a value
+ * beginning with `-` reaches git as an option rather than a revision.
+ *
+ * That is not reachable today: `rev-list` runs first and rejects the unknown
+ * option, so the call fails before `log` sees it. But the only thing standing
+ * between that and `git log --output=<file>`, which does write the file, is
+ * the order of two calls in the function below. This turns an accident into a
+ * property. There is no shell to escape here and the value can only come from
+ * the caller's own account, so this is not the injection the SET-clause rule
+ * was written for -- it is the same shape, caught one step earlier and for one
+ * line.
+ *
+ * Anything that is not a hex object id answers undefined, which every caller
+ * already reads as "I do not know" rather than as zero.
+ */
+const COMMIT_ID = /^[0-9a-f]{4,64}$/i;
+
+/**
  * What landed since a baseline commit.
  *
  * Two calls rather than one, because the count and the text want different
@@ -155,6 +178,8 @@ export function gitCommitsSince(
   dir: string,
   base: string,
 ): { count: number; subjects: string[] } | undefined {
+  if (!COMMIT_ID.test(base)) return undefined;
+
   const counted = git(dir, ["rev-list", "--count", `${base}..HEAD`]);
   if (counted === undefined) return undefined;
 
