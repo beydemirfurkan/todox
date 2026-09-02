@@ -579,7 +579,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("list_projects", "listProjects", {
     title: "List projects",
     description:
-      "Every project in your todox account, with open/done counts and root paths. Cheap; call it when unsure which slug to use.",
+      "Every project in your todox account that holds a task or a note, with open/done counts and root paths. Cheap; call it when unsure which slug to use. Projects with nothing in them are left out and counted in `empty_projects_omitted` — they still resolve by slug or path, so pass `cwd` rather than looking for one here.",
     annotations: READ_ONLY,
   });
 
