@@ -200,12 +200,56 @@ describe("the same repo, seen from a second machine", () => {
     const result = await resolveOrCreate(1, "/Users/me/brand-new");
 
     expect(result.created).toBe(true);
-    expect(result.warning).toBeUndefined();
+    // Not flagged as a duplicate, which is what this describe block is about.
+    // It does carry the no-remote warning -- a different thing, asserted below.
+    expect(result.warning ?? "").not.toContain("already have a project");
     expect(repo.create).toHaveBeenCalledWith(1, {
       name: "brand-new",
       slug: "fresh-slug",
       root_path: "/Users/me/brand-new",
       repo_url: null,
     });
+  });
+});
+
+/**
+ * The condition that is invisible until the day it costs something.
+ *
+ * A project with no `repo_url` is identified by its path, so `adoptable()`
+ * will only ever match it across OS families -- two Macs, or two Linux boxes,
+ * each register the same repository again and the history splits. 44 of 58
+ * projects in production are in that state, and nothing said so.
+ *
+ * Said at registration and nowhere else. The condition holds for most projects
+ * most of the time, so repeating it in every briefing would turn it into
+ * wallpaper; the moment it is news is the moment the project first appears.
+ */
+describe("a project registered without a remote", () => {
+  it("says so, and says what it costs", async () => {
+    const { warning } = await resolveOrCreate(1, "/Users/me/no-origin");
+
+    expect(warning).toContain("no git remote");
+    expect(warning).toContain("second computer");
+  });
+
+  it("says nothing when there is a remote to identify it by", async () => {
+    const { warning } = await resolveOrCreate(1, "/Users/me/has-origin", {
+      repoUrl: "git@github.com:me/has-origin.git",
+    });
+
+    expect(warning).toBeUndefined();
+  });
+
+  /**
+   * The duplicate branch already explains `repo_url` in more detail, and two
+   * warnings on one call is how an agent learns to skim them.
+   */
+  it("does not stack with the duplicate warning", async () => {
+    repo.listByName.mockResolvedValue([project(7, "/Users/me/elsewhere/dup")]);
+
+    const { warning } = await resolveOrCreate(1, "/Users/me/dup");
+
+    expect(warning).toContain("already have a project");
+    expect(warning).not.toContain("no git remote");
   });
 });

@@ -303,7 +303,15 @@ export default async function ProjectPage({
               {t("sharedBy", { name: project.owner_name })}
             </Chip>
           )}
-          {repo && (
+          {/* The remote, or the fact that there isn't one.
+              An absent remote used to render as nothing at all, which is the
+              one state worth saying out loud: 44 of 58 projects in production
+              are in it, and it is invisible until the day the same repo is
+              opened on a second computer and registers again. The whole
+              sentence is here rather than behind a tooltip — hover does not
+              exist on a phone — and the owner's fix is one drawer away, under
+              `projectRepoNote`. */}
+          {repo ? (
             <a
               href={repo}
               target="_blank"
@@ -312,6 +320,8 @@ export default async function ProjectPage({
             >
               {repoLabel(repo)} ↗
             </a>
+          ) : (
+            <span className="text-small text-faint">{t("noRemote")}</span>
           )}
         </div>
 

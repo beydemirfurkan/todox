@@ -198,7 +198,19 @@ export async function resolveOrCreate(
     };
   }
 
-  return { project: await create(userId, name, root, hints.repoUrl), created: true };
+  return {
+    project: await create(userId, name, root, hints.repoUrl),
+    created: true,
+    // Only on the call that registers the project, and only when there is no
+    // remote to identify it by. The condition holds for 44 of 58 projects in
+    // production, so saying it in every briefing would make it wallpaper --
+    // this is the one moment it is news, and the one moment somebody is
+    // looking at the project for the first time.
+    //
+    // The duplicate branch above says the same thing in more detail, so it is
+    // not repeated here.
+    ...(hints.repoUrl ? {} : { warning: noRemoteWarning(name) }),
+  };
 }
 
 /**
@@ -237,6 +249,27 @@ const create = async (userId: number, name: string, root: string, repoUrl?: stri
     root_path: root,
     repo_url: repoUrl ? scrubRemote(repoUrl) : null,
   });
+
+/**
+ * Registered by its path, because there was no remote to register it by.
+ *
+ * Says what it costs rather than that it happened: `repo_url` is the only
+ * identifier that means the same thing on a second computer, and without it
+ * `adoptable()` will only match across OS families -- so two Macs, or two
+ * Linux boxes, each get their own copy of the same repository and the history
+ * splits. That is not theoretical here; it is what `merge_projects` exists to
+ * undo.
+ *
+ * Written for the agent to relay, not to act on. A directory with no origin
+ * cannot be given one from this side, and telling a model to run
+ * `update_project` would have it invent a URL.
+ */
+const noRemoteWarning = (name: string) =>
+  `"${name}" was registered by its path, because this directory has no git remote. ` +
+  `todox identifies a project by its remote first, so opening this same repo on a ` +
+  `second computer will register it again and split the history. If it is a checkout ` +
+  `that simply has no origin yet, adding one and reopening is the fix; tell the ` +
+  `developer rather than guessing a URL.`;
 
 const duplicateWarning = (
   name: string,

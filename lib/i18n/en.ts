@@ -331,6 +331,7 @@ export const en = {
   projectRepoPh: "git@github.com:you/repo.git (optional)",
   projectRepoNote:
     "How todox recognises this repo on another machine. Without it, opening the same project on a second computer registers a duplicate and the history splits in two.",
+  noRemote: "no git remote — this project is known by its path, so a second computer registers it again",
   allClear: "All clear.",
   tasks: "tasks",
   taskFilterLabel: "Filter by status",
