@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { ENTRY_KINDS } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
+import { byline } from "./byline";
 import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
 import * as entriesRepo from "@/lib/repositories/entries";
@@ -65,6 +66,7 @@ export const dynamic = "force-dynamic";
 const currentUser = cache(requireUser);
 const projectBySlug = cache((userId: number, slug: string) => projects.bySlug(userId, slug));
 const taskById = cache((id: number) => tasksRepo.byId(id));
+
 
 /**
  * The tab. A task is the thing people leave open while they work on it, and
@@ -255,13 +257,8 @@ export default async function TaskPage({
                       >
                         {kindLabel(t, e.kind)}
                       </Chip>
-                      {/* A name when there is one. `author` only ever said
-                          'human' or 'agent', which answers nothing once two
-                          people share a project -- and it is still the answer
-                          for entries written before the column existed, or
-                          whose author has since deleted their account. */}
                       <span className="mono text-[11px] text-faint">
-                        {t("by")} {e.author_name ?? e.author} · {ago(e.created_at, t)}
+                        {byline(t, e)}{ago(e.created_at, t)}
                       </span>
                       <form action={deleteEntryAction} className="ml-auto">
                         <input type="hidden" name="entry_id" value={e.id} />
