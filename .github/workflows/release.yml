@@ -87,7 +87,7 @@ jobs:
       # Unconditional, and the reason this workflow is useful with no secrets at
       # all: the tarball is a URL `npx` accepts.
       - name: attach it to the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist-npm/*.tgz
           generate_release_notes: true
