@@ -3,26 +3,26 @@ import type { Key } from "./en";
 export const tr: Record<Key, string> = {
   tagline: "o hatırlar, sen uğraşma",
   siteName: "todox",
-  metaTitleHome: "todox — geliştiriciler ve ajanları için çalışma belleği",
+  metaTitleHome: "todox — geliştiriciler ve agent'ları için çalışma belleği",
   metaTitleLogin: "todox hesabına giriş yap — projeler ve günlük",
   metaTitleRegister: "todox hesabı oluştur — ücretsiz çalışma belleği",
   metaTitleForgot: "todox şifre sıfırlama — e-postana gelen bağlantı",
-  metaTitleAbout: "todox hakkında — geliştiriciler ve ajanları için çalışma belleği",
+  metaTitleAbout: "todox hakkında — geliştiriciler ve agent'ları için çalışma belleği",
   metaTitlePrivacy: "todox gizlilik politikası — toplanan veriler ve hakların",
   metaTitleContact: "todox ile iletişim — hata bildirimi ve GitHub deposu",
   metaTitleAccount: "Hesap — todox",
   metaTitleReport: "Etkinlik raporu — todox",
   metaTitleSearch: "Arama — todox",
   metaDescription:
-    "todox, geliştiricilerin ve kodlama ajanlarının kullandığı bir çalışma belleğidir: projeler, görevler ve her oturumdan sağ çıkan günlük.",
+    "todox, geliştiricilerin ve kodlama agent'larının kullandığı bir çalışma belleğidir: projeler, görevler ve her oturumdan sağ çıkan günlük.",
   metaDescriptionLogin:
-    "Projelerine, görevlerine ve her kodlama oturumundan sağ çıkan günlüğe ulaşmak için todox'a giriş yap; ajanınla aynı belleği paylaş.",
+    "Projelerine, görevlerine ve her kodlama oturumundan sağ çıkan günlüğe ulaşmak için todox'a giriş yap; agent'ınla aynı belleği paylaş.",
   metaDescriptionRegister:
-    "Ücretsiz bir todox hesabı aç; projelerini, görev günlüğünü ve kodlama ajanının bağlamını tek bir yerde topla. Başka kimse bunların hiçbirini göremez.",
+    "Ücretsiz bir todox hesabı aç; projelerini, görev günlüğünü ve kodlama agent'ının bağlamını tek bir yerde topla. Başka kimse bunların hiçbirini göremez.",
   metaDescriptionForgot:
     "todox hesabının şifresini tek adımda sıfırla. Bir kez kullanılabilen ve bir saat içinde geçersiz olan bir bağlantıyı e-postana göndeririz; giriş yapmana gerek kalmaz.",
   metaDescriptionAbout:
-    "todox, geliştirici ve kodlama ajanı için küçük ve açık kaynaklı bir çalışma alanıdır: projeler, görevler ve her devir tesliminde yaşayan oturum günlüğü.",
+    "todox, geliştirici ve kodlama agent'ı için küçük ve açık kaynaklı bir çalışma alanıdır: projeler, görevler ve her devir tesliminde yaşayan oturum günlüğü.",
   metaDescriptionPrivacy:
     "todox gizlilik politikasını oku: neleri topluyoruz, neden, ne kadar süre saklıyoruz ve verilerini nasıl silebilirsin.",
   metaDescriptionContact:
@@ -33,8 +33,8 @@ export const tr: Record<Key, string> = {
   whatItIs: "Nedir",
   whatItIs1: "Depo başına bir proje; üzerinde çalıştığın görevler ve her birinin başına gelenleri anlatan günlük girdileri.",
   whatItIs2: "Görev başına canlı bir günlük: yapılıyor, takıldı, bitti. Her değişiklik bir satır, düzenleme değil; tarihçe tek doğru kaynak.",
-  whatItIs3: "Günlük ve haftalık etkinlik raporu — günü başlatan kişi için: geliştirici ya da devralacağı ajan.",
-  whatItIs4: "Aynı yüzeyi kodlama ajanlarına açan bir MCP sunucusu (/api/mcp). Barındırılan uç ile stdio süreci aynı araç listesini paylaşır.",
+  whatItIs3: "Günlük ve haftalık etkinlik raporu — günü başlatan kişi için: geliştirici ya da devralacağı agent.",
+  whatItIs4: "Aynı yüzeyi kodlama agent'larına açan bir MCP sunucusu (/api/mcp). Barındırılan uç ile stdio süreci aynı araç listesini paylaşır.",
   whatItIsNot: "Nedir değil",
   whatItIsNot1: "Bir Kanban panosu değil. Swimlane, sprint, Gantt yok.",
   whatItIsNot2: "Takım sohbeti değil. Yorumlar anlattıkları değişikliğin yanında durur.",
@@ -42,7 +42,7 @@ export const tr: Record<Key, string> = {
   builtBy: "Yapan",
   builtByBody:
     "todox, Furkan Beydemir tarafından geliştirilmiş ve sürdürülmektedir. Depo MIT lisansıyla açık kaynaktır; katkılar GitHub'da kabul edilir.",
-  forAgents: "Ajan mısın? /llms.txt dosyasını oku.",
+  forAgents: "Agent mısın? /llms.txt dosyasını oku.",
   privacyLastUpdated: "Son güncelleme: 12 Ağustos 2026.",
   privacyWhatWeStore: "Neleri saklıyoruz",
   privacyStore1: "Hesabın: e-posta, kullanıcı adı, görünür ad ve şifrenin hash'i. Hash scrypt'tir; şifreni okuyamayız.",
@@ -102,7 +102,7 @@ export const tr: Record<Key, string> = {
   mascotShy: "bakmıyorum",
   loginIntro: "Projelerine ve arkalarındaki kayda ulaşmak için giriş yap.",
   registerTitle: "Hesabını oluştur",
-  registerIntro: "Projelerin, kaydın, ajanların. Hiçbirini başkası göremez.",
+  registerIntro: "Projelerin, kaydın, agent'ların. Hiçbirini başkası göremez.",
   identifier: "kullanıcı adı veya e-posta",
   username: "kullanıcı adı",
   email: "e-posta",
@@ -159,8 +159,8 @@ export const tr: Record<Key, string> = {
   changeEmailSent: "Değişti. Doğrulama bağlantısı için yeni adrese bak.",
   changePassword: "Şifre değiştir",
   changePasswordNote:
-    "Her yerden çıkış yapılır. Ajan token'ları çalışmaya devam eder — sorun onlardan biriyse aşağıdan iptal et.",
-  apiTokens: "Ajan token'ları",
+    "Her yerden çıkış yapılır. Agent token'ları çalışmaya devam eder — sorun onlardan biriyse aşağıdan iptal et.",
+  apiTokens: "Agent token'ları",
   invites: "Davetler",
   viewInvites: "Davetleri gör",
   pendingInvites: "Bekleyen davetler",
@@ -174,7 +174,7 @@ export const tr: Record<Key, string> = {
   inviteInvalidTitle: "Bu davet artık kullanılamıyor",
   inviteInvalidBody: "Süresi dolmuş, iptal edilmiş veya daha önce kabul edilmiş olabilir.",
   apiTokensIntro:
-    "Ajan bunlardan biriyle giriş yapar. Bir tane oluştur; hangi ajanı kullanıyorsan ona olduğu gibi yapıştırabileceğin bir kurulum metni çıkar. Ajan yalnızca senin hesabına erişir.",
+    "Agent bunlardan biriyle giriş yapar. Bir tane oluştur; hangi agent'ı kullanıyorsan ona olduğu gibi yapıştırabileceğin bir kurulum metni çıkar. Agent yalnızca senin hesabına erişir.",
   tokenName: "ne için",
   createToken: "token oluştur",
   tokenCreating: "oluşturuluyor…",
@@ -185,7 +185,7 @@ export const tr: Record<Key, string> = {
   tokenOnce: "Şimdi kopyala — bir daha gösterilmeyecek.",
   tokenTooMany:
     "Bir gün için bu kadar token çok. Yaklaşık {n} dakika sonra tekrar dene — ya da aşağıdan artık kullanmadıklarını iptal et.",
-  setupPromptTitle: "Ajanına yapıştır",
+  setupPromptTitle: "Agentına yapıştır",
   setupPromptTemplate: [
     "todox'u MCP sunucusu olarak ekle. Uzak (HTTP) bir sunucu, kurulacak bir",
     "şey yok:",
@@ -221,14 +221,14 @@ export const tr: Record<Key, string> = {
     "bana anlat.",
   ].join("\n"),
   setupPromptWarning:
-    "Bu metin token'ını taşıyor, yani o ajanın oturum kaydına giriyor. İstediğin bu değilse aşağıdan iptal et.",
+    "Bu metin token'ını taşıyor, yani o agent'ın oturum kaydına giriyor. İstediğin bu değilse aşağıdan iptal et.",
   setupManualTitle: "Ya da elle ekle",
   setupScopeNote:
     "Aşağıdaki yolların hepsi genel olan. Bu araçların hepsi varsayılan olarak içinde bulunduğun projeye kaydeder; o da tek klasörde çalışan bir hafıza demek.",
-  setupAgentLabel: "Ajanını seç",
+  setupAgentLabel: "Agentını seç",
   setupAgentOther: "diğer",
   setupVerify:
-    "Bağlandıktan sonra ajana get_context çağırt — çalıştığını böyle görürsün.",
+    "Bağlandıktan sonra agent'a get_context çağırt — çalıştığını böyle görürsün.",
   copySnippet: "kopyala",
   neverUsed: "hiç kullanılmadı",
   lastUsed: "son kullanım",
@@ -262,43 +262,43 @@ export const tr: Record<Key, string> = {
   unlink: "bağı kaldır",
   acceptRef: "güncel kabul et",
   checkedAt: "kontrol",
-  neverChecked: "henüz bir ajan bakmadı",
+  neverChecked: "henüz bir agent bakmadı",
   append: "ekle",
   apply: "uygula",
   title: "başlık",
   none: "yok",
 
-  heroTitle: "Sana ve ajanlarına ait bir hafıza",
+  heroTitle: "Sana ve agent'larına ait bir hafıza",
   heroBody:
-    "todox bir yapılacaklar listesi değil. Her görev bir kayıt taşır — arkasındaki kararlar, işe yaramamış denemeler, hâlâ açık sorular ve son oturumun bıraktığı not. Yeni açılan bir ajan bunu tek bir get_context çağrısıyla okur ve sana hiçbir şey sormadan devam eder.",
+    "todox bir yapılacaklar listesi değil. Her görev bir kayıt taşır — arkasındaki kararlar, işe yaramamış denemeler, hâlâ açık sorular ve son oturumun bıraktığı not. Yeni açılan bir agent bunu tek bir get_context çağrısıyla okur ve sana hiçbir şey sormadan devam eder.",
   step1Title: "Yazıya geçer",
   step1Body:
-    "Çoğunu ajan çalışırken yazar: neye karar verdiği, neyi deneyip tutturamadığı, senden neyi öğrenmesi gerektiği.",
+    "Çoğunu agent çalışırken yazar: neye karar verdiği, neyi deneyip tutturamadığı, senden neyi öğrenmesi gerektiği.",
   step2Title: "Yerinde kalır",
   step2Body:
     "Repolarının dışında tek bir veritabanında. Dal değişimi, worktree ve temiz klonlar onu kaybedemez; git'e de hiç girmez.",
   step3Title: "Sonraki oturum okur",
   step3Body:
-    "Tek bir get_context çağrısı ve sıfırdan açılan ajan öncekinin bildiğini bilir — hangi duvara tekrar toslamayacağı dahil.",
+    "Tek bir get_context çağrısı ve sıfırdan açılan agent öncekinin bildiğini bilir — hangi duvara tekrar toslamayacağı dahil.",
   kindsSummary: "kayda tam olarak ne girer — beş tür",
   projects: "Projeler",
   newProject: "+ yeni proje",
   projectNamePh: "ad",
   projectPathPh: "/repo/için/mutlak/yol (isteğe bağlı)",
-  projectSummaryPh: "bu proje ne? hiçbir şey bilmeyen bir ajan için yaz",
+  projectSummaryPh: "bu proje ne? hiçbir şey bilmeyen bir agent için yaz",
   globalContext: "Genel bağlam",
   globalContextSub: "— her projede geçerli",
   globalEmpty:
     "Henüz boş. Projeler arası bilgi burada yaşar: değişmeyen tercihlerin, her repoyu bağlayan kararlar, sürekli düştüğün tuzaklar.",
   addGlobalNote: "+ genel not ekle",
   noteBodyPh: "notun kendisi",
-  hookTitle: "Ajanını bağla",
+  hookTitle: "Agentını bağla",
   hookBody:
-    "Bir ajan token'ı oluştur ve çıkan kurulum metnini ajanına yapıştır — Claude Code, Codex, Cursor, VS Code, MCP konuşan her şey. Sonrasında bu kaydı kendisi okuyup yazar.",
+    "Bir agent token'ı oluştur ve çıkan kurulum metnini agent'ına yapıştır — Claude Code, Codex, Cursor, VS Code, MCP konuşan her şey. Sonrasında bu kaydı kendisi okuyup yazar.",
   hookCta: "Hesap sayfasına git →",
   firstRunTitle: "Burası henüz boş",
   firstRunBody:
-    "Aşağıdan ilk projeni ekle — bir ad ver ve bir repo yolu göster. Sonra todox'u ajanına bağla, yazma işini ona bırak.",
+    "Aşağıdan ilk projeni ekle — bir ad ver ve bir repo yolu göster. Sonra todox'u agent'ına bağla, yazma işini ona bırak.",
   countInFlight: "uçuşta",
   countStuck: "takıldı",
   countQueued: "sırada",
@@ -356,14 +356,14 @@ export const tr: Record<Key, string> = {
   staleAndMore: "ve {n} tane daha; görevlerin kendi sayfalarında listeli.",
   observationsTitle: "Önceki oturumlar ne yaptı",
   observationsBody:
-    "Oturum sürerken git'ten kaydedildi; kimse yazmadı. Neyin değiştiğini söylerler, neden değiştiğini asla — saklamaya değeni bir ajan gerçek bir nota dönüştürür.",
+    "Oturum sürerken git'ten kaydedildi; kimse yazmadı. Neyin değiştiğini söylerler, neden değiştiğini asla — saklamaya değeni bir agent gerçek bir nota dönüştürür.",
   observationsBranch: "{branch} dalında",
   observationsNoBranch: "dal yok",
   observationsCommitOne: "1 commit",
   observationsCommitMany: "{n} commit",
   observationsFileOne: "1 dosya değişti",
   observationsFileMany: "{n} dosya değişti",
-  observationsAndMore: "ve {n} tane daha eski; ajan için iki hafta tutuluyor.",
+  observationsAndMore: "ve {n} tane daha eski; agent için iki hafta tutuluyor.",
   inLog: "kayıt",
   deadEndCount: "çıkmaz",
   deadEndCountPlural: "çıkmaz",
@@ -399,12 +399,12 @@ export const tr: Record<Key, string> = {
     "Boş. Asıl önemli kısım burası: kararlar, çıkmazlar, açık sorular ve sonraki oturumun ilk okuyacağı devir notu.",
   filesInPlay: "İşin içindeki dosyalar",
   filesHint:
-    "Dosyaların parmak izini ajan alır, çünkü onları gerçekten görebilen taraf o. Biri değiştiğinde bu görevdeki her not işaretlenir — böylece kimse değişmiş koda ait bir açıklamaya güvenmez.",
+    "Dosyaların parmak izini agent alır, çünkü onları gerçekten görebilen taraf o. Biri değiştiğinde bu görevdeki her not işaretlenir — böylece kimse değişmiş koda ait bir açıklamaya güvenmez.",
   filesEmpty:
-    "Bu görevin dokunduğu dosyaları bağla. Bu görevi okuyan bir sonraki ajan onları kontrol eder ve bir not bayatladıysa söyler.",
+    "Bu görevin dokunduğu dosyaları bağla. Bu görevi okuyan bir sonraki agent onları kontrol eder ve bir not bayatladıysa söyler.",
   filePathPh: "/mutlak/yol/...",
   fileNotePh: "bu dosya neden önemli (isteğe bağlı)",
-  whatAgentSees: "Ajanın gördüğü",
+  whatAgentSees: "Agentın gördüğü",
   agentSeesBody:
     "bu görevi kararları, çıkmazları, açık soruları ve son devir notuyla birlikte verir — üstüne, not alındığından beri değişmiş her bağlı dosya için bir uyarı ekler.",
   updated: "güncellendi",
@@ -506,10 +506,10 @@ export const tr: Record<Key, string> = {
   deleteProjectSubmit: "Sil, içindekilerle birlikte",
 
   landingLede:
-    "Ajanın her oturuma bir öncekinden hiçbir şey bilmeden başlıyor. Bunun bedelini iki kez ödüyorsun — bir kez projeyi baştan anlatırken, bir kez de önceki oturumun çoktan tosladığı duvara yeniden toslarken.",
+    "Agentın her oturuma bir öncekinden hiçbir şey bilmeden başlıyor. Bunun bedelini iki kez ödüyorsun — bir kez projeyi baştan anlatırken, bir kez de önceki oturumun çoktan tosladığı duvara yeniden toslarken.",
   landingCta: "Hesap oluştur",
   landingSecondary: "Zaten hesabım var",
-  landingConnectTitle: "Hâlihazırda kullandığın ajanla çalışır",
+  landingConnectTitle: "Hâlihazırda kullandığın agent'la çalışır",
   landingConnectBody:
     "Tek bir adres ve bir token. Kurulacak paket yok, ayakta tutulacak yerel süreç yok — MCP konuşan her şey bağlanır: Claude Code, Codex, Cursor, VS Code.",
   /* ürünün gerçekten ileri sürdüğü üç iddia ve arkasındaki yük */
@@ -519,11 +519,11 @@ export const tr: Record<Key, string> = {
     "Notların çoğu neyin işe yaradığını yazar. Pahalı bilgi ise işe yaramayanıdır: doğru görünen, bir öğleden sonrayı yiyen ve kimsenin yazmadığı bir sebeple çöken yaklaşım. Burada onun kendi türü var, çünkü bir sonraki oturumun aynı duvara toslamasını durduran kayıt odur.",
   diff2Title: "Bayat not bunu kendisi söyler",
   diff2Body:
-    "Bağlı her dosya, onu görebilen taraf — yani ajanın — tarafından hash'lenir ve sonra yeniden bakılır. Kod ilerlediyse not \"yalan söylüyor olabilir\" diye işaretlenir. Biri gerçekten bakana kadar da \"kontrol edilmedi\" der, taze olduğunu iddia etmez: yalan söyleyen bağlam hiç bağlam olmamasından beterdir, ve buna ne kadar emin olduğu konusunda yalan söylemek de dahildir.",
+    "Bağlı her dosya, onu görebilen taraf — yani agent'ın — tarafından hash'lenir ve sonra yeniden bakılır. Kod ilerlediyse not \"yalan söylüyor olabilir\" diye işaretlenir. Biri gerçekten bakana kadar da \"kontrol edilmedi\" der, taze olduğunu iddia etmez: yalan söyleyen bağlam hiç bağlam olmamasından beterdir, ve buna ne kadar emin olduğu konusunda yalan söylemek de dahildir.",
   diff3Title: "Rapor bir sorgudur, kazı değil",
   diff3Body:
     "Her durum değişikliği bir olaydır; bugün ne bitti, ne kadar sürdü ve hangi model yaptı sorularının cevabı commit'lerden çıkarılmaz, kayıttan okunur.",
-  briefingTitle: "Ajanın tek çağrıda okuduğu şey",
+  briefingTitle: "Agentın tek çağrıda okuduğu şey",
   briefingBody:
     "Bu, `get_context`'in şekli — her oturumun yaptığı ilk çağrı. Ürünün özeti değil: yükün kendisi.",
   briefingCaption: "Ekrana sığsın diye kısaltıldı. Gerçeği açık olan her görevi taşır.",
