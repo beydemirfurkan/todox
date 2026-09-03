@@ -445,6 +445,8 @@ export const en = {
   deadEndsHit: "Dead ends hit",
   questionsRaised: "Questions raised",
   readEntryInFull: "read it in full",
+  showMore: "show more",
+  showLess: "show less",
   noActivity: "Nothing happened in this window.",
   leadTime: "start to finish",
   activeTime: "worked",

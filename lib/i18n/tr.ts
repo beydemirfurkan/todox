@@ -433,6 +433,8 @@ export const tr: Record<Key, string> = {
   deadEndsHit: "Girilen çıkmazlar",
   questionsRaised: "Sorulan sorular",
   readEntryInFull: "tamamını oku",
+  showMore: "devamını göster",
+  showLess: "daha az göster",
   noActivity: "Bu aralıkta hiçbir şey olmamış.",
   leadTime: "baştan sona",
   activeTime: "çalışılan",

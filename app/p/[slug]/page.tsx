@@ -39,7 +39,16 @@ import { SharePanel } from "../../features/share-panel";
 import { Picker } from "../../features/picker";
 import { SubmitButton } from "../../features/submit";
 import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
-import { Blob, Chip, Counter, Empty, Field, Panel, StatusDot } from "../../components";
+import {
+  Blob,
+  Chip,
+  Counter,
+  Empty,
+  ExpandableText,
+  Field,
+  Panel,
+  StatusDot,
+} from "../../components";
 import { privatePageMetadata } from "../../metadata-shared";
 import {
   compareTasks,
@@ -650,11 +659,15 @@ export default async function ProjectPage({
                       </SubmitButton>
                     </form>
                   </div>
-                  {/* Clamped: these are paragraphs, and the rail is a summary.
-                      The full text is one click away on hover/expand. */}
-                  <p className="mt-1.5 line-clamp-4 text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-muted">
-                    {c.body}
-                  </p>
+                  {/* Clamped, because these are paragraphs and the rail is a
+                      summary — and expandable, because for a long time it was
+                      only the first half. */}
+                  <ExpandableText
+                    text={c.body}
+                    more={t("showMore")}
+                    less={t("showLess")}
+                    className="mt-1.5 text-[13.5px] leading-relaxed text-muted"
+                  />
                 </div>
               ))}
               <details>
