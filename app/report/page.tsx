@@ -7,7 +7,7 @@ import { getT, getTz } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
 import { resolve } from "@/lib/services/project-resolver";
 import { periodLabel, renderMarkdown } from "@/lib/services/report-markdown";
-import { activityReport, type TaskReport } from "@/lib/services/reports";
+import { activityReport, type ReportEntry, type TaskReport } from "@/lib/services/reports";
 import { resolvePeriod, type PeriodName } from "@/lib/util/time";
 import { Blob, Chip, Counter, Empty, MarkdownPreview, Panel } from "../components";
 import { privatePageMetadata } from "../metadata-shared";
@@ -165,18 +165,21 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
               title={t("decisionsMade")}
               color={KIND_COLOR.decision}
               items={report.decisions}
+              t={t}
             />
             <EntryList
               delay={220}
               title={t("deadEndsHit")}
               color={KIND_COLOR.dead_end}
               items={report.dead_ends}
+              t={t}
             />
             <EntryList
               delay={240}
               title={t("questionsRaised")}
               color={KIND_COLOR.question}
               items={report.open_questions}
+              t={t}
             />
             {report.by_model.length > 0 && (
               <Panel delay={260} title={t("byModel")}>
@@ -252,7 +255,7 @@ function TaskRow({ task, t }: { task: TaskReport; t: T }) {
         <span className="mono text-[12px] text-faint">#{task.id}</span>
         <Link
           href={`/p/${task.project_slug}/t/${task.id}`}
-          className="text-[15px] font-medium underline decoration-dotted underline-offset-2"
+          className="min-w-0 text-[15px] font-medium break-words underline decoration-dotted underline-offset-2"
         >
           {task.title}
         </Link>
@@ -289,16 +292,26 @@ function TaskRow({ task, t }: { task: TaskReport; t: T }) {
   );
 }
 
+/**
+ * The report's own summary of a kind of entry.
+ *
+ * `body` arrives cut to a summary from `activityReport`, so this is the one
+ * render of an entry that is not the whole thing -- the link is how the reader
+ * gets the rest, and it is the reason the cut is worth making. The same markup
+ * on the share page is the full body and has no link.
+ */
 function EntryList({
   title,
   color,
   items,
   delay,
+  t,
 }: {
   title: string;
   color: string;
-  items: { task_id: number; task: string; body: string }[];
+  items: ReportEntry[];
   delay: number;
+  t: T;
 }) {
   if (items.length === 0) return null;
   return (
@@ -312,12 +325,30 @@ function EntryList({
               style={{ background: color, borderColor: "var(--edge-dark)" }}
             />
             <span className="min-w-0">
-              <span className="display text-[13px] font-bold">{item.task}</span>
-              <p className="text-[14px] leading-relaxed text-muted">{item.body}</p>
+              <span className="display text-[13px] font-bold break-words">{item.task}</span>
+              {/* Both classes, and for the reasons the sibling render on the
+                  share page has always had them: a body is paragraphs, which
+                  is what `pre-wrap` keeps, and it carries paths, urls and
+                  commit hashes, which `pre-wrap` alone refuses to break. This
+                  copy had neither, so every body arrived here as one slab and
+                  a long link pushed it out of the card. */}
+              <p className="text-[14px] leading-relaxed break-words whitespace-pre-wrap text-muted">
+                {item.truncated ? `${item.body}…` : item.body}
+              </p>
+              {item.truncated && item.project_slug && (
+                <Link
+                  href={`/p/${item.project_slug}/t/${item.task_id}`}
+                  className="link-more mt-1.5 inline-block"
+                >
+                  {t("readEntryInFull")}
+                  {/* Every one of these links says the same three words. */}
+                  <span className="sr-only"> — {item.task}</span>
+                </Link>
+              )}
             </span>
           </li>
         ))}
       </ul>
-        </Panel>
+    </Panel>
   );
 }

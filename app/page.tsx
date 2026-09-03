@@ -17,7 +17,7 @@ import { Landing } from "./features/landing";
 import { Picker } from "./features/picker";
 import { SubmitButton } from "./features/submit";
 import { contextKindLabel, kindOptions } from "./kinds";
-import { Blob, Chip, Counter, Empty, Field, Panel } from "./components";
+import { Blob, Chip, Counter, Empty, ExpandableText, Field, Panel } from "./components";
 import { pageOpenGraph } from "./metadata-shared";
 
 export const dynamic = "force-dynamic";
@@ -223,13 +223,15 @@ export default async function Home() {
                   </SubmitButton>
                 </form>
               </div>
-              {/* `break-words`: bodies carry paths, urls and commit hashes, and
-                  `pre-wrap` alone will not break an unbroken run. The
-                  `overflow-x: clip` net in globals.css hides the overflow by
-                  cutting the text off, which is worse than a wrap. */}
-              <p className="mt-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap text-muted">
-                {c.body}
-              </p>
+              {/* Same treatment as the project rail: these are the same notes,
+                  and one of them running to three thousand characters used to
+                  push everything under it off the first screen. */}
+              <ExpandableText
+                text={c.body}
+                more={t("showMore")}
+                less={t("showLess")}
+                className="mt-1.5 text-[14px] leading-relaxed text-muted"
+              />
             </div>
           ))}
 

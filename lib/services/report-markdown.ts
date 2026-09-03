@@ -1,5 +1,5 @@
 import { duration, type Key, type T } from "../i18n";
-import type { ActivityReport, TaskReport } from "./reports";
+import type { ActivityReport, ReportEntry, TaskReport } from "./reports";
 
 const PERIOD_KEY: Record<string, Key> = {
   today: "periodToday",
@@ -16,6 +16,32 @@ export function periodLabel(label: string, t: T) {
 }
 
 const day = (iso: string) => iso.slice(0, 10);
+
+/**
+ * Put a prose body inside a list item without ending the list.
+ *
+ * Markdown closes a `- ` item at the first line that is not indented to the
+ * marker's width, so a body with a blank line in it re-parsed its own
+ * paragraphs as top-level blocks: a decision that happened to contain a `##`
+ * line grew a heading in the middle of the report, and the items after it were
+ * no longer a list. Nearly every body here has a blank line -- they are
+ * paragraphs, written for a person to read.
+ *
+ * Blank lines stay blank rather than becoming two spaces, because trailing
+ * whitespace is what an editor strips on save and the diff then looks like a
+ * change nobody made.
+ */
+function indented(body: string): string {
+  return body
+    .split("\n")
+    .map((line, i) => (i === 0 || line.trim() === "" ? line : `  ${line}`))
+    .join("\n");
+}
+
+/** `- **task** — body`, with the body's own shape kept. */
+function entryBullet(e: ReportEntry): string {
+  return `- **${e.task}** — ${indented(e.truncated ? `${e.body}…` : e.body)}`;
+}
 
 /**
  * Markdown built to be pasted into a status update as-is: headline numbers
@@ -78,21 +104,21 @@ export function renderMarkdown(r: ActivityReport, t: T): string {
   if (r.decisions.length) {
     out.push(`## ${t("decisionsMade")}`);
     out.push("");
-    for (const d of r.decisions) out.push(`- **${d.task}** — ${d.body}`);
+    for (const d of r.decisions) out.push(entryBullet(d));
     out.push("");
   }
 
   if (r.dead_ends.length) {
     out.push(`## ${t("deadEndsHit")}`);
     out.push("");
-    for (const d of r.dead_ends) out.push(`- **${d.task}** — ${d.body}`);
+    for (const d of r.dead_ends) out.push(entryBullet(d));
     out.push("");
   }
 
   if (r.open_questions.length) {
     out.push(`## ${t("questionsRaised")}`);
     out.push("");
-    for (const q of r.open_questions) out.push(`- **${q.task}** — ${q.body}`);
+    for (const q of r.open_questions) out.push(entryBullet(q));
     out.push("");
   }
 
@@ -126,11 +152,11 @@ function taskLines(task: TaskReport, t: T): string[] {
   if (task.body) lines.push("", task.body.trim());
   if (task.decisions.length) {
     lines.push("", `**${t("decisionsMade")}**`);
-    for (const d of task.decisions) lines.push(`- ${d}`);
+    for (const d of task.decisions) lines.push(`- ${indented(d.trim())}`);
   }
   if (task.dead_ends.length) {
     lines.push("", `**${t("deadEndsHit")}**`);
-    for (const d of task.dead_ends) lines.push(`- ${d}`);
+    for (const d of task.dead_ends) lines.push(`- ${indented(d.trim())}`);
   }
   lines.push("");
   return lines;

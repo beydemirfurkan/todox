@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Status } from "../constants";
 import type { Task, TaskEvent } from "../types";
-import { timingFor } from "./reports";
+import { summarise, timingFor } from "./reports";
 
 const HOUR = 3_600_000;
 
@@ -123,5 +123,52 @@ describe("timingFor", () => {
       Date.parse("2026-03-01T10:00:00Z"),
     );
     expect(t.partial).toBe(true);
+  });
+});
+
+
+/**
+ * The cut is what keeps a report a summary. It has to be honest about having
+ * happened -- the page turns `truncated` into a link and the markdown into an
+ * ellipsis, and neither may infer it from the length, because a body that ends
+ * exactly on the limit was not cut.
+ */
+describe("summarise", () => {
+  it("leaves a short body alone, and keeps its paragraphs", () => {
+    const body = "Chose Postgres FTS.\n\nEmbeddings lost on cost.";
+    expect(summarise(`  ${body}  `)).toEqual({ body, truncated: false });
+  });
+
+  it("does not call a body that ends on the limit cut", () => {
+    const exact = "x".repeat(480);
+    expect(summarise(exact)).toEqual({ body: exact, truncated: false });
+  });
+
+  it("cuts a long body at a word boundary", () => {
+    const long = "decision ".repeat(200);
+    const { body, truncated } = summarise(long);
+
+    expect(truncated).toBe(true);
+    expect(body.length).toBeLessThanOrEqual(480);
+    expect(body.endsWith("decision")).toBe(true);
+    expect(long.startsWith(body)).toBe(true);
+  });
+
+  it("counts a newline as a boundary, not just a space", () => {
+    // The second line has no space in the first 480 characters, so a boundary
+    // search that only looked for `" "` would fall through to the hard cut and
+    // end the summary in the middle of a word.
+    const long = `${"a".repeat(470)}\nsecondlinethatrunspastthelimit`;
+
+    expect(summarise(long).body).toBe("a".repeat(470));
+  });
+
+  it("cuts hard when there is no boundary to back up to", () => {
+    // A pasted url or a stack frame is one unbroken run, and a word boundary
+    // that would leave a three-character summary is worse than a hard cut.
+    const { body, truncated } = summarise(`see ${"x".repeat(900)}`);
+
+    expect(truncated).toBe(true);
+    expect(body.length).toBe(480);
   });
 });

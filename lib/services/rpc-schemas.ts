@@ -302,7 +302,9 @@ export const SHAPES = {
       .string()
       .min(1)
       .max(MAX.text)
-      .describe("Write for a stranger, not for yourself"),
+      .describe(
+        "Write for a stranger, not for yourself. One entry says one thing: what was decided and why it beat the alternative, or what was tried and how it failed. Not a transcript of the session — measurements, file listings and options nobody chose belong in the task body or a context note, and an entry that repeats what the diff already shows is noise the next session reads past. Reports and briefings show the opening of a body, so the first paragraph has to stand on its own; the length after it is for whoever follows the link.",
+      ),
     author: z.enum(["agent", "human"]).optional(),
     answers_entry_id: z
       .number()
