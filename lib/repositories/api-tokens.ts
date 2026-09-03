@@ -8,6 +8,25 @@ export const listByUser = (userId: number) =>
     userId,
   ]);
 
+/**
+ * Whether an agent on this account has ever actually connected.
+ *
+ * Not "has a token": minting one is a click, and the setup failing afterwards
+ * is the exact case the prompt on the home page exists for. `last_used_at` is
+ * the same line `pnpm funnel` draws between "got as far as the Account page"
+ * and "the setup actually worked", so the page and the measurement agree on
+ * what connected means.
+ */
+export const hasConnectedAgent = async (userId: number): Promise<boolean> =>
+  Boolean(
+    await one<{ n: number }>(
+      `SELECT 1 AS n FROM api_tokens
+        WHERE user_id = ? AND last_used_at IS NOT NULL
+        LIMIT 1`,
+      [userId],
+    ),
+  );
+
 export async function create(input: {
   user_id: number;
   name: string;
