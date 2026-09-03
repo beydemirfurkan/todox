@@ -303,26 +303,6 @@ export default async function ProjectPage({
               {t("sharedBy", { name: project.owner_name })}
             </Chip>
           )}
-          {/* The remote, or the fact that there isn't one.
-              An absent remote used to render as nothing at all, which is the
-              one state worth saying out loud: 44 of 58 projects in production
-              are in it, and it is invisible until the day the same repo is
-              opened on a second computer and registers again. The whole
-              sentence is here rather than behind a tooltip — hover does not
-              exist on a phone — and the owner's fix is one drawer away, under
-              `projectRepoNote`. */}
-          {repo ? (
-            <a
-              href={repo}
-              target="_blank"
-              rel="noreferrer"
-              className="mono link-more text-small"
-            >
-              {repoLabel(repo)} ↗
-            </a>
-          ) : (
-            <span className="text-small text-faint">{t("noRemote")}</span>
-          )}
         </div>
 
         {/* `.prose` is the measure on the paragraph below. It used to carry
@@ -334,11 +314,41 @@ export default async function ProjectPage({
           </p>
         )}
 
-        {project.root_path && (
-          <p className="mono truncate text-[11.5px] text-faint" title={project.root_path}>
-            {t("localPathLabel")}: {project.root_path}
-          </p>
-        )}
+        {/* Where the project lives, in one line: the name it has everywhere,
+            and the path it has here.
+
+            These were split — the remote sat beside the h1 and the path sat
+            two lines below — which put a sentence about identity in the row
+            that names the project, competing with it. They answer the same
+            question and now sit together, quietly, under the summary.
+
+            The absent case still says so out loud, because it is invisible
+            until the day the same repo is opened on a second computer and
+            registers again. It says it in half the words: the consequence
+            fits here, and the reasoning is a drawer away under
+            `projectRepoNote`, where the field that fixes it is. */}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11.5px]">
+          {repo ? (
+            <a
+              href={repo}
+              target="_blank"
+              rel="noreferrer"
+              className="mono link-more"
+            >
+              {repoLabel(repo)} ↗
+            </a>
+          ) : (
+            <span className="text-faint">{t("noRemote")}</span>
+          )}
+          {project.root_path && (
+            <span
+              className="mono min-w-0 truncate text-faint"
+              title={project.root_path}
+            >
+              {t("localPathLabel")}: {project.root_path}
+            </span>
+          )}
+        </div>
       </header>
 
       {stale.length > 0 && (
