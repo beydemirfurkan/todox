@@ -163,6 +163,19 @@ export const promoteStmt = (id: number, promotedAs: string, at = now()): Stateme
   params: [at, promotedAs, id],
 });
 
+/**
+ * Every observation on an account, newest first.
+ *
+ * For `smoke:mcp`, which is the only thing that can prove the carrier and the
+ * server ever meet -- the briefing's read is scoped to one project and filters
+ * out anything promoted, neither of which is what that assertion is asking.
+ */
+export const byUser = (userId: number) =>
+  all<Observation>(
+    `SELECT * FROM observations WHERE user_id = ? ORDER BY observed_at DESC, id DESC`,
+    [userId],
+  );
+
 export const byId = (id: number) =>
   one<Observation>("SELECT * FROM observations WHERE id = ?", [id]);
 

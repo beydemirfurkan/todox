@@ -24,12 +24,13 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as contextsRepo from "../lib/repositories/contexts";
 import * as entriesRepo from "../lib/repositories/entries";
+import * as observationsRepo from "../lib/repositories/observations";
 import * as projectsRepo from "../lib/repositories/projects";
 import * as tasksRepo from "../lib/repositories/tasks";
 import * as usersRepo from "../lib/repositories/users";
@@ -38,16 +39,32 @@ import { hashPassword } from "../lib/util/password";
 import { normalisePath } from "../lib/util/paths";
 import { SERVER_INFO } from "../mcp/tools";
 
+/**
+ * Resolved, because the two halves of this suite would otherwise disagree
+ * about where the fixture is.
+ *
+ * On macOS `tmpdir()` answers `/var/folders/...` while a process started in
+ * that directory reports `/private/var/folders/...` for its own cwd — `/var`
+ * is a symlink. The project gets registered under one spelling and the stdio
+ * carrier reports the other, so every observation it writes is refused
+ * against a project that is right there.
+ *
+ * This is the macOS twin of the Windows 8.3 short-name problem already in the
+ * log, and the same sentence covers both: the path a process reports for
+ * itself is not always the path its project was registered under.
+ */
+const TMP = realpathSync(tmpdir());
+
 /** A throwaway repo the agent has never heard of, to prove auto-registration. */
-const SCRATCH = join(tmpdir(), "todox-smoke-repo");
+const SCRATCH = join(TMP, "todox-smoke-repo");
 /** A second one, because one account holds many and they must not mix. */
-const OTHER = join(tmpdir(), "todox-smoke-other");
+const OTHER = join(TMP, "todox-smoke-other");
 /**
  * The same repository as SCRATCH, as it looks on the developer's other computer:
  * a different absolute path, the same git remote. This is the fixture that
  * proves one repo stays one project across machines.
  */
-const ELSEWHERE = join(tmpdir(), "todox-smoke-repo-elsewhere");
+const ELSEWHERE = join(TMP, "todox-smoke-repo-elsewhere");
 /** Both checkouts answer with this, which is what ties them together. */
 const REMOTE = "git@github.com:todox-smoke/repo.git";
 const URL_BASE = process.env.TODOX_URL ?? "http://localhost:3000";
@@ -85,8 +102,17 @@ const MODES: Mode[] = [
     local: true,
     transport: (token) =>
       new StdioClientTransport({
-        command: "pnpm",
-        args: ["exec", "tsx", join(__dirname, "..", "mcp", "server.ts")],
+        // The binary directly rather than `pnpm exec`, because the process is
+        // started outside this workspace and `pnpm exec` resolves from its own
+        // cwd.
+        command: join(__dirname, "..", "node_modules", ".bin", "tsx"),
+        args: [join(__dirname, "..", "mcp", "server.ts")],
+        // Started *inside* the fixture repository, the way a real agent
+        // launcher starts it inside the developer's checkout. It used to
+        // inherit todox's own root, where this account has no project, so
+        // every observation the carrier tried to write was refused and the
+        // whole feature went unexercised.
+        cwd: SCRATCH,
         // The client name reaches this process through its environment, the
         // way a real agent launcher passes it. Over HTTP the same fact arrives
         // in the `initialize` handshake instead — one fact, two channels, which
@@ -701,6 +727,46 @@ async function runSuite(mode: Mode, token: string) {
   await client.close();
 }
 
+/**
+ * That the carrier wrote something, which nothing else here could tell you.
+ *
+ * The observer lives in the stdio process and writes on a path with no agent
+ * and no human on it: it fires after somebody else's tool call, and it
+ * swallows every error it meets, deliberately, because it must never break
+ * work that has nothing to do with being measured. Both of those are right,
+ * and together they mean a carrier that stops writing looks exactly like a
+ * carrier that has nothing to say.
+ *
+ * `smoke:observe` covers the server half by calling `recordObservation`
+ * directly, and `mcp/observer.test.ts` covers the carrier against a fake git
+ * and a fake server. Neither of them proves the two ever meet. This does, and
+ * it is the only thing that does.
+ *
+ * Not hypothetical: on 2026-09-03, the day after the feature shipped,
+ * production held zero observations and had never received a single
+ * `recordObservation` call.
+ */
+async function observerActuallyWrote(userId: number) {
+  const rows = await observationsRepo.byUser(userId);
+
+  if (rows.length === 0)
+    throw new Error(
+      "the stdio carrier wrote no observation. It runs after every tool call " +
+        "and swallows its own errors, so this is the only assertion that can " +
+        "notice -- check that the process is started inside a git repository " +
+        "this account has a project for.",
+    );
+
+  const [row] = rows;
+  if (row!.head_sha === null || row!.base_sha === null)
+    throw new Error(`observation ${row!.id} carries no git state: ${JSON.stringify(row)}`);
+
+  console.log(
+    `observer wrote: ${rows.length} row(s), branch ${row!.branch ?? "(none)"}, ` +
+      `${row!.commits} commit(s), ${row!.files_changed} file(s) dirty`,
+  );
+}
+
 async function main() {
   if (!(await fetch(URL_BASE).catch(() => null))) {
     console.error(
@@ -722,6 +788,20 @@ async function main() {
   for (const dir of [SCRATCH, ELSEWHERE]) {
     spawnSync("git", ["-C", dir, "init", "-q"], { stdio: "ignore" });
     spawnSync("git", ["-C", dir, "remote", "add", "origin", REMOTE], { stdio: "ignore" });
+    // And a commit, so the repository has a HEAD. The observer compares
+    // against one and reports nothing without it -- which is correct
+    // behaviour and, until now, the reason nothing here ever observed
+    // anything.
+    spawnSync(
+      "git",
+      [
+        "-C", dir,
+        "-c", "user.email=smoke@todox.local",
+        "-c", "user.name=smoke",
+        "commit", "-q", "--allow-empty", "-m", "smoke fixture",
+      ],
+      { stdio: "ignore" },
+    );
   }
 
   const user = await ensureUser("smoke-agent", "Smoke");
@@ -734,6 +814,9 @@ async function main() {
   await removeRows(user.id);
 
   for (const mode of MODES) await runSuite(mode, token);
+
+  await observerActuallyWrote(user.id);
+
 
   const rpc = (bearer: string | null, body: unknown) =>
     fetch(new URL("/api/rpc", URL_BASE), {
@@ -897,7 +980,13 @@ async function removeRows(userId: number) {
   for (const p of await projectsRepo.list(userId, true)) {
     for (const t of await tasksRepo.listByProject(p.id, "all"))
       if (t.title.startsWith("SMOKE:")) await tasksRepo.remove(t.id);
-    if (p.root_path && ours.has(normalisePath(p.root_path)))
+    // By path, and also by the fixture's remote. The path alone strands rows
+    // whenever these constants change spelling -- which they just did, when
+    // they were resolved through the /var symlink -- and a stranded project
+    // does not stay out of the way: it carries the same origin, so the
+    // resolver matches it by remote, hands it back with last run's root_path,
+    // and the failure lands somewhere else entirely.
+    if ((p.root_path && ours.has(normalisePath(p.root_path))) || p.repo_url === REMOTE)
       await projectsRepo.remove(userId, p.id);
   }
 }
