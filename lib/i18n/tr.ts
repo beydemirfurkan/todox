@@ -345,6 +345,7 @@ export const tr: Record<Key, string> = {
   localPathLabel: "bu makinede",
   newTask: "+ yeni görev",
   taskTitlePh: "başlık",
+  editTask: "düzenle",
   taskBodyPh: "amaç, kısıtlar, biten sayılma koşulu",
   p1: "p1 yüksek",
   p2: "p2 normal",

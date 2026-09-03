@@ -354,6 +354,7 @@ export const en = {
   localPathLabel: "on this machine",
   newTask: "+ new task",
   taskTitlePh: "title",
+  editTask: "edit",
   taskBodyPh: "goal, constraints, definition of done",
   p1: "p1 high",
   p2: "p2 normal",
