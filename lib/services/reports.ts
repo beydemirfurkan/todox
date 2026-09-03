@@ -67,10 +67,51 @@ export type ActivityReport = {
   by_model: { model: string; entries: number; tasks: number }[];
   completed: TaskReport[];
   in_progress: TaskReport[];
-  decisions: { task_id: number; task: string; body: string; at: string }[];
-  dead_ends: { task_id: number; task: string; body: string; at: string }[];
-  open_questions: { task_id: number; task: string; body: string; at: string }[];
+  decisions: ReportEntry[];
+  dead_ends: ReportEntry[];
+  open_questions: ReportEntry[];
 };
+
+export type ReportEntry = {
+  task_id: number;
+  task: string;
+  /** Null when the entry's task fell outside the window, same as `task`. */
+  project_slug: string | null;
+  /** Cut at a word boundary when `truncated`; the entry itself is on the task. */
+  body: string;
+  truncated: boolean;
+  at: string;
+};
+
+/**
+ * How much of an entry body a report section carries.
+ *
+ * A report is a summary and the entry itself is one click away, but these
+ * sections shipped the whole body: they are written agent-to-agent and run to
+ * a few thousand characters -- the longest in this repo's own log is 3839, and
+ * two thirds of them are over 1200. A month's worth of that is the entire log
+ * in a page that renders each one as a single paragraph.
+ *
+ * `truncated` is the part a caller needs: the page links to the entry, the
+ * markdown marks the cut. Neither may guess from the length, because a body
+ * that stops exactly on the limit was not cut.
+ */
+const SUMMARY_CHARS = 480;
+
+export function summarise(body: string): { body: string; truncated: boolean } {
+  const text = body.trim();
+  if (text.length <= SUMMARY_CHARS) return { body: text, truncated: false };
+
+  const cut = text.slice(0, SUMMARY_CHARS);
+  // Back up to the last whitespace so the summary does not stop mid-word.
+  // `search` finds where that run starts; -1 means there is no whitespace at
+  // all in reach -- a pasted url, a stack frame -- and then a hard cut is the
+  // only answer. Half the budget is the floor: a body that opens with one word
+  // and then an unbroken 470-character run should not summarise to that word.
+  const boundary = cut.search(/\s\S*$/);
+  const kept = boundary > SUMMARY_CHARS / 2 ? cut.slice(0, boundary) : cut;
+  return { body: kept.trimEnd(), truncated: true };
+}
 
 const IMPORTANCE: Record<number, TaskReport["importance"]> = {
   1: "high",
@@ -227,6 +268,11 @@ export async function activityReport(
   // quadratic on a month with a few thousand entries in it.
   const titles = new Map(reports.map((r) => [r.id, r.title]));
   const titleOf = (taskId: number) => titles.get(taskId) ?? `#${taskId}`;
+  // Same reason the title has a fallback: an entry can belong to a task the
+  // window did not pick up. A section then has no task page to link to, which
+  // is a missing link and not a broken one.
+  const slugs = new Map(reports.map((r) => [r.id, r.project_slug]));
+  const slugOf = (taskId: number) => slugs.get(taskId) ?? null;
 
   // Answered anywhere, not just inside the window: a question closed last month
   // is not an open question this week, and a report that says otherwise sends
@@ -238,14 +284,15 @@ export async function activityReport(
       .filter((id): id is number => id != null),
   );
 
-  const pick = (kind: EntryKind) =>
+  const pick = (kind: EntryKind): ReportEntry[] =>
     periodEntries
       .filter((e) => e.kind !== "question" || !answered.has(e.id))
       .filter((e) => e.kind === kind)
       .map((e) => ({
         task_id: e.task_id,
         task: titleOf(e.task_id),
-        body: e.body,
+        project_slug: slugOf(e.task_id),
+        ...summarise(e.body),
         at: e.created_at,
       }));
 

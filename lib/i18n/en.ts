@@ -444,6 +444,7 @@ export const en = {
   decisionsMade: "Decisions made",
   deadEndsHit: "Dead ends hit",
   questionsRaised: "Questions raised",
+  readEntryInFull: "read it in full",
   noActivity: "Nothing happened in this window.",
   leadTime: "start to finish",
   activeTime: "worked",
