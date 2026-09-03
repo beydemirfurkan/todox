@@ -5,6 +5,7 @@ import { CONTEXT_KINDS } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
+import * as apiTokens from "@/lib/repositories/api-tokens";
 import * as contexts from "@/lib/repositories/contexts";
 import * as memberships from "@/lib/repositories/project-memberships";
 import * as projects from "@/lib/repositories/projects";
@@ -50,28 +51,58 @@ export default async function Home() {
       </>
     );
   // One counts query for the whole page instead of one per project card.
-  const [allProjects, globalContext, counts] = await Promise.all([
+  const [allProjects, globalContext, counts, connected] = await Promise.all([
     projects.list(user.id),
     contexts.listByProject(user.id, null),
     tasks.countsByProject(user.id),
+    // Rides along rather than costing a round trip of its own.
+    apiTokens.hasConnectedAgent(user.id),
   ]);
   // One grouped query for every card, not one per card.
   const teamSizes = await memberships.countsByProjects(allProjects.map((p) => p.id));
 
+  /**
+   * The pitch is for somebody who has not started yet.
+   *
+   * It used to be here on every visit: a headline, a paragraph explaining what
+   * todox is, and three cards explaining how it works — better than half the
+   * screen, above the projects, for an account that has been using it for a
+   * month. Explaining the product to the person already using it is the same
+   * failure the log itself is written against: a thing that is always true
+   * does not need saying every time.
+   *
+   * The first project is the line. Before it there is nothing else to show and
+   * the page has to teach; after it the page has work on it, and the
+   * explanation is one click away on /about. The five entry kinds go with it,
+   * because the task composer already names each one where it is actually
+   * being chosen.
+   */
+  const beforeFirstProject = allProjects.length === 0;
+
   return (
     <div className="space-y-8">
-      <div className="pop prose">
-        <h1 className="display text-[28px] leading-[1.1] font-bold sm:text-[36px]">
-          {t("heroTitle")}
+      {beforeFirstProject ? (
+        <>
+          <div className="pop prose">
+            <h1 className="display text-[28px] leading-[1.1] font-bold sm:text-[36px]">
+              {t("heroTitle")}
+            </h1>
+            <p className="mt-2 text-[15.5px] leading-relaxed text-muted">{t("heroBody")}</p>
+          </div>
+
+          <Explainer t={t} />
+
+          <h2 className="display pop pt-1 text-[25px] font-bold">{t("projects")}</h2>
+          <FirstRun t={t} />
+        </>
+      ) : (
+        // The page is a list of projects, so that is its heading. Promoted from
+        // h2 rather than left behind a headline that is no longer the subject:
+        // a document has one h1, and this is now it.
+        <h1 className="display pop text-[28px] leading-[1.1] font-bold sm:text-[36px]">
+          {t("projects")}
         </h1>
-        <p className="mt-2 text-[15.5px] leading-relaxed text-muted">{t("heroBody")}</p>
-      </div>
-
-      <Explainer t={t} />
-
-      <h2 className="display pop pt-1 text-[25px] font-bold">{t("projects")}</h2>
-
-      {allProjects.length === 0 && <FirstRun t={t} />}
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {allProjects.map((p, i) => {
@@ -229,6 +260,16 @@ export default async function Home() {
         </div>
       </Panel>
 
+      {/* The same rule as the pitch above, applied to the last block on the
+          page: once an agent has actually connected, telling somebody to
+          connect one is advice they have already taken.
+
+          "Connected" is a token that has been used, not a token that exists.
+          Minting one is a click and the setup failing afterwards is precisely
+          the case this prompt is for — which is the same line `pnpm funnel`
+          draws between "got as far as the Account page" and "the setup
+          actually worked", so the page and the measurement agree. */}
+      {!connected && (
       <section
         className="pop sticker p-5"
         style={{ animationDelay: "300ms" }}
@@ -247,6 +288,7 @@ export default async function Home() {
           </div>
         </div>
       </section>
+      )}
     </div>
   );
 }
