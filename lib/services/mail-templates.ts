@@ -92,7 +92,7 @@ export type Lang = "tr" | "en";
 export type Template = { subject: string; text: string; html: string };
 
 const FOOTER: Record<Lang, string> = {
-  tr: "todox — geliştiriciler ve ajanları için çalışma belleği. Bu e-postayı beklemiyorsan görmezden gelebilirsin.",
+  tr: "todox — geliştiriciler ve agent'ları için çalışma belleği. Bu e-postayı beklemiyorsan görmezden gelebilirsin.",
   en: "todox — working memory for developers and their agents. If you were not expecting this, you can ignore it.",
 };
 
@@ -241,7 +241,7 @@ export function emailChanged(input: {
         "",
         "Bunu sen yaptıysan yapman gereken bir şey yok.",
         "Yapmadıysan hesabına başkası erişiyor demektir: hemen şifreni",
-        `sıfırla (${forgotUrl}) ve ajan tokenlarını iptal et.`,
+        `sıfırla (${forgotUrl}) ve agent tokenlarını iptal et.`,
       ].join("\n"),
       html: layout(
         "Hesabının e-posta adresi değişti",
@@ -254,7 +254,7 @@ export function emailChanged(input: {
           { kind: "text", body: "Bunu sen yaptıysan yapman gereken bir şey yok." },
           {
             kind: "note",
-            body: `Yapmadıysan hesabına başkası erişiyor demektir: hemen <a href="${esc(forgotUrl)}" style="color:${BRAND.accent}">şifreni sıfırla</a> ve ajan tokenlarını iptal et.`,
+            body: `Yapmadıysan hesabına başkası erişiyor demektir: hemen <a href="${esc(forgotUrl)}" style="color:${BRAND.accent}">şifreni sıfırla</a> ve agent tokenlarını iptal et.`,
           },
         ],
         FOOTER.tr,
