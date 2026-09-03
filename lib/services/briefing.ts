@@ -228,10 +228,46 @@ export async function briefing(userId: number, project: Project, focus?: string)
     observations: observed.rows,
     observations_omitted: observed.omitted,
     stale_refs: stale,
-    hint:
-      "Before you finish, call log_entry(kind:'handoff') on any task you touched, " +
-      "and record dead ends so the next session does not repeat them.",
+    hint: closingHint(openTasks),
   };
+}
+
+/**
+ * The wrap-up request, naming what is actually missing.
+ *
+ * It used to be one sentence, identical in every briefing: call `log_entry`
+ * with a handoff before you finish. Two accounts in production read that at
+ * the top of every session for weeks and wrote nothing, which is roughly what
+ * a request that is the same whether or not it applies deserves.
+ *
+ * The payload already knows the answer -- `last_handoff` is computed for each
+ * open task a few lines above -- so the ask can name a number instead of a
+ * virtue. Nothing is queried for this.
+ *
+ * It goes quiet when there is nothing to say. A briefing where every open task
+ * carries a handoff should not end by asking for one; that is the same
+ * always-true sentence in a different disguise, and it is what teaches an
+ * agent to stop reading the last line.
+ */
+function closingHint(openTasks: { id: number; last_handoff: string | null }[]): string {
+  const naked = openTasks.filter((t) => t.last_handoff === null);
+  const always =
+    "Record dead ends as you hit them, so the next session does not repeat them.";
+
+  if (naked.length === 0) return always;
+
+  // The ids, so the ask is actionable rather than a count to go and match up.
+  // Capped: past a handful this is a statement about the backlog, not a list
+  // of things to do before finishing.
+  const shown = naked.slice(0, 5).map((t) => `#${t.id}`).join(", ");
+  const rest = naked.length - 5;
+
+  return (
+    `${naked.length} of the open tasks below have no handoff at all (${shown}` +
+    `${rest > 0 ? `, +${rest} more` : ""}). If you touch one, leave one: ` +
+    `log_entry(kind:'handoff') is what makes the next session cheaper than yours. ` +
+    always
+  );
 }
 
 /**

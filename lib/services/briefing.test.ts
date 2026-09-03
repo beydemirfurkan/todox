@@ -361,13 +361,68 @@ describe("context notes", () => {
   });
 });
 
+/**
+ * The wrap-up request, and why it is no longer the same sentence every time.
+ *
+ * It used to be one line, identical in every briefing: write a handoff before
+ * you finish. Two accounts in production read that at the top of every session
+ * for weeks and wrote nothing — roughly what a request that is the same
+ * whether or not it applies deserves.
+ *
+ * `last_handoff` is already computed for each open task, so the ask can name a
+ * number and the ids behind it without querying anything. The half worth
+ * guarding is the other one: when every open task already has a handoff, the
+ * briefing must not end by asking for one. That is the same always-true
+ * sentence wearing a different hat, and it is what teaches an agent to stop
+ * reading the last line.
+ */
 describe("the closing hint", () => {
-  it("asks for a handoff and for the dead ends by name", async () => {
-    // The one instruction that decides whether the next briefing is worth
-    // anything, so it travels with every one of them.
+  it("still asks for dead ends, which is true whatever the tasks look like", async () => {
     const out = await brief();
-    expect(out.hint).toContain("handoff");
     expect(out.hint).toContain("dead ends");
+  });
+
+  it("names how many open tasks have no handoff, and which", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: [task(1), task(2), task(3)], total: 3 });
+    // No handoff entries at all, so all three are naked.
+    mocks.listByTasksPerKind.mockResolvedValue(new Map());
+
+    const out = await brief();
+
+    expect(out.hint).toContain("3 of the open tasks");
+    expect(out.hint).toContain("#1, #2, #3");
+    expect(out.hint).toContain("handoff");
+  });
+
+  it("goes quiet about handoffs when every open task already has one", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
+    // A flat list per task, which is what the repository answers.
+    mocks.listByTasksPerKind.mockResolvedValue(
+      new Map([[1, [entry("handoff", "where I left it")]]]),
+    );
+
+    const out = await brief();
+
+    expect(out.hint).not.toContain("handoff");
+    expect(out.hint).toContain("dead ends");
+  });
+
+  /**
+   * Past a handful this stops being a list of things to do before finishing
+   * and becomes a statement about the backlog, which is a different message
+   * and not this one's job.
+   */
+  it("caps the ids it lists", async () => {
+    const many = Array.from({ length: 9 }, (_, i) => task(i + 1));
+    mocks.pageByProject.mockResolvedValue({ rows: many, total: 9 });
+    mocks.listByTasksPerKind.mockResolvedValue(new Map());
+
+    const out = await brief();
+
+    expect(out.hint).toContain("9 of the open tasks");
+    expect(out.hint).toContain("#5");
+    expect(out.hint).not.toContain("#6");
+    expect(out.hint).toContain("+4 more");
   });
 });
 
