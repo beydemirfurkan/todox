@@ -134,15 +134,6 @@ export default async function TaskPage({
         / <span aria-current="page">#{task.id}</span>
       </nav>
 
-      {/* The most-used page in the app had no h1 at all: its outline started
-          at the h2 every Panel emits, and the thing that reads as the title is
-          a textarea -- an editing control, not a heading. Visually hidden
-          because the title is already on screen; a second copy of it would be
-          the wrong fix for a document-structure problem. */}
-      <h1 className="sr-only">
-        {t("task")} #{task.id} — {task.title}
-      </h1>
-
       <Panel
             title={
               <span className="flex items-center gap-2">
@@ -163,38 +154,75 @@ export default async function TaskPage({
               </form>
             }
           >
-            <form action={updateTaskAction} className="space-y-2">
-              <input type="hidden" name="task_id" value={task.id} />
-              {/* textarea, not input: long titles are the norm here and an
-                  input would clip the thing you most need to read */}
-              <Field label={t("taskTitlePh")} hidden>
-                <textarea
-                  name="title"
-                  rows={2}
-                  defaultValue={task.title}
-                  className="textarea-title"
-                />
-              </Field>
-              <Field label={t("taskBodyPh")}>
-                <textarea name="body" defaultValue={task.body ?? ""} />
-              </Field>
-              <div className="flex flex-wrap items-end gap-2">
-                <Field label={t("priorityLabel")} className="w-40">
-                  <Picker
-                    name="priority"
-                    value={String(task.priority)}
-                    options={priorityOptions(t)}
-                    label={t("priorityLabel")}
+            {/* Read first, edit on request.
+                This page is opened to find out what a task is, and it used to
+                answer with a form: the title in a textarea, the body in a
+                second one, a priority select and a save button. Reading meant
+                looking at controls, and because the thing that reads as the
+                title was an editing control, the document had no real heading
+                -- there was a visually hidden h1 duplicating it to make the
+                outline valid, which is a workaround for a layout problem
+                rather than a fix.
+
+                The title is now the heading it always was. Editing is a
+                `details`, the same disclosure the new-project form and the
+                kinds reference already use, so it still works with no
+                JavaScript and the Server Action still lives in a real form. */}
+            <h1 className="display text-[21px] leading-snug font-bold sm:text-[24px]">
+              {task.title}
+            </h1>
+
+            {task.body && (
+              <p className="prose mt-2 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-muted">
+                {task.body}
+              </p>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              {/* Only when it is not the middle one, the way the project page
+                  already does it: a badge every task carries says nothing. */}
+              {task.priority !== 2 && (
+                <Chip color={task.priority === 1 ? "var(--accent)" : "var(--k-note)"} tilt={-3}>
+                  {task.priority === 1 ? t("p1") : t("p3")}
+                </Chip>
+              )}
+              <span className="mono text-[11px] text-faint">
+                {t("updated")} {ago(task.updated_at, t)}
+              </span>
+            </div>
+
+            <details className="mt-3">
+              <summary className="link-more text-meta">{t("editTask")}</summary>
+              <form action={updateTaskAction} className="mt-3 space-y-2">
+                <input type="hidden" name="task_id" value={task.id} />
+                {/* textarea, not input: long titles are the norm here and an
+                    input would clip the thing you most need to read */}
+                <Field label={t("taskTitlePh")}>
+                  <textarea
+                    name="title"
+                    rows={2}
+                    defaultValue={task.title}
+                    className="textarea-title"
                   />
                 </Field>
-                <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
-                  {t("save")}
-                </SubmitButton>
-                <span className="mono ml-auto text-[11px] text-faint">
-                  {t("updated")} {ago(task.updated_at, t)}
-                </span>
-              </div>
-            </form>
+                <Field label={t("taskBodyPh")}>
+                  <textarea name="body" defaultValue={task.body ?? ""} />
+                </Field>
+                <div className="flex flex-wrap items-end gap-2">
+                  <Field label={t("priorityLabel")} className="w-40">
+                    <Picker
+                      name="priority"
+                      value={String(task.priority)}
+                      options={priorityOptions(t)}
+                      label={t("priorityLabel")}
+                    />
+                  </Field>
+                  <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
+                    {t("save")}
+                  </SubmitButton>
+                </div>
+              </form>
+            </details>
           </Panel>
 
       <Tabs tabs={tabs} current={tab} label={t("taskSections")} />
