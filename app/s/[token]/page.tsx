@@ -117,7 +117,7 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
         <h1 className="display mt-2 text-[33px] leading-[1.1] font-bold">
           {project.name}
         </h1>
-        <p className="mt-1.5 text-[14.5px] text-muted">
+        <p className="mt-1.5 text-[14.5px] break-words whitespace-pre-wrap text-muted">
           {project.summary ?? t("sharedIntro")}
         </p>
         {!withLog && <p className="mt-1 text-[13.5px] text-muted">{t("sharedNoLog")}</p>}
@@ -139,7 +139,9 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
                 <div className="flex flex-wrap items-baseline gap-2">
                   <StatusDot status={task.status} t={t} />
                   <span className="mono text-[12px] text-faint">#{task.id}</span>
-                  <span className="text-[15px] font-medium">{task.title}</span>
+                  <span className="min-w-0 text-[15px] font-medium break-words">
+                    {task.title}
+                  </span>
                   <Chip>{statusLabel(t, task.status)}</Chip>
                   {task.priority === 1 && (
                     <Chip color="var(--accent)" tilt={-3}>

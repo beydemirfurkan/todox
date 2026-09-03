@@ -279,7 +279,11 @@ export default async function TaskPage({
               {refs.map((r) => (
                 <div key={r.id} className="sticker-flat group p-2.5">
                   <p className="mono text-[12.5px] break-all">{r.path}</p>
-                  {r.note && <p className="mt-1 text-[13.5px] text-muted">{r.note}</p>}
+                  {r.note && (
+                    <p className="mt-1 text-[13.5px] break-words whitespace-pre-wrap text-muted">
+                      {r.note}
+                    </p>
+                  )}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <RefBadge status={r.state} t={t} />
                     <span className="mono text-[11px] text-faint">

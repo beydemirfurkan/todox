@@ -304,7 +304,7 @@ export default async function ProjectPage({
             `min-w-3xl` beside it, which is a 768px *minimum* — wider than the
             max-width `.prose` sets, and wider than a phone. */}
         {project.summary && (
-          <p className="prose text-[14.5px] leading-relaxed text-muted">
+          <p className="prose text-[14.5px] leading-relaxed break-words whitespace-pre-wrap text-muted">
             {project.summary}
           </p>
         )}
@@ -418,7 +418,7 @@ export default async function ProjectPage({
                       <span className="flex flex-wrap items-baseline gap-2">
                         <span className="mono text-[12px] text-faint">#{task.id}</span>
                         <span
-                          className={`text-[15px] font-medium ${done ? "text-muted line-through decoration-1" : ""}`}
+                          className={`min-w-0 text-[15px] font-medium break-words ${done ? "text-muted line-through decoration-1" : ""}`}
                         >
                           {task.title}
                         </span>

@@ -255,7 +255,7 @@ function TaskRow({ task, t }: { task: TaskReport; t: T }) {
         <span className="mono text-[12px] text-faint">#{task.id}</span>
         <Link
           href={`/p/${task.project_slug}/t/${task.id}`}
-          className="text-[15px] font-medium underline decoration-dotted underline-offset-2"
+          className="min-w-0 text-[15px] font-medium break-words underline decoration-dotted underline-offset-2"
         >
           {task.title}
         </Link>
