@@ -322,7 +322,7 @@ export const tr: Record<Key, string> = {
   projectRepoPh: "git@github.com:sen/repo.git (isteğe bağlı)",
   projectRepoNote:
     "todox bu repoyu başka bir makinede bununla tanıyor. Olmazsa aynı projeyi ikinci bir bilgisayarda açmak ikinci bir kayıt oluşturur ve geçmiş ikiye bölünür.",
-  noRemote: "git uzak adresi yok — bu proje yoluyla tanınıyor, ikinci bir bilgisayar onu yeniden kaydeder",
+  noRemote: "uzak adres yok — ikinci bir bilgisayar yeniden kaydeder",
   allClear: "Her şey temiz.",
   tasks: "görev",
   taskFilterLabel: "Duruma göre filtrele",
