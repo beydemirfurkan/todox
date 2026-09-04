@@ -119,7 +119,10 @@ const BASE = [
   "a note, not a question.",
   "",
   "ANSWERING WHAT WAS ASKED: a briefing hands you open_questions with their",
-  "ids. If you work one of them out -- or the developer tells you -- log the",
+  "ids and their first lines; when its budget did not reach one, `body` is",
+  "null and get_task has the rest, so read that before you answer a question",
+  "you have only seen the head of. If you work one out -- or the developer",
+  "tells you -- log the",
   "answer with answers_entry_id set to that question. Until something does,",
   "that question comes back in every briefing and every report for ever, and a",
   "list of questions nobody can close stops being read. This is the cheapest",
@@ -162,9 +165,11 @@ const BASE = [
   "ONE ENTRY SAYS ONE THING: the decision and why it beat the alternative,",
   "or the approach and how it failed. Not the session transcript —",
   "measurements, file listings and options nobody chose go in the task body",
-  "or a context note. Briefings and reports show the opening of a body and",
-  "link to the rest, so write the first paragraph to stand alone. A log",
-  "nobody finishes reading is the failure mode, not a short entry.",
+  "or a context note. A briefing shows the FIRST LINE of every entry and",
+  "pays for as many whole bodies as its budget allows, so write the first",
+  "line as a headline that stands on its own -- it is what the next session",
+  "reads when the budget ran out before your entry. A log nobody finishes",
+  "reading is the failure mode, not a short entry.",
   "",
   "WHAT OUTLIVES A TASK: add_context, for the things that constrain everything",
   "else -- a convention the codebase follows, a gotcha that will bite the next",
@@ -638,7 +643,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       // shows them -- a tool description is the one place an agent always
       // looks.
       description:
-        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`. It is capped so it cannot grow without bound: fifty open tasks, three log entries per kind per task, and sixty context-note bodies per scope — twenty-five when you send a `focus`, because those twenty-five are the ones about what you asked. Every note's title comes back regardless — a `body` of null means that note was past the ceiling, not that it is empty, and `get_context_note` reads it. `open_tasks_omitted`, `log_omitted` and `context_omitted` say how much was left out. Pass `focus` — one sentence about what this session is for — and the notes that keep their bodies are the ones relevant to it rather than the ones written most recently; `context_ranked_by` tells you which of the two you got.",
+        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`. It is capped so it cannot grow without bound: fifty open tasks, three log entries of each kind per task (one handoff), sixty context-note bodies per scope, and a byte budget on the log bodies. Nothing is ever truncated. Every note and every entry comes back named whatever the budget did — an entry always carries its `id`, `kind`, `created_at` and `head`, which is the first line of what somebody wrote. A `body` of null means the budget was already spent, never that the record is empty: `get_task` returns the whole entry, `get_context_note` the whole note. Three counts say what you did not get, and they mean different things — `open_tasks_omitted` and `log_omitted` count records that are NOT in this payload, `context_omitted` and `log_bodies_omitted` count records that ARE, minus their bodies. Pass `focus` — one sentence about what this session is for — and the budget is spent on what is relevant rather than on whatever is newest; `context_ranked_by` and `log_ranked_by` tell you which of the two you got.",
       annotations: READ_ONLY,
     },
     {
@@ -791,7 +796,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("get_context_note", "getContextNote", {
     title: "Read one context note in full",
     description:
-      "The whole body of a single context note. get_context carries every note's title but only the newest sixty bodies per scope, and reports the rest as `context_omitted`; this is how you read one of those, or how you read past the 240-character snippet a search hit gives you. A body of null in a briefing means the note was past that ceiling, never that it is empty.",
+      "The whole body of a single context NOTE. get_context carries every note's title but only the newest sixty bodies per scope, and reports the rest as `context_omitted`; this is how you read one of those, or how you read past the 240-character snippet a search hit gives you. A note body of null in a briefing means it was past that ceiling, never that it is empty. This does not read entries: a briefing entry whose body the budget did not reach is read with get_task.",
     annotations: READ_ONLY,
   });
 

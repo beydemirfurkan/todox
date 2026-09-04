@@ -224,7 +224,7 @@ export const SHAPES = {
       .max(MAX.line)
       .optional()
       .describe(
-        "What this session is about, in a sentence -- the bug, the feature, the file. Standing notes are ranked against it, so the ones that matter are the ones that come back with a body instead of whichever were written most recently. Send it whenever you know; it can only move a note up the list, never drop one.",
+        "What this session is about, in a sentence -- the bug, the feature, the file. Both budgets are spent against it -- the standing notes AND the log -- so the bodies that come back are the ones about what you asked instead of whichever were written most recently. Send it whenever you know; it can only move a record up the list, never drop one, so a focus that matches nothing costs nothing.",
       ),
     repo_root: repoRoot,
     repo_url: repoIdentity,
