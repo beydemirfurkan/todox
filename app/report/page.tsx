@@ -100,7 +100,16 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
             <Stat n={report.totals.touched} label={t("totalsTouched")} fill="var(--k-note)" />
             <Stat
               text={duration(report.totals.active_ms, t)}
-              label={t("totalsActive")}
+              label={
+                // The denominator belongs on the tile, not in a footnote below
+                // the fold. A task closed without ever being set to `doing`
+                // contributes a clean zero to this figure, and until now the
+                // headline rolled every one of those in and said nothing --
+                // 43 of 78 completed tasks, measured in production.
+                report.totals.unmeasured
+                  ? `${t("totalsActive")} · ${t("totalsUnmeasured", { n: report.totals.unmeasured })}`
+                  : t("totalsActive")
+              }
               fill="var(--accent)"
             />
           </section>

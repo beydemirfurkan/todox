@@ -66,7 +66,14 @@ export function renderMarkdown(r: ActivityReport, t: T): string {
     `**${r.totals.completed}** ${t("totalsCompleted")} · ` +
       `**${r.totals.created}** ${t("totalsCreated")} · ` +
       `**${r.totals.touched}** ${t("totalsTouched")} · ` +
-      `**${duration(r.totals.active_ms, t)}** ${t("totalsActive")}`,
+      `**${duration(r.totals.active_ms, t)}** ${t("totalsActive")}` +
+      // The denominator, beside the number rather than in a footnote. The
+      // per-task lines have said `~` for a while; the headline summed every
+      // unmeasured zero into itself and claimed nothing about them, which is
+      // the one place this report was not honest.
+      (r.totals.unmeasured
+        ? ` · ${t("totalsUnmeasured", { n: r.totals.unmeasured })}`
+        : ""),
   );
   out.push("");
 

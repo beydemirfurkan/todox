@@ -55,6 +55,22 @@ export type ActivityReport = {
     dead_ends: number;
     questions: number;
     active_ms: number;
+    /**
+     * Tasks the window touched whose time could not be measured at all.
+     *
+     * `active_ms` above sums time spent in `doing`, and a task that went
+     * straight to `done` contributes a clean zero to it. Per task that is
+     * already said out loud -- `partial` is true and the markdown marks the
+     * figure with a tilde -- but the headline number rolled every one of those
+     * zeros in and claimed nothing.
+     *
+     * Measured in production on 2026-09-04: 43 of 78 completed tasks never
+     * passed through `doing`, and of the 38 in one report window, 23 answered
+     * `active_ms: 0, partial: true`. So the headline was an average over a
+     * denominator nobody was shown, and the product's own rule is that context
+     * which lies is worse than none.
+     */
+    unmeasured: number;
   };
   by_project: {
     slug: string;
@@ -359,6 +375,11 @@ export async function activityReport(
       dead_ends: periodEntries.filter((e) => e.kind === "dead_end").length,
       questions: periodEntries.filter((e) => e.kind === "question").length,
       active_ms: reports.reduce((n, r) => n + activeInPeriod(r), 0),
+      // Counted from `partial` rather than from `active_ms === 0`, because
+      // those are different facts: a task can genuinely have spent no time in
+      // the window, and saying "not measured" about it would be its own small
+      // lie in the other direction.
+      unmeasured: reports.filter((r) => r.partial).length,
     },
     by_project: byProject,
     by_model: byModel,

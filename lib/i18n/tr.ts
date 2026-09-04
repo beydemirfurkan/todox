@@ -458,7 +458,8 @@ export const tr: Record<Key, string> = {
   imp_low: "düşük",
   modelLabel: "model",
   partialNote:
-    "~ ile işaretli süreler geçiş takibinden önceye ait; ölçüm değil, alt sınır.",
+    "~ ile işaretli süreler ölçüm değil, alt sınır: görev hiç `doing` yapılmadan kapatılmış ya da geçiş kaydından önceye ait. Sayıyı gerçek yapan şey, işe başlarken görevi `doing` yapmak.",
+  totalsUnmeasured: "{n} tanesi ölçülemedi",
   copyReport: "markdown olarak kopyala",
   reportCopied: "kopyalandı",
   reportForManager:
