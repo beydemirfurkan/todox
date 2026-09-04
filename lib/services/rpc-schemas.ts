@@ -85,7 +85,7 @@ const repoRoot = z
   .string()
   .max(MAX.path)
   .optional()
-  .describe("Absolute path of the repository root containing `cwd`.");
+  .describe("Absolute path of the repository root containing `cwd` -- the directory holding .git. Registering a NEW project needs this or `repo_url`: todox stores repositories, not directories, and a bare `cwd` is a directory you happen to be standing in.");
 
 /**
  * How the server recognises this repo somewhere other than this machine.
@@ -217,7 +217,7 @@ export const SHAPES = {
       .boolean()
       .optional()
       .describe(
-        "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call.",
+        "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call. Registering needs `repo_root` or `repo_url` as well -- a path on its own is not evidence of a repository.",
       ),
     focus: z
       .string()

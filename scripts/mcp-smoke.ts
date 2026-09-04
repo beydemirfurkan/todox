@@ -60,6 +60,12 @@ const SCRATCH = join(TMP, "todox-smoke-repo");
 /** A second one, because one account holds many and they must not mix. */
 const OTHER = join(TMP, "todox-smoke-other");
 /**
+ * A directory that is deliberately NOT a checkout, shaped like the ones that
+ * caused this rule: a client's per-prompt scratch folder. Nothing is written
+ * into it, so nothing above it can be mistaken for a root marker.
+ */
+const NOT_A_REPO = join(TMP, "todox-smoke-scratch", "2026-09-04", "some-prompt");
+/**
  * The same repository as SCRATCH, as it looks on the developer's other computer:
  * a different absolute path, the same git remote. This is the fixture that
  * proves one repo stays one project across machines.
@@ -715,6 +721,57 @@ async function runSuite(mode: Mode, token: string) {
   if (noteIn(afterRemoval))
     throw new Error("a deleted note is still in the briefing");
   console.log("entry and note both removed, and gone from what the next session reads");
+
+  // A project is a repository, not a path. This is the assertion that keeps
+  // that true on the transport where it can actually go wrong: the hosted
+  // server has no disk, so a bare `cwd` is the only thing some clients send,
+  // and every one of those used to become a project. Twelve of one production
+  // account's twenty-one projects were its client's per-prompt scratch folders.
+  //
+  // Both transports are checked, and they fail for different reasons, which is
+  // the point of running it twice: hosted has nothing to look at, and stdio
+  // looks and finds no root marker.
+  console.log("\n--- a directory that is not a repository is not a project ---");
+  mkdirSync(NOT_A_REPO, { recursive: true });
+  // A refused tool call comes back as text, not as a rejection -- the same
+  // shape the `refused` helper above reads.
+  const noRepo = await text("get_context", { cwd: NOT_A_REPO });
+  if (!/no repository at/.test(noRepo))
+    throw new Error(`a scratch directory was registered as a project: ${noRepo.slice(0, 120)}`);
+  for (const clue of ["repo_root", "repo_url", "create_project"])
+    if (!noRepo.includes(clue))
+      throw new Error(`the refusal does not say to send ${clue}: ${noRepo}`);
+  console.log("refused, and said what to send:", noRepo.slice(0, 58) + "…");
+
+  // The same path goes through the moment the caller can show it is a repo.
+  // Without this the assertion above would also pass if registration were
+  // simply broken -- and the two transports have to prove it differently,
+  // which is itself the thing worth asserting.
+  //
+  // Hosted: the client supplies the remote, because the server cannot look.
+  // Stdio: the model is NOT allowed to supply one (`localInternal` strips
+  // repo_url, since a model cannot invent a git remote and a plausible guess
+  // becomes the project's identity for good), so the only way through is for
+  // the directory to actually become a repository.
+  if (mode.local) writeFileSync(join(NOT_A_REPO, "package.json"), '{"name":"scratch"}\n');
+  const allowed = JSON.parse(
+    await text("get_context", {
+      cwd: NOT_A_REPO,
+      ...(mode.local ? {} : { repo_url: "git@github.com:todox-smoke/scratch.git" }),
+    }),
+  );
+  if (!allowed.project_created)
+    throw new Error(`evidence was supplied and it still was not registered: ${JSON.stringify(allowed).slice(0, 160)}`);
+  await text("delete_project", {
+    project: allowed.project.slug,
+    confirm: allowed.project.slug,
+  });
+  rmSync(join(NOT_A_REPO, "package.json"), { force: true });
+  console.log(
+    mode.local
+      ? "and registers it once a root marker appears on disk"
+      : "and registers it once the caller sends the remote",
+  );
 
   console.log("\n--- report sees it ---");
   const md = await text("activity_report", {
