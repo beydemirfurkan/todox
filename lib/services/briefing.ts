@@ -132,7 +132,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const [globalContext, projectContext, logs, counts, files, observed] = await Promise.all([
     contexts.pageByProject(userId, null, notes, focus),
     contexts.pageByProject(userId, project.id, notes, focus),
-    entries.listByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
+    entries.pageByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
     // The honest total, and what the caps dropped. Counting in the database is
     // what lets the log above be cut without `entry_count` starting to lie --
     // and a number that lies about how much it is hiding is worse here than a
@@ -160,16 +160,17 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // A cold agent needs the shape of the work, not every keystroke: the last
     // handoff, the recent decisions, and the dead ends (the expensive ones).
     const handoff = [...log].reverse().find((e) => e.kind === "handoff");
-    // With the id, because an agent that reads a record and then wants to do
-    // something about it -- answer the question, correct the entry -- could not
-    // name it. Notes kept their id and entries did not, so acting on one meant a
-    // second `get_task` that returns the whole log to find a number the briefing
-    // already had in hand.
-    const bodies = (kind: string) =>
-      log.filter((e) => e.kind === kind).map((e) => ({ id: e.id, body: e.body }));
-    const decisions = bodies("decision");
-    const dead_ends = bodies("dead_end");
-    const open_questions = bodies("question");
+    // Whole records rather than `{ id, body }` pairs, and the id was already
+    // here for the reason the rest now joins it: an agent that reads a record
+    // and then wants to do something about it -- answer the question, correct
+    // the entry -- could not name it, so acting on one meant a second
+    // `get_task` that returns the whole log to find a number the briefing
+    // already had in hand. `head` and `created_at` are the same argument: a
+    // record you cannot date is one you cannot weigh against a newer one.
+    const of = (kind: string) => log.filter((e) => e.kind === kind);
+    const decisions = of("decision");
+    const dead_ends = of("dead_end");
+    const open_questions = of("question");
 
     const count = counts.get(t.id);
     // Only the three lists below are capped, so only they can hide anything.
@@ -188,7 +189,12 @@ export async function briefing(userId: number, project: Project, focus?: string)
       priority: t.priority,
       body: t.body,
       updated_at: t.updated_at,
-      last_handoff: handoff?.body ?? null,
+      // The record, not its body. `null` here has always meant "this task has
+      // no handoff", and `closingHint` below reads exactly that to decide
+      // whether to ask for one -- so a handoff whose body a budget did not pay
+      // for must still arrive as an object. Flattening this back to a string
+      // would make the briefing end by asking for a handoff that exists.
+      last_handoff: handoff ?? null,
       decisions,
       dead_ends,
       open_questions,
@@ -257,8 +263,16 @@ export async function briefing(userId: number, project: Project, focus?: string)
  * carries a handoff should not end by asking for one; that is the same
  * always-true sentence in a different disguise, and it is what teaches an
  * agent to stop reading the last line.
+ *
+ * WHAT THIS TESTS IS EXISTENCE, NOT LEGIBILITY, and the type below is written
+ * to make that hard to get wrong. `last_handoff` carries a body the briefing's
+ * byte budget may not have paid for, and a handoff nobody can read here is
+ * still a handoff -- it is one `get_task` away. Narrowing this to
+ * `t.last_handoff?.body == null` compiles, is silent, and puts the
+ * always-true sentence back for every task whose handoff fell outside the
+ * budget, which on a long log is most of them.
  */
-function closingHint(openTasks: { id: number; last_handoff: string | null }[]): string {
+function closingHint(openTasks: { id: number; last_handoff: object | null }[]): string {
   const naked = openTasks.filter((t) => t.last_handoff === null);
   const always =
     "Record dead ends as you hit them, so the next session does not repeat them.";

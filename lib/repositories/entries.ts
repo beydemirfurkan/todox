@@ -107,34 +107,16 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, EntryV
  * `rpc-schemas.ts` lets one body be 100 KB, so a small count is doing the real
  * work. Callers that must bound the payload itself need their own budget.
  *
- * `perKind` takes a number for every kind alike, or one number per kind. The
- * second exists because a caller can want three of one kind and one of another,
- * and fetching the larger number for both is paid for on the network whether or
- * not anything reads it: the briefing asked for three handoffs per task and has
- * only ever shown the newest, which on the widest project measured was 28 KB
- * pulled across and dropped on the floor.
+ * This one returns whole rows and is for `get_file_context`, which shows a
+ * file's dead ends and decisions in full. The briefing wants the same cut with
+ * a byte budget and a head on every row, and that is `pageByTasksPerKind`.
  */
 export async function listByTasksPerKind(
   taskIds: number[],
   kinds: readonly EntryKind[],
-  perKind: number | Partial<Record<EntryKind, number>>,
+  perKind: number,
 ): Promise<Map<number, EntryView[]>> {
   if (!taskIds.length || !kinds.length) return new Map();
-  // One shape below this line. A CASE over the kinds we are already filtering
-  // by, so the uniform number and the per-kind map are the same query and there
-  // is no second path to keep correct. No ELSE is needed and none is written: a
-  // row whose kind is not in `kinds` cannot reach here, because `kinds` is also
-  // the filter -- and an ELSE would have to guess between hiding rows and
-  // showing all of them.
-  //
-  // The ::int is load-bearing. ROW_NUMBER() is bigint and the THEN parameters
-  // carry no type, so Postgres infers them from the only other thing in the
-  // CASE -- `kind`, which is text -- and the comparison fails with "operator
-  // does not exist: bigint <= text". It fails at the database, so `pnpm test`
-  // cannot see it: every test above mocks this repository. `pnpm bench:memory`
-  // found it on the first run.
-  const take = (kind: EntryKind) =>
-    typeof perKind === "number" ? perKind : (perKind[kind] ?? 0);
   const rows = await all<EntryView>(
     `SELECT * FROM (
        SELECT e.*, u.name AS author_name,
@@ -151,12 +133,136 @@ export async function listByTasksPerKind(
           -- template literal and a backtick ends it.
           AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)
      ) ranked
-     WHERE rank <= (CASE kind ${kinds.map(() => "WHEN ? THEN ?").join(" ")} END)::int
+     WHERE rank <= ?
      ORDER BY task_id, id`,
-    [...taskIds, ...kinds, ...kinds.flatMap((k) => [k, take(k)])],
+    [...taskIds, ...kinds, perKind],
   );
   return groupBy(rows, (r) => r.task_id);
 }
+
+/**
+ * An entry as the briefing carries it.
+ *
+ * `body` is null when the byte budget was already spent -- not when the entry
+ * is empty, which cannot happen: `log_entry` requires at least one character.
+ * So null means "ask for it", the same thing it means on `BriefingNote`, and
+ * `get_task` is where it is asked for.
+ */
+export type BriefingEntry = {
+  id: number;
+  /**
+   * Redundant inside `decisions`, and the reason it is here anyway is
+   * `last_handoff`: one field of this type on its own, where a reader with the
+   * object in hand and no surrounding list has nothing else to say what it is.
+   */
+  kind: EntryKind;
+  created_at: string;
+  /**
+   * The first line of the body, and never a truncation of a paragraph.
+   *
+   * This log's own writing convention puts a headline on the first line -- the
+   * tool instructions ask for it in so many words ("write the first paragraph
+   * to stand alone") -- so the first line is a label somebody already wrote,
+   * not a cut somebody guessed at. That is what makes it safe to always send:
+   * an agent skimming a task indexes off `head` without having to branch on
+   * whether a body arrived.
+   *
+   * A head that had to be shortened carries an ellipsis, so a whole headline
+   * and a cut one are distinguishable. Half a sentence with no mark is the
+   * thing `BriefingNote` refuses to do to a body, for the same reason.
+   */
+  head: string;
+  body: string | null;
+};
+
+/**
+ * How much of a body a head may be. The same 240 `search` cuts its snippet to,
+ * because an agent has already been taught to expect that shape there.
+ */
+export const HEAD_CHARS = 240;
+
+/**
+ * The first line, with any carriage return left by a Windows editor removed.
+ *
+ * `chr(10)` and `chr(13)` rather than `E'\n'` for two separate reasons, both
+ * of which have bitten this repository. The query is a JavaScript template
+ * literal, so a backslash escape is consumed before Postgres ever sees it; and
+ * the obvious first-SENTENCE split wants `[.!?]`, whose `?` inside a string
+ * literal would shift every parameter after it -- `lib/db/client.ts` rewrites
+ * positionally and does not parse strings.
+ */
+const FIRST_LINE = `rtrim(split_part(e.body, chr(10), 1), chr(13))`;
+
+/**
+ * The same cut as `listByTasksPerKind`, as the briefing needs it: a head on
+ * every row, a count that can differ per kind, and no join for an author
+ * nothing here renders.
+ *
+ * `perKind` is one number per kind because the briefing wants three decisions
+ * and exactly one handoff, and asking for three of each is paid for on the
+ * network whether or not anything reads it. Measured on production
+ * 2026-09-04: 13 handoff rows fetched where 6 were shown, 45,753 bytes where
+ * 21,444 were rendered.
+ */
+/**
+ * The query above as text, so its shape can be asserted without a database.
+ *
+ * `pnpm test` runs without one, so this is the only thing CI checks on every
+ * push -- and shape is where the expensive mistakes live here: a placeholder
+ * inside a literal, a lost cast, a dropped filter. The same argument
+ * `observations.ts` makes for exporting its `QUERIES`.
+ */
+export const pageByTasksPerKindSql = (taskCount: number, kindCount: number): string =>
+  `SELECT id, task_id, kind, created_at, head, body FROM (
+       SELECT e.id, e.task_id, e.kind, e.created_at, e.body,
+              CASE WHEN length(${FIRST_LINE}) > ?
+                   THEN left(${FIRST_LINE}, ?) || '…'
+                   ELSE ${FIRST_LINE} END AS head,
+              ROW_NUMBER() OVER (PARTITION BY e.task_id, e.kind ORDER BY e.id DESC) AS rank
+         FROM entries e
+        WHERE e.task_id IN (${Array.from({ length: taskCount }, () => "?").join(",")})
+          AND e.kind IN (${Array.from({ length: kindCount }, () => "?").join(",")})
+          -- A question that something answers is no longer open, and this is
+          -- the one place that has to know it. Filtering after the read would
+          -- let three answered questions push the open one past the per-kind
+          -- ceiling, which is the cut this window is applying -- and no
+          -- backtick may appear in this comment, because the whole query is a
+          -- template literal and a backtick ends it.
+          AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)
+     ) ranked
+     -- A CASE over the kinds already being filtered by, so one number per kind
+     -- and one number for all of them are the same query. No ELSE is needed
+     -- and none is written: a row whose kind is not in the filter cannot reach
+     -- here, and an ELSE would have to guess between hiding rows and showing
+     -- every one of them.
+     --
+     -- The cast is load-bearing. ROW_NUMBER() is bigint and the THEN
+     -- parameters carry no type, so Postgres infers them from the only other
+     -- thing in the CASE -- kind, which is text -- and the comparison dies
+     -- with "operator does not exist: bigint <= text". It fails at the
+     -- database, so the unit tests cannot see it: they all mock this module.
+     WHERE rank <= (CASE kind ${Array.from({ length: kindCount }, () => "WHEN ? THEN ?").join(" ")} END)::int
+     ORDER BY task_id, id`;
+
+export async function pageByTasksPerKind(
+  taskIds: number[],
+  kinds: readonly EntryKind[],
+  perKind: Partial<Record<EntryKind, number>>,
+): Promise<Map<number, BriefingEntry[]>> {
+  if (!taskIds.length || !kinds.length) return new Map();
+  const rows = await all<BriefingEntry & { task_id: number }>(
+    pageByTasksPerKindSql(taskIds.length, kinds.length),
+    [
+      HEAD_CHARS,
+      HEAD_CHARS,
+      ...taskIds,
+      ...kinds,
+      ...kinds.flatMap((k) => [k, perKind[k] ?? 0]),
+    ],
+  );
+  return groupBy(rows, (r) => r.task_id);
+}
+
 
 /**
  * The newest `perTask` entries of each task, every kind, in reading order.
