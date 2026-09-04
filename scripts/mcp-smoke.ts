@@ -773,6 +773,31 @@ async function runSuite(mode: Mode, token: string) {
       : "and registers it once the caller sends the remote",
   );
 
+  // merge_projects has existed since the cross-machine identity work and
+  // nothing ever pointed at a duplicate that ALREADY exists: the resolver says
+  // it once, at registration, and after that the two rows sit there in silence.
+  // Production carried two such pairs for weeks, one of them a project with
+  // twelve open tasks beside a namesake with one.
+  console.log("\n--- a project with a namesake says so, every session ---");
+  const twinName = "SMOKE-TWIN";
+  const twinA = JSON.parse(await text("create_project", { name: twinName, model: MODEL }));
+  const twinB = JSON.parse(await text("create_project", { name: twinName, model: MODEL }));
+  const onTwin = JSON.parse(await text("get_context", { project: twinA.slug }));
+  if (!onTwin.duplicate)
+    throw new Error("two projects share a name and the briefing did not mention it");
+  if (!onTwin.duplicate.includes(twinB.slug))
+    throw new Error(`the warning does not name the other project: ${onTwin.duplicate}`);
+  if (!onTwin.duplicate.includes("merge_projects("))
+    throw new Error("the warning does not hand over the call that fixes it");
+  // And it is not its own duplicate -- an always-true warning is the failure
+  // mode the closing hint was rebuilt to stop being.
+  await text("delete_project", { project: twinB.slug, confirm: twinB.slug });
+  const alone = JSON.parse(await text("get_context", { project: twinA.slug }));
+  if (alone.duplicate)
+    throw new Error("the only project with its name still claims to have a twin");
+  await text("delete_project", { project: twinA.slug, confirm: twinA.slug });
+  console.log("named the twin and the merge call, and went quiet once it was gone");
+
   console.log("\n--- report sees it ---");
   const md = await text("activity_report", {
     period: "today",

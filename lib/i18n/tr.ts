@@ -355,6 +355,9 @@ export const tr: Record<Key, string> = {
   staleBody:
     "Bunların arkasındaki dosyalar yazıldıklarından beri değişti. Bayat bağlam, hiç bağlam olmamasından beterdir.",
   staleAndMore: "ve {n} tane daha; görevlerin kendi sayfalarında listeli.",
+  twinTitle: '"{name}" adında başka bir proje daha var',
+  twinBody:
+    "Aynı deponun ikinci bir bilgisayarda açılmış hâliyse birleştir — birleştirene kadar günlük ikiye bölünmüş durumda. Gerçekten iki ayrı depoysa her birine remote ver, bu uyarı bir daha çıkmaz.",
   observationsTitle: "Önceki oturumlar ne yaptı",
   observationsBody:
     "Oturum sürerken git'ten kaydedildi; kimse yazmadı. Neyin değiştiğini söylerler, neden değiştiğini asla — saklamaya değeni bir agent gerçek bir nota dönüştürür.",

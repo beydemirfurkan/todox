@@ -1,6 +1,7 @@
 import * as contexts from "../repositories/contexts";
 import * as entries from "../repositories/entries";
 import * as observations from "../repositories/observations";
+import * as projects from "../repositories/projects";
 import * as refs from "../repositories/refs";
 import * as tasks from "../repositories/tasks";
 import type { Project, Task } from "../types";
@@ -120,7 +121,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const { rows: open, total } = await tasks.pageByProject(project.id, "open", BRIEFING_TASKS);
   const ids = open.map((t) => t.id);
 
-  const [globalContext, projectContext, logs, counts, files, observed] = await Promise.all([
+  const [globalContext, projectContext, logs, counts, files, observed, sameName] = await Promise.all([
     contexts.pageByProject(userId, null, notes, focus),
     contexts.pageByProject(userId, project.id, notes, focus),
     entries.listByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
@@ -133,6 +134,14 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // Sixth query, and it rides along rather than costing a round trip of its
     // own: the page and its honest total come back together.
     observations.pageByProject(project.id, BRIEFING_OBSERVATIONS),
+    // Seventh, and in the same Promise.all for the same reason: it costs a
+    // connection, not a round trip of latency. `merge_projects` has existed
+    // since the cross-machine identity work and nothing has ever pointed at a
+    // duplicate that already exists -- the resolver says it once, at the moment
+    // of registration, and after that the two rows sit there silently. In
+    // production that is two live pairs, one of them a project with twelve open
+    // tasks beside a namesake with one.
+    projects.listByName(userId, project.name),
   ]);
 
   const openTasks = open.map((t) => {
@@ -228,7 +237,38 @@ export async function briefing(userId: number, project: Project, focus?: string)
     observations: observed.rows,
     observations_omitted: observed.omitted,
     stale_refs: stale,
+    /**
+     * A namesake in the same account, named at the one moment somebody is
+     * reading this project rather than six weeks later.
+     *
+     * Deliberately not an error and deliberately not automatic: two projects
+     * with one folder name really can be two repositories (`~/work/api` and
+     * `~/personal/api` is the case decision #28 refuses to fuse), so this says
+     * what it sees and hands over the call rather than making it.
+     */
+    ...duplicateOf(project, sameName),
     hint: closingHint(openTasks),
+  };
+}
+
+/**
+ * Whether this project has a namesake, and what to do about it.
+ *
+ * Returns nothing at all when there is none, so the field is absent rather
+ * than null -- a briefing that carries a key meaning "no problem" teaches the
+ * reader to skip the key.
+ */
+function duplicateOf(project: Project, sameName: Project[]): { duplicate?: string } {
+  const others = sameName.filter((p) => p.id !== project.id);
+  if (!others.length) return {};
+  const list = others.map((p) => `"${p.slug}"`).join(", ");
+  return {
+    duplicate:
+      `Another project in this account is also called "${project.name}" (${list}). ` +
+      `If it is the same repository seen from another machine, merge them: ` +
+      `merge_projects(from:"<the duplicate>", into:"${project.slug}", confirm:"<the duplicate>"). ` +
+      `If they are genuinely two repositories, set repo_url on both with ` +
+      `update_project and this stops being asked.`,
   };
 }
 

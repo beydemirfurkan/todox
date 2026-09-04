@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   listRefs: vi.fn(),
   freshness: vi.fn(() => "fresh"),
   pageObservations: vi.fn(),
+  listByName: vi.fn(),
 }));
 
 vi.mock("../repositories/tasks", () => ({ pageByProject: mocks.pageByProject }));
@@ -31,6 +32,7 @@ vi.mock("../repositories/refs", () => ({
   freshness: mocks.freshness,
 }));
 vi.mock("../repositories/observations", () => ({ pageByProject: mocks.pageObservations }));
+vi.mock("../repositories/projects", () => ({ listByName: mocks.listByName }));
 
 const { briefing } = await import("./briefing");
 
@@ -72,6 +74,8 @@ beforeEach(() => {
   mocks.listRefs.mockResolvedValue(new Map());
   mocks.freshness.mockReturnValue("fresh");
   mocks.pageObservations.mockResolvedValue({ rows: [], omitted: 0 });
+  // The common case: this project is the only one with its name.
+  mocks.listByName.mockResolvedValue([{ id: PROJECT.id, slug: PROJECT.slug }]);
 });
 
 describe("what the briefing costs", () => {
@@ -501,5 +505,46 @@ describe("unverified observations", () => {
       expect(t.dead_ends).toEqual([]);
       expect(t.open_questions).toEqual([]);
     }
+  });
+});
+
+/**
+ * A namesake in the same account.
+ *
+ * `merge_projects` has existed since the cross-machine identity work and
+ * nothing ever pointed at a duplicate that already exists: the resolver says it
+ * once, at registration, and after that the two rows sit there in silence. In
+ * production on 2026-09-04 that was two live pairs, one of them a project with
+ * twelve open tasks beside a namesake with one.
+ */
+describe("a project with a namesake", () => {
+  it("says so, and writes the merge call", async () => {
+    mocks.listByName.mockResolvedValue([
+      { id: PROJECT.id, slug: "crm-marcaspio" },
+      { id: 42, slug: "crm-marcaspio-2" },
+    ]);
+    const out = await brief();
+    expect(out.duplicate).toContain("crm-marcaspio-2");
+    expect(out.duplicate).toContain("merge_projects(");
+    // The survivor is this project, so the agent does not have to work out
+    // which way round the call goes.
+    expect(out.duplicate).toContain(`into:"${PROJECT.slug}"`);
+  });
+
+  /**
+   * MUTATION CHECK. Dropping the `p.id !== project.id` filter makes every
+   * project its own duplicate, and the briefing then ends with an always-true
+   * warning -- the exact failure mode the closing hint was rebuilt to stop
+   * being, which is why the field is absent rather than null when there is
+   * nothing to say.
+   */
+  it("is not its own duplicate", async () => {
+    const out = await brief();
+    expect(out).not.toHaveProperty("duplicate");
+  });
+
+  it("says nothing when the account has no projects at all by that name", async () => {
+    mocks.listByName.mockResolvedValue([]);
+    expect(await brief()).not.toHaveProperty("duplicate");
   });
 });
