@@ -188,6 +188,26 @@ export async function updateProjectAction(fd: FormData) {
  * a project created by a mistyped `cwd` stayed in the account for good.
  * Everything below it goes: the schema cascades from this row.
  */
+/**
+ * Clear one project that holds nothing.
+ *
+ * Separate from `deleteProjectAction` rather than a flag on it, because the two
+ * are protected by different things and a boolean would hide that. Deleting a
+ * project with work in it asks for the slug to be typed, because it cascades to
+ * every task, entry and note underneath. This one cannot cascade to anything --
+ * and what stands in for the typed slug is `removeIfEmpty`, which re-tests
+ * emptiness inside the DELETE, so a project that gained its first task while
+ * the page was open is not removed by a click aimed at the old list.
+ */
+export async function clearEmptyProjectAction(fd: FormData): Promise<void> {
+  const user = await writingUser();
+  const id = num(fd, "project_id");
+  await assertProject(user.id, id);
+
+  await projects.removeIfEmpty(user.id, id);
+  revalidatePath("/", "layout");
+}
+
 export async function deleteProjectAction(
   _prev: AuthState,
   fd: FormData,

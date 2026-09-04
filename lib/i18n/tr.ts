@@ -354,6 +354,11 @@ export const tr: Record<Key, string> = {
   staleTitleMany: "{n} not sana yalan söylüyor olabilir",
   staleBody:
     "Bunların arkasındaki dosyalar yazıldıklarından beri değişti. Bayat bağlam, hiç bağlam olmamasından beterdir.",
+  emptyProjectsTitleOne: "1 proje henüz boş",
+  emptyProjectsTitleMany: "{n} proje henüz boş",
+  emptyProjectsBody:
+    "Bir yoldan kaydedilmiş ve içine hiç yazılmamış. Silmek yanında hiçbir şey götürmez — boş olmasının anlamı bu.",
+  emptyProjectsRemove: "kaldır",
   staleAndMore: "ve {n} tane daha; görevlerin kendi sayfalarında listeli.",
   twinTitle: '"{name}" adında başka bir proje daha var',
   twinBody:

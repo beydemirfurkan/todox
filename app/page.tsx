@@ -10,7 +10,12 @@ import * as contexts from "@/lib/repositories/contexts";
 import * as memberships from "@/lib/repositories/project-memberships";
 import * as projects from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
-import { addContextAction, createProjectAction, deleteContextAction } from "./actions";
+import {
+  addContextAction,
+  clearEmptyProjectAction,
+  createProjectAction,
+  deleteContextAction,
+} from "./actions";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { Explainer, FirstRun } from "./features/explainer";
 import { Landing } from "./features/landing";
@@ -51,15 +56,34 @@ export default async function Home() {
       </>
     );
   // One counts query for the whole page instead of one per project card.
-  const [allProjects, globalContext, counts, connected] = await Promise.all([
+  const [allProjects, globalContext, counts, connected, notesByProject] = await Promise.all([
     projects.list(user.id),
     contexts.listByProject(user.id, null),
     tasks.countsByProject(user.id),
     // Rides along rather than costing a round trip of its own.
     apiTokens.hasConnectedAgent(user.id),
+    // Same, and it is what separates "empty" from "quiet" below: a project can
+    // carry standing rules and no tasks, and that is a project doing its job.
+    contexts.projectIdsWithNotes(user.id),
   ]);
   // One grouped query for every card, not one per card.
   const teamSizes = await memberships.countsByProjects(allProjects.map((p) => p.id));
+
+  /**
+   * Projects that hold nothing at all.
+   *
+   * `list_projects` has counted these and left them out since it was written,
+   * and the browser has never had anywhere to act on that count. Registration
+   * is deliberately frictionless -- a path an agent passes becomes a project --
+   * so the shells are the price of that, and on 2026-09-04 they were eighteen
+   * of sixty-four across the account holders here.
+   *
+   * Notes are what separates "empty" from "quiet": a project can carry standing
+   * rules and no tasks, and that is a project doing its job.
+   */
+  const emptyProjects = allProjects.filter(
+    (p) => !counts.map.has(p.id) && !notesByProject.has(p.id),
+  );
 
   /**
    * The pitch is for somebody who has not started yet.
@@ -184,6 +208,43 @@ export default async function Home() {
           </form>
         </details>
       </div>
+
+      {emptyProjects.length > 0 && (
+        // Quiet on purpose: a fold, not a banner. These are not a problem to be
+        // alarmed about -- they are the cost of registration being frictionless
+        // enough that an agent never stops to ask -- so the count is visible
+        // and the list is one click away.
+        <details className="sticker pop p-4" style={{ animationDelay: "200ms" }}>
+          <summary className="cursor-pointer text-[14px]">
+            {emptyProjects.length === 1
+              ? t("emptyProjectsTitleOne")
+              : t("emptyProjectsTitleMany", { n: emptyProjects.length })}
+          </summary>
+          <p className="mt-1.5 text-[13px] text-faint">{t("emptyProjectsBody")}</p>
+          <ul className="mt-3 space-y-1.5">
+            {emptyProjects.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-2">
+                <Link href={`/p/${p.slug}`} className="mono link-more min-w-0 truncate">
+                  {p.slug}
+                </Link>
+                {p.root_path && (
+                  <span className="mono min-w-0 truncate text-[12px] text-faint" title={p.root_path}>
+                    {p.root_path}
+                  </span>
+                )}
+                <form action={clearEmptyProjectAction} className="ms-auto">
+                  <input type="hidden" name="project_id" value={p.id} />
+                  {/* A real label, not an icon: colour and shape never carry
+                      meaning alone here. */}
+                  <SubmitButton pendingLabel={t("working")}>
+                    {t("emptyProjectsRemove")}
+                  </SubmitButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <Panel
         delay={220}

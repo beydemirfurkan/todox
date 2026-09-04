@@ -363,6 +363,11 @@ export const en = {
   staleTitleMany: "{n} notes may be lying to you",
   staleBody:
     "The files behind these have changed since they were written. Stale context is worse than none.",
+  emptyProjectsTitleOne: "1 project holds nothing yet",
+  emptyProjectsTitleMany: "{n} projects hold nothing yet",
+  emptyProjectsBody:
+    "Registered from a path and never written to. Removing one takes nothing with it — that is what makes it empty.",
+  emptyProjectsRemove: "remove",
   staleAndMore: "and {n} more, listed on the tasks themselves.",
   twinTitle: 'Another project is also called "{name}"',
   twinBody:
