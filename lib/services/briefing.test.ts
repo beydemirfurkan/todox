@@ -100,8 +100,22 @@ describe("what the briefing costs", () => {
     // still answered with every entry ever written on any of them.
     await brief();
     const [, kinds, perKind] = mocks.listByTasksPerKind.mock.calls[0]!;
-    expect(perKind).toBe(3);
+    expect(perKind).toEqual({ handoff: 1, decision: 3, dead_end: 3, question: 3 });
     expect(kinds).toEqual(["handoff", "decision", "dead_end", "question"]);
+  });
+
+  it("asks for one handoff, because one handoff is what it shows", async () => {
+    // Not a tidy-up. `openTasks` reads the newest handoff and nothing else, so
+    // the other two were fetched on the first query of every session and
+    // dropped -- 28 KB of a 143 KB payload on the widest project measured, and
+    // uncounted, because `log_omitted` deliberately does not count handoffs.
+    //
+    // Asserted as "whatever the briefing asks for, it is the number it renders"
+    // rather than as the literal 1, so raising it later fails here instead of
+    // quietly going back to paying for rows nobody reads.
+    await brief();
+    const [, , perKind] = mocks.listByTasksPerKind.mock.calls[0]!;
+    expect((perKind as Record<string, number>).handoff).toBe(1);
   });
 
   it("never asks for notes, because nothing reads one", async () => {

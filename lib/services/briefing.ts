@@ -39,9 +39,18 @@ const BRIEFING_TASKS = 50;
  * Three is small because these are summaries of a summary. What falls off is
  * the oldest of that kind, and `log_omitted` says how much -- an agent that
  * needs the rest calls `get_task`.
+ *
+ * One handoff, not three, and this was a real cost rather than a tidy-up. The
+ * map below is what the briefing SHOWS: three decisions, three dead ends, three
+ * open questions, and the single newest handoff -- `openTasks` has only ever
+ * read `.find(...)` for that one. The other two were fetched across the network
+ * on the first query of every session and dropped without being counted, which
+ * on the widest project measured (gametable-with-king, 2026-09-04) was 28 KB of
+ * a 143 KB payload. The comment under `omitted` already said "there is one
+ * shown and one wanted"; now that is true of what is asked for, too.
  */
 const BRIEFING_KINDS = ["handoff", "decision", "dead_end", "question"] as const;
-const PER_KIND = 3;
+const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
 
 /**
  * Context note bodies carried per scope -- account-wide and project each.

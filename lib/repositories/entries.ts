@@ -106,13 +106,35 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, EntryV
  * Bytes are bounded by this only as far as the row count goes -- `MAX.text` in
  * `rpc-schemas.ts` lets one body be 100 KB, so a small count is doing the real
  * work. Callers that must bound the payload itself need their own budget.
+ *
+ * `perKind` takes a number for every kind alike, or one number per kind. The
+ * second exists because a caller can want three of one kind and one of another,
+ * and fetching the larger number for both is paid for on the network whether or
+ * not anything reads it: the briefing asked for three handoffs per task and has
+ * only ever shown the newest, which on the widest project measured was 28 KB
+ * pulled across and dropped on the floor.
  */
 export async function listByTasksPerKind(
   taskIds: number[],
   kinds: readonly EntryKind[],
-  perKind: number,
+  perKind: number | Partial<Record<EntryKind, number>>,
 ): Promise<Map<number, EntryView[]>> {
   if (!taskIds.length || !kinds.length) return new Map();
+  // One shape below this line. A CASE over the kinds we are already filtering
+  // by, so the uniform number and the per-kind map are the same query and there
+  // is no second path to keep correct. No ELSE is needed and none is written: a
+  // row whose kind is not in `kinds` cannot reach here, because `kinds` is also
+  // the filter -- and an ELSE would have to guess between hiding rows and
+  // showing all of them.
+  //
+  // The ::int is load-bearing. ROW_NUMBER() is bigint and the THEN parameters
+  // carry no type, so Postgres infers them from the only other thing in the
+  // CASE -- `kind`, which is text -- and the comparison fails with "operator
+  // does not exist: bigint <= text". It fails at the database, so `pnpm test`
+  // cannot see it: every test above mocks this repository. `pnpm bench:memory`
+  // found it on the first run.
+  const take = (kind: EntryKind) =>
+    typeof perKind === "number" ? perKind : (perKind[kind] ?? 0);
   const rows = await all<EntryView>(
     `SELECT * FROM (
        SELECT e.*, u.name AS author_name,
@@ -129,9 +151,9 @@ export async function listByTasksPerKind(
           -- template literal and a backtick ends it.
           AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)
      ) ranked
-     WHERE rank <= ?
+     WHERE rank <= (CASE kind ${kinds.map(() => "WHEN ? THEN ?").join(" ")} END)::int
      ORDER BY task_id, id`,
-    [...taskIds, ...kinds, perKind],
+    [...taskIds, ...kinds, ...kinds.flatMap((k) => [k, take(k)])],
   );
   return groupBy(rows, (r) => r.task_id);
 }
