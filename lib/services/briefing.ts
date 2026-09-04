@@ -49,8 +49,42 @@ const BRIEFING_TASKS = 50;
  * a 143 KB payload. The comment under `omitted` already said "there is one
  * shown and one wanted"; now that is true of what is asked for, too.
  */
-const BRIEFING_KINDS = ["handoff", "decision", "dead_end", "question"] as const;
+/**
+ * ORDERED, and the order is the spend priority, not decoration.
+ *
+ * `pageByTasksPerKind` pays for bodies in this order once the round robin
+ * below has taken every task's newest of each kind. Handoff first because it
+ * is the state the session is resuming from; dead ends next because they are
+ * the entries whose whole value is paid by the session that does not read
+ * them; questions before decisions because a question nobody answers is
+ * cheaper to carry than one nobody sees.
+ */
+const BRIEFING_KINDS = ["handoff", "dead_end", "question", "decision"] as const;
 const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
+
+/**
+ * Bytes of log body carried per briefing.
+ *
+ * The counterpart of `BRIEFING_NOTES`, and it exists for the same reason that
+ * one does, arrived at four months later. Every ceiling above this line is a
+ * COUNT ceiling -- fifty tasks, three entries of a kind, six observations --
+ * and a count says nothing about bytes when the median entry is 1,737
+ * characters and the longest measured is 6,521. Notes were capped by BODY and
+ * the log was not, so on 2026-09-04 one production project answered
+ * `get_context` with 143 KB: 112 KB of log, and two bytes of notes.
+ *
+ * Whole or not at all, and never a truncation -- the argument `BRIEFING_NOTES`
+ * makes about cutting a decision off mid-sentence applies harder here, because
+ * an entry IS the reasoning. What a spent budget leaves behind is the head and
+ * the id, and `get_task` returns the rest.
+ *
+ * Chosen from `pnpm bench:memory`, which prints recall against a curve of
+ * budgets, by the rule the note ceiling was chosen with: take the smallest
+ * budget at which recall is unchanged, then ship the step above it. The margin
+ * is deliberate and is not a hedge -- the benchmark asks whether ONE entry came
+ * back, and a briefing is not one answer.
+ */
+const BRIEFING_LOG_BYTES = 24_576;
 
 /**
  * Context note bodies carried per scope -- account-wide and project each.
@@ -132,7 +166,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const [globalContext, projectContext, logs, counts, files, observed] = await Promise.all([
     contexts.pageByProject(userId, null, notes, focus),
     contexts.pageByProject(userId, project.id, notes, focus),
-    entries.pageByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
+    entries.pageByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND, BRIEFING_LOG_BYTES),
     // The honest total, and what the caps dropped. Counting in the database is
     // what lets the log above be cut without `entry_count` starting to lie --
     // and a number that lies about how much it is hiding is worse here than a
@@ -145,7 +179,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   ]);
 
   const openTasks = open.map((t) => {
-    const log = logs.get(t.id) ?? [];
+    const log = logs.rows.get(t.id) ?? [];
     // `hash` and `id` go out so the agent can check the file itself and report
     // back — this process has no copy of the repository, so the status here is
     // only ever as fresh as the last thing an agent told us.
@@ -243,6 +277,18 @@ export async function briefing(userId: number, project: Project, focus?: string)
     observations: observed.rows,
     observations_omitted: observed.omitted,
     stale_refs: stale,
+    /**
+     * Records carried with a head and no body, because the byte budget was
+     * already spent. Beside `context_omitted` rather than on a task, because
+     * one budget is spent across the whole briefing.
+     *
+     * Distinct from `log_omitted`, which counts records the per-kind CAP
+     * dropped and which are not in the payload at all. A record counted here
+     * IS in the payload -- named, dated and headed -- and `get_task` reads it.
+     * Folding the two together would tell an agent that something is missing
+     * when in fact it is holding it.
+     */
+    log_bodies_omitted: logs.bodiesOmitted,
     hint: closingHint(openTasks),
   };
 }

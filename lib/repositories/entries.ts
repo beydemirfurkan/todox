@@ -212,16 +212,17 @@ const FIRST_LINE = `rtrim(split_part(e.body, chr(10), 1), chr(13))`;
  * inside a literal, a lost cast, a dropped filter. The same argument
  * `observations.ts` makes for exporting its `QUERIES`.
  */
-export const pageByTasksPerKindSql = (taskCount: number, kindCount: number): string =>
-  `SELECT id, task_id, kind, created_at, head, body FROM (
+export const pageByTasksPerKindSql = (taskCount: number, kindCount: number): string => {
+  const list = (n: number, each: string) => Array.from({ length: n }, () => each).join(",");
+  return `WITH picked AS (
        SELECT e.id, e.task_id, e.kind, e.created_at, e.body,
               CASE WHEN length(${FIRST_LINE}) > ?
                    THEN left(${FIRST_LINE}, ?) || '…'
                    ELSE ${FIRST_LINE} END AS head,
-              ROW_NUMBER() OVER (PARTITION BY e.task_id, e.kind ORDER BY e.id DESC) AS rank
+              ROW_NUMBER() OVER (PARTITION BY e.task_id, e.kind ORDER BY e.id DESC) AS in_kind
          FROM entries e
-        WHERE e.task_id IN (${Array.from({ length: taskCount }, () => "?").join(",")})
-          AND e.kind IN (${Array.from({ length: kindCount }, () => "?").join(",")})
+        WHERE e.task_id IN (${list(taskCount, "?")})
+          AND e.kind IN (${list(kindCount, "?")})
           -- A question that something answers is no longer open, and this is
           -- the one place that has to know it. Filtering after the read would
           -- let three answered questions push the open one past the per-kind
@@ -229,7 +230,7 @@ export const pageByTasksPerKindSql = (taskCount: number, kindCount: number): str
           -- backtick may appear in this comment, because the whole query is a
           -- template literal and a backtick ends it.
           AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)
-     ) ranked
+     ),
      -- A CASE over the kinds already being filtered by, so one number per kind
      -- and one number for all of them are the same query. No ELSE is needed
      -- and none is written: a row whose kind is not in the filter cannot reach
@@ -241,15 +242,59 @@ export const pageByTasksPerKindSql = (taskCount: number, kindCount: number): str
      -- thing in the CASE -- kind, which is text -- and the comparison dies
      -- with "operator does not exist: bigint <= text". It fails at the
      -- database, so the unit tests cannot see it: they all mock this module.
-     WHERE rank <= (CASE kind ${Array.from({ length: kindCount }, () => "WHEN ? THEN ?").join(" ")} END)::int
-     ORDER BY task_id, id`;
+     kept AS (
+       SELECT * FROM picked
+        WHERE in_kind <= (CASE kind ${Array.from({ length: kindCount }, () => "WHEN ? THEN ?").join(" ")} END)::int
+     ),
+     -- What every row before this one already cost.
+     --
+     -- ROWS ... AND 1 PRECEDING rather than CURRENT ROW, so the row that
+     -- crosses the line is still paid for and a briefing always carries at
+     -- least one body. The alternative has a cliff: MAX.text lets one entry be
+     -- 100 KB, and a sum that included the current row would answer a whole
+     -- briefing of heads and nothing else the moment such a row sorted first.
+     -- The cost of the rule chosen is that the payload can overshoot by
+     -- exactly one body, bounded by MAX.text and in practice by about 6.5 KB.
+     --
+     -- octet_length rather than length, because half of this corpus is Turkish
+     -- and character count undercounts it by 10-15%. JSON escaping adds a few
+     -- percent on top of that, so the budget is honest to within a few percent
+     -- and not to the byte.
+     --
+     -- SPEND ORDER, and the first term is the one that matters: in_kind ASC is
+     -- a round robin, so EVERY task's newest dead end is paid for before ANY
+     -- task's second-newest anything. Pure recency would let one busy task's
+     -- three fresh decisions eat the budget and return every dead end in the
+     -- project as a head. That is listByTasksPerKind's own argument -- "a dead
+     -- end is the one entry that stops the next session repeating something"
+     -- one level down, applied to bytes instead of rows.
+     --
+     -- Then kind, in the order the caller listed them, which is why that array
+     -- is ordered rather than a set.
+     spent AS (
+       SELECT *,
+              SUM(octet_length(body)) OVER (
+                ORDER BY in_kind ASC,
+                         (CASE kind ${Array.from({ length: kindCount }, () => "WHEN ? THEN ?").join(" ")} END)::int ASC,
+                         id DESC
+                ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+              ) AS spent_before
+         FROM kept
+     )
+     SELECT id, task_id, kind, created_at, head,
+            CASE WHEN coalesce(spent_before, 0) < ? THEN body END AS body
+       FROM spent
+      ORDER BY task_id, id`;
+};
+
 
 export async function pageByTasksPerKind(
   taskIds: number[],
   kinds: readonly EntryKind[],
   perKind: Partial<Record<EntryKind, number>>,
-): Promise<Map<number, BriefingEntry[]>> {
-  if (!taskIds.length || !kinds.length) return new Map();
+  budgetBytes: number,
+): Promise<{ rows: Map<number, BriefingEntry[]>; bodiesOmitted: number }> {
+  if (!taskIds.length || !kinds.length) return { rows: new Map(), bodiesOmitted: 0 };
   const rows = await all<BriefingEntry & { task_id: number }>(
     pageByTasksPerKindSql(taskIds.length, kinds.length),
     [
@@ -258,9 +303,19 @@ export async function pageByTasksPerKind(
       ...taskIds,
       ...kinds,
       ...kinds.flatMap((k) => [k, perKind[k] ?? 0]),
+      // The kinds again, as their spend priority: the caller's order.
+      ...kinds.flatMap((k, i) => [k, i]),
+      budgetBytes,
     ],
   );
-  return groupBy(rows, (r) => r.task_id);
+  // Derived from the rows already in hand rather than counted again, exactly
+  // as `contexts.pageByProject` does it. One budget is spent across the whole
+  // briefing, so this total belongs beside `context_omitted` at the top of the
+  // payload and not on any one task.
+  return {
+    rows: groupBy(rows, (r) => r.task_id),
+    bodiesOmitted: rows.filter((r) => r.body === null).length,
+  };
 }
 
 

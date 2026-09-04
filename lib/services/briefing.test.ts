@@ -45,6 +45,17 @@ const PROJECT = {
 
 const brief = (userId = 7, focus?: string) => briefing(userId, PROJECT as never, focus);
 
+/**
+ * What `pageByTasksPerKind` answers: the rows, and how many of them came back
+ * without a body because the byte budget was already spent. `bodiesOmitted` is
+ * derived here rather than passed, so a test cannot claim a body was dropped
+ * while handing one over.
+ */
+const logPage = (rows: Map<number, { body: string | null }[]>) => ({
+  rows,
+  bodiesOmitted: [...rows.values()].flat().filter((e) => e.body === null).length,
+});
+
 const task = (id: number, over: Record<string, unknown> = {}) => ({
   id,
   title: `task ${id}`,
@@ -80,7 +91,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
   mocks.pageNotes.mockResolvedValue({ rows: [], omitted: 0 });
-  mocks.pageByTasksPerKind.mockResolvedValue(new Map());
+  mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
   mocks.countsByTasks.mockResolvedValue(counts());
   mocks.listRefs.mockResolvedValue(new Map());
   mocks.freshness.mockReturnValue("fresh");
@@ -114,7 +125,10 @@ describe("what the briefing costs", () => {
     await brief();
     const [, kinds, perKind] = mocks.pageByTasksPerKind.mock.calls[0]!;
     expect(perKind).toEqual({ handoff: 1, decision: 3, dead_end: 3, question: 3 });
-    expect(kinds).toEqual(["handoff", "decision", "dead_end", "question"]);
+    // Ordered, and the order is load-bearing: it is the priority the byte
+    // budget is spent in, not just a filter. Handoff, then dead ends, then
+    // questions, then decisions.
+    expect(kinds).toEqual(["handoff", "dead_end", "question", "decision"]);
   });
 
   it("asks for one handoff, because one handoff is what it shows", async () => {
@@ -177,7 +191,7 @@ describe("what each task carries", () => {
   ];
 
   beforeEach(() => {
-    mocks.pageByTasksPerKind.mockResolvedValue(new Map([[1, log]]));
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map([[1, log]])));
     // Six in the table, five shown: one of them is a note nobody asked for.
     mocks.countsByTasks.mockResolvedValue(
       counts({ total: 6, decisions: 1, dead_ends: 1, questions: 1 }),
@@ -280,9 +294,9 @@ describe("what each task carries", () => {
    */
   it("counts a record carried without its body as carried, not as omitted", async () => {
     mocks.countsByTasks.mockResolvedValue(counts({ total: 1, decisions: 1 }));
-    mocks.pageByTasksPerKind.mockResolvedValue(
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(
       new Map([[1, [entry("decision", null, { head: "chose the CTE" })]]]),
-    );
+    ));
 
     const out = await brief();
 
@@ -291,7 +305,7 @@ describe("what each task carries", () => {
   });
 
   it("says there is no handoff rather than inventing one", async () => {
-    mocks.pageByTasksPerKind.mockResolvedValue(new Map());
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
     const out = await brief();
     expect(out.open_tasks[0]!.last_handoff).toBeNull();
   });
@@ -450,7 +464,7 @@ describe("the closing hint", () => {
   it("names how many open tasks have no handoff, and which", async () => {
     mocks.pageByProject.mockResolvedValue({ rows: [task(1), task(2), task(3)], total: 3 });
     // No handoff entries at all, so all three are naked.
-    mocks.pageByTasksPerKind.mockResolvedValue(new Map());
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
 
     const out = await brief();
 
@@ -462,9 +476,9 @@ describe("the closing hint", () => {
   it("goes quiet about handoffs when every open task already has one", async () => {
     mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
     // A flat list per task, which is what the repository answers.
-    mocks.pageByTasksPerKind.mockResolvedValue(
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(
       new Map([[1, [entry("handoff", "where I left it")]]]),
-    );
+    ));
 
     const out = await brief();
 
@@ -488,9 +502,9 @@ describe("the closing hint", () => {
    */
   it("counts a handoff it could not afford to show as a handoff", async () => {
     mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
-    mocks.pageByTasksPerKind.mockResolvedValue(
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(
       new Map([[1, [entry("handoff", null, { head: "where I left it" })]]]),
-    );
+    ));
 
     const out = await brief();
 
@@ -507,7 +521,7 @@ describe("the closing hint", () => {
   it("caps the ids it lists", async () => {
     const many = Array.from({ length: 9 }, (_, i) => task(i + 1));
     mocks.pageByProject.mockResolvedValue({ rows: many, total: 9 });
-    mocks.pageByTasksPerKind.mockResolvedValue(new Map());
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
 
     const out = await brief();
 

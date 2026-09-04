@@ -45,14 +45,15 @@ describe("no question mark inside a string literal", () => {
 
 describe("the parameters it takes", () => {
   /**
-   * Two for the head, one per task, one per kind, and a pair per kind for the
-   * CASE. Counted rather than trusted, because a placeholder added to the text
-   * without a value added to the array is the failure this rewriting cannot
-   * detect -- it just binds everything one position out.
+   * Two for the head, one per task, one per kind, a pair per kind for the
+   * per-kind ceiling, a pair per kind for the spend priority, and one for the
+   * budget. Counted rather than trusted, because a placeholder added to the
+   * text without a value added to the array is the failure this rewriting
+   * cannot detect -- it just binds everything one position out, silently.
    */
   it("takes exactly the placeholders the caller binds", () => {
     const placeholders = (SQL.match(/\?/g) ?? []).length;
-    expect(placeholders).toBe(2 + 3 + 4 + 4 * 2);
+    expect(placeholders).toBe(2 + 3 + 4 + 4 * 2 + 4 * 2 + 1);
   });
 
   it("never interpolates a count into the text", () => {
@@ -97,5 +98,48 @@ describe("the head", () => {
     // Otherwise every head written on Windows ends in an invisible character,
     // and a head is compared and displayed, not just read.
     expect(SQL).toContain("chr(13)");
+  });
+});
+
+describe("the byte budget", () => {
+  /**
+   * The frame is the whole design and losing it is silent.
+   *
+   * `1 PRECEDING` compares what every row BEFORE this one cost, so the row
+   * that crosses the line is still paid for and a briefing always carries at
+   * least one body. `CURRENT ROW` has a cliff: `MAX.text` allows a 100 KB
+   * entry, and one of those sorting first would answer with a briefing of
+   * heads and nothing else. Nothing errors either way -- the payload just
+   * quietly stops carrying the log.
+   */
+  it("charges for what came before, not including the row itself", () => {
+    expect(SQL).toContain("ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING");
+  });
+
+  it("counts bytes, not characters", () => {
+    // Half this corpus is Turkish; length() undercounts it by 10-15%.
+    expect(SQL).toContain("SUM(octet_length(body))");
+    expect(SQL).not.toContain("SUM(length(body))");
+  });
+
+  it("spends one budget across the whole briefing, not one per task", () => {
+    // A PARTITION BY here would give every open task its own budget, so fifty
+    // tasks would cost fifty budgets and the ceiling would not be a ceiling.
+    const window = SQL.slice(SQL.indexOf("SUM(octet_length"), SQL.indexOf("AS spent_before"));
+    expect(window).not.toContain("PARTITION BY");
+  });
+
+  /**
+   * Every task's newest of a kind is paid for before any task's second-newest.
+   * Pure recency lets one busy task's fresh decisions eat the budget and
+   * return every dead end in the project as a head.
+   */
+  it("spends round robin before it spends by recency", () => {
+    const window = SQL.slice(SQL.indexOf("SUM(octet_length"), SQL.indexOf("AS spent_before"));
+    expect(window.indexOf("in_kind ASC")).toBeLessThan(window.indexOf("id DESC"));
+  });
+
+  it("binds the budget rather than writing it into the text", () => {
+    expect(SQL).toContain("coalesce(spent_before, 0) < ?");
   });
 });
