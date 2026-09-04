@@ -380,6 +380,36 @@ describe("context notes", () => {
     );
   });
 
+  it("spends the log budget on the session's subject when it has one", async () => {
+    // The log gets the same treatment the notes already had, and the two have
+    // to agree: a briefing that ranked its notes by relevance and its log by
+    // recency would answer half the question and say nothing about the seam.
+    await brief(7, "the login redirect loop");
+    const [, , , budget, focus] = mocks.pageByTasksPerKind.mock.calls[0]!;
+    expect(focus).toBe("the login redirect loop");
+    const [, , , unfocused] = (
+      await (async () => {
+        vi.clearAllMocks();
+        mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
+        mocks.pageNotes.mockResolvedValue({ rows: [], omitted: 0 });
+        mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
+        mocks.countsByTasks.mockResolvedValue(counts());
+        mocks.listRefs.mockResolvedValue(new Map());
+        mocks.pageObservations.mockResolvedValue({ rows: [], omitted: 0 });
+        await brief();
+        return mocks.pageByTasksPerKind.mock.calls[0]!;
+      })()
+    );
+    // Lower when aimed, for the reason the note ceiling gives: a guess needs
+    // breadth and an aimed budget does not.
+    expect(budget).toBeLessThan(unfocused);
+  });
+
+  it("says which of the two orderings the log came back in", async () => {
+    expect((await brief()).log_ranked_by).toBe("recency");
+    expect((await brief(7, "search")).log_ranked_by).toBe("focus");
+  });
+
   it("says which of the two orderings the notes came back in", async () => {
     // The agent cannot tell by looking, and it changes what a null body means:
     // ranked, it was judged irrelevant; recent, nobody said what to judge by.

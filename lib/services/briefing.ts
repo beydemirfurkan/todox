@@ -87,6 +87,19 @@ const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
 const BRIEFING_LOG_BYTES = 24_576;
 
 /**
+ * The same budget, once somebody has said what the session is about.
+ *
+ * Lower, and for the reason `BRIEFING_NOTES_FOCUSED` gives: sixty was chosen
+ * when the only ordering was recency, and a guess needs breadth to be worth
+ * anything. Take the guess away and most of that breadth is bodies nobody was
+ * going to read.
+ *
+ * Two ceilings rather than one because the lower one is not safe without a
+ * focus, which is the same shape the notes settled on and for the same reason.
+ */
+const BRIEFING_LOG_BYTES_FOCUSED = 16_384;
+
+/**
  * Context note bodies carried per scope -- account-wide and project each.
  *
  * The task list was capped, the log under it was capped, and the notes above
@@ -157,6 +170,7 @@ const BRIEFING_OBSERVATIONS = 6;
 
 export async function briefing(userId: number, project: Project, focus?: string) {
   const notes = focus ? BRIEFING_NOTES_FOCUSED : BRIEFING_NOTES;
+  const logBytes = focus ? BRIEFING_LOG_BYTES_FOCUSED : BRIEFING_LOG_BYTES;
 
   // Cut in SQL rather than after the fact. This read every open task and then
   // took fifty, on the first query of every session.
@@ -166,7 +180,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const [globalContext, projectContext, logs, counts, files, observed] = await Promise.all([
     contexts.pageByProject(userId, null, notes, focus),
     contexts.pageByProject(userId, project.id, notes, focus),
-    entries.pageByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND, BRIEFING_LOG_BYTES),
+    entries.pageByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND, logBytes, focus),
     // The honest total, and what the caps dropped. Counting in the database is
     // what lets the log above be cut without `entry_count` starting to lie --
     // and a number that lies about how much it is hiding is worse here than a
@@ -289,6 +303,13 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * when in fact it is holding it.
      */
     log_bodies_omitted: logs.bodiesOmitted,
+    /**
+     * Which of the two orderings spent the log budget, said out loud for the
+     * same reason `context_ranked_by` is: an agent reading a briefing with
+     * bodies missing should be able to tell whether the ones it got were the
+     * relevant ones or merely the newest.
+     */
+    log_ranked_by: focus ? "focus" : "recency",
     hint: closingHint(openTasks),
   };
 }

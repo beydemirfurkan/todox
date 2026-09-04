@@ -16,7 +16,8 @@ import { HEAD_CHARS, pageByTasksPerKindSql } from "./entries";
  * Both are needed: the bigint/text cast below was written correctly here and
  * still failed on the first real run.
  */
-const SQL = pageByTasksPerKindSql(3, 4);
+const SQL = pageByTasksPerKindSql(3, 4, false);
+const FOCUSED = pageByTasksPerKindSql(3, 4, true);
 
 /**
  * `lib/db/client.ts` rewrites `?` to `$n` positionally and does not parse
@@ -61,8 +62,8 @@ describe("the parameters it takes", () => {
   });
 
   it("asks for every task in one statement", () => {
-    expect(pageByTasksPerKindSql(50, 4)).toContain("e.task_id IN (?,?,");
-    expect(pageByTasksPerKindSql(50, 4).match(/SELECT id, task_id/g)).toHaveLength(1);
+    expect(pageByTasksPerKindSql(50, 4, false)).toContain("e.task_id IN (?,?,");
+    expect(pageByTasksPerKindSql(50, 4, false).match(/SELECT id, task_id/g)).toHaveLength(1);
   });
 });
 
@@ -141,5 +142,44 @@ describe("the byte budget", () => {
 
   it("binds the budget rather than writing it into the text", () => {
     expect(SQL).toContain("coalesce(spent_before, 0) < ?");
+  });
+});
+
+describe("a focus, when one was sent", () => {
+  /**
+   * `ts_rank` answers 0 for a document the query does not touch, so relevance
+   * first in the spend order can only move a body UP it. A focus that matches
+   * nothing produces the same briefing as no focus at all -- which is what
+   * makes sending one free, and it is promised in so many words in the `focus`
+   * description an agent reads before deciding whether to bother.
+   */
+  it("cannot cost a record its place, only move it up", () => {
+    expect(SQL).toContain("0 AS relevance");
+    expect(FOCUSED).toContain("ts_rank");
+    // Same rows either way: the focus changes the ORDER BY, never the WHERE.
+    const where = (sql: string) => sql.slice(sql.indexOf("WHERE e.task_id"), sql.indexOf(") ranked") + 1);
+    expect(where(FOCUSED)).toBe(where(SQL));
+  });
+
+  it("ranks before it round-robins", () => {
+    const window = FOCUSED.slice(
+      FOCUSED.indexOf("SUM(octet_length"),
+      FOCUSED.indexOf("AS spent_before"),
+    );
+    expect(window.indexOf("relevance DESC")).toBeLessThan(window.indexOf("in_kind ASC"));
+  });
+
+  it("asks both configurations, so neither language is the poor relation", () => {
+    expect(FOCUSED).toContain("'english'");
+    expect(FOCUSED).toContain("'turkish'");
+  });
+
+  it("keeps no question mark inside a literal on this branch either", () => {
+    for (const literal of FOCUSED.match(/'[^']*'/g) ?? []) expect(literal).not.toContain("?");
+  });
+
+  it("takes two more parameters than the unfocused form, for the two configs", () => {
+    const count = (sql: string) => (sql.match(/\?/g) ?? []).length;
+    expect(count(FOCUSED)).toBe(count(SQL) + 2);
   });
 });

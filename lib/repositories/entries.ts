@@ -1,5 +1,6 @@
 import type { EntryKind } from "../constants";
 import { all, groupBy, one, run, type Statement } from "../db/client";
+import { document, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
 import type { Entry, EntryView } from "../types";
 import { now } from "../util/time";
 
@@ -212,15 +213,27 @@ const FIRST_LINE = `rtrim(split_part(e.body, chr(10), 1), chr(13))`;
  * inside a literal, a lost cast, a dropped filter. The same argument
  * `observations.ts` makes for exporting its `QUERIES`.
  */
-export const pageByTasksPerKindSql = (taskCount: number, kindCount: number): string => {
+export const pageByTasksPerKindSql = (
+  taskCount: number,
+  kindCount: number,
+  focused: boolean,
+): string => {
   const list = (n: number, each: string) => Array.from({ length: n }, () => each).join(",");
-  return `WITH picked AS (
+  const doc = document("entries", "e");
+  // `ts_rank` is 0 for a document the query does not touch, so a focus can only
+  // move a body up the spend order -- it can never cost a record its place in
+  // the payload, and a focus that matches nothing produces the same briefing as
+  // no focus at all. That property is what makes sending one free, and it is
+  // promised out loud in the `focus` description an agent reads.
+  const relevance = focused ? rank(doc) : "0";
+  return `WITH ${focused ? `q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),\n     ` : ""}picked AS (
        SELECT e.id, e.task_id, e.kind, e.created_at, e.body,
               CASE WHEN length(${FIRST_LINE}) > ?
                    THEN left(${FIRST_LINE}, ?) || '…'
                    ELSE ${FIRST_LINE} END AS head,
-              ROW_NUMBER() OVER (PARTITION BY e.task_id, e.kind ORDER BY e.id DESC) AS in_kind
-         FROM entries e
+              ROW_NUMBER() OVER (PARTITION BY e.task_id, e.kind ORDER BY e.id DESC) AS in_kind,
+              ${relevance} AS relevance
+         FROM ${focused ? "q CROSS JOIN entries e" : "entries e"}
         WHERE e.task_id IN (${list(taskCount, "?")})
           AND e.kind IN (${list(kindCount, "?")})
           -- A question that something answers is no longer open, and this is
@@ -274,7 +287,8 @@ export const pageByTasksPerKindSql = (taskCount: number, kindCount: number): str
      spent AS (
        SELECT *,
               SUM(octet_length(body)) OVER (
-                ORDER BY in_kind ASC,
+                ORDER BY relevance DESC,
+                         in_kind ASC,
                          (CASE kind ${Array.from({ length: kindCount }, () => "WHEN ? THEN ?").join(" ")} END)::int ASC,
                          id DESC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
@@ -293,11 +307,15 @@ export async function pageByTasksPerKind(
   kinds: readonly EntryKind[],
   perKind: Partial<Record<EntryKind, number>>,
   budgetBytes: number,
+  focus?: string,
 ): Promise<{ rows: Map<number, BriefingEntry[]>; bodiesOmitted: number }> {
   if (!taskIds.length || !kinds.length) return { rows: new Map(), bodiesOmitted: 0 };
   const rows = await all<BriefingEntry & { task_id: number }>(
-    pageByTasksPerKindSql(taskIds.length, kinds.length),
+    pageByTasksPerKindSql(taskIds.length, kinds.length, Boolean(focus)),
     [
+      // The focus twice, for the two configurations `TSQUERY` builds, and
+      // first because the `q` CTE is the first thing in the statement.
+      ...(focus ? [focus, focus] : []),
       HEAD_CHARS,
       HEAD_CHARS,
       ...taskIds,
