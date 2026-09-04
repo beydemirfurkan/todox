@@ -16,8 +16,15 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, Ref[]>
   return groupBy(rows, (r) => r.task_id!);
 }
 
-export const listByContext = (contextId: number) =>
-  all<Ref>("SELECT * FROM refs WHERE context_id = ? ORDER BY path", [contextId]);
+/*
+ * There is no `listByContext`. A note's linked files are asked for from the
+ * other direction -- `get_file_context` takes a path and answers with the
+ * notes attached to it -- and that is the reader context #37 required when
+ * `link_files(context_id:)` was added. A second reader by note id existed,
+ * had no caller anywhere, and was removed rather than left looking like a
+ * surface somebody could use: production has 29 refs and none of them on a
+ * context, so building for it would be guessing.
+ */
 
 /**
  * Every link on any of these exact paths.
