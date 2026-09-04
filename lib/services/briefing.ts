@@ -78,11 +78,39 @@ const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
  * an entry IS the reasoning. What a spent budget leaves behind is the head and
  * the id, and `get_task` returns the rest.
  *
- * Chosen from `pnpm bench:memory`, which prints recall against a curve of
- * budgets, by the rule the note ceiling was chosen with: take the smallest
- * budget at which recall is unchanged, then ship the step above it. The margin
- * is deliberate and is not a hedge -- the benchmark asks whether ONE entry came
- * back, and a briefing is not one answer.
+ * CHOSEN FROM THE CURVE, and the curve came out flat. `pnpm bench:memory` at
+ * 48 open tasks, recall of the eight questions an entry answers:
+ *
+ *   budget    recency   focused   log bytes
+ *   64 KB       0/8       4/8      137.6 KB
+ *   32 KB       0/8       4/8      105.9 KB
+ *   24 KB       0/8       4/8       96.5 KB
+ *   16 KB       0/8       4/8       89.1 KB
+ *    8 KB       0/8       4/8       81.6 KB
+ *    4 KB       0/8       4/8       77.9 KB
+ *
+ * The four it misses are the SAME four at every budget, which is the finding:
+ * the budget is not what costs them, the RANKING is -- three of the four are
+ * also in the list `search` cannot reach from a natural question. So no budget
+ * on this ladder buys recall, and the number is chosen on cost and margin
+ * instead.
+ *
+ * Read literally the rule would say 8 KB. Twenty-four, for the reason
+ * `BRIEFING_NOTES_FOCUSED` gives about shipping twenty-five where the curve
+ * allowed eight: the benchmark asks whether ONE entry came back, and a
+ * briefing is not one answer -- it is the state of the work, and most of it is
+ * relevant to a session that never names it. The corpus this was measured on
+ * is also 83% filler at 48 tasks, which is a worse case than any real project
+ * here: the widest measured in production has eight open tasks and 41 records.
+ *
+ * Effect on that project: 112 KB of log bodies becomes 24 KB, and the briefing
+ * goes from 143 KB to roughly 55 KB.
+ *
+ * WHAT THIS DOES NOT BOUND, said out loud because the bench makes it visible:
+ * at 48 open tasks 77.9 KB of the log section is heads and metadata, and no
+ * budget here touches that. It is bounded only by BRIEFING_TASKS times
+ * PER_KIND times HEAD_CHARS. Task bodies are the other unbounded axis. Both
+ * are real, both are smaller than what this fixes, and neither is fixed here.
  */
 const BRIEFING_LOG_BYTES = 24_576;
 

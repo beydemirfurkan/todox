@@ -20,6 +20,7 @@
 import "../env";
 
 import * as contextsRepo from "../../lib/repositories/contexts";
+import * as entriesRepo from "../../lib/repositories/entries";
 import * as observationsRepo from "../../lib/repositories/observations";
 import * as projectsRepo from "../../lib/repositories/projects";
 import * as usersRepo from "../../lib/repositories/users";
@@ -393,7 +394,103 @@ async function reportLogGrowth(
       "  get_context with 143 KB, 112 KB of it log, for eight open tasks.\n",
   );
 
+  await reportLogBudget(userId, project);
+
   for (const id of added) await tasksRepo.remove(id);
+}
+
+/**
+ * The budget mirrored from `briefing.ts`, the way `OBSERVATIONS` above mirrors
+ * `BRIEFING_OBSERVATIONS`: the point of this section is to VARY a number the
+ * briefing holds as a constant, so it has to reach the repository directly.
+ * `reportFocus` does the same thing to the note ceiling for the same reason.
+ */
+const BENCH_KINDS = ["handoff", "dead_end", "question", "decision"] as const;
+const BENCH_PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
+
+/**
+ * What the log budget costs, as a curve rather than an opinion.
+ *
+ * The question is not "is the payload smaller" -- any budget makes it smaller.
+ * It is how far the budget can come down before an agent stops receiving the
+ * entry that answers what it asked. Read it the way `BRIEFING_NOTES_FOCUSED`
+ * was read: take the smallest budget where recall is unchanged, then ship the
+ * step above it, because this measures whether ONE entry came back and a
+ * briefing is not one answer.
+ *
+ * Recall here is stricter than SEARCH's above, deliberately. An entry whose
+ * head came back is NOT a hit: the agent can see that something exists and can
+ * fetch it, but it did not receive the answer in the payload, and the whole
+ * claim of the briefing is that a cold session does not have to go and ask.
+ */
+async function reportLogBudget(
+  userId: number,
+  project: Awaited<ReturnType<typeof seed>>["project"],
+) {
+  const answerable = QUESTIONS.filter((q) => q.answerType === "task");
+  const open = await tasksRepoOpen(project.id);
+
+  console.log("\n  what a byte budget costs, at 48 open tasks:\n");
+  console.log(row("  budget", "recency    with focus   log bytes"));
+  let atSmallest: string[] = [];
+
+  for (const budget of [65_536, 32_768, 24_576, 16_384, 12_288, 8_192, 4_096]) {
+    const paid = async (focus?: string) => {
+      const page = await entriesRepo.pageByTasksPerKind(
+        open,
+        BENCH_KINDS,
+        BENCH_PER_KIND,
+        budget,
+        focus,
+      );
+      return [...page.rows.values()].flat();
+    };
+
+    const flat = await paid();
+    const plain = answerable.filter((q) =>
+      flat.some((e) => e.body?.includes(q.term)),
+    ).length;
+
+    // One question at a time, because each is its own session with its own
+    // focus -- averaging them would describe a session nobody has.
+    let aimed = 0;
+    const missed: string[] = [];
+    for (const q of answerable) {
+      const rows = await paid(q.asked);
+      if (rows.some((e) => e.body?.includes(q.term))) aimed++;
+      else missed.push(q.asked);
+    }
+
+    const carried = flat.reduce((n, e) => n + bytes(e), 0);
+    console.log(
+      row(
+        `  ${kb(budget)}`,
+        `${String(plain).padStart(2)}/${answerable.length}      ` +
+          `${String(aimed).padStart(2)}/${answerable.length}     ${kb(carried).padStart(9)}`,
+      ),
+    );
+    atSmallest = missed;
+  }
+
+  // Named, because a flat curve is only good news if the misses are the same
+  // ones at every budget. If they are, the budget is not what is costing them
+  // -- the ranking is -- and lowering it further is free. If they change as it
+  // comes down, the curve is not flat and this table is being misread.
+  if (atSmallest.length) {
+    console.log("\n  never carried with a body, at any budget on the ladder:");
+    for (const q of atSmallest) console.log(`    · ${q}`);
+  }
+  console.log("");
+}
+
+/** The ids the briefing would carry, in the order it carries them. */
+async function tasksRepoOpen(projectId: number): Promise<number[]> {
+  const { rows } = await (await import("../../lib/repositories/tasks")).pageByProject(
+    projectId,
+    "open",
+    50,
+  );
+  return rows.map((t) => t.id);
 }
 
 async function main() {
