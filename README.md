@@ -396,6 +396,12 @@ Details, and an honest list of what is **not** covered, in
 - Observations only see what git can tell them, so they answer "what changed"
   and never "why". The half that carries reasoning is a transcript, and the
   only hook API that exposes one belongs to a single client.
+- **Observations are captured by the local process only.** Watching git means
+  running on the machine that holds the checkout, and the hosted endpoint has
+  none — so connected that way, the `observations` section of every briefing
+  stays empty and nothing anywhere fills it. The Try-it path in this README is
+  the hosted one, so that is most people. `npx todox-mcp` is the transport that
+  captures. Everything else works identically either way.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

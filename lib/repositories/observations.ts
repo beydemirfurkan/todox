@@ -28,8 +28,17 @@ export const expiryFrom = (at: string) =>
  * What the briefing selects. `id` is in it because an agent that reads an
  * observation and wants to act on it -- promote it, quote it in a handoff --
  * has to be able to name the row.
+ *
+ * `source` is deliberately NOT in it, and the column is still in the schema.
+ * It exists to tell a reader which carrier saw a row, and there is exactly one
+ * carrier: `recordObservation` has no `source` parameter, so every row ever
+ * written says "stdio". A field with one possible value tells a reader nothing
+ * and costs bytes in the payload every session opens with -- the same argument
+ * the log's byte budget is built on. Put it back in the moment a second
+ * carrier can write, and not before: a column carried without a reader is what
+ * `repo_url` and `refs.context_id` both were.
  */
-const COLUMNS = `id, source, client, branch, base_sha, head_sha, commits,
+const COLUMNS = `id, client, branch, base_sha, head_sha, commits,
                  files_changed, commit_subjects, started_at, observed_at`;
 
 /**

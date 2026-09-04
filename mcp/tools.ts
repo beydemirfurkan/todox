@@ -125,8 +125,11 @@ const BASE = [
   "list of questions nobody can close stops being read. This is the cheapest",
   "way to make the next session's briefing shorter and truer than yours was.",
   "",
-  "WHAT NOBODY WROTE DOWN: a briefing also carries `observations`, and they are",
-  "not entries. Nobody decided they were worth keeping -- a process watched git",
+  "WHAT NOBODY WROTE DOWN: a briefing MAY also carry `observations`, and they",
+  "are not entries. Only a process running on the developer's machine can watch",
+  "git, so whether you ever see one depends on how you are connected -- the",
+  "note at the end of these instructions says which side you are on. Nobody",
+  "decided they were worth keeping -- a process watched git",
   "while an earlier session ran and recorded what changed: a branch, a count of",
   "commits, their subject lines, how many files were dirty. Read them as",
   "evidence, never as intent. They tell you what happened to the tree, and",
@@ -193,6 +196,12 @@ const LOCAL_NOTE = [
   "FILES: link_files and create_task's `files` take plain paths. This process",
   "hashes them for you, so todox can later warn that a note describes code",
   "that has since changed.",
+  "",
+  "OBSERVATIONS: this process is the one that writes them. It watches the",
+  "checkout it was started in while you work, so the section is filled in for",
+  "you and there is no call that does it. Connected over the hosted endpoint",
+  "instead, that section is always empty -- which is why these two notes say",
+  "different things about it.",
 ];
 
 const REMOTE_NOTE = [
@@ -221,6 +230,15 @@ const REMOTE_NOTE = [
   "- after get_context or get_task hands you linked files, re-hash the ones",
   "  you can read and send them to report_file_hashes with the ids you were",
   "  given. That is what turns a stale note into a warning.",
+  "",
+  "AND ONE THING YOU WILL NOT GET: `observations` is always empty on this",
+  "transport. Automatic capture means watching git while a session runs, and",
+  "only a process on the developer's machine can do that -- this server has no",
+  "checkout. So the instructions above about reading observations and promoting",
+  "them with from_observation_id describe a section that will never have",
+  "anything in it for you. Nothing is wrong when it is empty, and there is no",
+  "call that fills it. The stdio server (`npx todox-mcp`) is the one that",
+  "captures; connect that way if you want it.",
 ];
 
 export function instructions(ws: { local: boolean }) {
