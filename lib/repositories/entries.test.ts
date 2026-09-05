@@ -54,7 +54,9 @@ describe("the parameters it takes", () => {
    */
   it("takes exactly the placeholders the caller binds", () => {
     const placeholders = (SQL.match(/\?/g) ?? []).length;
-    expect(placeholders).toBe(2 + 3 + 4 + 4 * 2 + 4 * 2 + 1);
+    // Three for the head now: the length test, the cut, and the floor for a
+    // body that is nothing but whitespace.
+    expect(placeholders).toBe(3 + 3 + 4 + 4 * 2 + 4 * 2 + 1);
   });
 
   it("never interpolates a count into the text", () => {
@@ -81,8 +83,13 @@ describe("the cut", () => {
   it("keeps an answered question out before the ceiling is applied", () => {
     // Filtering afterwards would let three answered questions push the open one
     // past the per-kind ceiling, which is the cut this window is applying.
-    const inner = SQL.slice(0, SQL.indexOf(") ranked"));
-    expect(inner).toContain("a.answers_entry_id = e.id");
+    // Sliced on a marker that EXISTS. This read `") ranked"`, which the query
+    // stopped containing when it became a CTE chain -- indexOf returned -1,
+    // the slice was the whole statement, and the assertion passed no matter
+    // where the filter went. Checked: the marker below is present.
+    expect(SQL).toContain("kept AS (");
+    const picked = SQL.slice(0, SQL.indexOf("kept AS ("));
+    expect(picked).toContain("a.answers_entry_id = e.id");
   });
 
   it("ranks newest first within a task and a kind", () => {
@@ -157,7 +164,11 @@ describe("a focus, when one was sent", () => {
     expect(SQL).toContain("0 AS relevance");
     expect(FOCUSED).toContain("ts_rank");
     // Same rows either way: the focus changes the ORDER BY, never the WHERE.
-    const where = (sql: string) => sql.slice(sql.indexOf("WHERE e.task_id"), sql.indexOf(") ranked") + 1);
+    // Same defect, and worse: both sides returned "" and the test compared
+    // "" === "", so the property the tool description promises an agent --
+    // a focus reorders and never filters -- was asserted by nothing.
+    const where = (sql: string) => sql.slice(sql.indexOf("WHERE e.task_id"), sql.indexOf("kept AS ("));
+    expect(where(SQL).length).toBeGreaterThan(0);
     expect(where(FOCUSED)).toBe(where(SQL));
   });
 

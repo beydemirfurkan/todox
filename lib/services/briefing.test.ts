@@ -575,8 +575,7 @@ describe("the closing hint", () => {
 describe("unverified observations", () => {
   const observation = (id: number, over: Record<string, unknown> = {}) => ({
     id,
-    source: "stdio",
-    client: "claude-code",
+        client: "claude-code",
     branch: "feat/x",
     base_sha: "aaa",
     head_sha: "bbb",

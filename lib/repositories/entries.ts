@@ -192,7 +192,8 @@ export const HEAD_CHARS = 240;
  * literal would shift every parameter after it -- `lib/db/client.ts` rewrites
  * positionally and does not parse strings.
  */
-const FIRST_LINE = `rtrim(split_part(e.body, chr(10), 1), chr(13))`;
+const BLANK = `chr(32)||chr(9)||chr(13)||chr(10)`;
+const FIRST_LINE = `rtrim(split_part(btrim(e.body, ${BLANK}), chr(10), 1), chr(13))`;
 
 /**
  * The same cut as `listByTasksPerKind`, as the briefing needs it: a head on
@@ -228,9 +229,16 @@ export const pageByTasksPerKindSql = (
   const relevance = focused ? rank(doc) : "0";
   return `WITH ${focused ? `q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),\n     ` : ""}picked AS (
        SELECT e.id, e.task_id, e.kind, e.created_at, e.body,
+              -- The first NON-EMPTY line. The btrim above drops leading blank
+              -- lines, which log_entry allows and which otherwise produced a
+              -- head of "" -- a record with no body and no label, which the
+              -- payload contract says cannot happen. The coalesce is the floor
+              -- for a body that is nothing but whitespace: one character in is
+              -- one character out. No backtick may appear in this comment; the
+              -- whole query is a template literal and a backtick ends it.
               CASE WHEN length(${FIRST_LINE}) > ?
                    THEN left(${FIRST_LINE}, ?) || '…'
-                   ELSE ${FIRST_LINE} END AS head,
+                   ELSE coalesce(nullif(${FIRST_LINE}, ''), left(e.body, ?)) END AS head,
               ROW_NUMBER() OVER (PARTITION BY e.task_id, e.kind ORDER BY e.id DESC) AS in_kind,
               ${relevance} AS relevance
          FROM ${focused ? "q CROSS JOIN entries e" : "entries e"}
@@ -318,6 +326,7 @@ export async function pageByTasksPerKind(
       ...(focus ? [focus, focus] : []),
       HEAD_CHARS,
       HEAD_CHARS,
+      HEAD_CHARS,
       ...taskIds,
       ...kinds,
       ...kinds.flatMap((k) => [k, perKind[k] ?? 0]),
@@ -330,8 +339,19 @@ export async function pageByTasksPerKind(
   // as `contexts.pageByProject` does it. One budget is spent across the whole
   // briefing, so this total belongs beside `context_omitted` at the top of the
   // payload and not on any one task.
+  // `task_id` is how these are grouped, not something a reader of one needs:
+  // every record is already nested under the task that owns it. Left on the
+  // row it is several KB of pure duplication across fifty tasks, on the payload
+  // this budget exists to shrink -- and it is not in `BriefingEntry`, so
+  // nothing downstream was expecting it either.
+  const grouped = groupBy(rows, (r) => r.task_id);
   return {
-    rows: groupBy(rows, (r) => r.task_id),
+    rows: new Map(
+      [...grouped].map(([taskId, entries]) => [
+        taskId,
+        entries.map(({ task_id: _grouped, ...entry }) => entry),
+      ]),
+    ),
     bodiesOmitted: rows.filter((r) => r.body === null).length,
   };
 }
