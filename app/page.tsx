@@ -3,10 +3,13 @@ import Link from "next/link";
 
 import { CONTEXT_KINDS } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
+import { firstLine } from "@/lib/util/headline";
 import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import * as apiTokens from "@/lib/repositories/api-tokens";
+import { OPEN_STATUSES } from "@/lib/constants";
 import * as contexts from "@/lib/repositories/contexts";
+import * as entriesRepo from "@/lib/repositories/entries";
 import * as invitationsRepo from "@/lib/repositories/project-invitations";
 import * as memberships from "@/lib/repositories/project-memberships";
 import * as projects from "@/lib/repositories/projects";
@@ -78,13 +81,15 @@ export default async function Home() {
   const owned = allProjects.filter((p) => p.user_id === user.id);
   // Both of these need the project list first, so they wait -- but they wait
   // together, the way the project page pairs its own second round.
-  const [teamSizes, notesByProject, pending] = await Promise.all([
+  const [teamSizes, notesByProject, pending, leftOff] = await Promise.all([
     // One grouped query for every card, not one per card.
     memberships.countsByProjects(allProjects.map((p) => p.id)),
     contexts.projectIdsHoldingNotes(owned.map((p) => p.id)),
     // People waiting on an invitation. Without this the list and the DELETE
     // disagree, and a disagreement here is a button that does nothing.
     invitationsRepo.projectIdsWithPending(owned.map((p) => p.id), new Date().toISOString()),
+    // What a card can say that its name and its counts cannot.
+    entriesRepo.latestHandoffByProjects(allProjects.map((p) => p.id), OPEN_STATUSES),
   ]);
 
   /**
@@ -194,6 +199,22 @@ export default async function Home() {
               </div>
               {p.summary && (
                 <p className="mt-1.5 line-clamp-2 text-[14px] text-muted">{p.summary}</p>
+              )}
+              {/* Where it left off, which is what a card is for.
+                  Two thirds of projects carry no summary -- 43 of 64 measured
+                  on production -- so for most cards the line above is simply
+                  absent and the card said nothing but a name and some counts.
+                  This says something true today and different tomorrow, and
+                  there is one to say on 28 of the 37 projects with open work.
+
+                  Absent rather than empty when there is no handoff: a card
+                  that always carries a line saying nothing happened is the
+                  always-true sentence this page already removed once. */}
+              {leftOff.get(p.id) && (
+                <p className="mt-1.5 line-clamp-2 text-[13px] text-faint">
+                  <span className="mono">{t("lastLeftOff")} </span>
+                  {firstLine(leftOff.get(p.id)!.body, 110)}
+                </p>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 {c.doing > 0 && (
