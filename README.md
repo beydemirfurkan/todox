@@ -404,6 +404,12 @@ Details, and an honest list of what is **not** covered, in
   fixed — one project went from 143 KB to about 55 KB — but neither is bounded
   in bytes, and `pnpm bench:memory` prints both so the next reader does not
   have to discover it.
+- **Observations are captured by the local process only.** Watching git means
+  running on the machine that holds the checkout, and the hosted endpoint has
+  none — so connected that way, the `observations` section of every briefing
+  stays empty and nothing anywhere fills it. The Try-it path in this README is
+  the hosted one, so that is most people. `npx todox-mcp` is the transport that
+  captures. Everything else works identically either way.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

@@ -247,8 +247,21 @@ export type NewObservation = {
   observed_at?: string;
 };
 
-/** The briefing's view: the row without the bookkeeping nobody reading it needs. */
+/**
+ * The briefing's view: the row without the bookkeeping nobody reading it needs.
+ *
+ * `source` is in this list rather than in the payload because there is only
+ * one carrier that can write an observation, so the field would answer "stdio"
+ * for every row that has ever existed. It goes back in when a second carrier
+ * does.
+ */
 export type BriefingObservation = Omit<
   Observation,
-  "user_id" | "project_id" | "session_id" | "expires_at" | "promoted_at" | "promoted_as"
+  | "user_id"
+  | "project_id"
+  | "session_id"
+  | "source"
+  | "expires_at"
+  | "promoted_at"
+  | "promoted_as"
 >;

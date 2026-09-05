@@ -329,6 +329,39 @@ describe("instructions", () => {
     expect(instructions({ local: true })).toContain("`cwd`");
   });
 
+  /**
+   * The one feature that does not work the same way on both transports.
+   *
+   * BASE described observations at length -- what they are, when they help,
+   * how to promote one -- and every hosted agent read all of it while its
+   * `observations` section stayed permanently empty. Production on 2026-09-04:
+   * one row in the whole table, from stdio, and every active account connected
+   * over the hosted endpoint. The feature was not broken; the promise was.
+   *
+   * The assertion is that the two notes DISAGREE, because the failure this
+   * guards against is somebody unifying them back into one honest-sounding
+   * sentence that is wrong on one side.
+   */
+  it("tells a hosted agent that its observations section will stay empty", () => {
+    const hosted = instructions({ local: false });
+    expect(hosted).toMatch(/`observations` is always empty on this/);
+    // And says which transport does capture, so the sentence is actionable
+    // rather than an apology.
+    expect(hosted).toContain("todox-mcp");
+  });
+
+  it("tells a local agent that it is the one doing the capturing", () => {
+    const local = instructions({ local: true });
+    expect(local).toMatch(/this process is the one that writes them/i);
+    expect(local).not.toMatch(/always empty on this/);
+  });
+
+  it("never promises observations unconditionally, on either side", () => {
+    // The shared half has to stop asserting what only one transport delivers.
+    for (const local of [true, false])
+      expect(instructions({ local })).not.toMatch(/a briefing also carries `observations`/);
+  });
+
   it("tells an agent how the query is actually read", () => {
     // The instructions name the two moments to reach for search -- 'have I hit
     // this before?' and 'where did we decide X?' -- and those are the right

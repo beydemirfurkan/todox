@@ -390,10 +390,16 @@ CREATE TABLE IF NOT EXISTS observations (
   -- todox has no sessions table and does not want one, because the only thing
   -- it would carry is what this row already carries.
   session_id      TEXT NOT NULL,
-  -- Which carrier saw this. Only the stdio process writes today. Claude Code
-  -- hooks are the next one, and they see what a tool call cannot: the session
-  -- boundary and the reasoning. The column is here so that the briefing can
-  -- tell the reader which of the two it is looking at.
+  -- Which carrier saw this. Only the stdio process writes today, and nothing
+  -- can write anything else: recordObservation has no source parameter, so
+  -- every row says 'stdio'. The briefing therefore does NOT carry it -- a field
+  -- with one possible value tells a reader nothing and costs bytes on the call
+  -- every session opens with.
+  -- The column stays because a second carrier is a real prospect (Claude Code
+  -- hooks see what a tool call cannot: the session boundary and the reasoning),
+  -- and the day one lands, the parameter and the briefing field go back
+  -- together. Not before: a column written without a reader is exactly what
+  -- repo_url and refs.context_id each were for months.
   source          TEXT NOT NULL DEFAULT 'stdio',
   client          TEXT,
   branch          TEXT,
