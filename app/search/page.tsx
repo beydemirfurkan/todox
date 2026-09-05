@@ -35,7 +35,16 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
         <h1 className="display text-[33px] leading-[1.1] font-bold">
           {query ? <>&ldquo;{query}&rdquo;</> : t("searchTitle")}
         </h1>
-        <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{t("searchIntro")}</p>
+        {/* Only before there is anything to read.
+            It explains what this page searches and how to phrase a query,
+            which is worth saying to somebody looking at an empty page and is
+            noise above their results -- the same rule the home page's pitch
+            follows since it started fading at the first project: a sentence
+            that is true in every state tells you nothing about the one you
+            are in, and it crowds the thing that does. */}
+        {!query && (
+          <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{t("searchIntro")}</p>
+        )}
       </div>
 
       <Panel delay={60} right={<Counter n={hits.length} label={t("resultsCount")} />}>
