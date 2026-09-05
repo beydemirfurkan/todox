@@ -151,18 +151,6 @@ export async function pageByProject(
 }
 
 /**
- * Which projects carry standing notes, for the caller that has to know whether
- * a project is empty.
- *
- * A set rather than counts, because the only question asked of it is "is there
- * anything here" -- and shipping a number nobody reads invites somebody to
- * start rendering it.
- *
- * Scoped by account rather than by membership on purpose: a note is written
- * against the writer's own account, and this only ever decides whether to show
- * the caller a project they already own.
- */
-/**
  * Which of these projects hold a note written by ANYBODY.
  *
  * The sibling below answers "which hold a note I wrote", which is the right
@@ -182,6 +170,18 @@ export async function projectIdsHoldingNotes(projectIds: number[]): Promise<Set<
   return new Set(rows.map((r) => r.project_id));
 }
 
+/**
+ * Which projects carry standing notes, for the caller that has to know whether
+ * a project is empty.
+ *
+ * A set rather than counts, because the only question asked of it is "is there
+ * anything here" -- and shipping a number nobody reads invites somebody to
+ * start rendering it.
+ *
+ * Scoped by account rather than by membership on purpose: a note is written
+ * against the writer's own account, and this only ever decides whether to show
+ * the caller a project they already own.
+ */
 export async function projectIdsWithNotes(userId: number): Promise<Set<number>> {
   const rows = await all<{ project_id: number }>(
     `SELECT DISTINCT project_id FROM contexts

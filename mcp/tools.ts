@@ -149,10 +149,15 @@ const BASE = [
   "",
   "CAPTURING WORK: whenever the developer mentions something that will not be",
   "finished in this session -- a follow-up, a deferred fix, a known rough",
-  "edge -- call create_task. Pass `cwd` and todox will find the right project,",
-  "or register a new one for that repo automatically. You do not need to ask",
-  "which project: the path decides. Only ask the human if the work clearly",
-  "belongs somewhere other than the current repo.",
+  "edge -- call create_task. Pass `cwd` and todox finds the right project; the",
+  "path decides and you do not need to ask which one. Only ask the human if",
+  "the work clearly belongs somewhere other than the current repo.",
+  "",
+  "REGISTERING A NEW ONE needs evidence that the path is a repository, and",
+  "not every caller can produce it -- so this is no longer automatic from a",
+  "`cwd` alone. See the note at the end of these instructions for which side",
+  "you are on and what to send. A directory nobody can show is a checkout is",
+  "refused with a message naming the two parameters that fix it.",
   "",
   "WHILE WORKING: update_task to move status (set it to 'doing' when you",
   "actually start -- that is what makes the time reports real); log_entry to",
@@ -690,7 +695,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Create task",
       description:
-        "Capture work that will not finish in this session. Pass `cwd` (your absolute working directory) and todox picks the right project — registering one for that repo if it has never seen it. Put the goal and the definition of done in `body`, not just a title.",
+        "Capture work that will not finish in this session. Pass `cwd` (your absolute working directory) and todox picks the right project. Registering a new one needs `repo_root` or `repo_url` as well — a bare `cwd` is a directory, not a repository, and the error says so and names both. Put the goal and the definition of done in `body`, not just a title.",
     },
     // Local only. A process sitting next to the code can hash it, so the model
     // is asked for paths and nothing else -- asking it for a sha256 would be

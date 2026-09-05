@@ -268,6 +268,11 @@ function duplicateOf(
   // somebody else's project here hands the agent a call that can only 404,
   // about two repositories that were never one. The same distinction
   // `updateProject` and `deleteProject` each carry a comment about.
+  // Both sides owned, not just the other one. `merge_projects` asserts
+  // ownership on `from` AND `into`, so a member reading a project shared with
+  // them was told to merge their own unrelated repo INTO somebody else's --
+  // a call that can only 404, about two repositories that were never one.
+  if (project.user_id !== userId) return {};
   const others = sameName.filter((p) => p.id !== project.id && p.user_id === userId);
   if (!others.length) return {};
   const list = others.map((p) => `"${p.slug}"`).join(", ");

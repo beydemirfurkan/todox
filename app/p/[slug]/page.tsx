@@ -161,7 +161,12 @@ export default async function ProjectPage({
   // Owned only, for the reason the briefing's twin of this carries: merging
   // asserts ownership on both sides, so offering it for a project shared with
   // this account is advice that cannot be taken.
-  const twins = sameName.filter((p) => p.id !== project.id && p.user_id === user.id);
+  // `owner` is computed above and is the same question. Without it a member
+  // viewing a shared project got a "merge them" sticker pointing at their own
+  // unrelated repo, and the merge asserts ownership on both sides.
+  const twins = owner
+    ? sameName.filter((p) => p.id !== project.id && p.user_id === user.id)
+    : [];
 
   const closed = all.filter((x) => isClosed(x.status));
 

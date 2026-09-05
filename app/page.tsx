@@ -7,6 +7,7 @@ import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import * as apiTokens from "@/lib/repositories/api-tokens";
 import * as contexts from "@/lib/repositories/contexts";
+import * as invitationsRepo from "@/lib/repositories/project-invitations";
 import * as memberships from "@/lib/repositories/project-memberships";
 import * as projects from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
@@ -77,10 +78,13 @@ export default async function Home() {
   const owned = allProjects.filter((p) => p.user_id === user.id);
   // Both of these need the project list first, so they wait -- but they wait
   // together, the way the project page pairs its own second round.
-  const [teamSizes, notesByProject] = await Promise.all([
+  const [teamSizes, notesByProject, pending] = await Promise.all([
     // One grouped query for every card, not one per card.
     memberships.countsByProjects(allProjects.map((p) => p.id)),
     contexts.projectIdsHoldingNotes(owned.map((p) => p.id)),
+    // People waiting on an invitation. Without this the list and the DELETE
+    // disagree, and a disagreement here is a button that does nothing.
+    invitationsRepo.projectIdsWithPending(owned.map((p) => p.id), new Date().toISOString()),
   ]);
 
   /**
@@ -95,8 +99,24 @@ export default async function Home() {
    * Notes are what separates "empty" from "quiet": a project can carry standing
    * rules and no tasks, and that is a project doing its job.
    */
+  /**
+   * The same question `removeIfEmpty` asks, in the same terms.
+   *
+   * A project with people in it is not empty, whatever else it holds -- and
+   * the state right after inviting somebody into a fresh repo is exactly no
+   * tasks and no notes. That project was listed here with a one-click remove,
+   * and the click took the membership and the invitation with it.
+   *
+   * The two definitions have to stay in step: if this list is looser than the
+   * DELETE the button does nothing, and if it is tighter the fold hides work
+   * somebody could clear.
+   */
   const emptyProjects = owned.filter(
-    (p) => !counts.map.has(p.id) && !notesByProject.has(p.id),
+    (p) =>
+      !counts.map.has(p.id) &&
+      !notesByProject.has(p.id) &&
+      !(teamSizes.get(p.id) ?? 0) &&
+      !pending.has(p.id),
   );
 
   /**

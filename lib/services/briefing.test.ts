@@ -39,6 +39,10 @@ const { briefing } = await import("./briefing");
 /** Cast where it is used, not here: the tests read `PROJECT.id`. */
 const PROJECT = {
   id: 1,
+  // Owned by the account these tests read as. `duplicateOf` needs it: the
+  // merge it suggests asserts ownership on both sides, so a project shared
+  // with the reader must not be told to merge anything.
+  user_id: 7,
   slug: "todox",
   name: "todox",
   root_path: "/repo",
@@ -565,6 +569,22 @@ describe("a project with a namesake", () => {
    * this exact distinction, which is how many times the codebase has learned
    * it before.
    */
+  /**
+   * The reader's OWN project must be owned too, not just the other one.
+   * A member reading a project shared with them was told to merge their own
+   * unrelated repo INTO somebody else's -- and `merge_projects` asserts
+   * ownership on `from` and `into`, so the call could only ever 404.
+   */
+  it("says nothing at all when the project being read is not this account's", async () => {
+    mocks.listByName.mockResolvedValue([
+      { id: PROJECT.id, slug: "todox", user_id: 4242 },
+      { id: 99, slug: "my-todox", user_id: USER },
+    ]);
+    // Same shape, read as somebody who is only a member of it.
+    const out = await briefing(USER, { ...PROJECT, user_id: 4242 } as never);
+    expect(out).not.toHaveProperty("duplicate");
+  });
+
   it("does not call a project shared with this account a duplicate", async () => {
     mocks.listByName.mockResolvedValue([
       { id: PROJECT.id, slug: "todox", user_id: USER },

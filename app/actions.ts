@@ -181,14 +181,6 @@ export async function updateProjectAction(fd: FormData) {
 }
 
 /**
- * Gated on typing the slug, and on nothing else being ambiguous about it.
- *
- * Registering a project is deliberately free -- any absolute path an agent
- * hands over becomes one -- so there has to be a way back. There was not, and
- * a project created by a mistyped `cwd` stayed in the account for good.
- * Everything below it goes: the schema cascades from this row.
- */
-/**
  * Clear one project that holds nothing.
  *
  * Separate from `deleteProjectAction` rather than a flag on it, because the two
@@ -208,6 +200,14 @@ export async function clearEmptyProjectAction(fd: FormData): Promise<void> {
   revalidatePath("/", "layout");
 }
 
+/**
+ * Gated on typing the slug, and on nothing else being ambiguous about it.
+ *
+ * Registering a project is deliberately free -- any absolute path an agent
+ * hands over becomes one -- so there has to be a way back. There was not, and
+ * a project created by a mistyped `cwd` stayed in the account for good.
+ * Everything below it goes: the schema cascades from this row.
+ */
 export async function deleteProjectAction(
   _prev: AuthState,
   fd: FormData,

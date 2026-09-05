@@ -212,7 +212,23 @@ export const removeIfEmpty = (userId: number, id: number) =>
     `DELETE FROM projects
       WHERE id = ? AND user_id = ?
         AND NOT EXISTS (SELECT 1 FROM tasks WHERE project_id = projects.id)
-        AND NOT EXISTS (SELECT 1 FROM contexts WHERE project_id = projects.id)`,
+        AND NOT EXISTS (SELECT 1 FROM contexts WHERE project_id = projects.id)
+        -- A project with people in it is not empty, whatever it holds.
+        --
+        -- Tasks and notes were the whole test, and the state right after
+        -- inviting somebody into a fresh repo is exactly no tasks and no
+        -- notes: the project appeared in the home page's "holds nothing yet"
+        -- fold with a one-click remove, and the click cascaded the membership
+        -- and the pending invitation away. No confirmation, no mention of the
+        -- team, and nothing anywhere said a person had lost access.
+        --
+        -- Checked against a real database: one member and one open invitation,
+        -- and the delete removed all three rows.
+        AND NOT EXISTS (SELECT 1 FROM project_memberships WHERE project_id = projects.id)
+        AND NOT EXISTS (
+          SELECT 1 FROM project_invitations
+           WHERE project_id = projects.id AND accepted_at IS NULL AND revoked_at IS NULL
+        )`,
     [id, userId],
   );
 

@@ -198,7 +198,15 @@ export async function resolveOrCreate(
   //
   // `create_project` is untouched: naming a project is a deliberate act, and
   // this rule is about what happens without one.
-  if (!hints.repoRoot && !hints.repoUrl) throw new BadRequest(noEvidence(ref));
+  //
+  // GATED AT EACH `create`, NOT HERE, and that placement is the whole of it.
+  // This function's other outcome is ADOPTION -- the same repository, seen
+  // from a second machine, matched by name and OS family and returned with
+  // `created: false`. Guarding above that branch turned a resolve into a hard
+  // error: a repo todox already knew, opened on a laptop whose client sends
+  // only `cwd`, stopped resolving and started answering "no repository at".
+  // The rule is about not INVENTING projects, and adoption invents nothing.
+  const evidence = Boolean(hints.repoRoot || hints.repoUrl);
 
   const sameName = await projects.listByName(userId, name);
   if (sameName.length) {
@@ -213,6 +221,7 @@ export async function resolveOrCreate(
       return { project: adopted, created: false };
     }
 
+    if (!evidence) throw new BadRequest(noEvidence(ref));
     return {
       project: await create(userId, name, root, hints.repoUrl),
       created: true,
@@ -220,6 +229,7 @@ export async function resolveOrCreate(
     };
   }
 
+  if (!evidence) throw new BadRequest(noEvidence(ref));
   return {
     project: await create(userId, name, root, hints.repoUrl),
     created: true,
