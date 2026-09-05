@@ -526,6 +526,70 @@ const FILLER_SUBJECTS = [
   "the payroll rounding rules",
 ];
 
+/**
+ * Open tasks whose log answers none of the questions above, for measuring what
+ * a byte budget on the log actually costs.
+ *
+ * The same argument as `filler`, one level down, and for the same reason: a
+ * duplicate of the entry that answers a question would compete with it for the
+ * same budget on identical text, and the run would score a miss where the agent
+ * in fact received the answer.
+ *
+ * WRITTEN AT PRODUCTION LENGTHS, and that is the whole point of the shape
+ * below. Measured on 2026-09-04 across 597 real entries: handoff p50 1,737 /
+ * p90 3,419; decision p50 2,365 / p90 3,828; dead_end p50 1,443 / p90 2,702.
+ * The corpus above runs to about 300 characters an entry, which is honest for
+ * what it was written to measure -- whether search finds a thing -- and useless
+ * for a byte curve. A budget measured against 300-character entries would come
+ * out five times too small and nobody would know until a real briefing hit it.
+ *
+ * `n` varies the subject, so forty of these are not one task forty times: a
+ * single relevance hit must not be able to stand in for all of them once the
+ * budget is spent by focus rather than recency.
+ */
+const LOG_SUBJECTS = [
+  "the shipment tracking poller",
+  "the tax rate importer",
+  "the seat reservation lock",
+  "the document thumbnailer",
+  "the supplier price feed",
+  "the timesheet approval chain",
+  "the returns intake queue",
+  "the loyalty points ledger",
+];
+
+/** Roughly the p50 of the kind, padded with material that reads like a body. */
+const para = (subject: string, n: number, sentences: number) =>
+  Array.from(
+    { length: sentences },
+    (_, i) =>
+      `${subject} keeps its ${100 + n + i} pending items in one table and the reader takes them ` +
+      `in order, which matters because the order is the only thing that makes a partial run ` +
+      `resumable. The obvious alternative was a queue per worker, and it was measured and ` +
+      `dropped: rebalancing after a worker died moved more rows than the run itself wrote, and ` +
+      `the window where two workers held the same item was wide enough to double-write ${n + i} ` +
+      `times in an afternoon. What replaced it is a single claim column stamped with the worker ` +
+      `id and a deadline, so a dead worker's items fall back on their own without anybody ` +
+      `noticing they were ever claimed.`,
+  ).join("\n\n");
+
+export const logFiller = (n: number): Task => {
+  const subject = LOG_SUBJECTS[n % LOG_SUBJECTS.length];
+  return {
+    title: `Batch ${n} claim handling in ${subject}`,
+    body:
+      `${subject} needs a claim that survives a worker dying mid-run. Done when a killed worker's ` +
+      `items are picked up by another within one deadline and nothing is written twice.`,
+    entries: [
+      { kind: "handoff", body: para(subject, n, 3) },
+      { kind: "decision", body: para(subject, n + 1, 4) },
+      { kind: "decision", body: para(subject, n + 2, 3) },
+      { kind: "dead_end", body: para(subject, n + 3, 3) },
+      { kind: "dead_end", body: para(subject, n + 4, 2) },
+    ],
+  };
+};
+
 export const filler = (n: number): Note => {
   const subject = FILLER_SUBJECTS[n % FILLER_SUBJECTS.length];
   return {

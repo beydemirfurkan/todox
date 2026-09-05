@@ -142,7 +142,7 @@ export default async function ProjectPage({
   // Both depend on the list above, so they wait for it -- but they wait
   // together. `staleRefs` used to fetch the project's open tasks for itself,
   // which queried the same table this render had already read in full.
-  const [counts, stale, observed] = await Promise.all([
+  const [counts, stale, observed, sameName] = await Promise.all([
     // Counted in the database. This used to load every entry of every task to
     // render three badges a row.
     entriesRepo.countsByTasks(all.map((x) => x.id)),
@@ -151,7 +151,22 @@ export default async function ProjectPage({
     // is walking into; a person reading their own project mostly wants to know
     // that something happened and roughly when.
     observationsRepo.pageByProject(project.id, OBSERVATIONS_SHOWN),
+    // A namesake in this account. `merge_projects` has existed since the
+    // cross-machine identity work and nothing has ever pointed at a duplicate
+    // that already exists -- the agent surface says it once, at registration.
+    // The person who can actually decide whether two rows are one repository
+    // was never told at all.
+    projects.listByName(user.id, project.name),
   ]);
+  // Owned only, for the reason the briefing's twin of this carries: merging
+  // asserts ownership on both sides, so offering it for a project shared with
+  // this account is advice that cannot be taken.
+  // `owner` is computed above and is the same question. Without it a member
+  // viewing a shared project got a "merge them" sticker pointing at their own
+  // unrelated repo, and the merge asserts ownership on both sides.
+  const twins = owner
+    ? sameName.filter((p) => p.id !== project.id && p.user_id === user.id)
+    : [];
 
   const closed = all.filter((x) => isClosed(x.status));
 
@@ -359,6 +374,42 @@ export default async function ProjectPage({
           )}
         </div>
       </header>
+
+      {twins.length > 0 && (
+        // Not an error, and not something to fix automatically: two projects
+        // with one folder name really can be two repositories, which is the
+        // case decision #28 refuses to fuse. So it names them and leaves the
+        // judgement with the person who knows.
+        <section
+          aria-labelledby="twin-heading"
+          className="on-fill sticker pop flex items-start gap-3.5 p-4"
+          style={{ background: "var(--k-question)", animationDelay: "30ms" }}
+        >
+          <Blob
+            mood="worried"
+            size={46}
+            fill="var(--paper)"
+            stroke="var(--ink)"
+            className="shrink-0"
+          />
+          <div className="min-w-0">
+            <h2 id="twin-heading" className="display text-[17px] font-bold">
+              {t("twinTitle", { name: project.name })}
+            </h2>
+            <p className="mt-0.5 text-[14px]">{t("twinBody")}</p>
+            <ul className="mono mt-2 space-y-0.5 text-[12px]">
+              {twins.map((p) => (
+                <li key={p.id} className="break-all">
+                  ·{" "}
+                  <Link href={`/p/${p.slug}`} className="link-more">
+                    {p.slug}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {stale.length > 0 && (
         // A labelled region, not `role="status"`. This is server-rendered and

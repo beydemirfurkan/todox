@@ -178,6 +178,36 @@ export async function resolveOrCreate(
   // project would be named "C:\Users\me\repo".
   const name = lastSegment(root) || "untitled";
 
+  // A PROJECT IS A REPOSITORY, NOT A PATH, and until now only the resolver's
+  // reading order said so -- creation took any absolute path at its word.
+  //
+  // What that cost, measured 2026-09-04: twelve of one account's twenty-one
+  // projects were its client's per-prompt scratch directories
+  // (`Documents/Codex/2026-09-02/yol`), plus the client's own installation
+  // under `Program Files` and its binary cache. Four of the twelve hold real
+  // tasks, which is the expensive half: a log written in a dated prompt folder
+  // is not noise, it is work filed where nobody will look for it again.
+  //
+  // The evidence is deliberately weak and deliberately not a guess about the
+  // path's SHAPE. Either the caller found a root marker at or above the
+  // directory (`repo_root`), or it read a remote off it (`repo_url`). Both are
+  // things only the machine with the disk can answer, both are already asked
+  // for in `REMOTE_NOTE`, and both are filled in automatically by the stdio
+  // process. A path with neither is a directory somebody happened to be
+  // standing in.
+  //
+  // `create_project` is untouched: naming a project is a deliberate act, and
+  // this rule is about what happens without one.
+  //
+  // GATED AT EACH `create`, NOT HERE, and that placement is the whole of it.
+  // This function's other outcome is ADOPTION -- the same repository, seen
+  // from a second machine, matched by name and OS family and returned with
+  // `created: false`. Guarding above that branch turned a resolve into a hard
+  // error: a repo todox already knew, opened on a laptop whose client sends
+  // only `cwd`, stopped resolving and started answering "no repository at".
+  // The rule is about not INVENTING projects, and adoption invents nothing.
+  const evidence = Boolean(hints.repoRoot || hints.repoUrl);
+
   const sameName = await projects.listByName(userId, name);
   if (sameName.length) {
     const paths = await knownPaths(userId);
@@ -191,6 +221,7 @@ export async function resolveOrCreate(
       return { project: adopted, created: false };
     }
 
+    if (!evidence) throw new BadRequest(noEvidence(ref));
     return {
       project: await create(userId, name, root, hints.repoUrl),
       created: true,
@@ -198,6 +229,7 @@ export async function resolveOrCreate(
     };
   }
 
+  if (!evidence) throw new BadRequest(noEvidence(ref));
   return {
     project: await create(userId, name, root, hints.repoUrl),
     created: true,
@@ -249,6 +281,22 @@ const create = async (userId: number, name: string, root: string, repoUrl?: stri
     root_path: root,
     repo_url: repoUrl ? scrubRemote(repoUrl) : null,
   });
+
+/**
+ * Why a directory was not turned into a project, and what to send instead.
+ *
+ * Written to be actionable by the thing that will read it, which is a model
+ * mid-tool-call: it names the two parameters, says how to get each, and says
+ * what to do if the directory really is not a repository. An error that only
+ * says no teaches an agent to stop calling the tool.
+ */
+const noEvidence = (ref: string) =>
+  `no repository at ${ref}. todox registers repositories, not directories, ` +
+  `and nothing here says this path is one. Send \`repo_root\` -- the directory ` +
+  `holding .git -- or \`repo_url\` from \`git remote get-url origin\`, and the ` +
+  `same call will register it. If this is a scratch directory rather than a ` +
+  `checkout, pass \`project\` to work in an existing project, or ` +
+  `\`create_project\` to name one deliberately.`;
 
 /**
  * Registered by its path, because there was no remote to register it by.
