@@ -34,6 +34,7 @@ const report = (over: Partial<ActivityReport> = {}): ActivityReport => ({
     dead_ends: 0,
     questions: 0,
     active_ms: 0,
+    unmeasured: 0,
   },
   by_project: [],
   by_model: [],
@@ -141,5 +142,45 @@ describe("renderMarkdown", () => {
     const lines = md.split("\n");
     expect(lines).toContain("- Cut the body.");
     expect(lines).toContain("  The entry is one click away.");
+  });
+});
+
+/**
+ * The headline number, and what it does not know.
+ *
+ * `active_ms` sums time spent in `doing`. A task that went straight to `done`
+ * contributes a clean zero, and per task that was already said out loud -- the
+ * tilde and `partialNote`. The headline rolled every one of those zeros into
+ * itself and claimed nothing about them.
+ *
+ * Measured in production 2026-09-04: 43 of 78 completed tasks never passed
+ * through `doing`, and 23 of the 38 in one window answered `active_ms: 0,
+ * partial: true`. A figure averaged over a denominator nobody is shown is the
+ * shape of thing this product's own rule calls worse than none.
+ */
+describe("what the report could not measure", () => {
+  it("says how many tasks contributed no measurement", () => {
+    const md = renderMarkdown(report({ totals: { ...report().totals, unmeasured: 23 } }), t);
+    expect(md).toContain("23");
+  });
+
+  /**
+   * This file renders a fixture, so it can only hold the RENDERER honest: given
+   * a zero it must not invent a caveat. Whether the zero itself is right is
+   * computed in `reports.ts`, which a fixture handed straight to
+   * `renderMarkdown` cannot see -- and the plausible edit there (counting
+   * `active_ms === 0` rather than `partial`) passes every test in this file.
+   * That check lives in `pnpm smoke:report`, against a real database, and was
+   * run against the mutation.
+   */
+  it("says nothing about measurement when nothing went unmeasured", () => {
+    const md = renderMarkdown(report({ totals: { ...report().totals, unmeasured: 0 } }), t);
+    expect(md).not.toMatch(/not measured/);
+  });
+
+  it("no longer blames transition tracking for every unmeasured task", () => {
+    // The note named one cause -- records predating the feature -- and the
+    // common cause today is the other one: closed without ever being started.
+    expect(t("partialNote")).toMatch(/without ever being set to/i);
   });
 });

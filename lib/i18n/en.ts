@@ -482,7 +482,8 @@ export const en = {
   imp_low: "low",
   modelLabel: "model",
   partialNote:
-    "Timings marked ~ predate transition tracking and are a lower bound, not a measurement.",
+    "Timings marked ~ are a lower bound, not a measurement: the task was closed without ever being set to `doing`, or it predates transition tracking. Setting a task to `doing` when work starts is what makes the number real.",
+  totalsUnmeasured: "{n} not measured",
   copyReport: "copy as markdown",
   reportCopied: "copied",
   reportForManager: "The markdown copy is written to be pasted straight into an update.",

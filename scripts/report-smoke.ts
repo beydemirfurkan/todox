@@ -105,6 +105,67 @@ assert(
   "and it reaches today's completed list",
 );
 
+console.log("\n--- the headline says how much of the time it could not measure ---");
+// `active_ms` sums time spent in `doing`, and a task closed without ever being
+// started contributes a clean zero. Per task that was already said out loud --
+// `partial`, and a tilde in the markdown -- but the headline rolled every one
+// of those zeros in and claimed nothing about them.
+//
+// Not a hypothetical ratio: 43 of 78 completed tasks in production on
+// 2026-09-04 had never passed through `doing`, and 23 of the 38 in one window
+// answered `active_ms: 0, partial: true`.
+//
+// This assertion lives here rather than beside the renderer because the count
+// is computed in `reports.ts`, and a fixture handed straight to
+// `renderMarkdown` cannot see it. Counting `active_ms === 0` instead of
+// `partial` reads like the same thing and is not -- a task really can spend no
+// time in a window -- and the two tasks below are what tells them apart.
+const unmeasuredBefore = (await activityReport(user.id, resolvePeriod("today"))).totals.unmeasured;
+
+const neverStarted = await taskService.create({
+  project_id: project.id,
+  title: "REPORT-SMOKE: closed without ever starting",
+  status: "done",
+  model: MODEL,
+});
+const afterNeverStarted = await activityReport(user.id, resolvePeriod("today"));
+assert(
+  afterNeverStarted.totals.unmeasured === unmeasuredBefore + 1,
+  "a task closed without ever being set to doing counts as unmeasured",
+);
+assert(
+  afterNeverStarted.completed.find((r) => r.id === neverStarted.id)?.partial === true,
+  "and the task itself says its figure is a floor",
+);
+
+// The other half, and the case that tells the two implementations apart. A
+// backfilled task is partial for the OTHER reason `timingFor` gives -- it has
+// no real history -- and it can still have accrued time. Counting
+// `active_ms === 0` would miss it, and the count would silently under-report
+// exactly the tasks whose numbers are least trustworthy.
+const backfilled = await taskService.create({
+  project_id: project.id,
+  title: "REPORT-SMOKE: backfilled, and it did take time",
+  status: "doing",
+  model: MODEL,
+});
+await taskService.update(backfilled.id, { status: "done" }, { model: MODEL });
+await run(
+  "UPDATE task_events SET actor = ? WHERE task_id = ? AND to_status = ?",
+  ["backfill", backfilled.id, "doing"],
+);
+const afterBoth = await activityReport(user.id, resolvePeriod("today"));
+const marked = afterBoth.completed.find((r) => r.id === backfilled.id);
+assert(marked?.partial === true, "a backfilled task is partial even though it accrued time");
+assert(
+  (marked?.active_ms ?? 0) > 0,
+  "and it really did accrue time, so active_ms === 0 would not have found it",
+);
+assert(
+  afterBoth.totals.unmeasured === unmeasuredBefore + 2,
+  "the count follows partial, not a zero reading",
+);
+
 console.log("\n--- a row on a period boundary belongs to one day, not two ---");
 // `resolvePeriod` hands back a half-open window, so yesterday's `to` is today's
 // `from` -- the same instant. Read with an inclusive comparison, anything
