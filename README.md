@@ -348,6 +348,32 @@ That is also why the image keeps its dev dependencies instead of using Next's
 `scripts/`, and a database that is deliberately unreachable from the internet
 can only be migrated from something already inside the network.
 
+### Knowing it actually deployed
+
+A merge is not a deploy, and the gap between them is silent: nothing errors,
+the site stays up, and the only symptom is that a fix you watched go green is
+not the one people are running. On 2026-09-05 this instance served code two
+days and fifty-six commits old, and the thing that made it visible was looking
+rather than anything reporting it.
+
+The image tag is the git sha and the container name changes on every deploy, so
+one line answers it:
+
+```bash
+docker inspect <container> --format '{{.Config.Image}}'
+```
+
+Compare that against `git rev-parse origin/main`. If they differ, the code you
+are reading is not the code that is running.
+
+Automatic deploys are worth wiring up, and worth checking after you do. A
+platform that pulls on a webhook can have the switch on and still never fire,
+because the switch and the webhook are two settings in two places: this
+instance had auto-deploy enabled for weeks while the repository had no webhook
+at all, so nothing was ever told to look. After wiring one, confirm from the
+sending side — the delivery log — rather than from the switch, because a
+webhook pointed at the wrong path answers cheerfully and does nothing.
+
 ## Taking your data with you
 
 The Account page has a **Download my data** button, and `/api/export` answers
