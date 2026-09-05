@@ -363,6 +363,10 @@ export const en = {
   staleTitleMany: "{n} notes may be lying to you",
   staleBody:
     "The files behind these have changed since they were written. Stale context is worse than none.",
+  noSummary:
+    "No description yet. A sentence or two on what this repository is makes every session that opens it cheaper — add one in project settings.",
+  lastLeftOff: "last left off on",
+  notesAndMore: "and {n} more, kept for the agent that asks for them.",
   staleAndMore: "and {n} more, listed on the tasks themselves.",
   observationsTitle: "What earlier sessions did",
   observationsBody:
