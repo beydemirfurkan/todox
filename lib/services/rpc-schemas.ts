@@ -85,7 +85,7 @@ const repoRoot = z
   .string()
   .max(MAX.path)
   .optional()
-  .describe("Absolute path of the repository root containing `cwd`.");
+  .describe("Absolute path of the repository root containing `cwd` -- the directory holding .git. Registering a NEW project needs this or `repo_url`: todox stores repositories, not directories, and a bare `cwd` is a directory you happen to be standing in.");
 
 /**
  * How the server recognises this repo somewhere other than this machine.
@@ -217,14 +217,14 @@ export const SHAPES = {
       .boolean()
       .optional()
       .describe(
-        "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call.",
+        "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call. Registering needs `repo_root` or `repo_url` as well -- a path on its own is not evidence of a repository.",
       ),
     focus: z
       .string()
       .max(MAX.line)
       .optional()
       .describe(
-        "What this session is about, in a sentence -- the bug, the feature, the file. Standing notes are ranked against it, so the ones that matter are the ones that come back with a body instead of whichever were written most recently. Send it whenever you know; it can only move a note up the list, never drop one.",
+        "What this session is about, in a sentence -- the bug, the feature, the file. Both budgets are spent against it -- the standing notes AND the log -- so the bodies that come back are the ones about what you asked instead of whichever were written most recently. Send it whenever you know; it can only move a record up the list, never drop one, so a focus that matches nothing costs nothing.",
       ),
     repo_root: repoRoot,
     repo_url: repoIdentity,
