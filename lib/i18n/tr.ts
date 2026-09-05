@@ -354,6 +354,10 @@ export const tr: Record<Key, string> = {
   staleTitleMany: "{n} not sana yalan söylüyor olabilir",
   staleBody:
     "Bunların arkasındaki dosyalar yazıldıklarından beri değişti. Bayat bağlam, hiç bağlam olmamasından beterdir.",
+  noSummary:
+    "Henüz bir açıklama yok. Bu deponun ne olduğunu anlatan bir iki cümle, onu açan her oturumu ucuzlatır — proje ayarlarından ekleyebilirsin.",
+  lastLeftOff: "en son şurada kalındı:",
+  notesAndMore: "ve {n} tane daha; soran agent hepsini alıyor.",
   emptyProjectsTitleOne: "1 proje henüz boş",
   emptyProjectsTitleMany: "{n} proje henüz boş",
   emptyProjectsBody:
