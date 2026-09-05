@@ -181,6 +181,26 @@ export async function updateProjectAction(fd: FormData) {
 }
 
 /**
+ * Clear one project that holds nothing.
+ *
+ * Separate from `deleteProjectAction` rather than a flag on it, because the two
+ * are protected by different things and a boolean would hide that. Deleting a
+ * project with work in it asks for the slug to be typed, because it cascades to
+ * every task, entry and note underneath. This one cannot cascade to anything --
+ * and what stands in for the typed slug is `removeIfEmpty`, which re-tests
+ * emptiness inside the DELETE, so a project that gained its first task while
+ * the page was open is not removed by a click aimed at the old list.
+ */
+export async function clearEmptyProjectAction(fd: FormData): Promise<void> {
+  const user = await writingUser();
+  const id = num(fd, "project_id");
+  await assertProject(user.id, id);
+
+  await projects.removeIfEmpty(user.id, id);
+  revalidatePath("/", "layout");
+}
+
+/**
  * Gated on typing the slug, and on nothing else being ambiguous about it.
  *
  * Registering a project is deliberately free -- any absolute path an agent
