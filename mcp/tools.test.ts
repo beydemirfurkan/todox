@@ -390,6 +390,51 @@ describe("instructions", () => {
  * sentence drifts back the moment somebody improves the wording. Assert the
  * claim, not the prose around it -- restoring "full-text" has to fail here.
  */
+/**
+ * What the briefing tool promises about its own ceilings.
+ *
+ * Here rather than in `briefing.test.ts` for the reason the search block below
+ * gives: the defect this guards against was never in the SQL. The description
+ * said "three log entries per kind per task" and nothing about bytes, which
+ * was true and useless -- three entries of 6 KB each is not a ceiling, and the
+ * agent reading that sentence had no reason to expect a body it could not
+ * read. A sentence drifts back the moment somebody improves the wording, so
+ * assert the claim rather than the prose.
+ */
+describe("the briefing tool's description", () => {
+  const briefingDescription = () =>
+    harness(remoteWs).tools.get("get_context")!.config.description!;
+
+  it("says the log bodies have a byte budget, not only a count", () => {
+    expect(briefingDescription()).toMatch(/byte budget/i);
+  });
+
+  it("no longer describes the cap as three entries per kind and stops there", () => {
+    // The sentence this block was written for.
+    expect(briefingDescription()).not.toMatch(/three log entries per kind per task, and sixty/i);
+  });
+
+  it("says a null body is a spent budget and not an empty record", () => {
+    expect(briefingDescription()).toMatch(/null means the budget was already spent/i);
+  });
+
+  it("names the call that reads what it did not send", () => {
+    // Without this the budget is indistinguishable from losing the log.
+    expect(briefingDescription()).toMatch(/get_task/);
+  });
+
+  it("promises the head that makes an unpaid record usable", () => {
+    expect(briefingDescription()).toMatch(/head/i);
+  });
+
+  it("is the same sentence on both transports", () => {
+    // The one difference between them is a Workspace, never the tool list.
+    expect(harness(localWs).tools.get("get_context")!.config.description).toBe(
+      briefingDescription(),
+    );
+  });
+});
+
 describe("the search tool's description", () => {
   const searchDescription = () => harness(remoteWs).tools.get("search")!.config.description!;
 

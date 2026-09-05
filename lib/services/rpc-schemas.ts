@@ -42,6 +42,18 @@ const MAX = {
   path: 4_096,
   /** Bodies, summaries, notes. Long prose is the point of this product. */
   text: 100_000,
+  /**
+   * A project summary: what this repository is, for somebody who has never
+   * seen it. Deliberately far below `text`.
+   *
+   * It was `text` -- a hundred thousand characters -- and the description
+   * asking for "1-3 sentences" was the only thing holding it. Measured across
+   * production on 2026-09-05: the median summary is 198 characters and reads
+   * like a description, while the two longest are 1,114 and 1,108 and read
+   * like release notes. This is the one field on the page whose whole job is
+   * to be short, and the page leads with it.
+   */
+  summary: 320,
   /** A search term. Longer than this is not a search. */
   query: 200,
   /** Paths in one call, matching the ceiling `reportRefs` already had. */
@@ -85,7 +97,7 @@ const repoRoot = z
   .string()
   .max(MAX.path)
   .optional()
-  .describe("Absolute path of the repository root containing `cwd`.");
+  .describe("Absolute path of the repository root containing `cwd` -- the directory holding .git. Registering a NEW project needs this or `repo_url`: todox stores repositories, not directories, and a bare `cwd` is a directory you happen to be standing in.");
 
 /**
  * How the server recognises this repo somewhere other than this machine.
@@ -140,11 +152,9 @@ export const SHAPES = {
       .describe("Defaults to a slug of the name"),
     root_path: ref.optional().describe("Absolute path of the repo/working dir"),
     repo_url: repoUrl,
-    summary: z
-      .string()
-      .max(MAX.text)
-      .optional()
-      .describe("What this project is, in 1-3 sentences, for a cold agent"),
+    summary: z.string().max(MAX.summary).optional().describe(
+      "What this repository IS, for somebody who has never seen it -- one or two sentences, the way a site's meta description reads. Not a changelog, not a status, not what changed recently: those are what tasks and the log are for, and a summary that carries them goes stale the day after it is written. This is the first thing on the project page and it is capped, so write the sentence you would give a new colleague in a corridor.",
+    ),
     model,
   },
 
@@ -153,7 +163,9 @@ export const SHAPES = {
     name: z.string().min(1).max(MAX.line).optional(),
     root_path: ref.optional(),
     repo_url: repoUrl,
-    summary: z.string().max(MAX.text).optional(),
+    summary: z.string().max(MAX.summary).optional().describe(
+      "What this repository IS, for somebody who has never seen it -- one or two sentences, the way a site's meta description reads. Not a changelog, not a status, not what changed recently: those are what tasks and the log are for, and a summary that carries them goes stale the day after it is written. This is the first thing on the project page and it is capped, so write the sentence you would give a new colleague in a corridor.",
+    ),
     model,
   },
 
@@ -217,14 +229,14 @@ export const SHAPES = {
       .boolean()
       .optional()
       .describe(
-        "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call.",
+        "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call. Registering needs `repo_root` or `repo_url` as well -- a path on its own is not evidence of a repository.",
       ),
     focus: z
       .string()
       .max(MAX.line)
       .optional()
       .describe(
-        "What this session is about, in a sentence -- the bug, the feature, the file. Standing notes are ranked against it, so the ones that matter are the ones that come back with a body instead of whichever were written most recently. Send it whenever you know; it can only move a note up the list, never drop one.",
+        "What this session is about, in a sentence -- the bug, the feature, the file. Both budgets are spent against it -- the standing notes AND the log -- so the bodies that come back are the ones about what you asked instead of whichever were written most recently. Send it whenever you know; it can only move a record up the list, never drop one, so a focus that matches nothing costs nothing.",
       ),
     repo_root: repoRoot,
     repo_url: repoIdentity,

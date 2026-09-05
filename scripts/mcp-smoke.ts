@@ -60,6 +60,12 @@ const SCRATCH = join(TMP, "todox-smoke-repo");
 /** A second one, because one account holds many and they must not mix. */
 const OTHER = join(TMP, "todox-smoke-other");
 /**
+ * A directory that is deliberately NOT a checkout, shaped like the ones that
+ * caused this rule: a client's per-prompt scratch folder. Nothing is written
+ * into it, so nothing above it can be mistaken for a root marker.
+ */
+const NOT_A_REPO = join(TMP, "todox-smoke-scratch", "2026-09-04", "some-prompt");
+/**
  * The same repository as SCRATCH, as it looks on the developer's other computer:
  * a different absolute path, the same git remote. This is the fixture that
  * proves one repo stays one project across machines.
@@ -632,6 +638,61 @@ async function runSuite(mode: Mode, token: string) {
     throw new Error("the note the focus described is not in the briefing at all");
   console.log("ranked_by:", ranked.context_ranked_by, "· same notes, reordered");
 
+  // The log gets the same treatment, and needs the same proof. A budget that
+  // dropped RECORDS rather than bodies would look identical from outside until
+  // the day an agent went looking for a dead end that used to be there.
+  if (ranked.log_ranked_by !== "focus")
+    throw new Error(`focus was ignored by the log: log_ranked_by=${ranked.log_ranked_by}`);
+  if (corrected.log_ranked_by !== "recency")
+    throw new Error("a briefing with no focus claimed its log was ranked by one");
+  const logIds = (b: {
+    open_tasks: {
+      decisions: { id: number }[];
+      dead_ends: { id: number }[];
+      open_questions: { id: number }[];
+    }[];
+  }) =>
+    b.open_tasks
+      .flatMap((t) => [...t.decisions, ...t.dead_ends, ...t.open_questions].map((e) => e.id))
+      .sort((a, b2) => a - b2)
+      .join("|");
+  if (logIds(ranked) !== logIds(corrected))
+    throw new Error("ranking by focus changed which entries came back, not just their order");
+
+  // Every record is identifiable whether or not its body was paid for. This is
+  // what makes a spent budget a budget rather than a loss.
+  for (const task of ranked.open_tasks)
+    for (const e of [
+      ...task.decisions,
+      ...task.dead_ends,
+      ...task.open_questions,
+      ...(task.last_handoff ? [task.last_handoff] : []),
+    ] as { id: number; kind: string; created_at: string; head: string; body: string | null }[]) {
+      if (!e.id || !e.kind || !e.created_at || !e.head)
+        throw new Error(`a briefing entry arrived without its name: ${JSON.stringify(e)}`);
+      if (e.body !== null && !e.body.startsWith(e.head.replace(/…$/, "")))
+        throw new Error(`head is not the opening of its own body: ${e.head}`);
+    }
+  console.log(
+    "log ranked_by:",
+    ranked.log_ranked_by,
+    `· same entries, reordered · bodies not paid for: ${ranked.log_bodies_omitted}`,
+  );
+
+  // The escape hatch, and the reason a null body is honest rather than a loss.
+  // Without this the budget would be indistinguishable from throwing the log
+  // away, which is the failure `get_context_note` exists to prevent for notes.
+  const withBody = ranked.open_tasks.flatMap(
+    (t: { id: number; decisions: { id: number; body: string | null }[] }) =>
+      t.decisions.filter((d) => d.body !== null).map((d) => ({ task: t.id, id: d.id })),
+  )[0];
+  if (withBody) {
+    const full = JSON.parse(await text("get_task", { task_id: withBody.task }));
+    if (!full.entries?.some((e: { id: number; body: string }) => e.id === withBody.id && e.body))
+      throw new Error("get_task does not return the body the briefing pointed at");
+    console.log("get_task returns the whole body the briefing named");
+  }
+
   // `search` was in none of the four smoke suites, which is how it kept a
   // description promising full-text over three ILIKE scans. Now that it parses
   // the query, the assertion worth making is the one that used to fail: a
@@ -715,6 +776,82 @@ async function runSuite(mode: Mode, token: string) {
   if (noteIn(afterRemoval))
     throw new Error("a deleted note is still in the briefing");
   console.log("entry and note both removed, and gone from what the next session reads");
+
+  // A project is a repository, not a path. This is the assertion that keeps
+  // that true on the transport where it can actually go wrong: the hosted
+  // server has no disk, so a bare `cwd` is the only thing some clients send,
+  // and every one of those used to become a project. Twelve of one production
+  // account's twenty-one projects were its client's per-prompt scratch folders.
+  //
+  // Both transports are checked, and they fail for different reasons, which is
+  // the point of running it twice: hosted has nothing to look at, and stdio
+  // looks and finds no root marker.
+  console.log("\n--- a directory that is not a repository is not a project ---");
+  mkdirSync(NOT_A_REPO, { recursive: true });
+  // A refused tool call comes back as text, not as a rejection -- the same
+  // shape the `refused` helper above reads.
+  const noRepo = await text("get_context", { cwd: NOT_A_REPO });
+  if (!/no repository at/.test(noRepo))
+    throw new Error(`a scratch directory was registered as a project: ${noRepo.slice(0, 120)}`);
+  for (const clue of ["repo_root", "repo_url", "create_project"])
+    if (!noRepo.includes(clue))
+      throw new Error(`the refusal does not say to send ${clue}: ${noRepo}`);
+  console.log("refused, and said what to send:", noRepo.slice(0, 58) + "…");
+
+  // The same path goes through the moment the caller can show it is a repo.
+  // Without this the assertion above would also pass if registration were
+  // simply broken -- and the two transports have to prove it differently,
+  // which is itself the thing worth asserting.
+  //
+  // Hosted: the client supplies the remote, because the server cannot look.
+  // Stdio: the model is NOT allowed to supply one (`localInternal` strips
+  // repo_url, since a model cannot invent a git remote and a plausible guess
+  // becomes the project's identity for good), so the only way through is for
+  // the directory to actually become a repository.
+  if (mode.local) writeFileSync(join(NOT_A_REPO, "package.json"), '{"name":"scratch"}\n');
+  const allowed = JSON.parse(
+    await text("get_context", {
+      cwd: NOT_A_REPO,
+      ...(mode.local ? {} : { repo_url: "git@github.com:todox-smoke/scratch.git" }),
+    }),
+  );
+  if (!allowed.project_created)
+    throw new Error(`evidence was supplied and it still was not registered: ${JSON.stringify(allowed).slice(0, 160)}`);
+  await text("delete_project", {
+    project: allowed.project.slug,
+    confirm: allowed.project.slug,
+  });
+  rmSync(join(NOT_A_REPO, "package.json"), { force: true });
+  console.log(
+    mode.local
+      ? "and registers it once a root marker appears on disk"
+      : "and registers it once the caller sends the remote",
+  );
+
+  // merge_projects has existed since the cross-machine identity work and
+  // nothing ever pointed at a duplicate that ALREADY exists: the resolver says
+  // it once, at registration, and after that the two rows sit there in silence.
+  // Production carried two such pairs for weeks, one of them a project with
+  // twelve open tasks beside a namesake with one.
+  console.log("\n--- a project with a namesake says so, every session ---");
+  const twinName = "SMOKE-TWIN";
+  const twinA = JSON.parse(await text("create_project", { name: twinName, model: MODEL }));
+  const twinB = JSON.parse(await text("create_project", { name: twinName, model: MODEL }));
+  const onTwin = JSON.parse(await text("get_context", { project: twinA.slug }));
+  if (!onTwin.duplicate)
+    throw new Error("two projects share a name and the briefing did not mention it");
+  if (!onTwin.duplicate.includes(twinB.slug))
+    throw new Error(`the warning does not name the other project: ${onTwin.duplicate}`);
+  if (!onTwin.duplicate.includes("merge_projects("))
+    throw new Error("the warning does not hand over the call that fixes it");
+  // And it is not its own duplicate -- an always-true warning is the failure
+  // mode the closing hint was rebuilt to stop being.
+  await text("delete_project", { project: twinB.slug, confirm: twinB.slug });
+  const alone = JSON.parse(await text("get_context", { project: twinA.slug }));
+  if (alone.duplicate)
+    throw new Error("the only project with its name still claims to have a twin");
+  await text("delete_project", { project: twinA.slug, confirm: twinA.slug });
+  console.log("named the twin and the merge call, and went quiet once it was gone");
 
   console.log("\n--- report sees it ---");
   const md = await text("activity_report", {

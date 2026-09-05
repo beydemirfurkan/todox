@@ -354,7 +354,19 @@ export const tr: Record<Key, string> = {
   staleTitleMany: "{n} not sana yalan söylüyor olabilir",
   staleBody:
     "Bunların arkasındaki dosyalar yazıldıklarından beri değişti. Bayat bağlam, hiç bağlam olmamasından beterdir.",
+  noSummary:
+    "Henüz bir açıklama yok. Bu deponun ne olduğunu anlatan bir iki cümle, onu açan her oturumu ucuzlatır — proje ayarlarından ekleyebilirsin.",
+  lastLeftOff: "en son şurada kalındı:",
+  notesAndMore: "ve {n} tane daha; soran agent hepsini alıyor.",
+  emptyProjectsTitleOne: "1 proje henüz boş",
+  emptyProjectsTitleMany: "{n} proje henüz boş",
+  emptyProjectsBody:
+    "Bir yoldan kaydedilmiş ve içine hiç yazılmamış. Silmek yanında hiçbir şey götürmez — boş olmasının anlamı bu.",
+  emptyProjectsRemove: "kaldır",
   staleAndMore: "ve {n} tane daha; görevlerin kendi sayfalarında listeli.",
+  twinTitle: '"{name}" adında başka bir proje daha var',
+  twinBody:
+    "Aynı deponun ikinci bir bilgisayarda açılmış hâliyse birleştir — birleştirene kadar günlük ikiye bölünmüş durumda. Gerçekten iki ayrı depoysa her birine remote ver, bu uyarı bir daha çıkmaz.",
   observationsTitle: "Önceki oturumlar ne yaptı",
   observationsBody:
     "Oturum sürerken git'ten kaydedildi; kimse yazmadı. Neyin değiştiğini söylerler, neden değiştiğini asla — saklamaya değeni bir agent gerçek bir nota dönüştürür.",
