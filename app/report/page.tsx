@@ -123,6 +123,12 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                     >
                       {bp.name}
                     </Link>
+                    {/* The slug, because the name is not unique and this row
+                        is where that stops being harmless: two projects called
+                        crm.marcaspio sit in production today, and in this list
+                        they were two identical rows with different links. The
+                        home page's cards have always shown both. */}
+                    <span className="mono text-[11.5px] text-faint">{bp.slug}</span>
                     <Chip color="var(--ok)">
                       {bp.completed} {t("totalsCompleted")}
                     </Chip>

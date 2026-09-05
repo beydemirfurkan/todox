@@ -42,6 +42,18 @@ const MAX = {
   path: 4_096,
   /** Bodies, summaries, notes. Long prose is the point of this product. */
   text: 100_000,
+  /**
+   * A project summary: what this repository is, for somebody who has never
+   * seen it. Deliberately far below `text`.
+   *
+   * It was `text` -- a hundred thousand characters -- and the description
+   * asking for "1-3 sentences" was the only thing holding it. Measured across
+   * production on 2026-09-05: the median summary is 198 characters and reads
+   * like a description, while the two longest are 1,114 and 1,108 and read
+   * like release notes. This is the one field on the page whose whole job is
+   * to be short, and the page leads with it.
+   */
+  summary: 320,
   /** A search term. Longer than this is not a search. */
   query: 200,
   /** Paths in one call, matching the ceiling `reportRefs` already had. */
@@ -140,11 +152,9 @@ export const SHAPES = {
       .describe("Defaults to a slug of the name"),
     root_path: ref.optional().describe("Absolute path of the repo/working dir"),
     repo_url: repoUrl,
-    summary: z
-      .string()
-      .max(MAX.text)
-      .optional()
-      .describe("What this project is, in 1-3 sentences, for a cold agent"),
+    summary: z.string().max(MAX.summary).optional().describe(
+      "What this repository IS, for somebody who has never seen it -- one or two sentences, the way a site's meta description reads. Not a changelog, not a status, not what changed recently: those are what tasks and the log are for, and a summary that carries them goes stale the day after it is written. This is the first thing on the project page and it is capped, so write the sentence you would give a new colleague in a corridor.",
+    ),
     model,
   },
 
@@ -153,7 +163,9 @@ export const SHAPES = {
     name: z.string().min(1).max(MAX.line).optional(),
     root_path: ref.optional(),
     repo_url: repoUrl,
-    summary: z.string().max(MAX.text).optional(),
+    summary: z.string().max(MAX.summary).optional().describe(
+      "What this repository IS, for somebody who has never seen it -- one or two sentences, the way a site's meta description reads. Not a changelog, not a status, not what changed recently: those are what tasks and the log are for, and a summary that carries them goes stale the day after it is written. This is the first thing on the project page and it is capped, so write the sentence you would give a new colleague in a corridor.",
+    ),
     model,
   },
 
