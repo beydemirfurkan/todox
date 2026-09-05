@@ -82,7 +82,11 @@ export function renderMarkdown(r: ActivityReport, t: T): string {
     out.push("");
     for (const bp of r.by_project) {
       out.push(
-        `- **${bp.name}** — ${bp.completed} ${t("totalsCompleted")}, ` +
+        // The slug too, and this is the copy somebody pastes into an
+        // update: the name is not unique -- production carries two projects
+        // called crm.marcaspio -- and on the web the link disambiguates them
+        // while here there is no link at all.
+        `- **${bp.name}** (${bp.slug}) — ${bp.completed} ${t("totalsCompleted")}, ` +
           `${bp.touched} ${t("totalsTouched")}, ${duration(bp.active_ms, t)}`,
       );
     }

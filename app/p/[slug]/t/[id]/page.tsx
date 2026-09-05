@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { ENTRY_KINDS } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
+import { splitHeadline } from "@/lib/util/headline";
 import { byline } from "./byline";
 import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
@@ -271,9 +272,35 @@ export default async function TaskPage({
                         </SubmitButton>
                       </form>
                     </div>
-                    <p className="mt-1.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
-                      {e.body}
-                    </p>
+                    {/* The headline this log is already written with.
+                        `log_entry` asks for it -- "write the first line as a
+                        headline that stands on its own" -- and 347 of 605
+                        entries in production do, averaging 73 characters. It
+                        was rendered as the first line of a wall, so a task
+                        with nine entries was fifteen thousand characters with
+                        nothing to scan.
+
+                        Nothing is cut: `splitHeadline` declines whenever
+                        promoting the line would truncate it or leave an empty
+                        body, and then this renders exactly what it always
+                        did. */}
+                    {(() => {
+                      const { headline, rest } = splitHeadline(e.body);
+                      return (
+                        <>
+                          {headline && (
+                            <p className="display mt-1.5 text-[15px] leading-snug font-bold break-words">
+                              {headline}
+                            </p>
+                          )}
+                          <p
+                            className={`${headline ? "mt-1" : "mt-1.5"} text-[15px] leading-relaxed break-words whitespace-pre-wrap`}
+                          >
+                            {rest}
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </li>
               ))}
