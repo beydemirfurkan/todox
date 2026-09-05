@@ -63,7 +63,14 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
     <div className="space-y-6">
       <div className="pop prose">
         <h1 className="display text-[33px] leading-[1.1] font-bold">{t("reportTitle")}</h1>
-        <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{t("reportIntro")}</p>
+        {/* Only when the window is empty.
+            Explaining that the report comes from the log rather than from
+            commits is the argument for reading it, and it is worth making to
+            somebody who has nothing to read yet. Above forty-five finished
+            tasks it is a paragraph between the reader and their numbers. */}
+        {report.totals.touched === 0 && (
+          <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{t("reportIntro")}</p>
+        )}
       </div>
 
       <nav aria-label={t("reportTitle")} className="pop flex flex-wrap gap-2">
