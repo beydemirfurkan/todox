@@ -363,7 +363,15 @@ export const en = {
   staleTitleMany: "{n} notes may be lying to you",
   staleBody:
     "The files behind these have changed since they were written. Stale context is worse than none.",
+  emptyProjectsTitleOne: "1 project holds nothing yet",
+  emptyProjectsTitleMany: "{n} projects hold nothing yet",
+  emptyProjectsBody:
+    "Registered from a path and never written to. Removing one takes nothing with it — that is what makes it empty.",
+  emptyProjectsRemove: "remove",
   staleAndMore: "and {n} more, listed on the tasks themselves.",
+  twinTitle: 'Another project is also called "{name}"',
+  twinBody:
+    "If it is the same repository opened on a second computer, merge them — the log is split across both until you do. If they really are two repositories, give each a remote and this stops being asked.",
   observationsTitle: "What earlier sessions did",
   observationsBody:
     "Recorded from git while a session ran, not written by anyone. They say what changed, never why — an agent turns one into a real note when it is worth keeping.",

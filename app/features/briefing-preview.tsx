@@ -62,19 +62,25 @@ const SAMPLE = `{
     {
       "title": "Bound the reads that had no ceiling",
       "status": "doing",
-      "last_handoff": "auth bypass closed; briefing capped per kind.
-                       Left: a byte budget, which is its own decision.",
+      "last_handoff": {
+        "id": 903, "kind": "handoff", "created_at": "2026-09-04",
+        "head": "Byte budget landed; heads are the remaining axis.",
+        "body": "auth bypass closed; briefing capped per kind and now
+                 per byte. Left: the heads, which are still row-capped."
+      },
       "decisions": [
-        { "id": 812, "body": "Capped per kind, not per task — a flat
-                              cut drops the two old dead ends." }
+        { "id": 812, "kind": "decision", "created_at": "2026-08-21",
+          "head": "Capped per kind, not per task.",
+          "body": "A flat cut drops the two old dead ends, and a dead
+                   end is the entry that stops a repeat." },
+        { "id": 819, "kind": "decision", "created_at": "2026-09-04",
+          "head": "Bytes, not count — a count of three says nothing.",
+          "body": null }
       ],
       "dead_ends": [
-        { "id": 806, "body": "1 MB body ceiling. The schema allows
-                              link_files up to ~2.4 MB, so it
-                              refused legal calls." }
-      ],
-      "open_questions": [
-        { "id": 819, "body": "Cap by bytes or by count?" }
+        { "id": 806, "kind": "dead_end", "created_at": "2026-08-20",
+          "head": "1 MB body ceiling refused legal calls.",
+          "body": null }
       ],
       "files": [
         { "path": "lib/services/briefing.ts", "status": "changed" },
@@ -84,5 +90,7 @@ const SAMPLE = `{
       "log_omitted": 3
     }
   ],
+  "log_bodies_omitted": 2,
+  "log_ranked_by": "focus",
   "stale_refs": ["task #113 -> lib/services/briefing.ts (changed)"]
 }`;
