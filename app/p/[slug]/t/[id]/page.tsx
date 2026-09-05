@@ -38,6 +38,7 @@ import {
   Chip,
   Counter,
   Empty,
+  ExpandableText,
   Field,
   Panel,
   RefBadge,
@@ -176,9 +177,20 @@ export default async function TaskPage({
             </h1>
 
             {task.body && (
-              <p className="prose mt-2 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-muted">
-                {task.body}
-              </p>
+              /* Clamped, like the log below it and the summary above it.
+                  The body is the brief -- goal, constraints, what counts as
+                  done -- and it sits between the reader and the history they
+                  came for. Measured on production: the median task body is
+                  1,384 characters and 113 of 193 are over 900, so this is
+                  usually a screen of scrolling before the first entry. Nothing
+                  is lost; ExpandableText only offers the control when the
+                  clamp actually bites. */
+              <ExpandableText
+                text={task.body}
+                more={t("showMore")}
+                less={t("showLess")}
+                className="prose mt-2 text-[15px] leading-relaxed text-muted"
+              />
             )}
 
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">

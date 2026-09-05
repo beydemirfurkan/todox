@@ -145,6 +145,46 @@ export async function listByTasksPerKind(
  * told; the human looking at the same project got a wall of summary and a list
  * of titles. One row, not one per task -- the page shows one line.
  */
+/**
+ * The newest handoff on an open task, per project, in one query.
+ *
+ * The sibling above answers for one project; the home page needs the same
+ * answer for every card. It said the project's name, its counts, and -- for
+ * two thirds of them -- nothing else at all: 43 of 64 projects in production
+ * carry no summary, so the line that should say what a project is was blank.
+ * Where it left off is the better answer anyway, and there is one to give on
+ * 28 of the 37 projects that have open work.
+ *
+ * `DISTINCT ON` rather than a window function or a lateral: it is the thing
+ * Postgres already has for "the first row of each group", and the ORDER BY it
+ * requires is the same one that picks the newest.
+ */
+export async function latestHandoffByProjects(
+  projectIds: number[],
+  openStatuses: readonly string[],
+): Promise<Map<number, { id: number; task_id: number; task_title: string; body: string; created_at: string }>> {
+  if (!projectIds.length || !openStatuses.length) return new Map();
+  const rows = await all<{
+    project_id: number;
+    id: number;
+    task_id: number;
+    task_title: string;
+    body: string;
+    created_at: string;
+  }>(
+    `SELECT DISTINCT ON (t.project_id)
+            t.project_id, e.id, e.task_id, t.title AS task_title, e.body, e.created_at
+       FROM entries e
+       JOIN tasks t ON t.id = e.task_id
+      WHERE t.project_id IN (${projectIds.map(() => "?").join(",")})
+        AND t.status IN (${openStatuses.map(() => "?").join(",")})
+        AND e.kind = 'handoff'
+      ORDER BY t.project_id, e.id DESC`,
+    [...projectIds, ...openStatuses],
+  );
+  return new Map(rows.map((r) => [r.project_id, r]));
+}
+
 export const latestHandoff = async (taskIds: number[]) =>
   taskIds.length
     ? one<Entry & { task_title: string }>(
