@@ -1,5 +1,6 @@
 import type { EntryKind } from "../constants";
 import { all, groupBy, one, run, type Statement } from "../db/client";
+import { document, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
 import type { Entry, EntryView } from "../types";
 import { now } from "../util/time";
 
@@ -106,6 +107,10 @@ export async function listByTasks(taskIds: number[]): Promise<Map<number, EntryV
  * Bytes are bounded by this only as far as the row count goes -- `MAX.text` in
  * `rpc-schemas.ts` lets one body be 100 KB, so a small count is doing the real
  * work. Callers that must bound the payload itself need their own budget.
+ *
+ * This one returns whole rows and is for `get_file_context`, which shows a
+ * file's dead ends and decisions in full. The briefing wants the same cut with
+ * a byte budget and a head on every row, and that is `pageByTasksPerKind`.
  */
 export async function listByTasksPerKind(
   taskIds: number[],
@@ -198,6 +203,222 @@ export const latestHandoff = async (taskIds: number[]) =>
         taskIds,
       )
     : undefined;
+
+/**
+ * An entry as the briefing carries it.
+ *
+ * `body` is null when the byte budget was already spent -- not when the entry
+ * is empty, which cannot happen: `log_entry` requires at least one character.
+ * So null means "ask for it", the same thing it means on `BriefingNote`, and
+ * `get_task` is where it is asked for.
+ */
+export type BriefingEntry = {
+  id: number;
+  /**
+   * Redundant inside `decisions`, and the reason it is here anyway is
+   * `last_handoff`: one field of this type on its own, where a reader with the
+   * object in hand and no surrounding list has nothing else to say what it is.
+   */
+  kind: EntryKind;
+  created_at: string;
+  /**
+   * The first line of the body, and never a truncation of a paragraph.
+   *
+   * This log's own writing convention puts a headline on the first line -- the
+   * tool instructions ask for it in so many words ("write the first paragraph
+   * to stand alone") -- so the first line is a label somebody already wrote,
+   * not a cut somebody guessed at. That is what makes it safe to always send:
+   * an agent skimming a task indexes off `head` without having to branch on
+   * whether a body arrived.
+   *
+   * A head that had to be shortened carries an ellipsis, so a whole headline
+   * and a cut one are distinguishable. Half a sentence with no mark is the
+   * thing `BriefingNote` refuses to do to a body, for the same reason.
+   */
+  head: string;
+  body: string | null;
+};
+
+/**
+ * How much of a body a head may be. The same 240 `search` cuts its snippet to,
+ * because an agent has already been taught to expect that shape there.
+ */
+export const HEAD_CHARS = 240;
+
+/**
+ * The first line, with any carriage return left by a Windows editor removed.
+ *
+ * `chr(10)` and `chr(13)` rather than `E'\n'` for two separate reasons, both
+ * of which have bitten this repository. The query is a JavaScript template
+ * literal, so a backslash escape is consumed before Postgres ever sees it; and
+ * the obvious first-SENTENCE split wants `[.!?]`, whose `?` inside a string
+ * literal would shift every parameter after it -- `lib/db/client.ts` rewrites
+ * positionally and does not parse strings.
+ */
+const BLANK = `chr(32)||chr(9)||chr(13)||chr(10)`;
+const FIRST_LINE = `rtrim(split_part(btrim(e.body, ${BLANK}), chr(10), 1), chr(13))`;
+
+/**
+ * The same cut as `listByTasksPerKind`, as the briefing needs it: a head on
+ * every row, a count that can differ per kind, and no join for an author
+ * nothing here renders.
+ *
+ * `perKind` is one number per kind because the briefing wants three decisions
+ * and exactly one handoff, and asking for three of each is paid for on the
+ * network whether or not anything reads it. Measured on production
+ * 2026-09-04: 13 handoff rows fetched where 6 were shown, 45,753 bytes where
+ * 21,444 were rendered.
+ */
+/**
+ * The query above as text, so its shape can be asserted without a database.
+ *
+ * `pnpm test` runs without one, so this is the only thing CI checks on every
+ * push -- and shape is where the expensive mistakes live here: a placeholder
+ * inside a literal, a lost cast, a dropped filter. The same argument
+ * `observations.ts` makes for exporting its `QUERIES`.
+ */
+export const pageByTasksPerKindSql = (
+  taskCount: number,
+  kindCount: number,
+  focused: boolean,
+): string => {
+  const list = (n: number, each: string) => Array.from({ length: n }, () => each).join(",");
+  const doc = document("entries", "e");
+  // `ts_rank` is 0 for a document the query does not touch, so a focus can only
+  // move a body up the spend order -- it can never cost a record its place in
+  // the payload, and a focus that matches nothing produces the same briefing as
+  // no focus at all. That property is what makes sending one free, and it is
+  // promised out loud in the `focus` description an agent reads.
+  const relevance = focused ? rank(doc) : "0";
+  return `WITH ${focused ? `q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),\n     ` : ""}picked AS (
+       SELECT e.id, e.task_id, e.kind, e.created_at, e.body,
+              -- The first NON-EMPTY line. The btrim above drops leading blank
+              -- lines, which log_entry allows and which otherwise produced a
+              -- head of "" -- a record with no body and no label, which the
+              -- payload contract says cannot happen. The coalesce is the floor
+              -- for a body that is nothing but whitespace: one character in is
+              -- one character out. No backtick may appear in this comment; the
+              -- whole query is a template literal and a backtick ends it.
+              CASE WHEN length(${FIRST_LINE}) > ?
+                   THEN left(${FIRST_LINE}, ?) || '…'
+                   ELSE coalesce(nullif(${FIRST_LINE}, ''), left(e.body, ?)) END AS head,
+              ROW_NUMBER() OVER (PARTITION BY e.task_id, e.kind ORDER BY e.id DESC) AS in_kind,
+              ${relevance} AS relevance
+         FROM ${focused ? "q CROSS JOIN entries e" : "entries e"}
+        WHERE e.task_id IN (${list(taskCount, "?")})
+          AND e.kind IN (${list(kindCount, "?")})
+          -- A question that something answers is no longer open, and this is
+          -- the one place that has to know it. Filtering after the read would
+          -- let three answered questions push the open one past the per-kind
+          -- ceiling, which is the cut this window is applying -- and no
+          -- backtick may appear in this comment, because the whole query is a
+          -- template literal and a backtick ends it.
+          AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)
+     ),
+     -- A CASE over the kinds already being filtered by, so one number per kind
+     -- and one number for all of them are the same query. No ELSE is needed
+     -- and none is written: a row whose kind is not in the filter cannot reach
+     -- here, and an ELSE would have to guess between hiding rows and showing
+     -- every one of them.
+     --
+     -- The cast is load-bearing. ROW_NUMBER() is bigint and the THEN
+     -- parameters carry no type, so Postgres infers them from the only other
+     -- thing in the CASE -- kind, which is text -- and the comparison dies
+     -- with "operator does not exist: bigint <= text". It fails at the
+     -- database, so the unit tests cannot see it: they all mock this module.
+     kept AS (
+       SELECT * FROM picked
+        WHERE in_kind <= (CASE kind ${Array.from({ length: kindCount }, () => "WHEN ? THEN ?").join(" ")} END)::int
+     ),
+     -- What every row before this one already cost.
+     --
+     -- ROWS ... AND 1 PRECEDING rather than CURRENT ROW, so the row that
+     -- crosses the line is still paid for and a briefing always carries at
+     -- least one body. The alternative has a cliff: MAX.text lets one entry be
+     -- 100 KB, and a sum that included the current row would answer a whole
+     -- briefing of heads and nothing else the moment such a row sorted first.
+     -- The cost of the rule chosen is that the payload can overshoot by
+     -- exactly one body, bounded by MAX.text and in practice by about 6.5 KB.
+     --
+     -- octet_length rather than length, because half of this corpus is Turkish
+     -- and character count undercounts it by 10-15%. JSON escaping adds a few
+     -- percent on top of that, so the budget is honest to within a few percent
+     -- and not to the byte.
+     --
+     -- SPEND ORDER, and the first term is the one that matters: in_kind ASC is
+     -- a round robin, so EVERY task's newest dead end is paid for before ANY
+     -- task's second-newest anything. Pure recency would let one busy task's
+     -- three fresh decisions eat the budget and return every dead end in the
+     -- project as a head. That is listByTasksPerKind's own argument -- "a dead
+     -- end is the one entry that stops the next session repeating something"
+     -- one level down, applied to bytes instead of rows.
+     --
+     -- Then kind, in the order the caller listed them, which is why that array
+     -- is ordered rather than a set.
+     spent AS (
+       SELECT *,
+              SUM(octet_length(body)) OVER (
+                ORDER BY relevance DESC,
+                         in_kind ASC,
+                         (CASE kind ${Array.from({ length: kindCount }, () => "WHEN ? THEN ?").join(" ")} END)::int ASC,
+                         id DESC
+                ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+              ) AS spent_before
+         FROM kept
+     )
+     SELECT id, task_id, kind, created_at, head,
+            CASE WHEN coalesce(spent_before, 0) < ? THEN body END AS body
+       FROM spent
+      ORDER BY task_id, id`;
+};
+
+
+export async function pageByTasksPerKind(
+  taskIds: number[],
+  kinds: readonly EntryKind[],
+  perKind: Partial<Record<EntryKind, number>>,
+  budgetBytes: number,
+  focus?: string,
+): Promise<{ rows: Map<number, BriefingEntry[]>; bodiesOmitted: number }> {
+  if (!taskIds.length || !kinds.length) return { rows: new Map(), bodiesOmitted: 0 };
+  const rows = await all<BriefingEntry & { task_id: number }>(
+    pageByTasksPerKindSql(taskIds.length, kinds.length, Boolean(focus)),
+    [
+      // The focus twice, for the two configurations `TSQUERY` builds, and
+      // first because the `q` CTE is the first thing in the statement.
+      ...(focus ? [focus, focus] : []),
+      HEAD_CHARS,
+      HEAD_CHARS,
+      HEAD_CHARS,
+      ...taskIds,
+      ...kinds,
+      ...kinds.flatMap((k) => [k, perKind[k] ?? 0]),
+      // The kinds again, as their spend priority: the caller's order.
+      ...kinds.flatMap((k, i) => [k, i]),
+      budgetBytes,
+    ],
+  );
+  // Derived from the rows already in hand rather than counted again, exactly
+  // as `contexts.pageByProject` does it. One budget is spent across the whole
+  // briefing, so this total belongs beside `context_omitted` at the top of the
+  // payload and not on any one task.
+  // `task_id` is how these are grouped, not something a reader of one needs:
+  // every record is already nested under the task that owns it. Left on the
+  // row it is several KB of pure duplication across fifty tasks, on the payload
+  // this budget exists to shrink -- and it is not in `BriefingEntry`, so
+  // nothing downstream was expecting it either.
+  const grouped = groupBy(rows, (r) => r.task_id);
+  return {
+    rows: new Map(
+      [...grouped].map(([taskId, entries]) => [
+        taskId,
+        entries.map(({ task_id: _grouped, ...entry }) => entry),
+      ]),
+    ),
+    bodiesOmitted: rows.filter((r) => r.body === null).length,
+  };
+}
+
 
 /**
  * The newest `perTask` entries of each task, every kind, in reading order.

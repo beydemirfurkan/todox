@@ -48,8 +48,16 @@ function asDirectory(p: string) {
  * make claims about the fallback otherwise -- the machine running it owns every
  * directory above the sandbox, and a stray `package.json` in one of them (this
  * happens in `%TEMP%`) is the function working, not failing.
+ *
+ * Two functions rather than one, and the difference is whether "I found
+ * nothing" is sayable. `findProjectRoot` falls back to the directory it started
+ * from, which is right for the observer and for asking git about a remote --
+ * both want a directory to work in and can cope with a plain one. It is wrong
+ * for the question "is this a repository at all", because the fallback answers
+ * yes for every directory on the disk. That question now has its own function,
+ * and registering a project is what asks it.
  */
-export function findProjectRoot(start: string, stopAt?: string): string {
+export function projectRootOf(start: string, stopAt?: string): string | undefined {
   let dir = asDirectory(start);
   for (let i = 0; i < 40; i++) {
     if (ROOT_MARKERS.some((m) => existsSync(join(dir, m)))) return dir;
@@ -57,7 +65,11 @@ export function findProjectRoot(start: string, stopAt?: string): string {
     if (up === dir || (stopAt && !isInside(up, stopAt))) break;
     dir = up;
   }
-  return asDirectory(start);
+  return undefined;
+}
+
+export function findProjectRoot(start: string, stopAt?: string): string {
+  return projectRootOf(start, stopAt) ?? asDirectory(start);
 }
 
 /**

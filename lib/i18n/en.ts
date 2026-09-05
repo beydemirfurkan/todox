@@ -367,7 +367,15 @@ export const en = {
     "No description yet. A sentence or two on what this repository is makes every session that opens it cheaper — add one in project settings.",
   lastLeftOff: "last left off on",
   notesAndMore: "and {n} more, kept for the agent that asks for them.",
+  emptyProjectsTitleOne: "1 project holds nothing yet",
+  emptyProjectsTitleMany: "{n} projects hold nothing yet",
+  emptyProjectsBody:
+    "Registered from a path and never written to. Removing one takes nothing with it — that is what makes it empty.",
+  emptyProjectsRemove: "remove",
   staleAndMore: "and {n} more, listed on the tasks themselves.",
+  twinTitle: 'Another project is also called "{name}"',
+  twinBody:
+    "If it is the same repository opened on a second computer, merge them — the log is split across both until you do. If they really are two repositories, give each a remote and this stops being asked.",
   observationsTitle: "What earlier sessions did",
   observationsBody:
     "Recorded from git while a session ran, not written by anyone. They say what changed, never why — an agent turns one into a real note when it is worth keeping.",

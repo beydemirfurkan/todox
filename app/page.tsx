@@ -10,10 +10,16 @@ import * as apiTokens from "@/lib/repositories/api-tokens";
 import { OPEN_STATUSES } from "@/lib/constants";
 import * as contexts from "@/lib/repositories/contexts";
 import * as entriesRepo from "@/lib/repositories/entries";
+import * as invitationsRepo from "@/lib/repositories/project-invitations";
 import * as memberships from "@/lib/repositories/project-memberships";
 import * as projects from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
-import { addContextAction, createProjectAction, deleteContextAction } from "./actions";
+import {
+  addContextAction,
+  clearEmptyProjectAction,
+  createProjectAction,
+  deleteContextAction,
+} from "./actions";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { Explainer, FirstRun } from "./features/explainer";
 import { Landing } from "./features/landing";
@@ -61,14 +67,62 @@ export default async function Home() {
     // Rides along rather than costing a round trip of its own.
     apiTokens.hasConnectedAgent(user.id),
   ]);
-  // Both need the project list first, so they wait -- but they wait together.
-  const ids = allProjects.map((p) => p.id);
-  const [teamSizes, leftOff] = await Promise.all([
+  /**
+   * Owned, and empty for everybody -- not just for me.
+   *
+   * Both halves were wrong first time round and both were found by building
+   * the case. `projects.list` answers with projects shared WITH this account
+   * as well as its own, and `clearEmptyProjectAction` asserts ownership -- so
+   * a shared project appeared in this list and its button threw. And notes
+   * were counted per author, so a project holding only its owner's standing
+   * rules read as empty to a member. `removeIfEmpty` refuses on any note by
+   * anyone, which is the definition this list now matches.
+   */
+  const owned = allProjects.filter((p) => p.user_id === user.id);
+  // Both of these need the project list first, so they wait -- but they wait
+  // together, the way the project page pairs its own second round.
+  const [teamSizes, notesByProject, pending, leftOff] = await Promise.all([
     // One grouped query for every card, not one per card.
-    memberships.countsByProjects(ids),
-    // Same, and it is what a card can say that the name and the counts cannot.
-    entriesRepo.latestHandoffByProjects(ids, OPEN_STATUSES),
+    memberships.countsByProjects(allProjects.map((p) => p.id)),
+    contexts.projectIdsHoldingNotes(owned.map((p) => p.id)),
+    // People waiting on an invitation. Without this the list and the DELETE
+    // disagree, and a disagreement here is a button that does nothing.
+    invitationsRepo.projectIdsWithPending(owned.map((p) => p.id), new Date().toISOString()),
+    // What a card can say that its name and its counts cannot.
+    entriesRepo.latestHandoffByProjects(allProjects.map((p) => p.id), OPEN_STATUSES),
   ]);
+
+  /**
+   * Projects that hold nothing at all.
+   *
+   * `list_projects` has counted these and left them out since it was written,
+   * and the browser has never had anywhere to act on that count. Registration
+   * is deliberately frictionless -- a path an agent passes becomes a project --
+   * so the shells are the price of that, and on 2026-09-04 they were eighteen
+   * of sixty-four across the account holders here.
+   *
+   * Notes are what separates "empty" from "quiet": a project can carry standing
+   * rules and no tasks, and that is a project doing its job.
+   */
+  /**
+   * The same question `removeIfEmpty` asks, in the same terms.
+   *
+   * A project with people in it is not empty, whatever else it holds -- and
+   * the state right after inviting somebody into a fresh repo is exactly no
+   * tasks and no notes. That project was listed here with a one-click remove,
+   * and the click took the membership and the invitation with it.
+   *
+   * The two definitions have to stay in step: if this list is looser than the
+   * DELETE the button does nothing, and if it is tighter the fold hides work
+   * somebody could clear.
+   */
+  const emptyProjects = owned.filter(
+    (p) =>
+      !counts.map.has(p.id) &&
+      !notesByProject.has(p.id) &&
+      !(teamSizes.get(p.id) ?? 0) &&
+      !pending.has(p.id),
+  );
 
   /**
    * The pitch is for somebody who has not started yet.
@@ -209,6 +263,43 @@ export default async function Home() {
           </form>
         </details>
       </div>
+
+      {emptyProjects.length > 0 && (
+        // Quiet on purpose: a fold, not a banner. These are not a problem to be
+        // alarmed about -- they are the cost of registration being frictionless
+        // enough that an agent never stops to ask -- so the count is visible
+        // and the list is one click away.
+        <details className="sticker pop p-4" style={{ animationDelay: "200ms" }}>
+          <summary className="cursor-pointer text-[14px]">
+            {emptyProjects.length === 1
+              ? t("emptyProjectsTitleOne")
+              : t("emptyProjectsTitleMany", { n: emptyProjects.length })}
+          </summary>
+          <p className="mt-1.5 text-[13px] text-faint">{t("emptyProjectsBody")}</p>
+          <ul className="mt-3 space-y-1.5">
+            {emptyProjects.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-2">
+                <Link href={`/p/${p.slug}`} className="mono link-more min-w-0 truncate">
+                  {p.slug}
+                </Link>
+                {p.root_path && (
+                  <span className="mono min-w-0 truncate text-[12px] text-faint" title={p.root_path}>
+                    {p.root_path}
+                  </span>
+                )}
+                <form action={clearEmptyProjectAction} className="ms-auto">
+                  <input type="hidden" name="project_id" value={p.id} />
+                  {/* A real label, not an icon: colour and shape never carry
+                      meaning alone here. */}
+                  <SubmitButton pendingLabel={t("working")}>
+                    {t("emptyProjectsRemove")}
+                  </SubmitButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <Panel
         delay={220}
