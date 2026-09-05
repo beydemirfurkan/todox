@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   pageByProject: vi.fn(),
   pageNotes: vi.fn(),
-  listByTasksPerKind: vi.fn(),
+  pageByTasksPerKind: vi.fn(),
   countsByTasks: vi.fn(),
   listRefs: vi.fn(),
   freshness: vi.fn(() => "fresh"),
@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../repositories/tasks", () => ({ pageByProject: mocks.pageByProject }));
 vi.mock("../repositories/contexts", () => ({ pageByProject: mocks.pageNotes }));
 vi.mock("../repositories/entries", () => ({
-  listByTasksPerKind: mocks.listByTasksPerKind,
+  pageByTasksPerKind: mocks.pageByTasksPerKind,
   countsByTasks: mocks.countsByTasks,
 }));
 vi.mock("../repositories/refs", () => ({
@@ -54,6 +54,17 @@ const USER = 7;
 
 const brief = (userId = USER, focus?: string) => briefing(userId, PROJECT as never, focus);
 
+/**
+ * What `pageByTasksPerKind` answers: the rows, and how many of them came back
+ * without a body because the byte budget was already spent. `bodiesOmitted` is
+ * derived here rather than passed, so a test cannot claim a body was dropped
+ * while handing one over.
+ */
+const logPage = (rows: Map<number, { body: string | null }[]>) => ({
+  rows,
+  bodiesOmitted: [...rows.values()].flat().filter((e) => e.body === null).length,
+});
+
 const task = (id: number, over: Record<string, unknown> = {}) => ({
   id,
   title: `task ${id}`,
@@ -64,7 +75,20 @@ const task = (id: number, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const entry = (kind: string, body: string) => ({ id: 1, kind, body });
+/**
+ * What `pageByTasksPerKind` answers. `head` is separate from `body` because the
+ * briefing may carry one without the other, and a factory that derived the head
+ * from the body could not express the case that matters -- a record carried
+ * with its head and no body at all.
+ */
+const entry = (kind: string, body: string | null, over: Record<string, unknown> = {}) => ({
+  id: 1,
+  kind,
+  created_at: "2026-08-16T00:00:00Z",
+  head: (body ?? "").split("\n")[0],
+  body,
+  ...over,
+});
 
 /** What `countsByTasks` answers: the real totals, whatever the log above shows. */
 const counts = (over: Partial<Record<string, number>> = {}) =>
@@ -76,7 +100,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
   mocks.pageNotes.mockResolvedValue({ rows: [], omitted: 0 });
-  mocks.listByTasksPerKind.mockResolvedValue(new Map());
+  mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
   mocks.countsByTasks.mockResolvedValue(counts());
   mocks.listRefs.mockResolvedValue(new Map());
   mocks.freshness.mockReturnValue("fresh");
@@ -102,8 +126,8 @@ describe("what the briefing costs", () => {
     // call every session makes first.
     mocks.pageByProject.mockResolvedValue({ rows: [task(1), task(2), task(3)], total: 3 });
     await brief();
-    expect(mocks.listByTasksPerKind).toHaveBeenCalledTimes(1);
-    expect(mocks.listByTasksPerKind.mock.calls[0]![0]).toEqual([1, 2, 3]);
+    expect(mocks.pageByTasksPerKind).toHaveBeenCalledTimes(1);
+    expect(mocks.pageByTasksPerKind.mock.calls[0]![0]).toEqual([1, 2, 3]);
     expect(mocks.countsByTasks).toHaveBeenCalledTimes(1);
     expect(mocks.listRefs).toHaveBeenCalledTimes(1);
   });
@@ -112,15 +136,32 @@ describe("what the briefing costs", () => {
     // The tasks were cut in SQL and the log under them was not, so fifty tasks
     // still answered with every entry ever written on any of them.
     await brief();
-    const [, kinds, perKind] = mocks.listByTasksPerKind.mock.calls[0]!;
-    expect(perKind).toBe(3);
-    expect(kinds).toEqual(["handoff", "decision", "dead_end", "question"]);
+    const [, kinds, perKind] = mocks.pageByTasksPerKind.mock.calls[0]!;
+    expect(perKind).toEqual({ handoff: 1, decision: 3, dead_end: 3, question: 3 });
+    // Ordered, and the order is load-bearing: it is the priority the byte
+    // budget is spent in, not just a filter. Handoff, then dead ends, then
+    // questions, then decisions.
+    expect(kinds).toEqual(["handoff", "dead_end", "question", "decision"]);
+  });
+
+  it("asks for one handoff, because one handoff is what it shows", async () => {
+    // Not a tidy-up. `openTasks` reads the newest handoff and nothing else, so
+    // the other two were fetched on the first query of every session and
+    // dropped -- 28 KB of a 143 KB payload on the widest project measured, and
+    // uncounted, because `log_omitted` deliberately does not count handoffs.
+    //
+    // Asserted as "whatever the briefing asks for, it is the number it renders"
+    // rather than as the literal 1, so raising it later fails here instead of
+    // quietly going back to paying for rows nobody reads.
+    await brief();
+    const [, , perKind] = mocks.pageByTasksPerKind.mock.calls[0]!;
+    expect((perKind as Record<string, number>).handoff).toBe(1);
   });
 
   it("never asks for notes, because nothing reads one", async () => {
     // They were carried across the network so that `.length` could count them.
     await brief();
-    expect(mocks.listByTasksPerKind.mock.calls[0]![1]).not.toContain("note");
+    expect(mocks.pageByTasksPerKind.mock.calls[0]![1]).not.toContain("note");
   });
 });
 
@@ -148,7 +189,7 @@ describe("the ceiling on open tasks", () => {
   it("fetches logs only for the tasks it is going to show", async () => {
     mocks.pageByProject.mockResolvedValue({ rows: fifty, total: 60 });
     await brief();
-    expect(mocks.listByTasksPerKind.mock.calls[0]![0]).toHaveLength(50);
+    expect(mocks.pageByTasksPerKind.mock.calls[0]![0]).toHaveLength(50);
   });
 });
 
@@ -163,7 +204,7 @@ describe("what each task carries", () => {
   ];
 
   beforeEach(() => {
-    mocks.listByTasksPerKind.mockResolvedValue(new Map([[1, log]]));
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map([[1, log]])));
     // Six in the table, five shown: one of them is a note nobody asked for.
     mocks.countsByTasks.mockResolvedValue(
       counts({ total: 6, decisions: 1, dead_ends: 1, questions: 1 }),
@@ -174,24 +215,24 @@ describe("what each task carries", () => {
     // The log grows forwards; the useful end is the new one. Reading from the
     // front hands the next session the state before the work happened.
     const out = await brief();
-    expect(out.open_tasks[0]!.last_handoff).toBe("latest handoff");
+    expect(out.open_tasks[0]!.last_handoff?.body).toBe("latest handoff");
   });
 
   it("carries every dead end", async () => {
     // The highest-value entry there is: it is what stops the repeat.
     const out = await brief();
     expect(out.open_tasks[0]!.dead_ends).toEqual([
-      { id: expect.any(Number), body: "the cron did not work" },
+      expect.objectContaining({ id: expect.any(Number), body: "the cron did not work" }),
     ]);
   });
 
   it("carries the decisions and the open questions apart", async () => {
     const out = await brief();
     expect(out.open_tasks[0]!.decisions).toEqual([
-      { id: expect.any(Number), body: "chose the CTE" },
+      expect.objectContaining({ id: expect.any(Number), body: "chose the CTE" }),
     ]);
     expect(out.open_tasks[0]!.open_questions).toEqual([
-      { id: expect.any(Number), body: "which timezone?" },
+      expect.objectContaining({ id: expect.any(Number), body: "which timezone?" }),
     ]);
   });
 
@@ -205,12 +246,25 @@ describe("what each task carries", () => {
    */
   it("names every record it hands back, so the agent can act on one", async () => {
     const out = await brief();
-    for (const list of [
-      out.open_tasks[0]!.decisions,
-      out.open_tasks[0]!.dead_ends,
-      out.open_tasks[0]!.open_questions,
-    ])
-      for (const record of list) expect(typeof record.id).toBe("number");
+    const task = out.open_tasks[0]!;
+    // `last_handoff` is in the list on purpose. It is the one field of this
+    // shape that stands alone, so it is the one where flattening it back to a
+    // bare string would look like a simplification rather than a loss.
+    const records = [
+      ...task.decisions,
+      ...task.dead_ends,
+      ...task.open_questions,
+      ...(task.last_handoff ? [task.last_handoff] : []),
+    ];
+    expect(records.length).toBeGreaterThan(0);
+    for (const record of records) {
+      expect(typeof record.id).toBe("number");
+      expect(typeof record.kind).toBe("string");
+      expect(typeof record.created_at).toBe("string");
+      // Always, even when the body came back whole: an agent skimming a task
+      // should not have to branch on whether it did.
+      expect(record.head.length).toBeGreaterThan(0);
+    }
   });
 
   it("counts the whole log, including the kinds it never asked for", async () => {
@@ -238,8 +292,33 @@ describe("what each task carries", () => {
     expect(out.open_tasks[0]!.log_omitted).toBe(0);
   });
 
+  /**
+   * MUTATION CHECK. `log_omitted` counts RECORDS THE CAP DROPPED, and a record
+   * carried without its body was not dropped -- it is in the payload, named,
+   * dated and headed, and `get_task` reads the rest.
+   *
+   * The plausible edit is `decisions.filter((d) => d.body !== null).length` in
+   * the arithmetic, which reads like a tightening. It would inflate
+   * `log_omitted` by every head-only record, and this number is the one thing
+   * telling the agent how much it has not seen -- so the mutation makes it lie
+   * in exactly the direction briefing.ts warns about: "a number that lies about
+   * how much it is hiding is worse here than a big payload, because the agent
+   * stops knowing to go and look."
+   */
+  it("counts a record carried without its body as carried, not as omitted", async () => {
+    mocks.countsByTasks.mockResolvedValue(counts({ total: 1, decisions: 1 }));
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(
+      new Map([[1, [entry("decision", null, { head: "chose the CTE" })]]]),
+    ));
+
+    const out = await brief();
+
+    expect(out.open_tasks[0]!.decisions).toHaveLength(1);
+    expect(out.open_tasks[0]!.log_omitted).toBe(0);
+  });
+
   it("says there is no handoff rather than inventing one", async () => {
-    mocks.listByTasksPerKind.mockResolvedValue(new Map());
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
     const out = await brief();
     expect(out.open_tasks[0]!.last_handoff).toBeNull();
   });
@@ -312,6 +391,36 @@ describe("context notes", () => {
       25,
       "why is login redirecting in a loop",
     );
+  });
+
+  it("spends the log budget on the session's subject when it has one", async () => {
+    // The log gets the same treatment the notes already had, and the two have
+    // to agree: a briefing that ranked its notes by relevance and its log by
+    // recency would answer half the question and say nothing about the seam.
+    await brief(7, "the login redirect loop");
+    const [, , , budget, focus] = mocks.pageByTasksPerKind.mock.calls[0]!;
+    expect(focus).toBe("the login redirect loop");
+    const [, , , unfocused] = (
+      await (async () => {
+        vi.clearAllMocks();
+        mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
+        mocks.pageNotes.mockResolvedValue({ rows: [], omitted: 0 });
+        mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
+        mocks.countsByTasks.mockResolvedValue(counts());
+        mocks.listRefs.mockResolvedValue(new Map());
+        mocks.pageObservations.mockResolvedValue({ rows: [], omitted: 0 });
+        await brief();
+        return mocks.pageByTasksPerKind.mock.calls[0]!;
+      })()
+    );
+    // Lower when aimed, for the reason the note ceiling gives: a guess needs
+    // breadth and an aimed budget does not.
+    expect(budget).toBeLessThan(unfocused);
+  });
+
+  it("says which of the two orderings the log came back in", async () => {
+    expect((await brief()).log_ranked_by).toBe("recency");
+    expect((await brief(7, "search")).log_ranked_by).toBe("focus");
   });
 
   it("says which of the two orderings the notes came back in", async () => {
@@ -398,7 +507,7 @@ describe("the closing hint", () => {
   it("names how many open tasks have no handoff, and which", async () => {
     mocks.pageByProject.mockResolvedValue({ rows: [task(1), task(2), task(3)], total: 3 });
     // No handoff entries at all, so all three are naked.
-    mocks.listByTasksPerKind.mockResolvedValue(new Map());
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
 
     const out = await brief();
 
@@ -410,14 +519,41 @@ describe("the closing hint", () => {
   it("goes quiet about handoffs when every open task already has one", async () => {
     mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
     // A flat list per task, which is what the repository answers.
-    mocks.listByTasksPerKind.mockResolvedValue(
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(
       new Map([[1, [entry("handoff", "where I left it")]]]),
-    );
+    ));
 
     const out = await brief();
 
     expect(out.hint).not.toContain("handoff");
     expect(out.hint).toContain("dead ends");
+  });
+
+  /**
+   * MUTATION CHECK. The only job of this test is to fail against one plausible
+   * edit, and the edit is plausible enough that it has a shape already used
+   * twice in this file: reading `.body` off a record where existence was the
+   * question.
+   *
+   * A handoff whose body the byte budget did not pay for is still a handoff --
+   * it is one `get_task` away, and its head is right there in the payload. If
+   * `closingHint` narrows to `t.last_handoff?.body == null`, or if
+   * `last_handoff` is flattened back to `handoff?.body ?? null`, this briefing
+   * ends by asking an agent to write a handoff that already exists. Both
+   * compile. Both are silent in production. Both put back the always-true
+   * sentence the hint was rebuilt to stop being, in a third disguise.
+   */
+  it("counts a handoff it could not afford to show as a handoff", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(
+      new Map([[1, [entry("handoff", null, { head: "where I left it" })]]]),
+    ));
+
+    const out = await brief();
+
+    expect(out.open_tasks[0]!.last_handoff).not.toBeNull();
+    expect(out.hint).not.toContain("handoff");
+    expect(out.hint).not.toContain("#1");
   });
 
   /**
@@ -428,7 +564,7 @@ describe("the closing hint", () => {
   it("caps the ids it lists", async () => {
     const many = Array.from({ length: 9 }, (_, i) => task(i + 1));
     mocks.pageByProject.mockResolvedValue({ rows: many, total: 9 });
-    mocks.listByTasksPerKind.mockResolvedValue(new Map());
+    mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
 
     const out = await brief();
 
@@ -452,8 +588,7 @@ describe("the closing hint", () => {
 describe("unverified observations", () => {
   const observation = (id: number, over: Record<string, unknown> = {}) => ({
     id,
-    source: "stdio",
-    client: "claude-code",
+        client: "claude-code",
     branch: "feat/x",
     base_sha: "aaa",
     head_sha: "bbb",

@@ -16,8 +16,10 @@ session left behind.
 
 A fresh agent calls `get_context`, reads that, and starts where the last one
 stopped — without walking into a wall somebody already hit. The briefing is
-capped rather than unbounded, and it reports what the caps left out instead of
-trimming in silence.
+capped rather than unbounded, in rows *and* in bytes, and it reports what the
+caps left out instead of trimming in silence. Nothing is ever cut mid-sentence:
+every record comes back named and dated with its first line, and a `body` of
+null means the budget was spent, not that the record is empty.
 
 ## What goes in a log
 
@@ -274,7 +276,7 @@ you are changing the tools themselves.
 
 | tool | what it does |
 | --- | --- |
-| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped so it cannot grow without bound, and it says what it left out. Pass `focus` — a sentence about what the session is for — and the budget is spent on the notes that answer it rather than the newest ones — which is what lets it be a smaller budget. |
+| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped in rows and in bytes, never truncated: every record keeps its id, kind, date and first line, and a `body` of null means the budget was spent — `get_task` reads it. Pass `focus` — a sentence about what the session is for — and both budgets are spent on the records that answer it rather than the newest ones, which is what lets them be smaller. |
 | `create_task` | Capture work. Pass `cwd` and it finds the project. Registering a **new** one also needs `repo_root` or `repo_url`: todox stores repositories, not directories, and a bare `cwd` is wherever the agent happened to be standing. |
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. `answers_entry_id` closes a `question` — the only thing that does. |
@@ -284,7 +286,7 @@ you are changing the tools themselves.
 | `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
 | `accept_file_change` · `unlink_file` | Clear a stale warning once you have read the change, or drop a link that has stopped meaning anything. Nothing else can clear it — the server never sees the file. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
-| `get_context_note` | One note in full, for the ones whose body the briefing capped and for reading past a search snippet. |
+| `get_context_note` | One **note** in full, for the ones whose body the briefing capped and for reading past a search snippet. An entry the budget did not reach is read with `get_task`. |
 | `get_file_context` | What is known about one file: the tasks that touched it with their dead ends, and the notes attached to it. Absolute or repo-relative; both find a link made on another machine. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
 | `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier.  Words that only one of the two languages treats as noise are dropped, so a question does not match every record containing the word "a". `kinds` narrows to dead ends or decisions; `project` stops it looking elsewhere.|
@@ -396,6 +398,12 @@ Details, and an honest list of what is **not** covered, in
 - Observations only see what git can tell them, so they answer "what changed"
   and never "why". The half that carries reasoning is a transcript, and the
   only hook API that exposes one belongs to a single client.
+- The briefing's byte budget covers log bodies and note bodies. Two axes are
+  still bounded only by a row count: the *heads* of carried entries (fifty
+  tasks' worth), and task bodies. Both are far smaller than what the budget
+  fixed — one project went from 143 KB to about 55 KB — but neither is bounded
+  in bytes, and `pnpm bench:memory` prints both so the next reader does not
+  have to discover it.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

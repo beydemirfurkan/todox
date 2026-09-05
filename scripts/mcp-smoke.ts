@@ -638,6 +638,61 @@ async function runSuite(mode: Mode, token: string) {
     throw new Error("the note the focus described is not in the briefing at all");
   console.log("ranked_by:", ranked.context_ranked_by, "· same notes, reordered");
 
+  // The log gets the same treatment, and needs the same proof. A budget that
+  // dropped RECORDS rather than bodies would look identical from outside until
+  // the day an agent went looking for a dead end that used to be there.
+  if (ranked.log_ranked_by !== "focus")
+    throw new Error(`focus was ignored by the log: log_ranked_by=${ranked.log_ranked_by}`);
+  if (corrected.log_ranked_by !== "recency")
+    throw new Error("a briefing with no focus claimed its log was ranked by one");
+  const logIds = (b: {
+    open_tasks: {
+      decisions: { id: number }[];
+      dead_ends: { id: number }[];
+      open_questions: { id: number }[];
+    }[];
+  }) =>
+    b.open_tasks
+      .flatMap((t) => [...t.decisions, ...t.dead_ends, ...t.open_questions].map((e) => e.id))
+      .sort((a, b2) => a - b2)
+      .join("|");
+  if (logIds(ranked) !== logIds(corrected))
+    throw new Error("ranking by focus changed which entries came back, not just their order");
+
+  // Every record is identifiable whether or not its body was paid for. This is
+  // what makes a spent budget a budget rather than a loss.
+  for (const task of ranked.open_tasks)
+    for (const e of [
+      ...task.decisions,
+      ...task.dead_ends,
+      ...task.open_questions,
+      ...(task.last_handoff ? [task.last_handoff] : []),
+    ] as { id: number; kind: string; created_at: string; head: string; body: string | null }[]) {
+      if (!e.id || !e.kind || !e.created_at || !e.head)
+        throw new Error(`a briefing entry arrived without its name: ${JSON.stringify(e)}`);
+      if (e.body !== null && !e.body.startsWith(e.head.replace(/…$/, "")))
+        throw new Error(`head is not the opening of its own body: ${e.head}`);
+    }
+  console.log(
+    "log ranked_by:",
+    ranked.log_ranked_by,
+    `· same entries, reordered · bodies not paid for: ${ranked.log_bodies_omitted}`,
+  );
+
+  // The escape hatch, and the reason a null body is honest rather than a loss.
+  // Without this the budget would be indistinguishable from throwing the log
+  // away, which is the failure `get_context_note` exists to prevent for notes.
+  const withBody = ranked.open_tasks.flatMap(
+    (t: { id: number; decisions: { id: number; body: string | null }[] }) =>
+      t.decisions.filter((d) => d.body !== null).map((d) => ({ task: t.id, id: d.id })),
+  )[0];
+  if (withBody) {
+    const full = JSON.parse(await text("get_task", { task_id: withBody.task }));
+    if (!full.entries?.some((e: { id: number; body: string }) => e.id === withBody.id && e.body))
+      throw new Error("get_task does not return the body the briefing pointed at");
+    console.log("get_task returns the whole body the briefing named");
+  }
+
   // `search` was in none of the four smoke suites, which is how it kept a
   // description promising full-text over three ILIKE scans. Now that it parses
   // the query, the assertion worth making is the one that used to fail: a
