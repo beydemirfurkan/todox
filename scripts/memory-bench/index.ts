@@ -12,12 +12,23 @@
  * sentence is a belief. Deliberately no threshold: a number with a threshold
  * becomes the target, which is the same reason `pnpm test:coverage` has none.
  *
- * It seeds its own corpus into a throwaway account and removes it afterwards,
- * so it can run against any database, including CI's. It does not read anybody's
- * real log: a benchmark that needs production data is one nobody else can run,
- * and one whose corpus moves underneath it cannot compare two runs.
+ * It seeds its own corpus into a throwaway account, so it runs against any
+ * LOCAL database, including CI's. It does not read anybody's real log: a
+ * benchmark that needs production data is one nobody else can run, and one
+ * whose corpus moves underneath it cannot compare two runs.
+ *
+ * `localDatabaseOnly` for the same reason the five smoke suites have it, and
+ * one this file used to get wrong: the `finally` below removes the project, and
+ * nothing removes the ACCOUNT. `memory-bench` survives every run, so a bench
+ * pointed at production leaves a row the funnel counts as somebody who
+ * registered and never came back -- which is the exact ten-point misreading
+ * `scripts/local-only.ts` was written after.
  */
 import "../env";
+
+import { localDatabaseOnly } from "../local-only";
+
+localDatabaseOnly("bench:memory");
 
 import * as contextsRepo from "../../lib/repositories/contexts";
 import * as entriesRepo from "../../lib/repositories/entries";
