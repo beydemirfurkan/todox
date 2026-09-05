@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { CONTEXT_KINDS, type Status } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
+import { firstLine } from "@/lib/util/headline";
 import { getT } from "@/lib/lang";
 import { publicUrl } from "@/lib/public-url";
 import { requireUser } from "@/lib/session";
@@ -82,6 +83,16 @@ const currentUser = cache(requireUser);
  * stays the true one; the point of the banner is that something has drifted, and
  * which files is a question the tasks themselves answer.
  */
+/**
+ * Context notes shown in the rail before it folds.
+ *
+ * Six, because the rail is a reminder of what constrains this project and not
+ * a reading list -- past a handful somebody is scrolling a column rather than
+ * being reminded of anything. The panel header carries the true count, so
+ * nothing here hides how much there is.
+ */
+const NOTES_SHOWN = 6;
+
 const STALE_SHOWN = 8;
 
 /**
@@ -142,7 +153,7 @@ export default async function ProjectPage({
   // Both depend on the list above, so they wait for it -- but they wait
   // together. `staleRefs` used to fetch the project's open tasks for itself,
   // which queried the same table this render had already read in full.
-  const [counts, stale, observed, sameName] = await Promise.all([
+  const [counts, stale, observed, lastHandoff, sameName] = await Promise.all([
     // Counted in the database. This used to load every entry of every task to
     // render three badges a row.
     entriesRepo.countsByTasks(all.map((x) => x.id)),
@@ -151,6 +162,10 @@ export default async function ProjectPage({
     // is walking into; a person reading their own project mostly wants to know
     // that something happened and roughly when.
     observationsRepo.pageByProject(project.id, OBSERVATIONS_SHOWN),
+    // The one question a person opens a project to ask. The briefing has
+    // carried `last_handoff` per task since it was written, so the agent has
+    // always been told; the human got a summary and a list of titles.
+    entriesRepo.latestHandoff(open.map((x) => x.id)),
     // A namesake in this account. `merge_projects` has existed since the
     // cross-machine identity work and nothing has ever pointed at a duplicate
     // that already exists -- the agent surface says it once, at registration.
@@ -332,9 +347,44 @@ export default async function ProjectPage({
         {/* `.prose` is the measure on the paragraph below. It used to carry
             `min-w-3xl` beside it, which is a 768px *minimum* — wider than the
             max-width `.prose` sets, and wider than a phone. */}
-        {project.summary && (
-          <p className="prose text-[14.5px] leading-relaxed break-words whitespace-pre-wrap text-muted">
-            {project.summary}
+        {/* Clamped, like every other long thing on this page.
+            `ExpandableText` has clamped the context rails for a while and the
+            summary -- the single longest string here, and the first one read --
+            was the one that was not. Measured on production: a median summary
+            is 198 characters and the two longest are over 1,100, so this is
+            the difference between a description and a wall. */}
+        {project.summary ? (
+          <ExpandableText
+            text={project.summary}
+            more={t("showMore")}
+            less={t("showLess")}
+            className="prose text-[14.5px] leading-relaxed text-muted"
+          />
+        ) : (
+          owner && (
+            // Said, rather than left blank. Forty-three of sixty-four projects
+            // in production have no summary, so for two thirds of pages the
+            // line that answers "what is this" is simply absent -- and nothing
+            // anywhere invites one.
+            <p className="prose text-[13.5px] leading-relaxed text-faint">
+              {t("noSummary")}
+            </p>
+          )
+        )}
+
+        {/* Where it left off, which is what somebody came here to find out.
+            Absent rather than empty when there is no handoff: a line saying
+            "nobody has left one" on every project that has never had one is
+            the always-true sentence this codebase keeps having to remove. */}
+        {lastHandoff && (
+          <p className="prose text-[13.5px] leading-relaxed text-muted">
+            <span className="text-faint">{t("lastLeftOff")} </span>
+            <Link href={`/p/${slug}/t/${lastHandoff.task_id}`} className="link-more">
+              #{lastHandoff.task_id} {lastHandoff.task_title}
+            </Link>{" "}
+            <span className="text-faint">· {ago(lastHandoff.created_at, t)}</span>
+            <br />
+            <span className="break-words">{firstLine(lastHandoff.body)}</span>
           </p>
         )}
 
@@ -784,7 +834,14 @@ export default async function ProjectPage({
           >
             <div className="space-y-3">
               {projectContext.length === 0 && <Empty>{t("projectContextEmpty")}</Empty>}
-              {projectContext.map((c) => (
+              {/* Capped, the way the stale banner beside it is.
+                  Each of these is a clamped paragraph, so the rail was bounded
+                  per note and not at all in total: the todox project itself
+                  carries 22 notes and 28,512 characters, and the column simply
+                  ran off the bottom of the page. The count in the panel header
+                  is the honest total either way, and the rest are a click
+                  away. */}
+              {projectContext.slice(0, NOTES_SHOWN).map((c) => (
                 <div key={c.id} className="sticker-flat group p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Chip color="var(--k-decision)" tilt={-2}>
@@ -815,6 +872,13 @@ export default async function ProjectPage({
                   />
                 </div>
               ))}
+              {projectContext.length > NOTES_SHOWN && (
+                // Says how many, rather than trailing off. The same sentence
+                // the stale banner uses when its own list is cut.
+                <p className="text-[13px] text-faint">
+                  {t("notesAndMore", { n: projectContext.length - NOTES_SHOWN })}
+                </p>
+              )}
               <details>
                 <summary className="link-more">{t("add")}</summary>
                 <form action={addContextAction} className="mt-3 space-y-2">
