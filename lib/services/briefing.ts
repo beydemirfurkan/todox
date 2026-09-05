@@ -39,9 +39,93 @@ const BRIEFING_TASKS = 50;
  * Three is small because these are summaries of a summary. What falls off is
  * the oldest of that kind, and `log_omitted` says how much -- an agent that
  * needs the rest calls `get_task`.
+ *
+ * One handoff, not three, and this was a real cost rather than a tidy-up. The
+ * map below is what the briefing SHOWS: three decisions, three dead ends, three
+ * open questions, and the single newest handoff -- `openTasks` has only ever
+ * read `.find(...)` for that one. The other two were fetched across the network
+ * on the first query of every session and dropped without being counted, which
+ * on the widest project measured (gametable-with-king, 2026-09-04) was 28 KB of
+ * a 143 KB payload. The comment under `omitted` already said "there is one
+ * shown and one wanted"; now that is true of what is asked for, too.
  */
-const BRIEFING_KINDS = ["handoff", "decision", "dead_end", "question"] as const;
-const PER_KIND = 3;
+/**
+ * ORDERED, and the order is the spend priority, not decoration.
+ *
+ * `pageByTasksPerKind` pays for bodies in this order once the round robin
+ * below has taken every task's newest of each kind. Handoff first because it
+ * is the state the session is resuming from; dead ends next because they are
+ * the entries whose whole value is paid by the session that does not read
+ * them; questions before decisions because a question nobody answers is
+ * cheaper to carry than one nobody sees.
+ */
+const BRIEFING_KINDS = ["handoff", "dead_end", "question", "decision"] as const;
+const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
+
+/**
+ * Bytes of log body carried per briefing.
+ *
+ * The counterpart of `BRIEFING_NOTES`, and it exists for the same reason that
+ * one does, arrived at four months later. Every ceiling above this line is a
+ * COUNT ceiling -- fifty tasks, three entries of a kind, six observations --
+ * and a count says nothing about bytes when the median entry is 1,737
+ * characters and the longest measured is 6,521. Notes were capped by BODY and
+ * the log was not, so on 2026-09-04 one production project answered
+ * `get_context` with 143 KB: 112 KB of log, and two bytes of notes.
+ *
+ * Whole or not at all, and never a truncation -- the argument `BRIEFING_NOTES`
+ * makes about cutting a decision off mid-sentence applies harder here, because
+ * an entry IS the reasoning. What a spent budget leaves behind is the head and
+ * the id, and `get_task` returns the rest.
+ *
+ * CHOSEN FROM THE CURVE, and the curve came out flat. `pnpm bench:memory` at
+ * 48 open tasks, recall of the eight questions an entry answers:
+ *
+ *   budget    recency   focused   log bytes
+ *   64 KB       0/8       4/8      137.6 KB
+ *   32 KB       0/8       4/8      105.9 KB
+ *   24 KB       0/8       4/8       96.5 KB
+ *   16 KB       0/8       4/8       89.1 KB
+ *    8 KB       0/8       4/8       81.6 KB
+ *    4 KB       0/8       4/8       77.9 KB
+ *
+ * The four it misses are the SAME four at every budget, which is the finding:
+ * the budget is not what costs them, the RANKING is -- three of the four are
+ * also in the list `search` cannot reach from a natural question. So no budget
+ * on this ladder buys recall, and the number is chosen on cost and margin
+ * instead.
+ *
+ * Read literally the rule would say 8 KB. Twenty-four, for the reason
+ * `BRIEFING_NOTES_FOCUSED` gives about shipping twenty-five where the curve
+ * allowed eight: the benchmark asks whether ONE entry came back, and a
+ * briefing is not one answer -- it is the state of the work, and most of it is
+ * relevant to a session that never names it. The corpus this was measured on
+ * is also 83% filler at 48 tasks, which is a worse case than any real project
+ * here: the widest measured in production has eight open tasks and 41 records.
+ *
+ * Effect on that project: 112 KB of log bodies becomes 24 KB, and the briefing
+ * goes from 143 KB to roughly 55 KB.
+ *
+ * WHAT THIS DOES NOT BOUND, said out loud because the bench makes it visible:
+ * at 48 open tasks 77.9 KB of the log section is heads and metadata, and no
+ * budget here touches that. It is bounded only by BRIEFING_TASKS times
+ * PER_KIND times HEAD_CHARS. Task bodies are the other unbounded axis. Both
+ * are real, both are smaller than what this fixes, and neither is fixed here.
+ */
+const BRIEFING_LOG_BYTES = 24_576;
+
+/**
+ * The same budget, once somebody has said what the session is about.
+ *
+ * Lower, and for the reason `BRIEFING_NOTES_FOCUSED` gives: sixty was chosen
+ * when the only ordering was recency, and a guess needs breadth to be worth
+ * anything. Take the guess away and most of that breadth is bodies nobody was
+ * going to read.
+ *
+ * Two ceilings rather than one because the lower one is not safe without a
+ * focus, which is the same shape the notes settled on and for the same reason.
+ */
+const BRIEFING_LOG_BYTES_FOCUSED = 16_384;
 
 /**
  * Context note bodies carried per scope -- account-wide and project each.
@@ -114,6 +198,7 @@ const BRIEFING_OBSERVATIONS = 6;
 
 export async function briefing(userId: number, project: Project, focus?: string) {
   const notes = focus ? BRIEFING_NOTES_FOCUSED : BRIEFING_NOTES;
+  const logBytes = focus ? BRIEFING_LOG_BYTES_FOCUSED : BRIEFING_LOG_BYTES;
 
   // Cut in SQL rather than after the fact. This read every open task and then
   // took fifty, on the first query of every session.
@@ -123,7 +208,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const [globalContext, projectContext, logs, counts, files, observed] = await Promise.all([
     contexts.pageByProject(userId, null, notes, focus),
     contexts.pageByProject(userId, project.id, notes, focus),
-    entries.listByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND),
+    entries.pageByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND, logBytes, focus),
     // The honest total, and what the caps dropped. Counting in the database is
     // what lets the log above be cut without `entry_count` starting to lie --
     // and a number that lies about how much it is hiding is worse here than a
@@ -136,7 +221,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   ]);
 
   const openTasks = open.map((t) => {
-    const log = logs.get(t.id) ?? [];
+    const log = logs.rows.get(t.id) ?? [];
     // `hash` and `id` go out so the agent can check the file itself and report
     // back — this process has no copy of the repository, so the status here is
     // only ever as fresh as the last thing an agent told us.
@@ -151,16 +236,17 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // A cold agent needs the shape of the work, not every keystroke: the last
     // handoff, the recent decisions, and the dead ends (the expensive ones).
     const handoff = [...log].reverse().find((e) => e.kind === "handoff");
-    // With the id, because an agent that reads a record and then wants to do
-    // something about it -- answer the question, correct the entry -- could not
-    // name it. Notes kept their id and entries did not, so acting on one meant a
-    // second `get_task` that returns the whole log to find a number the briefing
-    // already had in hand.
-    const bodies = (kind: string) =>
-      log.filter((e) => e.kind === kind).map((e) => ({ id: e.id, body: e.body }));
-    const decisions = bodies("decision");
-    const dead_ends = bodies("dead_end");
-    const open_questions = bodies("question");
+    // Whole records rather than `{ id, body }` pairs, and the id was already
+    // here for the reason the rest now joins it: an agent that reads a record
+    // and then wants to do something about it -- answer the question, correct
+    // the entry -- could not name it, so acting on one meant a second
+    // `get_task` that returns the whole log to find a number the briefing
+    // already had in hand. `head` and `created_at` are the same argument: a
+    // record you cannot date is one you cannot weigh against a newer one.
+    const of = (kind: string) => log.filter((e) => e.kind === kind);
+    const decisions = of("decision");
+    const dead_ends = of("dead_end");
+    const open_questions = of("question");
 
     const count = counts.get(t.id);
     // Only the three lists below are capped, so only they can hide anything.
@@ -179,7 +265,12 @@ export async function briefing(userId: number, project: Project, focus?: string)
       priority: t.priority,
       body: t.body,
       updated_at: t.updated_at,
-      last_handoff: handoff?.body ?? null,
+      // The record, not its body. `null` here has always meant "this task has
+      // no handoff", and `closingHint` below reads exactly that to decide
+      // whether to ask for one -- so a handoff whose body a budget did not pay
+      // for must still arrive as an object. Flattening this back to a string
+      // would make the briefing end by asking for a handoff that exists.
+      last_handoff: handoff ?? null,
       decisions,
       dead_ends,
       open_questions,
@@ -228,6 +319,25 @@ export async function briefing(userId: number, project: Project, focus?: string)
     observations: observed.rows,
     observations_omitted: observed.omitted,
     stale_refs: stale,
+    /**
+     * Records carried with a head and no body, because the byte budget was
+     * already spent. Beside `context_omitted` rather than on a task, because
+     * one budget is spent across the whole briefing.
+     *
+     * Distinct from `log_omitted`, which counts records the per-kind CAP
+     * dropped and which are not in the payload at all. A record counted here
+     * IS in the payload -- named, dated and headed -- and `get_task` reads it.
+     * Folding the two together would tell an agent that something is missing
+     * when in fact it is holding it.
+     */
+    log_bodies_omitted: logs.bodiesOmitted,
+    /**
+     * Which of the two orderings spent the log budget, said out loud for the
+     * same reason `context_ranked_by` is: an agent reading a briefing with
+     * bodies missing should be able to tell whether the ones it got were the
+     * relevant ones or merely the newest.
+     */
+    log_ranked_by: focus ? "focus" : "recency",
     hint: closingHint(openTasks),
   };
 }
@@ -248,8 +358,16 @@ export async function briefing(userId: number, project: Project, focus?: string)
  * carries a handoff should not end by asking for one; that is the same
  * always-true sentence in a different disguise, and it is what teaches an
  * agent to stop reading the last line.
+ *
+ * WHAT THIS TESTS IS EXISTENCE, NOT LEGIBILITY, and the type below is written
+ * to make that hard to get wrong. `last_handoff` carries a body the briefing's
+ * byte budget may not have paid for, and a handoff nobody can read here is
+ * still a handoff -- it is one `get_task` away. Narrowing this to
+ * `t.last_handoff?.body == null` compiles, is silent, and puts the
+ * always-true sentence back for every task whose handoff fell outside the
+ * budget, which on a long log is most of them.
  */
-function closingHint(openTasks: { id: number; last_handoff: string | null }[]): string {
+function closingHint(openTasks: { id: number; last_handoff: object | null }[]): string {
   const naked = openTasks.filter((t) => t.last_handoff === null);
   const always =
     "Record dead ends as you hit them, so the next session does not repeat them.";
