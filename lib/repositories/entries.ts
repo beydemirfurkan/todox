@@ -142,6 +142,29 @@ export async function listByTasksPerKind(
 }
 
 /**
+ * The single newest handoff across a set of tasks, with the task it belongs to.
+ *
+ * For the project page, which had no answer at all to the question a person
+ * opens a project to ask: where did this leave off. The briefing has carried
+ * `last_handoff` per task since it was written, so the AGENT has always been
+ * told; the human looking at the same project got a wall of summary and a list
+ * of titles. One row, not one per task -- the page shows one line.
+ */
+export const latestHandoff = async (taskIds: number[]) =>
+  taskIds.length
+    ? one<Entry & { task_title: string }>(
+        `SELECT e.*, t.title AS task_title
+           FROM entries e
+           JOIN tasks t ON t.id = e.task_id
+          WHERE e.task_id IN (${taskIds.map(() => "?").join(",")})
+            AND e.kind = 'handoff'
+          ORDER BY e.id DESC
+          LIMIT 1`,
+        taskIds,
+      )
+    : undefined;
+
+/**
  * An entry as the briefing carries it.
  *
  * `body` is null when the byte budget was already spent -- not when the entry
