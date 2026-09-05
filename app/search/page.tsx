@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { CONTEXT_KINDS, ENTRY_KINDS } from "@/lib/constants";
 import { ago, type Key } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
+import * as projectsRepo from "@/lib/repositories/projects";
 import { search } from "@/lib/services/search";
-import { Chip, Counter, Empty, Panel } from "../components";
+import { Chip, Counter, Empty, Field, Panel } from "../components";
+import { Picker } from "../features/picker";
+import { SubmitButton } from "../features/submit";
+import { contextKindLabel, kindLabel } from "../kinds";
 import { privatePageMetadata } from "../metadata-shared";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,6 +21,23 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * What the `kind` filter offers, in the order the tool description names them.
+ *
+ * Entry kinds and note kinds in one list, because that is what `search` takes
+ * and what a person is actually choosing between -- "has this been tried?" is
+ * a dead end whether somebody wrote it on a task or as a standing rule.
+ * Tasks have no kind, so picking any of these excludes them, which the service
+ * documents and the empty state explains well enough on its own.
+ */
+const KINDS: string[] = [...new Set([...ENTRY_KINDS, ...CONTEXT_KINDS])];
+
+/** The label for a kind that may come from either list. */
+const kindOrContextLabel = (t: (k: Key) => string, kind: string) =>
+  (ENTRY_KINDS as readonly string[]).includes(kind)
+    ? kindLabel(t, kind as never)
+    : contextKindLabel(t, kind as never);
+
 const TYPE_COLOR: Record<string, string> = {
   task: "var(--accent)",
   entry: "var(--k-handoff)",
@@ -25,9 +47,31 @@ const TYPE_COLOR: Record<string, string> = {
 export default async function SearchPage({ searchParams }: PageProps<"/search">) {
   const user = await requireUser();
   const { t } = await getT();
-  const { q: raw } = await searchParams;
-  const query = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
-  const hits = query ? await search(user.id, query) : [];
+  const { q: raw, kind: rawKind, project: rawProject } = await searchParams;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)?.trim() ?? "";
+  const query = one(raw);
+
+  /**
+   * The two filters the agent surface has always had and the browser did not.
+   *
+   * `search`'s own description teaches an agent to reach for these by name --
+   * kinds:['dead_end'] for "has this been tried?", project to stop it looking
+   * elsewhere -- and a person searching the same log had neither. The service
+   * already takes both; nothing here passed them.
+   */
+  const kind = KINDS.includes(one(rawKind)) ? one(rawKind) : "";
+  const slug = one(rawProject);
+  const projects = await projectsRepo.list(user.id);
+  const scoped = slug ? projects.find((p) => p.slug === slug) : undefined;
+
+  const hits = query
+    ? await search(user.id, query, 30, {
+        kinds: kind ? [kind] : null,
+        // A slug nobody has is not a silent "everything": it is a filter that
+        // found nothing, which is what the empty state is for.
+        projectId: slug ? (scoped?.id ?? -1) : null,
+      })
+    : [];
 
   return (
     <div className="space-y-6">
@@ -37,6 +81,37 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
         </h1>
         <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{t("searchIntro")}</p>
       </div>
+
+      {/* A GET form, so a filtered search is a URL somebody can keep. The
+          query rides along in a hidden field rather than being retyped. */}
+      <form action="/search" className="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="q" value={query} />
+        <Field label={t("searchKind")} className="w-44">
+          <Picker
+            name="kind"
+            value={kind}
+            label={t("searchKind")}
+            options={[
+              { value: "", label: t("searchAnyKind") },
+              ...KINDS.map((k) => ({ value: k, label: kindOrContextLabel(t, k) })),
+            ]}
+          />
+        </Field>
+        <Field label={t("searchProject")} className="w-56">
+          <Picker
+            name="project"
+            value={slug}
+            label={t("searchProject")}
+            options={[
+              { value: "", label: t("searchAllProjects") },
+              ...projects.map((p) => ({ value: p.slug, label: p.name })),
+            ]}
+          />
+        </Field>
+        <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+          {t("apply")}
+        </SubmitButton>
+      </form>
 
       <Panel delay={60} right={<Counter n={hits.length} label={t("resultsCount")} />}>
         <div className="space-y-2.5" aria-live="polite">

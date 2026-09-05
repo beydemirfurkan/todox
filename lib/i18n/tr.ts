@@ -415,6 +415,10 @@ export const tr: Record<Key, string> = {
   searchTitle: "Arama",
   searchIntro:
     "Tüm projeler birden — görevler, kayıt girdileri, bağlam notları. Cümleyle sor, en yakın cevap başa gelsin; tam geçmesini istediğin ifadeyi tırnak içine al.",
+  searchKind: "tür",
+  searchAnyKind: "her tür",
+  searchProject: "proje",
+  searchAllProjects: "tüm projeler",
   searchNoResults: "Eşleşen bir şey yok. Daha az kelime dene, ya da aradığın şeyde geçtiğini bildiğin bir terim.",
   searchPrompt: "Yukarıdaki kutuya bir şey yaz.",
   resultsCount: "sonuç",
