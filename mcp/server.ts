@@ -25,6 +25,7 @@ import { instructions, registerTools, SERVER_INFO, type Workspace } from "./tool
 import {
   checkRefs,
   findProjectRoot,
+  projectRootOf,
   gitBranch,
   gitCommitsSince,
   gitDirtyCount,
@@ -64,7 +65,12 @@ const localWorkspace: Workspace = {
   tz: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   // `isAbsolutePath` rather than a leading slash: this process runs where the
   // developer is, and on Windows every path they hand us starts `C:\`.
-  repoRoot: (path) => (isAbsolutePath(path) ? findProjectRoot(path) : undefined),
+  // `projectRootOf`, not `findProjectRoot`: this answer decides whether a
+  // directory may become a project, and the fallback would say yes to every
+  // directory on the disk -- including the per-prompt scratch folders some
+  // clients open, which is how twelve of one account's twenty-one projects
+  // came to be dated prompt titles.
+  repoRoot: (path) => (isAbsolutePath(path) ? projectRootOf(path) : undefined),
   // From the root rather than the path itself: an agent hands over the file it
   // is editing as often as the directory, and `.git` only sits at the top.
   repoUrl: (path) => (isAbsolutePath(path) ? gitRemote(findProjectRoot(path)) : undefined),

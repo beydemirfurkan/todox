@@ -79,6 +79,27 @@ export const listPendingForEmail = (email: string, at: string) =>
     [email, at],
   );
 
+/**
+ * Which of these projects have somebody waiting on an invitation.
+ *
+ * For the home page's empty-projects fold, whose definition of empty has to
+ * match `removeIfEmpty`'s or it offers a button that does nothing. A project
+ * with an unanswered invitation holds a person, whatever else it holds.
+ */
+export async function projectIdsWithPending(
+  projectIds: number[],
+  at: string,
+): Promise<Set<number>> {
+  if (!projectIds.length) return new Set();
+  const rows = await all<{ project_id: number }>(
+    `SELECT DISTINCT project_id FROM project_invitations
+      WHERE project_id IN (${projectIds.map(() => "?").join(",")})
+        AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?`,
+    [...projectIds, at],
+  );
+  return new Set(rows.map((r) => r.project_id));
+}
+
 export const listByProject = (projectId: number) =>
   all<InvitationView>(
     `SELECT i.*, p.name AS project_name, p.slug AS project_slug, p.user_id AS owner_id,
