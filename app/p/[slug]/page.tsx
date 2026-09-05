@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { CONTEXT_KINDS, type Status } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
+import { firstLine } from "@/lib/util/headline";
 import { getT } from "@/lib/lang";
 import { publicUrl } from "@/lib/public-url";
 import { requireUser } from "@/lib/session";
@@ -82,16 +83,6 @@ const currentUser = cache(requireUser);
  * stays the true one; the point of the banner is that something has drifted, and
  * which files is a question the tasks themselves answer.
  */
-/**
- * The opening line of a handoff, which by this log's own convention is a
- * headline. The rest is one click away on the task; this line exists to make
- * the click worth making.
- */
-function firstLine(body: string): string {
-  const line = body.split("\n").find((l) => l.trim().length) ?? "";
-  return line.length > 140 ? `${line.slice(0, 140).trimEnd()}…` : line;
-}
-
 /**
  * Context notes shown in the rail before it folds.
  *
