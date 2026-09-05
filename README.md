@@ -277,7 +277,7 @@ you are changing the tools themselves.
 | tool | what it does |
 | --- | --- |
 | `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped in rows and in bytes, never truncated: every record keeps its id, kind, date and first line, and a `body` of null means the budget was spent — `get_task` reads it. Pass `focus` — a sentence about what the session is for — and both budgets are spent on the records that answer it rather than the newest ones, which is what lets them be smaller. |
-| `create_task` | Capture work. Pass `cwd` and it finds the project, **registering one for that repo if it has never seen it** — so the agent never stops to ask. |
+| `create_task` | Capture work. Pass `cwd` and it finds the project. Registering a **new** one also needs `repo_root` or `repo_url`: todox stores repositories, not directories, and a bare `cwd` is wherever the agent happened to be standing. |
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. `answers_entry_id` closes a `question` — the only thing that does. |
 | `delete_entry` | For an entry that was wrong when it was written. One overtaken by later work is history, not an error — append instead. |

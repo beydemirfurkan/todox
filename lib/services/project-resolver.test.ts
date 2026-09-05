@@ -62,6 +62,18 @@ beforeEach(() => {
   paths.listFor.mockResolvedValue([]);
 });
 
+/**
+ * The evidence a real caller carries: the stdio process fills `repo_root` from
+ * a root marker, and `REMOTE_NOTE` asks a hosted client for it. Registration
+ * refuses without one, so a test that means to register has to say so -- which
+ * is the point, and why this is spelled out rather than defaulted.
+ *
+ * The same path the call is about, because that is what a caller standing in
+ * the repository root actually sends, and because `repo_root` is what the
+ * project is named and rooted from.
+ */
+const at = (path: string) => ({ repoRoot: path });
+
 describe("resolve by path", () => {
   it("skips a row with a null root_path instead of throwing", async () => {
     // Exactly the shape that took production down: a shared project whose
@@ -150,7 +162,7 @@ describe("the same repo, seen from a second machine", () => {
     repo.listByName.mockResolvedValue([project(7, "C:/Users/me/todox")]);
     repo.withRootPath.mockResolvedValue([project(7, "C:/Users/me/todox")]);
 
-    const result = await resolveOrCreate(1, "/Users/me/todox");
+    const result = await resolveOrCreate(1, "/Users/me/todox", at("/Users/me/todox"));
 
     expect(result).toMatchObject({ project: { id: 7 }, created: false });
     expect(repo.create).not.toHaveBeenCalled();
@@ -179,7 +191,7 @@ describe("the same repo, seen from a second machine", () => {
     repo.listByName.mockResolvedValue([project(7, "/Users/me/work/api")]);
     repo.withRootPath.mockResolvedValue([project(7, "/Users/me/work/api")]);
 
-    const result = await resolveOrCreate(1, "/Users/me/personal/api");
+    const result = await resolveOrCreate(1, "/Users/me/personal/api", at("/Users/me/personal/api"));
 
     expect(result.created).toBe(true);
     expect(result.warning).toMatch(/merge_projects/);
@@ -190,14 +202,14 @@ describe("the same repo, seen from a second machine", () => {
   it("does not adopt a project that has no path at all", async () => {
     repo.listByName.mockResolvedValue([project(7, null)]);
 
-    const result = await resolveOrCreate(1, "/Users/me/todox");
+    const result = await resolveOrCreate(1, "/Users/me/todox", at("/Users/me/todox"));
 
     expect(result.created).toBe(true);
     expect(repo.create).toHaveBeenCalled();
   });
 
   it("registers normally when the name is new", async () => {
-    const result = await resolveOrCreate(1, "/Users/me/brand-new");
+    const result = await resolveOrCreate(1, "/Users/me/brand-new", at("/Users/me/brand-new"));
 
     expect(result.created).toBe(true);
     // Not flagged as a duplicate, which is what this describe block is about.
@@ -226,7 +238,7 @@ describe("the same repo, seen from a second machine", () => {
  */
 describe("a project registered without a remote", () => {
   it("says so, and says what it costs", async () => {
-    const { warning } = await resolveOrCreate(1, "/Users/me/no-origin");
+    const { warning } = await resolveOrCreate(1, "/Users/me/no-origin", at("/Users/me/no-origin"));
 
     expect(warning).toContain("no git remote");
     expect(warning).toContain("second computer");
@@ -247,9 +259,82 @@ describe("a project registered without a remote", () => {
   it("does not stack with the duplicate warning", async () => {
     repo.listByName.mockResolvedValue([project(7, "/Users/me/elsewhere/dup")]);
 
-    const { warning } = await resolveOrCreate(1, "/Users/me/dup");
+    const { warning } = await resolveOrCreate(1, "/Users/me/dup", at("/Users/me/dup"));
 
     expect(warning).toContain("already have a project");
     expect(warning).not.toContain("no git remote");
+  });
+});
+
+/**
+ * A project is a repository, not a path -- enforced at the one place that used
+ * to take a path at its word.
+ *
+ * Measured on production 2026-09-04, and the numbers are why this exists at
+ * all: twelve of one account's twenty-one projects were its client's per-prompt
+ * scratch directories, plus the client's own installation and its binary cache.
+ * Four of the twelve hold real tasks, so this is not a tidiness problem -- it
+ * is work filed in a dated prompt folder nobody will open again.
+ */
+describe("registering needs evidence that the path is a repository", () => {
+  it("refuses a directory nothing says is a checkout", async () => {
+    await expect(
+      resolveOrCreate(1, "C:/Users/me/Documents/Codex/2026-09-02/yol"),
+    ).rejects.toThrow(/no repository at/);
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts a root marker as evidence, with no remote at all", async () => {
+    // A local-only checkout is a real repository. Requiring the remote instead
+    // would have refused `airflow-dags`, which has seven tasks and no origin.
+    const { created } = await resolveOrCreate(1, "/Users/me/local-only", {
+      repoRoot: "/Users/me/local-only",
+    });
+    expect(created).toBe(true);
+  });
+
+  it("accepts a remote as evidence, with no root marker", async () => {
+    // The hosted transport cannot look for a marker; a client that answered
+    // `git remote get-url origin` has still proved the point.
+    const { created } = await resolveOrCreate(1, "/Users/me/hosted", {
+      repoUrl: "git@github.com:me/hosted.git",
+    });
+    expect(created).toBe(true);
+  });
+
+  /**
+   * The error is read by a model mid-tool-call, so it has to be actionable. An
+   * error that only says no teaches an agent to stop calling the tool, which
+   * costs more than the junk it prevents.
+   */
+  it("says what to send instead, by name", async () => {
+    const err = await resolveOrCreate(1, "/scratch/thing").catch((e: Error) => e);
+    expect(err).toBeInstanceOf(Error);
+    for (const clue of ["repo_root", "repo_url", "create_project", "project"])
+      expect((err as Error).message).toContain(clue);
+  });
+
+  /**
+   * MUTATION CHECK. `||` instead of `&&` in the guard reads identically and
+   * refuses every hosted caller that sends only a remote -- which is the one
+   * evidence the hosted transport can actually produce, so the whole surface
+   * would stop registering anything while the unit above still passed.
+   */
+  it("takes either piece of evidence, not both", async () => {
+    await expect(
+      resolveOrCreate(1, "/Users/me/one", { repoUrl: "git@github.com:me/one.git" }),
+    ).resolves.toMatchObject({ created: true });
+    await expect(
+      resolveOrCreate(1, "/Users/me/two", { repoRoot: "/Users/me/two" }),
+    ).resolves.toMatchObject({ created: true });
+  });
+
+  it("still resolves a path it already knows, with no evidence at all", async () => {
+    // The gate is on CREATION. An agent working in a directory todox has seen
+    // before must not start needing to prove it again.
+    repo.withRootPath.mockResolvedValue([project(9, "/Users/me/known")]);
+    const found = await resolveOrCreate(1, "/Users/me/known/src/app.ts");
+    expect(found.created).toBe(false);
+    expect(found.project.id).toBe(9);
   });
 });

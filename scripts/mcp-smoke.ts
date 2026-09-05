@@ -60,6 +60,12 @@ const SCRATCH = join(TMP, "todox-smoke-repo");
 /** A second one, because one account holds many and they must not mix. */
 const OTHER = join(TMP, "todox-smoke-other");
 /**
+ * A directory that is deliberately NOT a checkout, shaped like the ones that
+ * caused this rule: a client's per-prompt scratch folder. Nothing is written
+ * into it, so nothing above it can be mistaken for a root marker.
+ */
+const NOT_A_REPO = join(TMP, "todox-smoke-scratch", "2026-09-04", "some-prompt");
+/**
  * The same repository as SCRATCH, as it looks on the developer's other computer:
  * a different absolute path, the same git remote. This is the fixture that
  * proves one repo stays one project across machines.
@@ -770,6 +776,82 @@ async function runSuite(mode: Mode, token: string) {
   if (noteIn(afterRemoval))
     throw new Error("a deleted note is still in the briefing");
   console.log("entry and note both removed, and gone from what the next session reads");
+
+  // A project is a repository, not a path. This is the assertion that keeps
+  // that true on the transport where it can actually go wrong: the hosted
+  // server has no disk, so a bare `cwd` is the only thing some clients send,
+  // and every one of those used to become a project. Twelve of one production
+  // account's twenty-one projects were its client's per-prompt scratch folders.
+  //
+  // Both transports are checked, and they fail for different reasons, which is
+  // the point of running it twice: hosted has nothing to look at, and stdio
+  // looks and finds no root marker.
+  console.log("\n--- a directory that is not a repository is not a project ---");
+  mkdirSync(NOT_A_REPO, { recursive: true });
+  // A refused tool call comes back as text, not as a rejection -- the same
+  // shape the `refused` helper above reads.
+  const noRepo = await text("get_context", { cwd: NOT_A_REPO });
+  if (!/no repository at/.test(noRepo))
+    throw new Error(`a scratch directory was registered as a project: ${noRepo.slice(0, 120)}`);
+  for (const clue of ["repo_root", "repo_url", "create_project"])
+    if (!noRepo.includes(clue))
+      throw new Error(`the refusal does not say to send ${clue}: ${noRepo}`);
+  console.log("refused, and said what to send:", noRepo.slice(0, 58) + "…");
+
+  // The same path goes through the moment the caller can show it is a repo.
+  // Without this the assertion above would also pass if registration were
+  // simply broken -- and the two transports have to prove it differently,
+  // which is itself the thing worth asserting.
+  //
+  // Hosted: the client supplies the remote, because the server cannot look.
+  // Stdio: the model is NOT allowed to supply one (`localInternal` strips
+  // repo_url, since a model cannot invent a git remote and a plausible guess
+  // becomes the project's identity for good), so the only way through is for
+  // the directory to actually become a repository.
+  if (mode.local) writeFileSync(join(NOT_A_REPO, "package.json"), '{"name":"scratch"}\n');
+  const allowed = JSON.parse(
+    await text("get_context", {
+      cwd: NOT_A_REPO,
+      ...(mode.local ? {} : { repo_url: "git@github.com:todox-smoke/scratch.git" }),
+    }),
+  );
+  if (!allowed.project_created)
+    throw new Error(`evidence was supplied and it still was not registered: ${JSON.stringify(allowed).slice(0, 160)}`);
+  await text("delete_project", {
+    project: allowed.project.slug,
+    confirm: allowed.project.slug,
+  });
+  rmSync(join(NOT_A_REPO, "package.json"), { force: true });
+  console.log(
+    mode.local
+      ? "and registers it once a root marker appears on disk"
+      : "and registers it once the caller sends the remote",
+  );
+
+  // merge_projects has existed since the cross-machine identity work and
+  // nothing ever pointed at a duplicate that ALREADY exists: the resolver says
+  // it once, at registration, and after that the two rows sit there in silence.
+  // Production carried two such pairs for weeks, one of them a project with
+  // twelve open tasks beside a namesake with one.
+  console.log("\n--- a project with a namesake says so, every session ---");
+  const twinName = "SMOKE-TWIN";
+  const twinA = JSON.parse(await text("create_project", { name: twinName, model: MODEL }));
+  const twinB = JSON.parse(await text("create_project", { name: twinName, model: MODEL }));
+  const onTwin = JSON.parse(await text("get_context", { project: twinA.slug }));
+  if (!onTwin.duplicate)
+    throw new Error("two projects share a name and the briefing did not mention it");
+  if (!onTwin.duplicate.includes(twinB.slug))
+    throw new Error(`the warning does not name the other project: ${onTwin.duplicate}`);
+  if (!onTwin.duplicate.includes("merge_projects("))
+    throw new Error("the warning does not hand over the call that fixes it");
+  // And it is not its own duplicate -- an always-true warning is the failure
+  // mode the closing hint was rebuilt to stop being.
+  await text("delete_project", { project: twinB.slug, confirm: twinB.slug });
+  const alone = JSON.parse(await text("get_context", { project: twinA.slug }));
+  if (alone.duplicate)
+    throw new Error("the only project with its name still claims to have a twin");
+  await text("delete_project", { project: twinA.slug, confirm: twinA.slug });
+  console.log("named the twin and the merge call, and went quiet once it was gone");
 
   console.log("\n--- report sees it ---");
   const md = await text("activity_report", {

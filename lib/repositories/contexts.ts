@@ -151,6 +151,26 @@ export async function pageByProject(
 }
 
 /**
+ * Which of these projects hold a note written by ANYBODY.
+ *
+ * The sibling below answers "which hold a note I wrote", which is the right
+ * question for a personal list and the wrong one for deciding a project is
+ * empty: a member can write standing rules into a project they do not own, and
+ * `removeIfEmpty` refuses on any note regardless of who wrote it. Asking the
+ * narrower question made the home page offer to clear projects that were not
+ * empty, and the button then failed on a guard the list had not applied.
+ */
+export async function projectIdsHoldingNotes(projectIds: number[]): Promise<Set<number>> {
+  if (!projectIds.length) return new Set();
+  const rows = await all<{ project_id: number }>(
+    `SELECT DISTINCT project_id FROM contexts
+      WHERE project_id IN (${projectIds.map(() => "?").join(",")})`,
+    projectIds,
+  );
+  return new Set(rows.map((r) => r.project_id));
+}
+
+/**
  * Which projects carry standing notes, for the caller that has to know whether
  * a project is empty.
  *

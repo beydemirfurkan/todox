@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   listRefs: vi.fn(),
   freshness: vi.fn(() => "fresh"),
   pageObservations: vi.fn(),
+  listByName: vi.fn(),
 }));
 
 vi.mock("../repositories/tasks", () => ({ pageByProject: mocks.pageByProject }));
@@ -31,19 +32,27 @@ vi.mock("../repositories/refs", () => ({
   freshness: mocks.freshness,
 }));
 vi.mock("../repositories/observations", () => ({ pageByProject: mocks.pageObservations }));
+vi.mock("../repositories/projects", () => ({ listByName: mocks.listByName }));
 
 const { briefing } = await import("./briefing");
 
 /** Cast where it is used, not here: the tests read `PROJECT.id`. */
 const PROJECT = {
   id: 1,
+  // Owned by the account these tests read as. `duplicateOf` needs it: the
+  // merge it suggests asserts ownership on both sides, so a project shared
+  // with the reader must not be told to merge anything.
+  user_id: 7,
   slug: "todox",
   name: "todox",
   root_path: "/repo",
   summary: "s",
 };
 
-const brief = (userId = 7, focus?: string) => briefing(userId, PROJECT as never, focus);
+/** The account every test in this file reads as. */
+const USER = 7;
+
+const brief = (userId = USER, focus?: string) => briefing(userId, PROJECT as never, focus);
 
 /**
  * What `pageByTasksPerKind` answers: the rows, and how many of them came back
@@ -96,6 +105,10 @@ beforeEach(() => {
   mocks.listRefs.mockResolvedValue(new Map());
   mocks.freshness.mockReturnValue("fresh");
   mocks.pageObservations.mockResolvedValue({ rows: [], omitted: 0 });
+  // The common case: this project is the only one with its name.
+  mocks.listByName.mockResolvedValue([
+    { id: PROJECT.id, slug: PROJECT.slug, user_id: USER },
+  ]);
 });
 
 describe("what the briefing costs", () => {
@@ -636,5 +649,82 @@ describe("unverified observations", () => {
       expect(t.dead_ends).toEqual([]);
       expect(t.open_questions).toEqual([]);
     }
+  });
+});
+
+/**
+ * A namesake in the same account.
+ *
+ * `merge_projects` has existed since the cross-machine identity work and
+ * nothing ever pointed at a duplicate that already exists: the resolver says it
+ * once, at registration, and after that the two rows sit there in silence. In
+ * production on 2026-09-04 that was two live pairs, one of them a project with
+ * twelve open tasks beside a namesake with one.
+ */
+describe("a project with a namesake", () => {
+  it("says so, and writes the merge call", async () => {
+    mocks.listByName.mockResolvedValue([
+      { id: PROJECT.id, slug: "crm-marcaspio", user_id: USER },
+      { id: 42, slug: "crm-marcaspio-2", user_id: USER },
+    ]);
+    const out = await brief();
+    expect(out.duplicate).toContain("crm-marcaspio-2");
+    expect(out.duplicate).toContain("merge_projects(");
+    // The survivor is this project, so the agent does not have to work out
+    // which way round the call goes.
+    expect(out.duplicate).toContain(`into:"${PROJECT.slug}"`);
+  });
+
+  /**
+   * MUTATION CHECK. Dropping the `p.id !== project.id` filter makes every
+   * project its own duplicate, and the briefing then ends with an always-true
+   * warning -- the exact failure mode the closing hint was rebuilt to stop
+   * being, which is why the field is absent rather than null when there is
+   * nothing to say.
+   */
+  it("is not its own duplicate", async () => {
+    const out = await brief();
+    expect(out).not.toHaveProperty("duplicate");
+  });
+
+  it("says nothing when the account has no projects at all by that name", async () => {
+    mocks.listByName.mockResolvedValue([]);
+    expect(await brief()).not.toHaveProperty("duplicate");
+  });
+
+  /**
+   * `listByName` answers with projects shared WITH this account as well as its
+   * own, and `merge_projects` asserts ownership on both sides -- so naming
+   * somebody else's project here hands the agent a call that can only 404,
+   * about two repositories that were never one.
+   *
+   * Found by building the case rather than by reading: a project shared with
+   * the account, holding the owner's standing note, was reported as a
+   * duplicate. `updateProject` and `deleteProject` each carry a comment about
+   * this exact distinction, which is how many times the codebase has learned
+   * it before.
+   */
+  /**
+   * The reader's OWN project must be owned too, not just the other one.
+   * A member reading a project shared with them was told to merge their own
+   * unrelated repo INTO somebody else's -- and `merge_projects` asserts
+   * ownership on `from` and `into`, so the call could only ever 404.
+   */
+  it("says nothing at all when the project being read is not this account's", async () => {
+    mocks.listByName.mockResolvedValue([
+      { id: PROJECT.id, slug: "todox", user_id: 4242 },
+      { id: 99, slug: "my-todox", user_id: USER },
+    ]);
+    // Same shape, read as somebody who is only a member of it.
+    const out = await briefing(USER, { ...PROJECT, user_id: 4242 } as never);
+    expect(out).not.toHaveProperty("duplicate");
+  });
+
+  it("does not call a project shared with this account a duplicate", async () => {
+    mocks.listByName.mockResolvedValue([
+      { id: PROJECT.id, slug: "todox", user_id: USER },
+      { id: 99, slug: "todox-shared", user_id: 4242 },
+    ]);
+    expect(await brief()).not.toHaveProperty("duplicate");
   });
 });
