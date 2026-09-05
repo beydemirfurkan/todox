@@ -31,6 +31,7 @@ import { localDatabaseOnly } from "../local-only";
 localDatabaseOnly("bench:memory");
 
 import * as contextsRepo from "../../lib/repositories/contexts";
+import * as entriesRepo from "../../lib/repositories/entries";
 import * as observationsRepo from "../../lib/repositories/observations";
 import * as projectsRepo from "../../lib/repositories/projects";
 import * as usersRepo from "../../lib/repositories/users";
@@ -38,7 +39,7 @@ import { briefing } from "../../lib/services/briefing";
 import { search } from "../../lib/services/search";
 import * as taskService from "../../lib/services/task-service";
 import { hashPassword } from "../../lib/util/password";
-import { filler, NOTES, QUESTIONS, TASKS, UNANSWERABLE, type Question } from "./corpus";
+import { filler, logFiller, NOTES, QUESTIONS, TASKS, UNANSWERABLE, type Question } from "./corpus";
 import { approxTokens, bytes, kb, reachableWithin, recallAt, score, type Hit } from "./measure";
 
 const USERNAME = "memory-bench";
@@ -131,6 +132,18 @@ async function reportBriefing(userId: number, project: Awaited<ReturnType<typeof
   console.log(row("  of which last handoffs", kb(sum((t) => t.last_handoff))));
   console.log(row("  of which dead ends", kb(sum((t) => t.dead_ends))));
   console.log(row("  of which decisions", kb(sum((t) => t.decisions))));
+  console.log(row("  of which open questions", kb(sum((t) => t.open_questions))));
+  // The four lines above as one number, because they are one thing: the log,
+  // which is the section with no byte budget on it. On the widest project
+  // measured in production it was 112 KB of a 143 KB briefing while the section
+  // that DOES have a body budget -- the notes -- returned two bytes. Reading
+  // them separately is what let that go unnoticed.
+  console.log(
+    row(
+      "  ── the log, all four",
+      kb(sum((t) => [t.last_handoff, t.dead_ends, t.decisions, t.open_questions])),
+    ),
+  );
   console.log(row("observations", kb(bytes(brief.observations))));
   console.log(row("stale_refs", kb(bytes(brief.stale_refs))));
   console.log(row("─".repeat(20), ""));
@@ -329,6 +342,168 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
   for (const id of added) await contextsRepo.remove(id);
 }
 
+/**
+ * What the log costs as open tasks accumulate, which is the axis with no budget.
+ *
+ * `reportGrowth` above asks the same question of notes, and the answer there is
+ * a curve that flattens, because note BODIES are capped. This one does not
+ * flatten, and that is the finding rather than a defect of the measurement: the
+ * ceilings in `briefing.ts` are all COUNT ceilings, and a count of three says
+ * nothing about bytes when the p50 entry is 1,737 characters.
+ *
+ * Calibrated against production on 2026-09-04 so the numbers here mean
+ * something outside the bench: one real project (gametable-with-king) answered
+ * `get_context` with 143 KB for eight open tasks -- 112 KB of it log -- and
+ * five projects were over 59 KB. `logFiller` writes entries at those measured
+ * lengths for exactly this reason.
+ *
+ * Seeded and removed here rather than in `seed()`, so every number above this
+ * line is the one it has always been and two runs stay comparable.
+ */
+async function reportLogGrowth(
+  userId: number,
+  project: Awaited<ReturnType<typeof seed>>["project"],
+) {
+  console.log("\n\nLOG  —  the section with no byte budget\n");
+  console.log(row("open tasks", "log bytes     briefing"));
+
+  const added: number[] = [];
+  const tasksRepo = await import("../../lib/repositories/tasks");
+  let seeded = 0;
+
+  for (const target of [8, 16, 24, 40]) {
+    for (; seeded < target; seeded++) {
+      const t = logFiller(seeded);
+      const task = await taskService.create({
+        project_id: project.id,
+        title: t.title,
+        body: t.body,
+        user_id: userId,
+      });
+      added.push(task.id);
+      for (const e of t.entries)
+        await taskService.addEntry({
+          task_id: task.id,
+          kind: e.kind,
+          body: e.body,
+          user_id: userId,
+        });
+    }
+
+    const brief = await briefing(userId, project);
+    const log = brief.open_tasks.reduce(
+      (n, t) => n + bytes([t.last_handoff, t.dead_ends, t.decisions, t.open_questions]),
+      0,
+    );
+    console.log(
+      row(`${brief.open_tasks.length}`, `${kb(log).padStart(9)} ${kb(bytes(brief)).padStart(11)}`),
+    );
+  }
+
+  console.log(
+    "\n  for scale, measured in production 2026-09-04: one project answered\n" +
+      "  get_context with 143 KB, 112 KB of it log, for eight open tasks.\n",
+  );
+
+  await reportLogBudget(userId, project);
+
+  for (const id of added) await tasksRepo.remove(id);
+}
+
+/**
+ * The budget mirrored from `briefing.ts`, the way `OBSERVATIONS` above mirrors
+ * `BRIEFING_OBSERVATIONS`: the point of this section is to VARY a number the
+ * briefing holds as a constant, so it has to reach the repository directly.
+ * `reportFocus` does the same thing to the note ceiling for the same reason.
+ */
+const BENCH_KINDS = ["handoff", "dead_end", "question", "decision"] as const;
+const BENCH_PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
+
+/**
+ * What the log budget costs, as a curve rather than an opinion.
+ *
+ * The question is not "is the payload smaller" -- any budget makes it smaller.
+ * It is how far the budget can come down before an agent stops receiving the
+ * entry that answers what it asked. Read it the way `BRIEFING_NOTES_FOCUSED`
+ * was read: take the smallest budget where recall is unchanged, then ship the
+ * step above it, because this measures whether ONE entry came back and a
+ * briefing is not one answer.
+ *
+ * Recall here is stricter than SEARCH's above, deliberately. An entry whose
+ * head came back is NOT a hit: the agent can see that something exists and can
+ * fetch it, but it did not receive the answer in the payload, and the whole
+ * claim of the briefing is that a cold session does not have to go and ask.
+ */
+async function reportLogBudget(
+  userId: number,
+  project: Awaited<ReturnType<typeof seed>>["project"],
+) {
+  const answerable = QUESTIONS.filter((q) => q.answerType === "task");
+  const open = await tasksRepoOpen(project.id);
+
+  console.log("\n  what a byte budget costs, at 48 open tasks:\n");
+  console.log(row("  budget", "recency    with focus   log bytes"));
+  let atSmallest: string[] = [];
+
+  for (const budget of [65_536, 32_768, 24_576, 16_384, 12_288, 8_192, 4_096]) {
+    const paid = async (focus?: string) => {
+      const page = await entriesRepo.pageByTasksPerKind(
+        open,
+        BENCH_KINDS,
+        BENCH_PER_KIND,
+        budget,
+        focus,
+      );
+      return [...page.rows.values()].flat();
+    };
+
+    const flat = await paid();
+    const plain = answerable.filter((q) =>
+      flat.some((e) => e.body?.includes(q.term)),
+    ).length;
+
+    // One question at a time, because each is its own session with its own
+    // focus -- averaging them would describe a session nobody has.
+    let aimed = 0;
+    const missed: string[] = [];
+    for (const q of answerable) {
+      const rows = await paid(q.asked);
+      if (rows.some((e) => e.body?.includes(q.term))) aimed++;
+      else missed.push(q.asked);
+    }
+
+    const carried = flat.reduce((n, e) => n + bytes(e), 0);
+    console.log(
+      row(
+        `  ${kb(budget)}`,
+        `${String(plain).padStart(2)}/${answerable.length}      ` +
+          `${String(aimed).padStart(2)}/${answerable.length}     ${kb(carried).padStart(9)}`,
+      ),
+    );
+    atSmallest = missed;
+  }
+
+  // Named, because a flat curve is only good news if the misses are the same
+  // ones at every budget. If they are, the budget is not what is costing them
+  // -- the ranking is -- and lowering it further is free. If they change as it
+  // comes down, the curve is not flat and this table is being misread.
+  if (atSmallest.length) {
+    console.log("\n  never carried with a body, at any budget on the ladder:");
+    for (const q of atSmallest) console.log(`    · ${q}`);
+  }
+  console.log("");
+}
+
+/** The ids the briefing would carry, in the order it carries them. */
+async function tasksRepoOpen(projectId: number): Promise<number[]> {
+  const { rows } = await (await import("../../lib/repositories/tasks")).pageByProject(
+    projectId,
+    "open",
+    50,
+  );
+  return rows.map((t) => t.id);
+}
+
 async function main() {
   const { user, project } = await seed();
   try {
@@ -354,6 +529,10 @@ async function main() {
     // bodies, and neither can be measured after the other has seeded.
     await reportFocus(user.id, project);
     await reportGrowth(user.id, project);
+    // Last, because it is the only one that adds TASKS: every section above
+    // reads open_tasks, and a briefing with forty filler tasks in it would
+    // change all of them.
+    await reportLogGrowth(user.id, project);
     console.log("\ndone. Nothing here is a threshold; both numbers are for comparing two runs.\n");
   } finally {
     // The corpus is removed whatever happened, so a failed run does not leave a

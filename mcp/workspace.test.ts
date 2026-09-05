@@ -344,7 +344,21 @@ describe("reading the session's git state", () => {
     expect(since.subjects.length).toBeLessThanOrEqual(3);
     for (const s of since.subjects) expect(s.length).toBeLessThanOrEqual(200);
     rmSync(repo, { recursive: true, force: true });
-  });
+    // Thirty sequential `git commit` processes, and on a Windows runner a
+    // process spawn is the expensive part rather than anything this test is
+    // about: measured at 5,624ms against vitest's 5,000ms default, which is a
+    // coin flip rather than a signal. It passed on seven other branches and on
+    // main in the same hour.
+    //
+    // The timeout is raised rather than the commit count lowered, because the
+    // count is the property: the cap is three subjects and thirty is what
+    // proves the count stays honest while the text does not. Trimming it to
+    // make a clock happy would be weakening the assertion to fix the
+    // environment.
+    //
+    // A test that fails at random on one platform is worse than a slow one --
+    // it teaches everybody to re-run red CI instead of reading it.
+  }, 30_000);
 
   /**
    * The baseline is the one value in this file that git did not produce.

@@ -190,6 +190,49 @@ export const removeStmt = (userId: number, id: number): Statement => ({
 });
 
 /**
+ * Remove a project only while it still holds nothing. Returns 0 when it does.
+ *
+ * The emptiness test is in the statement rather than in the caller, and that is
+ * the whole point of the function. `deleteProject` asks for the slug to be
+ * typed because it cascades to every task, entry and note underneath -- a
+ * project with nothing underneath has nothing for that ceremony to protect, so
+ * the bulk clean-up offers one click instead. What replaces the typed slug as
+ * the safety property is this WHERE: read the counts, render a list, and by the
+ * time somebody clicks, an agent may have written the first task into one of
+ * them. Checking in the caller leaves exactly that window open; checking here
+ * closes it, because the row either still qualifies at DELETE time or it does
+ * not go.
+ *
+ * Cross-table in a repository that owns one table, deliberately: the row being
+ * deleted is a project's, so the SQL belongs with projects, and moving the test
+ * to a service is what would reopen the race.
+ */
+export const removeIfEmpty = (userId: number, id: number) =>
+  run(
+    `DELETE FROM projects
+      WHERE id = ? AND user_id = ?
+        AND NOT EXISTS (SELECT 1 FROM tasks WHERE project_id = projects.id)
+        AND NOT EXISTS (SELECT 1 FROM contexts WHERE project_id = projects.id)
+        -- A project with people in it is not empty, whatever it holds.
+        --
+        -- Tasks and notes were the whole test, and the state right after
+        -- inviting somebody into a fresh repo is exactly no tasks and no
+        -- notes: the project appeared in the home page's "holds nothing yet"
+        -- fold with a one-click remove, and the click cascaded the membership
+        -- and the pending invitation away. No confirmation, no mention of the
+        -- team, and nothing anywhere said a person had lost access.
+        --
+        -- Checked against a real database: one member and one open invitation,
+        -- and the delete removed all three rows.
+        AND NOT EXISTS (SELECT 1 FROM project_memberships WHERE project_id = projects.id)
+        AND NOT EXISTS (
+          SELECT 1 FROM project_invitations
+           WHERE project_id = projects.id AND accepted_at IS NULL AND revoked_at IS NULL
+        )`,
+    [id, userId],
+  );
+
+/**
  * Adopt a remote only when there is none yet.
  *
  * A merge should not overwrite the surviving project's own remote with the
