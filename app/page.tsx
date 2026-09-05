@@ -56,18 +56,32 @@ export default async function Home() {
       </>
     );
   // One counts query for the whole page instead of one per project card.
-  const [allProjects, globalContext, counts, connected, notesByProject] = await Promise.all([
+  const [allProjects, globalContext, counts, connected] = await Promise.all([
     projects.list(user.id),
     contexts.listByProject(user.id, null),
     tasks.countsByProject(user.id),
     // Rides along rather than costing a round trip of its own.
     apiTokens.hasConnectedAgent(user.id),
-    // Same, and it is what separates "empty" from "quiet" below: a project can
-    // carry standing rules and no tasks, and that is a project doing its job.
-    contexts.projectIdsWithNotes(user.id),
   ]);
-  // One grouped query for every card, not one per card.
-  const teamSizes = await memberships.countsByProjects(allProjects.map((p) => p.id));
+  /**
+   * Owned, and empty for everybody -- not just for me.
+   *
+   * Both halves were wrong first time round and both were found by building
+   * the case. `projects.list` answers with projects shared WITH this account
+   * as well as its own, and `clearEmptyProjectAction` asserts ownership -- so
+   * a shared project appeared in this list and its button threw. And notes
+   * were counted per author, so a project holding only its owner's standing
+   * rules read as empty to a member. `removeIfEmpty` refuses on any note by
+   * anyone, which is the definition this list now matches.
+   */
+  const owned = allProjects.filter((p) => p.user_id === user.id);
+  // Both of these need the project list first, so they wait -- but they wait
+  // together, the way the project page pairs its own second round.
+  const [teamSizes, notesByProject] = await Promise.all([
+    // One grouped query for every card, not one per card.
+    memberships.countsByProjects(allProjects.map((p) => p.id)),
+    contexts.projectIdsHoldingNotes(owned.map((p) => p.id)),
+  ]);
 
   /**
    * Projects that hold nothing at all.
@@ -81,7 +95,7 @@ export default async function Home() {
    * Notes are what separates "empty" from "quiet": a project can carry standing
    * rules and no tasks, and that is a project doing its job.
    */
-  const emptyProjects = allProjects.filter(
+  const emptyProjects = owned.filter(
     (p) => !counts.map.has(p.id) && !notesByProject.has(p.id),
   );
 

@@ -246,7 +246,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * `~/personal/api` is the case decision #28 refuses to fuse), so this says
      * what it sees and hands over the call rather than making it.
      */
-    ...duplicateOf(project, sameName),
+    ...duplicateOf(userId, project, sameName),
     hint: closingHint(openTasks),
   };
 }
@@ -258,8 +258,17 @@ export async function briefing(userId: number, project: Project, focus?: string)
  * than null -- a briefing that carries a key meaning "no problem" teaches the
  * reader to skip the key.
  */
-function duplicateOf(project: Project, sameName: Project[]): { duplicate?: string } {
-  const others = sameName.filter((p) => p.id !== project.id);
+function duplicateOf(
+  userId: number,
+  project: Project,
+  sameName: Project[],
+): { duplicate?: string } {
+  // Owned only. `listByName` answers with projects shared WITH this account
+  // too, and `merge_projects` asserts ownership on both sides -- so naming
+  // somebody else's project here hands the agent a call that can only 404,
+  // about two repositories that were never one. The same distinction
+  // `updateProject` and `deleteProject` each carry a comment about.
+  const others = sameName.filter((p) => p.id !== project.id && p.user_id === userId);
   if (!others.length) return {};
   const list = others.map((p) => `"${p.slug}"`).join(", ");
   return {

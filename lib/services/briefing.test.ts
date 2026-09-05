@@ -45,7 +45,10 @@ const PROJECT = {
   summary: "s",
 };
 
-const brief = (userId = 7, focus?: string) => briefing(userId, PROJECT as never, focus);
+/** The account every test in this file reads as. */
+const USER = 7;
+
+const brief = (userId = USER, focus?: string) => briefing(userId, PROJECT as never, focus);
 
 const task = (id: number, over: Record<string, unknown> = {}) => ({
   id,
@@ -75,7 +78,9 @@ beforeEach(() => {
   mocks.freshness.mockReturnValue("fresh");
   mocks.pageObservations.mockResolvedValue({ rows: [], omitted: 0 });
   // The common case: this project is the only one with its name.
-  mocks.listByName.mockResolvedValue([{ id: PROJECT.id, slug: PROJECT.slug }]);
+  mocks.listByName.mockResolvedValue([
+    { id: PROJECT.id, slug: PROJECT.slug, user_id: USER },
+  ]);
 });
 
 describe("what the briefing costs", () => {
@@ -520,8 +525,8 @@ describe("unverified observations", () => {
 describe("a project with a namesake", () => {
   it("says so, and writes the merge call", async () => {
     mocks.listByName.mockResolvedValue([
-      { id: PROJECT.id, slug: "crm-marcaspio" },
-      { id: 42, slug: "crm-marcaspio-2" },
+      { id: PROJECT.id, slug: "crm-marcaspio", user_id: USER },
+      { id: 42, slug: "crm-marcaspio-2", user_id: USER },
     ]);
     const out = await brief();
     expect(out.duplicate).toContain("crm-marcaspio-2");
@@ -545,6 +550,26 @@ describe("a project with a namesake", () => {
 
   it("says nothing when the account has no projects at all by that name", async () => {
     mocks.listByName.mockResolvedValue([]);
+    expect(await brief()).not.toHaveProperty("duplicate");
+  });
+
+  /**
+   * `listByName` answers with projects shared WITH this account as well as its
+   * own, and `merge_projects` asserts ownership on both sides -- so naming
+   * somebody else's project here hands the agent a call that can only 404,
+   * about two repositories that were never one.
+   *
+   * Found by building the case rather than by reading: a project shared with
+   * the account, holding the owner's standing note, was reported as a
+   * duplicate. `updateProject` and `deleteProject` each carry a comment about
+   * this exact distinction, which is how many times the codebase has learned
+   * it before.
+   */
+  it("does not call a project shared with this account a duplicate", async () => {
+    mocks.listByName.mockResolvedValue([
+      { id: PROJECT.id, slug: "todox", user_id: USER },
+      { id: 99, slug: "todox-shared", user_id: 4242 },
+    ]);
     expect(await brief()).not.toHaveProperty("duplicate");
   });
 });

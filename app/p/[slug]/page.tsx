@@ -158,7 +158,10 @@ export default async function ProjectPage({
     // was never told at all.
     projects.listByName(user.id, project.name),
   ]);
-  const twins = sameName.filter((p) => p.id !== project.id);
+  // Owned only, for the reason the briefing's twin of this carries: merging
+  // asserts ownership on both sides, so offering it for a project shared with
+  // this account is advice that cannot be taken.
+  const twins = sameName.filter((p) => p.id !== project.id && p.user_id === user.id);
 
   const closed = all.filter((x) => isClosed(x.status));
 
