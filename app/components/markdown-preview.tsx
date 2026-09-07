@@ -1,8 +1,19 @@
+import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 
-export function MarkdownPreview({ markdown }: { markdown: string }) {
+function EntryHeading({ children }: { children?: ReactNode }) {
+  return <h4>{children}</h4>;
+}
+
+export function MarkdownPreview({
+  markdown,
+  variant = "report",
+}: {
+  markdown: string;
+  variant?: "report" | "entry";
+}) {
   return (
-    <div className="report-markdown">
+    <div className={variant === "report" ? "report-markdown" : "entry-markdown"}>
       <ReactMarkdown
         skipHtml
         components={{
@@ -14,6 +25,9 @@ export function MarkdownPreview({ markdown }: { markdown: string }) {
               {children}
             </a>
           ),
+          ...(variant === "entry"
+            ? { h1: EntryHeading, h2: EntryHeading, h3: EntryHeading }
+            : {}),
         }}
       >
         {markdown}

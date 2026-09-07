@@ -28,4 +28,16 @@ describe("MarkdownPreview", () => {
     expect(html).not.toContain("<img");
     expect(html).not.toContain('href="javascript:');
   });
+
+  it("uses the compact entry treatment without changing report styling", () => {
+    const entry = renderToStaticMarkup(
+      <MarkdownPreview markdown={"# Nested heading\n\nA short note"} variant="entry" />,
+    );
+    const report = renderToStaticMarkup(<MarkdownPreview markdown="A report" />);
+
+    expect(entry).toContain('class="entry-markdown"');
+    expect(entry).toContain("<h4>Nested heading</h4>");
+    expect(entry).not.toContain("<h1>");
+    expect(report).toContain('class="report-markdown"');
+  });
 });

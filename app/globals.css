@@ -1306,6 +1306,84 @@ pre {
   text-underline-offset: 3px;
 }
 
+/* A log entry is compact enough to scan, but still reads like authored text
+   once opened. It deliberately has no surface of its own: the article around
+   it already owns the border and background. */
+.entry-markdown {
+  max-width: 68ch;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.entry-markdown > :first-child {
+  margin-top: 0;
+}
+.entry-markdown > :last-child {
+  margin-bottom: 0;
+}
+.entry-markdown p,
+.entry-markdown ul,
+.entry-markdown ol,
+.entry-markdown blockquote,
+.entry-markdown pre,
+.entry-markdown h4 {
+  margin-block: 0.55em;
+}
+.entry-markdown p,
+.entry-markdown li {
+  white-space: pre-wrap;
+}
+.entry-markdown ul,
+.entry-markdown ol {
+  padding-left: 1.35rem;
+}
+.entry-markdown ul {
+  list-style: disc;
+}
+.entry-markdown ol {
+  list-style: decimal;
+}
+.entry-markdown li + li {
+  margin-top: 0.25em;
+}
+.entry-markdown strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+.entry-markdown code {
+  padding: 1px 4px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-family: var(--font-dm-mono), ui-monospace, monospace;
+  font-size: 0.88em;
+}
+.entry-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.entry-markdown pre code {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.entry-markdown blockquote {
+  padding-left: 10px;
+  border-left: 3px solid var(--k-question);
+}
+.entry-markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .user-menu-panel,
   .user-menu-item {

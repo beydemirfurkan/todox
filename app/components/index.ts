@@ -1,5 +1,6 @@
 export { Blob, type Mood } from "./blob";
 export { Chip, Counter } from "./chip";
+export { EntryBody } from "./entry-body";
 export { ExpandableText } from "./expandable-text";
 export { Field } from "./field";
 export { MarkdownPreview } from "./markdown-preview";
