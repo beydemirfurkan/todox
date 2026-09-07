@@ -746,7 +746,10 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
         "Everything todox has recorded against a file: the tasks that touched it with their dead ends and decisions, and the context notes attached to it in full. Ask before editing a file you have not seen this session — a dead end costs nothing to read and an afternoon to rediscover. The path may be absolute or relative to the repository root; both fold to the same answer, so a note linked on one machine is found from another. Pass `cwd` or `project` to say which repository is being asked about.",
       annotations: READ_ONLY,
     },
-    { referenceRequirement: "project-or-cwd" },
+    // Same as get_context: locally the process reads the remote off the
+    // checkout, so asking the model for it would be asking it to shell out to
+    // git for something already on disk.
+    { referenceRequirement: "project-or-cwd", localInternal: ["repo_url"] },
   );
 
   /* --------------------------------------------------------------- tasks */

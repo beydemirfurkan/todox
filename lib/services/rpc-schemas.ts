@@ -433,6 +433,13 @@ export const SHAPES = {
    * The path is folded to its repo-relative form before anything is matched,
    * so `cwd` or `project` is not optional decoration -- it is what says which
    * roots to fold against.
+   *
+   * `repo_url` is here for the same reason it is on `getContext`: a `cwd` is a
+   * different string on the developer's other machine and the remote is not.
+   * This was the one project-resolved read without it, so it was also the only
+   * one that fell back to matching absolute paths and nothing else -- and a
+   * client whose working directory is a per-prompt scratch folder has no
+   * absolute path worth matching.
    */
   getFileContext: {
     path: z
@@ -444,6 +451,7 @@ export const SHAPES = {
       ),
     project: ref.optional().describe("Slug, name, or a path inside the project"),
     cwd: ref.optional().describe("Absolute working directory, used if project is omitted"),
+    repo_url: repoIdentity,
     model,
   },
 

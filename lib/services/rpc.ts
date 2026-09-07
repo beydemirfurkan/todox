@@ -23,7 +23,7 @@ import {
 } from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
 import * as projectActivity from "./project-activity";
-import { mustResolve, resolveOrCreate } from "./project-resolver";
+import { mustResolve, resolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { search } from "./search";
@@ -386,11 +386,34 @@ export const methods = {
         };
   },
 
-  getFileContext: async ({ userId }, p: { path: string; project?: string; cwd?: string }) => {
+  getFileContext: async (
+    { userId },
+    p: { path: string; project?: string; cwd?: string; repo_url?: string },
+  ) => {
     // Resolution, not creation: asking what is known about a file in a repo
     // todox has never seen is a question with an answer -- nothing -- and
     // registering a project as a side effect of a read would be a surprise.
-    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }));
+    const hints = { repoUrl: p.repo_url };
+    const ref = pickRef({ project: p.project, cwd: p.cwd });
+
+    // The reference the caller named comes first, always: an explicit `project`
+    // is an answer, not a guess, and must not lose to a path.
+    //
+    // Failing that, the path itself. Every other tool here carries a remote and
+    // is found by it when two machines spell the same directory differently;
+    // this one is a read whose `cwd` is often not the repository at all --
+    // several clients run each session from a per-prompt scratch folder, and
+    // the file being asked about is the only argument that points at the code.
+    // Falling back to it costs nothing when `cwd` was already right and is the
+    // whole answer when it was not.
+    const project =
+      (await resolve(userId, ref, hints)) ??
+      (isAbsolutePath(p.path) ? await resolve(userId, p.path, hints) : undefined) ??
+      // Nothing matched. This resolves `ref` a second time to do it, which is
+      // a round trip spent on the way to an error -- worth it to keep the
+      // message, and the list of slugs to choose from, written in one place.
+      (await mustResolve(userId, ref, hints));
+
     return fileContext(userId, project, p.path);
   },
 
