@@ -98,12 +98,19 @@ export async function mustResolve(
   const shown = slugs.slice(0, SUGGESTIONS).join(", ");
   const rest = slugs.length - SUGGESTIONS;
 
+  // Nothing that reaches here can create anything. Most callers are reads, and
+  // the one creating path that does call this (`resolveOrCreate`) only gets
+  // here when the reference was not an absolute path -- which is exactly the
+  // case where registering is not on offer either. So the advice has to be
+  // about finding the project rather than making one, and the remote is what
+  // finds a repo the caller has already opened somewhere else: the thing most
+  // likely to be missing when a path stops matching.
   throw new BadRequest(
     `no project matches "${ref}". ` +
       (slugs.length
-        ? `Known slugs: ${shown}${rest > 0 ? ` (+${rest} more)` : ""}. `
-        : "You have no projects yet. ") +
-      `Pass an absolute path to create one.`,
+        ? `Known slugs: ${shown}${rest > 0 ? ` (+${rest} more)` : ""}. ` +
+          "Pass `project`, or `repo_url` if this is the same repository under a different path."
+        : "You have no projects yet. Call get_context with an absolute path to register one."),
   );
 }
 
