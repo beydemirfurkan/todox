@@ -12,6 +12,20 @@ export type NewContext = {
   body: string;
 };
 
+/** The newest curated note per project, loaded for every dashboard card at once. */
+export async function latestUpdatedByProjects(
+  projectIds: number[],
+): Promise<Map<number, string>> {
+  if (!projectIds.length) return new Map();
+  const rows = await all<{ project_id: number; updated_at: string }>(
+    `SELECT project_id, MAX(updated_at) AS updated_at
+       FROM contexts WHERE project_id IN (${projectIds.map(() => "?").join(",")})
+      GROUP BY project_id`,
+    projectIds,
+  );
+  return new Map(rows.map((row) => [row.project_id, row.updated_at]));
+}
+
 /**
  * A note as the briefing carries it.
  *

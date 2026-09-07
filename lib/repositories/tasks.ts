@@ -29,6 +29,20 @@ export type TaskPatch = Partial<
   Pick<Task, "title" | "body" | "status" | "priority" | "closed_at">
 >;
 
+/** One grouped read for the project dashboard, never one query per card. */
+export async function latestUpdatedByProjects(
+  projectIds: number[],
+): Promise<Map<number, string>> {
+  if (!projectIds.length) return new Map();
+  const rows = await all<{ project_id: number; updated_at: string }>(
+    `SELECT project_id, MAX(updated_at) AS updated_at
+       FROM tasks WHERE project_id IN (${projectIds.map(() => "?").join(",")})
+      GROUP BY project_id`,
+    projectIds,
+  );
+  return new Map(rows.map((row) => [row.project_id, row.updated_at]));
+}
+
 /** The only columns `update` will write. See `setClause` for why this exists. */
 const COLUMNS = ["title", "body", "status", "priority", "closed_at"] as const;
 
