@@ -102,6 +102,36 @@ describe("isInside", () => {
   it("does not care which separator was used", () => {
     expect(isInside("C:/Users/me/todox/lib", "C:\\Users\\me\\todox")).toBe(true);
   });
+
+  /**
+   * A space in a segment is ordinary on Windows -- "C:/Users/Furkan Beydemir"
+   * is where this repo actually sits on one of the machines that opens it --
+   * and nothing here should treat it as a separator or trim it.
+   */
+  it("treats a space in a segment as part of the name", () => {
+    expect(isInside("C:/Users/Furkan Beydemir/todox/lib", "C:/Users/Furkan Beydemir/todox")).toBe(
+      true,
+    );
+    expect(isInside("C:/Users/Furkan/todox", "C:/Users/Furkan Beydemir/todox")).toBe(false);
+  });
+
+  /**
+   * The 8.3 short name is a DIFFERENT SEGMENT, not a different spelling of one,
+   * so no amount of folding here can match it against the long name -- and this
+   * asserts that, rather than pretending otherwise.
+   *
+   * It is deliberately not a bug in this file. Expanding `FURKAN~1` requires
+   * asking the filesystem, and this module's whole contract is that it never
+   * does. The expansion belongs to whoever holds the disk: `realpathSync.native`
+   * in the process that reports the path, before it is ever sent. What lives
+   * here is the reminder of which side that work is on.
+   */
+  it("cannot fold an 8.3 short name into its long name, and must not pretend to", () => {
+    expect(isInside("C:/Users/FURKAN~1/todox/lib", "C:/Users/Furkan Beydemir/todox")).toBe(false);
+    // Case still folds, so the failure above is about the segment and not about
+    // capitalisation quietly doing the work.
+    expect(isInside("C:/USERS/FURKAN~1/todox", "C:/Users/FURKAN~1/todox")).toBe(true);
+  });
 });
 
 describe("isAbsolutePath", () => {

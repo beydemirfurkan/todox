@@ -52,8 +52,15 @@ import { SERVER_INFO } from "../mcp/tools";
  * This is the macOS twin of the Windows 8.3 short-name problem already in the
  * log, and the same sentence covers both: the path a process reports for
  * itself is not always the path its project was registered under.
+ *
+ * `.native` rather than plain `realpathSync`, because only one of them covers
+ * the Windows half this comment claims. The JS implementation resolves
+ * symlinks and junctions and stops there, so `C:\Users\FURKAN~1\...` comes
+ * back unchanged; the native binding goes through the OS and answers with the
+ * long name. The comment was already right about the two problems being one --
+ * the code was only fixing the half the developers were standing on.
  */
-const TMP = realpathSync(tmpdir());
+const TMP = realpathSync.native(tmpdir());
 
 /** A throwaway repo the agent has never heard of, to prove auto-registration. */
 const SCRATCH = join(TMP, "todox-smoke-repo");
