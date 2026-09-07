@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { SHAPES } from "@/lib/services/rpc-schemas";
 import { instructions, registerTools, type Workspace } from "./tools";
@@ -16,7 +17,7 @@ type Registered = {
 };
 
 /** Captures registrations instead of speaking the protocol. */
-function harness(ws: Workspace) {
+function harness(ws: Workspace, answer: unknown = { ok: true }) {
   const tools = new Map<string, Registered>();
   const calls: { method: string; params: Record<string, unknown> }[] = [];
 
@@ -28,7 +29,7 @@ function harness(ws: Workspace) {
 
   registerTools(server, async (method, params) => {
     calls.push({ method, params });
-    return { ok: true };
+    return answer;
   }, ws);
 
   return { tools, calls };
@@ -91,8 +92,10 @@ describe("what each side fills in for itself", () => {
 
   it("a hosted server asks the agent for them instead", () => {
     const { tools } = harness(remoteWs);
-    expect(tools.get("get_context")!.config.inputSchema).toHaveProperty("repo_root");
-    expect(tools.get("get_context")!.config.inputSchema).toHaveProperty("repo_url");
+    const schema = tools.get("get_context")!.config.inputSchema as unknown as z.ZodType;
+    const advertised = JSON.stringify(z.toJSONSchema(schema));
+    expect(advertised).toContain('"repo_root"');
+    expect(advertised).toContain('"repo_url"');
     expect(tools.get("activity_report")!.config.inputSchema).toHaveProperty("tz");
   });
 
@@ -211,6 +214,65 @@ describe("the payload the agent receives", () => {
       expect(text, name).not.toBe("{}");
     }
   });
+
+  it("returns a compact receipt after creating a task", async () => {
+    const body = "A long handoff ".repeat(200);
+    const answer = {
+      task: {
+        id: 223,
+        title: "Repex reconciliation",
+        body,
+        status: "todo",
+        priority: 2,
+        created_at: "2026-09-07T16:31:05.888Z",
+        updated_at: "2026-09-07T16:31:05.888Z",
+      },
+      project: { slug: "invoice-to-xlsx-v2", name: "invoice-to-xlsx-v2" },
+      project_created: false,
+      warning: "keep this warning",
+      next: "keep this next step",
+    };
+
+    for (const workspace of [localWs, remoteWs]) {
+      const { tools } = harness(workspace, answer);
+      const result = await tools
+        .get("create_task")!
+        .handler({ cwd: "/repo", title: "Repex" });
+      const payload = payloadOf(result);
+      const task = payload.task as Record<string, unknown>;
+
+      expect(task).not.toHaveProperty("body");
+      expect(task.body_characters).toBe(body.length);
+      expect(payload.task_path).toBe("/p/invoice-to-xlsx-v2/t/223");
+      expect(payload.warning).toBe("keep this warning");
+      expect(payload.next).toBe("keep this next step");
+    }
+  });
+
+  it("leaves an unexpected create-task response untouched", async () => {
+    const answer = { error: "upstream shape changed" };
+    const { tools } = harness(remoteWs, answer);
+
+    const result = await tools
+      .get("create_task")!
+      .handler({ cwd: "/repo", title: "Repex" });
+
+    expect(payloadOf(result)).toEqual(answer);
+  });
+});
+
+describe("project reference schemas", () => {
+  it.each(["get_context", "get_file_context", "list_tasks", "create_task"])(
+    "%s advertises project OR cwd rather than two optional fields",
+    (name) => {
+      const schema = harness(remoteWs).tools.get(name)!.config.inputSchema as unknown as z.ZodType;
+      const json = z.toJSONSchema(schema) as { anyOf?: { required?: string[] }[] };
+      const required = json.anyOf?.flatMap((branch) => branch.required ?? []) ?? [];
+
+      expect(required).toContain("project");
+      expect(required).toContain("cwd");
+    },
+  );
 });
 
 /**

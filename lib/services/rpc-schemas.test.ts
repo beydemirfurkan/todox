@@ -182,7 +182,7 @@ describe("model field round-trips through parseParams on every method", () => {
     updateProject: { project: "x", summary: "y" },
     deleteProject: { project: "x", confirm: "x" },
     mergeProjects: { from: "x", into: "y", confirm: "x" },
-    createTask: { title: "x" },
+    createTask: { title: "x", cwd: "/repo" },
     updateTask: { task_id: 1, status: "doing" },
     logEntry: { task_id: 1, kind: "note", body: "x" },
     deleteEntry: { entry_id: 1 },
@@ -234,8 +234,25 @@ describe("repo_url reaches the resolver", () => {
       parseParams("getContext", { cwd: "/tmp", repo_url: "git@github.com:me/repo.git" }).repo_url,
     ).toBe("git@github.com:me/repo.git");
     expect(
-      parseParams("createTask", { title: "x", repo_url: "https://github.com/me/repo" }).repo_url,
+      parseParams("createTask", {
+        title: "x",
+        cwd: "/repo",
+        repo_url: "https://github.com/me/repo",
+      }).repo_url,
     ).toBe("https://github.com/me/repo");
+  });
+});
+
+describe("createTask project reference", () => {
+  const task = { title: "Capture the follow-up" };
+
+  it("accepts either an explicit project or the working directory", () => {
+    expect(() => parseParams("createTask", { ...task, project: "todox" })).not.toThrow();
+    expect(() => parseParams("createTask", { ...task, cwd: "/repo/todox" })).not.toThrow();
+  });
+
+  it("refuses a task whose destination cannot be resolved", () => {
+    expect(() => parseParams("createTask", task)).toThrow(/either `project` or `cwd`/);
   });
 });
 

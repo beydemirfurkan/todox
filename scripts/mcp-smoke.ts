@@ -145,6 +145,22 @@ const MODES: Mode[] = [
  */
 const CLIENT_NAME = "claude-code-smoke";
 
+interface ToolSchema {
+  properties?: Record<string, unknown>;
+  anyOf?: ToolSchema[];
+  required?: string[];
+}
+
+function propertyNames(schema: ToolSchema | undefined): string[] {
+  const direct = Object.keys(schema?.properties ?? {});
+  const alternatives = schema?.anyOf?.flatMap(propertyNames) ?? [];
+  return [...new Set([...direct, ...alternatives])];
+}
+
+function alternativeRequirements(schema: ToolSchema | undefined): string[] {
+  return schema?.anyOf?.flatMap((alternative) => alternative.required ?? []) ?? [];
+}
+
 /** The same run through whichever way in it was handed. */
 async function runSuite(mode: Mode, token: string) {
   console.log(`\n=========== ${mode.label} ===========`);
@@ -171,9 +187,7 @@ async function runSuite(mode: Mode, token: string) {
   // the schema must say so. Locally the process fills them in and hiding them
   // is what stops a model inventing a path it cannot see.
   const ctx = tools.tools.find((t) => t.name === "get_context");
-  const props = Object.keys(
-    (ctx?.inputSchema as { properties?: Record<string, unknown> })?.properties ?? {},
-  );
+  const props = propertyNames(ctx?.inputSchema as ToolSchema | undefined);
   const shows = props.includes("repo_root");
   if (shows === mode.local) {
     throw new Error(
@@ -192,24 +206,36 @@ async function runSuite(mode: Mode, token: string) {
   }
   console.log("repo_url advertised:", showsUrl);
 
+  const createTask = tools.tools.find((tool) => tool.name === "create_task");
+  const requirements = alternativeRequirements(createTask?.inputSchema as ToolSchema | undefined);
+  if (!requirements.includes("project") || !requirements.includes("cwd")) {
+    throw new Error("create_task must advertise project OR cwd as required alternatives");
+  }
+  console.log("create_task reference:", "project OR cwd");
+
   const text = async (name: string, args: Record<string, unknown> = {}) => {
     const r = await client.callTool({ name, arguments: args });
     return (r.content as { text: string }[])[0].text;
   };
 
   console.log("\n--- the agent starts with only a working directory ---");
+  const freshBody = "The agent only knew its working directory.";
   const fresh = JSON.parse(
     await text("create_task", {
       cwd: SCRATCH,
       title: "SMOKE: captured without being told the project",
-      body: "The agent only knew its working directory.",
+      body: freshBody,
       model: MODEL,
       // Remote cannot walk up looking for a .git, nor read one, so the agent
       // says where it is and what it is. Locally both are filled in for it.
       ...(mode.local ? {} : { repo_root: SCRATCH, repo_url: REMOTE }),
     }),
   );
+  if ("body" in fresh.task || fresh.task.body_characters !== freshBody.length) {
+    throw new Error("create_task receipt must report body length without echoing the body");
+  }
   console.log("project_created:", fresh.project_created, "| slug:", fresh.project.slug);
+  console.log("compact receipt:", `${fresh.task.body_characters} body characters`);
   const taskId = fresh.task.id;
 
   console.log("\n--- a nested file path resolves to the same project ---");

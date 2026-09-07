@@ -297,7 +297,7 @@ type RegisterTool = (
   config: {
     title: string;
     description: string;
-    inputSchema: z.ZodRawShape;
+    inputSchema: z.ZodRawShape | z.ZodType;
     annotations?: { readOnlyHint?: boolean; idempotentHint?: boolean };
   },
   handler: (args: Record<string, unknown>) => Promise<CallToolResult>,
@@ -312,6 +312,31 @@ type RegisterTool = (
  * is exactly the friction that gets a habit dropped.
  */
 const READ_ONLY = { readOnlyHint: true, idempotentHint: true } as const;
+
+/**
+ * Make the alternative project references visible in the MCP JSON schema.
+ *
+ * A Zod `refine` enforces this on the server but disappears when Zod converts
+ * it to JSON Schema. The model then sees two optional fields and can produce a
+ * call the server will always reject. Zod metadata adds the missing `anyOf`
+ * while keeping an object at the root, as required by the MCP SDK.
+ */
+function schemaWithProjectReference(shape: z.ZodRawShape): z.ZodType {
+  const project = shape.project;
+  const cwd = shape.cwd;
+  if (!(project instanceof z.ZodOptional) || !(cwd instanceof z.ZodOptional))
+    throw new Error("project and cwd must be optional fields");
+
+  return z
+    .object(shape)
+    .strict()
+    .refine((value) => value.project || value.cwd, {
+      message: "pass either `project` or `cwd`",
+    })
+    .meta({
+      anyOf: [{ required: ["project"] }, { required: ["cwd"] }],
+    });
+}
 
 /**
  * Adds the captured MCP client and a short list of client-specific notes to
@@ -336,6 +361,25 @@ async function appendClientNotes(ws: Workspace, result: unknown): Promise<unknow
     ...(result as Record<string, unknown>),
     client: info.name,
     notes: notesFor(clientFamily(info.name)),
+  };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+/** Keep the receipt useful without echoing the body the caller just sent. */
+function compactTaskCreation(result: unknown): unknown {
+  if (!isRecord(result) || !isRecord(result.task) || !isRecord(result.project)) return result;
+
+  const { body, ...task } = result.task;
+  const id = task.id;
+  const slug = result.project.slug;
+  if (typeof id !== "number" || typeof slug !== "string") return result;
+
+  return {
+    ...result,
+    task: { ...task, body_characters: typeof body === "string" ? body.length : 0 },
+    task_path: `/p/${slug}/t/${id}`,
   };
 }
 
@@ -503,6 +547,8 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
         result: unknown,
         args: Record<string, unknown>,
       ) => unknown | Promise<unknown>;
+      /** A project-resolved call must name a project or the working directory. */
+      referenceRequirement?: "project-or-cwd";
       /**
        * Fields only *this* tool fills in for itself locally.
        *
@@ -525,7 +571,12 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       ),
     ) as z.ZodRawShape;
 
-    register(name, { ...config, inputSchema: advertised }, async (raw) => {
+    const inputSchema =
+      opts.referenceRequirement === "project-or-cwd"
+        ? schemaWithProjectReference(advertised)
+        : advertised;
+
+    register(name, { ...config, inputSchema }, async (raw) => {
       const args = raw ?? {};
       // Forward only what the server's schema declares. It rejects unknown
       // keys, and it should: presentation options and any metadata the client
@@ -633,7 +684,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("list_projects", "listProjects", {
     title: "List projects",
     description:
-      "Every project in your todox account that holds a task or a note, with open/done counts and root paths. Cheap; call it when unsure which slug to use. Projects with nothing in them are left out and counted in `empty_projects_omitted` — they still resolve by slug or path, so pass `cwd` rather than looking for one here.",
+      "Every project in your todox account that holds a task or a note, newest activity first, with `activity_at`, open/done counts and root paths. Cheap; call it when unsure which slug to use. Projects with nothing in them are left out and counted in `empty_projects_omitted` — they still resolve by slug or path, so pass `cwd` rather than looking for one here.",
     annotations: READ_ONLY,
   });
 
@@ -682,23 +733,34 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       localInternal: ["repo_url"],
       after: checkLinkedFiles,
       transform: async (result, _args) => appendClientNotes(ws, result),
+      referenceRequirement: "project-or-cwd",
     },
   );
 
-  tool("get_file_context", "getFileContext", {
-    title: "What is known about one file",
-    description:
-      "Everything todox has recorded against a file: the tasks that touched it with their dead ends and decisions, and the context notes attached to it in full. Ask before editing a file you have not seen this session — a dead end costs nothing to read and an afternoon to rediscover. The path may be absolute or relative to the repository root; both fold to the same answer, so a note linked on one machine is found from another. Pass `cwd` or `project` to say which repository is being asked about.",
-    annotations: READ_ONLY,
-  });
+  tool(
+    "get_file_context",
+    "getFileContext",
+    {
+      title: "What is known about one file",
+      description:
+        "Everything todox has recorded against a file: the tasks that touched it with their dead ends and decisions, and the context notes attached to it in full. Ask before editing a file you have not seen this session — a dead end costs nothing to read and an afternoon to rediscover. The path may be absolute or relative to the repository root; both fold to the same answer, so a note linked on one machine is found from another. Pass `cwd` or `project` to say which repository is being asked about.",
+      annotations: READ_ONLY,
+    },
+    { referenceRequirement: "project-or-cwd" },
+  );
 
   /* --------------------------------------------------------------- tasks */
 
-  tool("list_tasks", "listTasks", {
-    title: "List tasks",
-    description: "Tasks in a project, filtered by status.",
-    annotations: READ_ONLY,
-  });
+  tool(
+    "list_tasks",
+    "listTasks",
+    {
+      title: "List tasks",
+      description: "Tasks in a project, filtered by status.",
+      annotations: READ_ONLY,
+    },
+    { referenceRequirement: "project-or-cwd" },
+  );
 
   tool(
     "get_task",
@@ -724,23 +786,27 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     // is asked for paths and nothing else -- asking it for a sha256 would be
     // asking it to invent one. Remote, the schema's own `{path, hash}` stands,
     // because there the agent is the one with the file.
-    local
-      ? {
-          localInternal: ["repo_url"],
-          overrides: {
-            files: z
-              .array(z.string())
-              .optional()
-              .describe("Absolute paths of files in play; hashed here for staleness"),
-          },
-          prepare: (p) => ({
-            ...p,
-            files: Array.isArray(p.files)
-              ? (p.files as string[]).map((path) => ({ path, hash: ws.hash(path) }))
-              : undefined,
-          }),
-        }
-      : {},
+    {
+      referenceRequirement: "project-or-cwd",
+      transform: compactTaskCreation,
+      ...(local
+        ? {
+            localInternal: ["repo_url"],
+            overrides: {
+              files: z
+                .array(z.string())
+                .optional()
+                .describe("Absolute paths of files in play; hashed here for staleness"),
+            },
+            prepare: (p) => ({
+              ...p,
+              files: Array.isArray(p.files)
+                ? (p.files as string[]).map((path) => ({ path, hash: ws.hash(path) }))
+                : undefined,
+            }),
+          }
+        : {}),
+    },
   );
 
   tool("update_task", "updateTask", {

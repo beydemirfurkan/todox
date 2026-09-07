@@ -650,7 +650,7 @@ const OBJECTS: Record<string, z.ZodType> = {
   // the right place to say. It used to be a runtime throw halfway through the
   // handler, so the tool advertised a call it would always refuse.
   ...Object.fromEntries(
-    (["getContext", "listTasks", "getFileContext", "recordObservation"] as const).map((name) => [
+    (["getContext", "listTasks", "getFileContext", "createTask", "recordObservation"] as const).map((name) => [
       name,
       z
         .object(SHAPES[name])

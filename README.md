@@ -277,7 +277,7 @@ you are changing the tools themselves.
 | tool | what it does |
 | --- | --- |
 | `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped in rows and in bytes, never truncated: every record keeps its id, kind, date and first line, and a `body` of null means the budget was spent — `get_task` reads it. Pass `focus` — a sentence about what the session is for — and both budgets are spent on the records that answer it rather than the newest ones, which is what lets them be smaller. |
-| `create_task` | Capture work. Pass `cwd` and it finds the project. Registering a **new** one also needs `repo_root` or `repo_url`: todox stores repositories, not directories, and a bare `cwd` is wherever the agent happened to be standing. |
+| `create_task` | Capture work. Pass `cwd` or an explicit `project`; the tool schema requires one before the call runs. Registering a **new** one also needs `repo_root` or `repo_url`. The receipt returns the task path and body length without echoing the body. |
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. `answers_entry_id` closes a `question` — the only thing that does. |
 | `delete_entry` | For an entry that was wrong when it was written. One overtaken by later work is history, not an error — append instead. |
@@ -291,7 +291,7 @@ you are changing the tools themselves.
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
 | `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier.  Words that only one of the two languages treats as noise are dropped, so a question does not match every record containing the word "a". `kinds` narrows to dead ends or decisions; `project` stops it looking elsewhere.|
 | `get_task` | One task with its log and linked files. |
-| `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. |
+| `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. Projects are newest-activity-first and carry `activity_at`. |
 | `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. |
 | `delete_project` | The way back from a mistyped `cwd`. Takes the project and everything under it; `confirm` must be the slug. |
 | `merge_projects` | The way back from one repo registered twice. Moves tasks, notes and paths into the surviving project; `confirm` must be the slug of the one being merged away. |
