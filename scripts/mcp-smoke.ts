@@ -344,6 +344,63 @@ async function runSuite(mode: Mode, token: string) {
     `by absolute and by relative: task #${taskId}, dead ends: ${known.tasks[0].dead_ends.length}`,
   );
 
+  /*
+   * The cwd that is not the repository, which is the shape this call fails in
+   * for real. Several clients run every session from a per-prompt scratch
+   * folder, so `cwd` points at a directory that is not a checkout of anything
+   * -- and this was the one project-resolved tool with nothing else to go on.
+   * It answered "no project matches", to the tool the instructions say to call
+   * before every edit.
+   *
+   * Two ways back, and they are tested apart because either one alone would
+   * make the other look like it works.
+   */
+  console.log("\n--- and it is still answerable when the cwd is not the repo ---");
+
+  // 1. The path carries it. No remote anywhere in this call: the file being
+  //    asked about is itself inside the repository, which is the one argument
+  //    a scratch-folder session still gets right.
+  const fromScratchDir = JSON.parse(
+    await text("get_file_context", { path: marker, cwd: NOT_A_REPO }),
+  );
+  if (!fromScratchDir.tasks.some((t: { id: number }) => t.id === taskId))
+    throw new Error(`an absolute path did not carry the project from ${NOT_A_REPO}`);
+  if (fromScratchDir.path !== "package.json")
+    throw new Error(
+      `expected the repo-relative path, got ${JSON.stringify(fromScratchDir.path)}`,
+    );
+
+  /*
+   * 2. The remote carries it, where the path cannot: a repo-relative name with
+   *    a working directory that is not the repository. Nothing in this call is
+   *    an absolute path, so the fallback above is not what answers it.
+   *
+   *    HOSTED ONLY, and the asymmetry is the point rather than a gap in the
+   *    suite. The local process derives `repo_url` by walking up from the
+   *    working directory, so a cwd that is not a checkout has no remote to
+   *    give and this pair is genuinely unanswerable there -- correctly so.
+   *    Over HTTP the agent is the one holding the disk and can send the remote
+   *    it already knows, which is exactly why the field has to be on the
+   *    schema: it is the only thing a hosted caller can offer once its
+   *    directory stops matching.
+   */
+  if (!mode.local) {
+    const fromRemote = JSON.parse(
+      await text("get_file_context", {
+        path: "package.json",
+        cwd: NOT_A_REPO,
+        repo_url: REMOTE,
+      }),
+    );
+    if (!fromRemote.tasks.some((t: { id: number }) => t.id === taskId))
+      throw new Error("the remote did not identify the repository a bare cwd could not");
+  }
+  console.log(
+    mode.local
+      ? "a scratch cwd still finds the repository through the file's own path"
+      : "a scratch cwd and a bare remote both still find the repository",
+  );
+
   // A standing rule about a file, findable from the file. The column and its
   // unique index existed; no surface could write one.
   const fileNote = JSON.parse(
@@ -438,12 +495,32 @@ async function runSuite(mode: Mode, token: string) {
    * one" claim to be something a stranger could check rather than believe.
    */
   console.log("\n--- one account, two repos, no bleeding ---");
-  await text("create_task", {
-    cwd: OTHER,
-    title: "SMOKE: work in the second repo",
-    model: MODEL,
-    ...(mode.local ? {} : { repo_root: OTHER }),
-  });
+  const other = JSON.parse(
+    await text("create_task", {
+      cwd: OTHER,
+      title: "SMOKE: work in the second repo",
+      model: MODEL,
+      ...(mode.local ? {} : { repo_root: OTHER }),
+    }),
+  ).project.slug;
+
+  /*
+   * A named project outranks the path, and this is where that can finally be
+   * asked: it needs two projects to be wrong in.
+   *
+   * `get_file_context` falls back to the file's own absolute path when the
+   * working directory identifies nothing. A fallback that also fired when the
+   * caller HAD said which project would be worse than the bug it fixes -- it
+   * would answer confidently about the wrong repository, and the answer would
+   * look exactly like a right one.
+   */
+  const named = JSON.parse(await text("get_file_context", { path: marker, project: other }));
+  if (named.project.slug !== other)
+    throw new Error(
+      `an explicit project lost to the path: asked for ${other}, got ${named.project.slug}`,
+    );
+  if (named.tasks.some((t: { id: number }) => t.id === taskId))
+    throw new Error("a path from the first repo dragged its tasks into the second");
 
   // A task that is still open, because a briefing carries open work: the
   // dead end above went on a task this suite had already closed, so the

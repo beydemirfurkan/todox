@@ -297,6 +297,33 @@ describe("getFileContext", () => {
       /invalid params/,
     );
   });
+
+  /**
+   * The field this tool was missing. Every other project-resolved method
+   * accepted the remote and was found by it when a `cwd` stopped matching; this
+   * one dropped straight to comparing absolute paths, so a client whose working
+   * directory is a per-prompt scratch folder got "no project matches" from the
+   * call the instructions tell it to make before every edit.
+   *
+   * The tool wrapper only fills in what the schema declares -- `accepted` is
+   * `Object.keys(shape)` -- so the field being absent here is the whole reason
+   * it was never sent.
+   */
+  it("accepts the remote, which is what finds the repo when the cwd does not", () => {
+    expect(
+      parseParams("getFileContext", {
+        path: "lib/auth.ts",
+        cwd: "/tmp/scratch/2026-09-07/some-prompt",
+        repo_url: "git@github.com:me/repo.git",
+      }).repo_url,
+    ).toBe("git@github.com:me/repo.git");
+  });
+
+  it("still refuses a field it does not declare", () => {
+    expect(() =>
+      parseParams("getFileContext", { path: "lib/auth.ts", cwd: "/repo", repo_root: "/repo" }),
+    ).toThrow(/invalid params/);
+  });
 });
 
 describe("mergeProjects", () => {
