@@ -1,17 +1,8 @@
-/**
- * A paragraph clamped to a few lines, with a control that shows the rest.
- *
- * The rails that list context notes have always clamped to four lines, and
- * until this existed nothing ever showed what was cut: the comment claiming
- * the full text was "one click away on hover/expand" described a control
- * nobody had built, and a note longer than four lines simply could not be read
- * in the app. That is the opposite of what the log is for.
- *
- * `<summary>` has to be the first child of `<details>` for the parser, and the
- * control belongs underneath the text it reveals, so the order is swapped in
- * the layout rather than in the markup. No JavaScript: `<details>` is the
- * disclosure widget the platform already ships, and it announces its own state.
- */
+"use client";
+
+import { useId, useState } from "react";
+
+/** A paragraph clamped to four lines, with the full text always reachable. */
 export function ExpandableText({
   text,
   more,
@@ -24,17 +15,26 @@ export function ExpandableText({
   className?: string;
 }) {
   const body = `break-words whitespace-pre-wrap ${className}`;
+  const [isExpanded, setIsExpanded] = useState(false);
+  const contentId = useId();
 
   if (!isLongerThanTheClamp(text)) return <p className={body}>{text}</p>;
 
   return (
-    <details className="group flex flex-col">
-      <summary className="link-more order-2 mt-1.5 self-start">
-        <span className="group-open:hidden">{more}</span>
-        <span className="hidden group-open:inline">{less}</span>
-      </summary>
-      <p className={`line-clamp-4 group-open:line-clamp-none ${body}`}>{text}</p>
-    </details>
+    <div>
+      <p id={contentId} className={`${isExpanded ? "" : "line-clamp-4"} ${body}`}>
+        {text}
+      </p>
+      <button
+        type="button"
+        className="link-more mt-1.5"
+        aria-controls={contentId}
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((current) => !current)}
+      >
+        {isExpanded ? less : more}
+      </button>
+    </div>
   );
 }
 

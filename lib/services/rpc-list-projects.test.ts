@@ -29,8 +29,14 @@ vi.mock("../repositories/tool-usage", async (importOriginal) => ({
 }));
 
 const projects = vi.hoisted(() => ({ list: vi.fn() }));
-const tasks = vi.hoisted(() => ({ countsByProject: vi.fn() }));
-const contexts = vi.hoisted(() => ({ projectIdsWithNotes: vi.fn() }));
+const tasks = vi.hoisted(() => ({
+  countsByProject: vi.fn(),
+  latestUpdatedByProjects: vi.fn(),
+}));
+const contexts = vi.hoisted(() => ({
+  projectIdsWithNotes: vi.fn(),
+  latestUpdatedByProjects: vi.fn(),
+}));
 
 vi.mock("../repositories/projects", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../repositories/projects")>()),
@@ -56,11 +62,15 @@ const project = (id: number, slug: string) => ({
   root_path: `/repo/${slug}`,
   summary: null,
   share_token: null,
+  created_at: `2026-09-${String(id).padStart(2, "0")}T00:00:00.000Z`,
 });
 
 const EMPTY_COUNTS = { todo: 0, doing: 0, blocked: 0, done: 0, dropped: 0 };
 
-type Listed = { projects: { slug: string }[]; empty_projects_omitted: number };
+type Listed = {
+  projects: { slug: string; activity_at: string }[];
+  empty_projects_omitted: number;
+};
 
 const list = () => invoke(CTX, "listProjects", {}) as Promise<Listed>;
 
@@ -68,7 +78,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   usage.record.mockResolvedValue(undefined);
   contexts.projectIdsWithNotes.mockResolvedValue(new Set<number>());
+  contexts.latestUpdatedByProjects.mockResolvedValue(new Map());
   tasks.countsByProject.mockResolvedValue({ map: new Map(), empty: EMPTY_COUNTS });
+  tasks.latestUpdatedByProjects.mockResolvedValue(new Map());
   projects.list.mockResolvedValue([]);
 });
 
@@ -83,6 +95,7 @@ describe("what a project has to carry to be listed", () => {
     const { projects: shown, empty_projects_omitted } = await list();
 
     expect(shown.map((p) => p.slug)).toEqual(["has-tasks"]);
+    expect(shown[0].activity_at).toBe("2026-09-01T00:00:00.000Z");
     expect(empty_projects_omitted).toBe(0);
   });
 
@@ -125,7 +138,7 @@ describe("saying what was left out", () => {
 
     const { projects: shown, empty_projects_omitted } = await list();
 
-    expect(shown.map((p) => p.slug)).toEqual(["has-tasks", "rules-only"]);
+    expect(shown.map((p) => p.slug)).toEqual(["rules-only", "has-tasks"]);
     expect(empty_projects_omitted).toBe(2);
   });
 

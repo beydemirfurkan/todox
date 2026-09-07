@@ -11,7 +11,9 @@ your client reads as global instructions.
    id. Writes record it on the row; reads use it as telemetry.
 
 3. When work that will not finish this session comes up, call `create_task`
-   with `cwd` and the goal in `body`. Status moves with `update_task`.
+   with `cwd` (or an explicit `project`) and the goal in `body`. Its compact
+   receipt confirms the task path and saved body length without echoing the
+   body. Status moves with `update_task`.
 
 4. Before stopping, call `log_entry(kind:'handoff')` on every task you
    touched, and `log_entry(kind:'dead_end')` for every approach that did not

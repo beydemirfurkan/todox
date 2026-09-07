@@ -22,6 +22,7 @@ import {
   assertTask,
 } from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
+import * as projectActivity from "./project-activity";
 import { mustResolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
@@ -97,7 +98,7 @@ export const methods = {
    */
   listProjects: async ({ userId }) => {
     const [rows, counts, withNotes] = await Promise.all([
-      projectsRepo.list(userId),
+      projectActivity.listRecent(userId),
       tasksRepo.countsByProject(userId),
       contextsRepo.projectIdsWithNotes(userId),
     ]);
@@ -110,6 +111,7 @@ export const methods = {
         name: p.name,
         root_path: p.root_path,
         summary: p.summary,
+        activity_at: p.activity_at,
         shared: Boolean(p.share_token),
         counts: counts.map.get(p.id) ?? counts.empty,
       })),

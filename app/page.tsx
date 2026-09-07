@@ -12,8 +12,8 @@ import * as contexts from "@/lib/repositories/contexts";
 import * as entriesRepo from "@/lib/repositories/entries";
 import * as invitationsRepo from "@/lib/repositories/project-invitations";
 import * as memberships from "@/lib/repositories/project-memberships";
-import * as projects from "@/lib/repositories/projects";
 import * as tasks from "@/lib/repositories/tasks";
+import * as projectActivity from "@/lib/services/project-activity";
 import {
   addContextAction,
   clearEmptyProjectAction,
@@ -61,7 +61,7 @@ export default async function Home() {
     );
   // One counts query for the whole page instead of one per project card.
   const [allProjects, globalContext, counts, connected] = await Promise.all([
-    projects.list(user.id),
+    projectActivity.listRecent(user.id),
     contexts.listByProject(user.id, null),
     tasks.countsByProject(user.id),
     // Rides along rather than costing a round trip of its own.
@@ -71,12 +71,12 @@ export default async function Home() {
    * Owned, and empty for everybody -- not just for me.
    *
    * Both halves were wrong first time round and both were found by building
-   * the case. `projects.list` answers with projects shared WITH this account
-   * as well as its own, and `clearEmptyProjectAction` asserts ownership -- so
-   * a shared project appeared in this list and its button threw. And notes
-   * were counted per author, so a project holding only its owner's standing
-   * rules read as empty to a member. `removeIfEmpty` refuses on any note by
-   * anyone, which is the definition this list now matches.
+   * the case. The project activity list answers with projects shared WITH this
+   * account as well as its own, and `clearEmptyProjectAction` asserts ownership
+   * -- so a shared project appeared in this list and its button threw. And
+   * notes were counted per author, so a project holding only its owner's
+   * standing rules read as empty to a member. `removeIfEmpty` refuses on any
+   * note by anyone, which is the definition this list now matches.
    */
   const owned = allProjects.filter((p) => p.user_id === user.id);
   // Both of these need the project list first, so they wait -- but they wait
@@ -236,6 +236,9 @@ export default async function Home() {
                   </Chip>
                 )}
               </div>
+              <p className="mono mt-2 text-[11px] text-faint">
+                {t("updated")} {ago(p.activity_at, t)}
+              </p>
               {p.root_path && (
                 <p className="mono mt-3 truncate text-[12px] text-faint">{p.root_path}</p>
               )}
