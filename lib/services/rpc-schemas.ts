@@ -64,7 +64,7 @@ const model = z
   .string()
   .max(MAX.line)
   .optional()
-  .describe("Your own model id, e.g. 'claude-opus-5'. Always pass this.");
+  .describe("Your model id, e.g. 'claude-opus-5'.");
 
 const projectRef = z
   .string()
@@ -86,7 +86,7 @@ const fromObservation = z
   .int()
   .optional()
   .describe(
-    "The id of an unverified observation from get_context that this record is based on. It marks the observation handled, so it stops appearing in the briefing — use it whenever you write up something an observation told you, and write the body yourself rather than copying the observation.",
+    "Id of the get_context observation this record writes up. Marks it handled so it leaves the briefing; write the body yourself.",
   );
 
 /**
@@ -97,7 +97,7 @@ const repoRoot = z
   .string()
   .max(MAX.path)
   .optional()
-  .describe("Absolute path of the repository root containing `cwd` -- the directory holding .git. Registering a NEW project needs this or `repo_url`: todox stores repositories, not directories, and a bare `cwd` is a directory you happen to be standing in.");
+  .describe("Absolute path of the directory holding .git above `cwd`. Registering a new project needs this or `repo_url`.");
 
 /**
  * How the server recognises this repo somewhere other than this machine.
@@ -113,7 +113,7 @@ const repoIdentity = z
   .max(MAX.line)
   .optional()
   .describe(
-    "Output of `git remote get-url origin` for this repo. This is how todox recognises the same repository when you open it on another machine — without it, a second machine registers a duplicate project and the history splits in two.",
+    "Output of `git remote get-url origin`, verbatim. What keeps the same repo on another machine from becoming a second project.",
   );
 
 /** A path or a slug arriving from a caller, wherever one is accepted. */
@@ -128,7 +128,7 @@ const repoUrl = z
   .max(MAX.line)
   .optional()
   .describe(
-    "Output of `git remote get-url origin`, verbatim — ssh or https, both fine. This is what identifies the project anywhere other than this one machine.",
+    "Output of `git remote get-url origin`, verbatim (ssh or https). The project's identity on every machine.",
   );
 
 /** Accepts anything `new Date()` understands, which is what `resolvePeriod` uses. */
@@ -153,7 +153,7 @@ export const SHAPES = {
     root_path: ref.optional().describe("Absolute path of the repo/working dir"),
     repo_url: repoUrl,
     summary: z.string().max(MAX.summary).optional().describe(
-      "What this repository IS, for somebody who has never seen it -- one or two sentences, the way a site's meta description reads. Not a changelog, not a status, not what changed recently: those are what tasks and the log are for, and a summary that carries them goes stale the day after it is written. This is the first thing on the project page and it is capped, so write the sentence you would give a new colleague in a corridor.",
+      "What this repository IS, in one or two sentences for somebody who has never seen it -- not a changelog or a status, those go stale.",
     ),
     model,
   },
@@ -164,7 +164,7 @@ export const SHAPES = {
     root_path: ref.optional(),
     repo_url: repoUrl,
     summary: z.string().max(MAX.summary).optional().describe(
-      "What this repository IS, for somebody who has never seen it -- one or two sentences, the way a site's meta description reads. Not a changelog, not a status, not what changed recently: those are what tasks and the log are for, and a summary that carries them goes stale the day after it is written. This is the first thing on the project page and it is capped, so write the sentence you would give a new colleague in a corridor.",
+      "What this repository IS, in one or two sentences for somebody who has never seen it -- not a changelog or a status, those go stale.",
     ),
     model,
   },
@@ -184,7 +184,7 @@ export const SHAPES = {
       .string()
       .max(MAX.line)
       .describe(
-        "The project's slug, typed again. Everything under it goes with it: tasks, log entries, notes and file links. Ask the human first.",
+        "The project's slug, typed again. Everything under it goes with it. Ask the human first.",
       ),
     model,
   },
@@ -229,14 +229,14 @@ export const SHAPES = {
       .boolean()
       .optional()
       .describe(
-        "Register a project for this repo if the path matches none. Defaults to true when what you passed is an absolute path, so a first session in a new repo works without a second call. Registering needs `repo_root` or `repo_url` as well -- a path on its own is not evidence of a repository.",
+        "Register a project if the path matches none. Defaults to true for an absolute path; needs `repo_root` or `repo_url` as well.",
       ),
     focus: z
       .string()
       .max(MAX.line)
       .optional()
       .describe(
-        "What this session is about, in a sentence -- the bug, the feature, the file. Both budgets are spent against it -- the standing notes AND the log -- so the bodies that come back are the ones about what you asked instead of whichever were written most recently. Send it whenever you know; it can only move a record up the list, never drop one, so a focus that matches nothing costs nothing.",
+        "What this session is about, in a sentence. The note and log budgets are spent on what matches it instead of what is newest; it can only move a record up, never drop one.",
       ),
     repo_root: repoRoot,
     repo_url: repoIdentity,
@@ -308,14 +308,14 @@ export const SHAPES = {
     kind: z
       .enum(ENTRY_KINDS)
       .describe(
-        "decision — why it is this way, so nobody re-argues it. dead_end — what was tried and failed, and why; the whole cost of one is paid by the session that does not read it. handoff — the state you are leaving, detailed enough to continue without asking. question — something only the developer can settle that you are leaving open on purpose; not for anything you could look up. note — anything else worth keeping.",
+        "decision: why it is this way. dead_end: what was tried and failed, and why. handoff: the state you are leaving, enough to continue without asking. question: something only the developer can settle, left open on purpose. note: anything else worth keeping.",
       ),
     body: z
       .string()
       .min(1)
       .max(MAX.text)
       .describe(
-        "Write for a stranger, not for yourself. One entry says one thing: what was decided and why it beat the alternative, or what was tried and how it failed. Not a transcript of the session — measurements, file listings and options nobody chose belong in the task body or a context note, and an entry that repeats what the diff already shows is noise the next session reads past. Reports and briefings show the opening of a body, so the first paragraph has to stand on its own; the length after it is for whoever follows the link.",
+        "One thing, for a stranger: the first line is the headline the briefing shows, the body a screen at most. Measurements and listings go in the task body or a note, not here.",
       ),
     author: z.enum(["agent", "human"]).optional(),
     answers_entry_id: z
@@ -323,7 +323,7 @@ export const SHAPES = {
       .int()
       .optional()
       .describe(
-        "The id of a `question` entry on this same task that this entry settles. A question with an answer stops being open: it drops out of the briefing and out of report windows, while both it and the answer stay readable through get_task. Use it whenever you resolve something a previous session had to ask about — it is the only way a question ever closes.",
+        "Id of the `question` entry on this task that this entry settles. The only way a question closes; both stay readable through get_task.",
       ),
     from_observation_id: fromObservation,
     model,
@@ -495,14 +495,14 @@ export const SHAPES = {
     project: ref
       .optional()
       .describe(
-        "Narrow to one project — a slug, a name, or any absolute path inside it. Leave it out to search everything, which is usually right: the answer to 'have I hit this before?' is often in a different repository. Account-wide notes come back either way, because a standing rule that applies to every project applies to this one.",
+        "Narrow to one project (slug, name or path). Leave it out to search everything; account-wide notes come back either way.",
       ),
     kinds: z
       .array(z.enum([...new Set([...ENTRY_KINDS, ...CONTEXT_KINDS])] as [string, ...string[]]))
       .min(1)
       .optional()
       .describe(
-        "Only these kinds of record: 'dead_end' for 'has this been tried?', 'decision' for 'why is it like this?', 'gotcha' for 'what will bite me?'. Tasks have no kind, so asking for any excludes them and leaves the log and the notes.",
+        "Only these kinds: 'dead_end' (has this been tried?), 'decision' (why is it like this?), 'gotcha' (what will bite me?). Tasks have no kind and are excluded.",
       ),
     // Unbounded, this is three unindexed ILIKE scans with no ceiling.
     limit: z.number().int().min(1).max(100).optional(),
@@ -522,7 +522,7 @@ export const SHAPES = {
       .max(64)
       .optional()
       .describe(
-        "IANA timezone the period is measured in, e.g. 'Europe/Istanbul'. Defaults to the account's. Send yours so 'today' means the developer's today.",
+        "IANA timezone the period is measured in, e.g. 'Europe/Istanbul'; send it so 'today' is the developer's.",
       ),
     model,
   },

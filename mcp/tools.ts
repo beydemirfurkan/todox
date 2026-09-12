@@ -55,210 +55,99 @@ export type Workspace = {
 export type Invoker = (method: MethodName, params: Record<string, unknown>) => Promise<unknown>;
 
 const BASE = [
-  "todox is the persistent working memory for this developer's projects.",
+  "todox is the persistent working memory for this developer's projects: what",
+  "was decided and why, what was tried and failed, what is still open, and where",
+  "the last session stopped. Written agent-to-agent, read by a human over the",
+  "shoulder. Not everything is worth keeping: an entry that restates the diff,",
+  "or a task for something you are finishing now, is noise the next session",
+  "reads past.",
   "",
-  "WHAT IT IS FOR: you start every session knowing nothing about the last one.",
-  "The developer pays for that twice -- once explaining the project again, and",
-  "once when you walk into a wall a previous session already found. todox is",
-  "where that knowledge is kept between sessions: what was decided and why,",
-  "which approaches were tried and failed, what is still open, and what state",
-  "the last session left things in. It is not a task tracker for humans to",
-  "groom; it is written agent-to-agent, with a human reading over the shoulder.",
+  "START: call get_context with `cwd` (absolute path). It resolves the project,",
+  "registers a new repo, and returns the standing rules, decisions, dead ends",
+  "and open tasks. Send `focus` -- one sentence on what this session is for --",
+  "so the budget is spent on relevant notes rather than the newest; a focus that",
+  "matches nothing changes nothing.",
   "",
-  "WHEN NOT TO USE IT: not everything is worth keeping. Do not open a task for",
-  "something you are finishing right now, and do not log an entry that only",
-  "restates what the diff already shows. The test is whether a session two",
-  "weeks from now would be worse off without it. A log nobody trusts because",
-  "it is full of noise is the failure mode to avoid.",
+  "LOOK UP: search covers every project. Ask it in words -- the query is",
+  "parsed and ranked -- and quote a phrase to require it. kinds:['dead_end'] answers",
+  "'has this been tried?', kinds:['decision'] 'why is it like this?'.",
+  "BEFORE YOU EDIT A FILE: get_file_context(path) gives the tasks, dead ends and",
+  "notes attached to it -- the cheapest call here and the one most worth making.",
+  "DO NOT READ list_tasks status:'all' or activity_report period:'all': they",
+  "return everything ever, bodies included.",
   "",
-  "START OF SESSION: call get_context with `cwd` set to the absolute path of",
-  "the directory you are working in. It resolves the project from that path --",
-  "registering one for the repo if todox has never seen it -- and returns the",
-  "standing rules, prior decisions, known dead ends and in-flight tasks. Do",
-  "this before planning any non-trivial work. Prefer it to list_tasks: it is",
-  "one call and it carries the reasoning as well as the list.",
+  "CAPTURE: create_task (pass `cwd`) for anything the developer mentions that",
+  "will not finish this session. Registering a NEW project needs `repo_root` or",
+  "`repo_url` -- a bare cwd is a directory, not a repository; the refusal names",
+  "what to send.",
   "",
-  "Send `focus` with it whenever the developer has said what they want --",
-  "'fix the login redirect loop', 'speed up search'. The briefing has a budget",
-  "and without a focus it spends it on the newest notes, which is a guess; with",
-  "one it spends it on the notes about what you are here to do. A standing rule",
-  "written a year ago can be the one that matters, and recency will never find",
-  "it. A focus that matches nothing changes nothing, so there is no cost to",
-  "sending it and no reason to leave it out.",
+  "WHILE WORKING: update_task to move status -- 'doing' when you actually start,",
+  "that is what makes time reports real. log_entry for 'decision' (what and why",
+  "it beat the alternative), 'dead_end' (what failed and how -- the highest-value",
+  "entry there is), 'question' (something only the developer can settle that",
+  "you must leave open; say what you would do unanswered; never for what search",
+  "or the diff would answer). When you settle a question, log the answer with",
+  "answers_entry_id -- nothing else closes one. add_context for what outlives a",
+  "task: a convention, a gotcha, a standing preference; omit project and cwd to",
+  "make it account-wide.",
   "",
-  "LOOKING THINGS UP: search covers every project you have. Reach for it when",
-  "the question is 'have I hit this before?' or 'where did we decide X?' --",
-  "the answer is often in a project other than this one. Ask it in words: the",
-  "query is parsed and ranked, so a whole question works and the record that",
-  "answers most of it comes back first. Quote a phrase to require it exactly.",
-  "Narrow with kinds when the question has a shape: kinds:['dead_end'] for",
-  "'has this been tried?', kinds:['decision'] for 'why is it like this?'. Pass",
-  "project only when you mean to stop looking elsewhere.",
+  "WRITE SHORT. One entry says one thing. The briefing shows every entry's",
+  "FIRST LINE and pays for whole bodies only while a byte budget lasts, so the",
+  "first line is a headline and the body is a screen at most -- state, next",
+  "step, what to watch. Measurements, listings and options nobody chose go in",
+  "the task body or a note, not the log. A handoff nobody finishes reading is",
+  "the failure mode, not a short one.",
   "",
-  "BEFORE YOU EDIT A FILE: get_file_context takes a path and answers with the",
-  "tasks that touched it, their dead ends, and any standing note attached to",
-  "it. This is the cheapest call here and the one most worth making unasked --",
-  "the whole cost of a dead end is paid by the session that does not read it.",
+  "OBSERVATIONS: a briefing MAY carry `observations` -- what a process saw git",
+  "do while an earlier session ran (branch, commits, dirty files). Evidence,",
+  "never intent: do not repeat one to the developer as a recorded decision. If",
+  "one explains something worth keeping, write the real record with",
+  "from_observation_id; otherwise leave it, it expires. Whether you see any",
+  "depends on the transport -- the note at the end says.",
   "",
-  "WHAT NOT TO READ: list_tasks with status:'all' and activity_report with",
-  "period:'all' return everything there has ever been, bodies included. They",
-  "will fill your context with a backlog instead of the work in front of you.",
-  "Ask for the window you actually need.",
+  "Pass `model` (your model id) on create_task, update_task, log_entry; it is",
+  "stored on the row so reports can say which model did what.",
   "",
-  "ASKING WHAT YOU CANNOT ANSWER: when you hit something only the developer can",
-  "settle -- which of two designs they want, whether a risk is acceptable, an",
-  "access or a credential you do not have -- and the session is going to end",
-  "before they settle it, log_entry(kind:'question') on the task. It is the one",
-  "kind that exists to leave a gap open on purpose, and it is what stops the",
-  "next session arriving at the same fork and guessing differently. Say what",
-  "you would do if nobody answers, so the question is still useful unanswered.",
+  "BEFORE YOU FINISH: log_entry(kind:'handoff') on every task you touched,",
+  "enough for a fresh session to continue without asking. If you stop without",
+  "finishing a task you set to 'doing', set it back to 'todo' or 'blocked': a",
+  "task left 'doing' by a session that ended is the log going stale, and the",
+  "next briefing will say so.",
   "",
-  "Not for anything you could find out. A question that search, the diff or the",
-  "file itself would have answered is work handed back to the developer, and it",
-  "costs more than it saved. If nothing has to stop until it is answered, it is",
-  "a note, not a question.",
-  "",
-  "ANSWERING WHAT WAS ASKED: a briefing hands you open_questions with their",
-  "ids and their first lines; when its budget did not reach one, `body` is",
-  "null and get_task has the rest, so read that before you answer a question",
-  "you have only seen the head of. If you work one out -- or the developer",
-  "tells you -- log the",
-  "answer with answers_entry_id set to that question. Until something does,",
-  "that question comes back in every briefing and every report for ever, and a",
-  "list of questions nobody can close stops being read. This is the cheapest",
-  "way to make the next session's briefing shorter and truer than yours was.",
-  "",
-  "WHAT NOBODY WROTE DOWN: a briefing MAY also carry `observations`, and they",
-  "are not entries. Only a process running on the developer's machine can watch",
-  "git, so whether you ever see one depends on how you are connected -- the",
-  "note at the end of these instructions says which side you are on. Nobody",
-  "decided they were worth keeping -- a process watched git",
-  "while an earlier session ran and recorded what changed: a branch, a count of",
-  "commits, their subject lines, how many files were dirty. Read them as",
-  "evidence, never as intent. They tell you what happened to the tree, and",
-  "nothing at all about why, so do not repeat one back to the developer as if",
-  "it were a decision somebody recorded.",
-  "",
-  "They are most useful when the log is thin: a session that ended without a",
-  "handoff still leaves these, so `observations` is often the only answer to",
-  "'what was the last session in the middle of?'. Ten commits on a branch whose",
-  "task has no handoff is worth opening the diff for.",
-  "",
-  "If one of them turns out to explain something a later session would want,",
-  "write the real record and pass from_observation_id: log_entry for something",
-  "about a task, add_context for a standing rule. Write the body yourself --",
-  "the observation is the prompt, not the content -- and the observation stops",
-  "arriving in the briefing. DO NOT promote them to tidy the list. Most",
-  "observations are ordinary work and deserve no entry at all; they expire on",
-  "their own, and a log filled with commit counts is the failure this whole",
-  "separation exists to prevent.",
-  "",
-  "CAPTURING WORK: whenever the developer mentions something that will not be",
-  "finished in this session -- a follow-up, a deferred fix, a known rough",
-  "edge -- call create_task. Pass `cwd` and todox finds the right project; the",
-  "path decides and you do not need to ask which one. Only ask the human if",
-  "the work clearly belongs somewhere other than the current repo.",
-  "",
-  "REGISTERING A NEW ONE needs evidence that the path is a repository, and",
-  "not every caller can produce it -- so this is no longer automatic from a",
-  "`cwd` alone. See the note at the end of these instructions for which side",
-  "you are on and what to send. A directory nobody can show is a checkout is",
-  "refused with a message naming the two parameters that fix it.",
-  "",
-  "WHILE WORKING: update_task to move status (set it to 'doing' when you",
-  "actually start -- that is what makes the time reports real); log_entry to",
-  "record decisions ('decision'), approaches that failed ('dead_end'), and",
-  "things only the human can answer ('question').",
-  "",
-  "ONE ENTRY SAYS ONE THING: the decision and why it beat the alternative,",
-  "or the approach and how it failed. Not the session transcript —",
-  "measurements, file listings and options nobody chose go in the task body",
-  "or a context note. A briefing shows the FIRST LINE of every entry and",
-  "pays for as many whole bodies as its budget allows, so write the first",
-  "line as a headline that stands on its own -- it is what the next session",
-  "reads when the budget ran out before your entry. A log nobody finishes",
-  "reading is the failure mode, not a short entry.",
-  "",
-  "WHAT OUTLIVES A TASK: add_context, for the things that constrain everything",
-  "else -- a convention the codebase follows, a gotcha that will bite the next",
-  "session, a standing preference. These lead the briefing, so a rule recorded",
-  "here is read before any task is. Omit both `project` and `cwd` to make one",
-  "apply across every project. Do not park these as notes on whichever task",
-  "happened to be open.",
-  "",
-  "Pass `model` with your own model id on the tools that write -- create_task,",
-  "update_task, log_entry -- and it is stored on the row, so reports can say",
-  "which model did what. Nothing else reads it.",
-  "",
-  "BEFORE YOU FINISH: call log_entry(kind:'handoff') on every task you touched,",
-  "detailed enough that a fresh session could continue without asking the",
-  "human anything. Dead ends are the highest-value entries: they are what",
-  "stops the next session burning tokens on the same wall. If you are stopping",
-  "without finishing a task you set to 'doing', set it back to 'todo' or",
-  "'blocked': a task left 'doing' by a session that ended is the log going",
-  "stale in the one column that is supposed to be current, and the next",
-  "briefing will say so.",
-  "",
-  "REPORTING: activity_report answers 'what did I get done today / this week'",
-  "from the log itself, including how long each task took, which model worked",
-  "on it and how important it was. Use format:'markdown' when the developer",
-  "wants something to hand to a manager.",
+  "REPORTING: activity_report answers 'what got done today / this week' from the",
+  "log, with durations and models; format:'markdown' for something to hand on.",
 ];
 
 const LOCAL_NOTE = [
   "",
-  "FILES: link_files and create_task's `files` take plain paths. This process",
-  "hashes them for you, so todox can later warn that a note describes code",
-  "that has since changed.",
-  "",
-  "OBSERVATIONS: this process is the one that writes them. It watches the",
-  "checkout it was started in while you work, so the section is filled in for",
-  "you and there is no call that does it. Connected over the hosted endpoint",
-  "instead, that section is always empty -- which is why these two notes say",
-  "different things about it.",
+  "FILES: link_files and create_task's `files` take plain paths; this process",
+  "hashes them, so todox can later warn that a note describes changed code.",
+  "OBSERVATIONS: this process is the one that writes them -- it watches the",
+  "checkout it was started in while you work. Over the hosted endpoint that",
+  "section is always empty, which is why the two notes differ.",
 ];
 
 const REMOTE_NOTE = [
   "",
-  "THIS SERVER HAS NO FILESYSTEM, BUT YOU DO. It cannot see the developer's",
-  "code; you are running on the machine that holds it. So the parts that need",
-  "a disk are yours to do:",
-  "- pass `cwd` as an absolute path, and `repo_root` as the directory holding",
-  "  the .git you are working under. REGISTERING A NEW PROJECT REQUIRES ONE OF",
-  "  `repo_root` OR `repo_url`, and refuses without both: todox stores",
-  "  repositories, not directories, and this server cannot look for a .git to",
-  "  check. A `cwd` alone is a directory you happen to be standing in -- one",
-  "  client's per-prompt scratch folders became twelve projects that way,",
-  "  four of them holding real work nobody will find again;",
-  "- pass `repo_url` on get_context and create_task: run",
-  "  `git remote get-url origin` and send it verbatim. A path is a different",
-  "  string on every machine, so this is what stops the same repo opened on a",
-  "  second computer registering as a second project and splitting the log.",
-  "  A checkout with no remote is still a repository -- send `repo_root` for",
-  "  it and the registration goes through;",
-  "- pass `tz` (IANA, e.g. 'Europe/Istanbul') on reports. If you cannot",
-  "  determine it, say in your answer that the window is measured in UTC",
-  "  rather than letting the developer assume it is their day;",
-  "- when a project is registered for the first time, follow up with",
-  "  update_project: a one-paragraph summary, and repo_url set to the output",
-  "  of `git remote get-url origin`. The path you sent is where the repo sits",
-  "  on this machine and means nothing on the next one;",
-  "- when you link a file, send its `hash`: the sha256 of the file's bytes.",
-  "  That hash is the only thing that lets todox tell you later that a note",
-  "  describes code which has since changed. Omit it and the note is recorded",
-  "  as never checked -- honest, but useless;",
-  "- after get_context or get_task hands you linked files, re-hash the ones",
-  "  you can read and send them to report_file_hashes with the ids you were",
-  "  given. That is what turns a stale note into a warning.",
+  "THIS SERVER HAS NO FILESYSTEM, BUT YOU DO. The parts that need a disk are",
+  "yours:",
+  "- `cwd` absolute, plus `repo_root` (the directory holding .git) or",
+  "  `repo_url` (`git remote get-url origin`, verbatim) on get_context and",
+  "  create_task. Registering a new project refuses without one of them; the",
+  "  remote is what keeps the same repo on a second machine from becoming a",
+  "  second project. A checkout with no remote is still a repository: send",
+  "  repo_root.",
+  "- `tz` (IANA, e.g. 'Europe/Istanbul') on reports, or say the window is UTC.",
+  "- on first registration, update_project with a one-paragraph summary and",
+  "  repo_url.",
+  "- when you link a file, send its sha256 `hash`; after get_context or",
+  "  get_task hands you linked files, re-hash the ones you can read and send",
+  "  them to report_file_hashes with their ids. That is what turns a stale note",
+  "  into a warning.",
   "",
-  "AND ONE THING YOU WILL NOT GET: `observations` is always empty on this",
-  "transport. Automatic capture means watching git while a session runs, and",
-  "only a process on the developer's machine can do that -- this server has no",
-  "checkout. So the instructions above about reading observations and promoting",
-  "them with from_observation_id describe a section that will never have",
-  "anything in it for you. Nothing is wrong when it is empty, and there is no",
-  "call that fills it. The stdio server (`npx todox-mcp`) is the one that",
-  "captures; connect that way if you want it.",
+  "`observations` is always empty on this transport: only a process on the",
+  "developer's machine can watch git. Nothing is wrong when it is empty and no",
+  "call fills it; the stdio server (todox-mcp) is the one that captures.",
 ];
 
 export function instructions(ws: { local: boolean }) {
@@ -735,32 +624,32 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("list_projects", "listProjects", {
     title: "List projects",
     description:
-      "Every project in your todox account that holds a task or a note, newest activity first, with `activity_at`, open/done counts and root paths. Cheap; call it when unsure which slug to use. Projects with nothing in them are left out and counted in `empty_projects_omitted` — they still resolve by slug or path, so pass `cwd` rather than looking for one here.",
+      "Projects that hold a task or a note, newest activity first, with counts and paths. Empty ones are left out (`empty_projects_omitted`) but still resolve by slug or path.",
     annotations: READ_ONLY,
   });
 
   tool("create_project", "createProject", {
     title: "Create project",
     description:
-      "Register a project explicitly. Usually unnecessary — create_task with `cwd` registers one for you. root_path is what lets any file path inside the repo resolve to this project later.",
+      "Register a project by name. Usually unnecessary: get_context and create_task register one from `cwd`.",
   });
 
   tool("update_project", "updateProject", {
     title: "Update project",
     description:
-      "Set the name, root_path, repo_url or summary. Worth calling right after a project is auto-created: a one-paragraph summary and the output of `git remote get-url origin` are what make it legible to a session on another machine, where the local path means nothing.",
+      "Set name, root_path, repo_url or summary. Right after a project is registered, a one-paragraph summary and repo_url are what make it legible from another machine.",
   });
 
   tool("delete_project", "deleteProject", {
     title: "Delete a project",
     description:
-      "Removes a project and everything under it — every task, every log entry, every note and file link. Not recoverable. `confirm` must be the project's slug. This exists because a mistyped `cwd` registers a project like any other path does; ask the human before calling it.",
+      "Removes a project and everything under it. Not recoverable; `confirm` must be its slug. Ask the human first.",
   });
 
   tool("merge_projects", "mergeProjects", {
     title: "Merge one project into another",
     description:
-      "Fold a duplicate project into the real one, keeping both sides' tasks, log entries, notes and paths. Use it when the same repository registered twice — usually because it was opened from two machines and the older resolver identified a project by its absolute path, so `todox` and `todox-2` are one repo. A project's slug cannot be renamed, so this moves the rows instead. `from` stops existing; `confirm` must be its slug. Not undoable: ask the human first, and set repo_url on the survivor afterwards so it cannot happen again.",
+      "Fold a duplicate project into the real one, keeping both sides' tasks, entries, notes and paths -- for the same repository registered twice (`todox` and `todox-2`). `from` stops existing; `confirm` must be its slug. Not undoable: ask the human first, then set repo_url on the survivor.",
   });
 
   /* ------------------------------------------------------- the briefing */
@@ -775,7 +664,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       // looks. What is here is what changes how the payload is read -- the
       // caps, what null means, which counts mean what -- not the pitch.
       description:
-        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`. It is capped so it cannot grow without bound: fifty open tasks, three log entries of each kind per task (one handoff), a row ceiling on context-note bodies per scope, and a byte budget on every body it carries -- notes, task bodies and log entries -- smaller when you send a `focus`. Nothing is ever truncated. Every note, task and entry comes back named whatever the budget did: an entry always carries its `id`, `kind`, `created_at` and `head`, a task its `head`, and head is the first line of what somebody wrote. A `body` of null means the budget was already spent, never that the record is empty -- the `head` beside it is non-empty -- and `get_task` returns the whole task and its whole log, `get_context_note` the whole note. The omitted counts mean two different things -- `open_tasks_omitted` and `log_omitted` count records that are NOT in this payload; `context_omitted`, `task_bodies_omitted` and `log_bodies_omitted` count records that ARE, minus their bodies. Pass `focus` -- one sentence about what this session is for -- and the budget is spent on what is relevant rather than on whatever is newest; `context_ranked_by` and `log_ranked_by` tell you which of the two you got.",
+        "The session-start briefing: standing rules, decisions, dead ends, open questions, open tasks with their linked files and the last handoff. Call it first, with `cwd`. Capped: fifty open tasks, three entries per kind per task (one handoff), and a byte budget on every body -- notes, task bodies and log entries -- smaller with a `focus`. Nothing is truncated: every record keeps its `id` and `head` (first line), and a `body` of null means the budget was already spent, never that the record is empty -- `get_task` and `get_context_note` read the rest. `open_tasks_omitted`/`log_omitted` count records NOT here; `context_omitted`/`task_bodies_omitted`/`log_bodies_omitted` count records here without a body. `focus` (one sentence on what this session is for) spends the budget on what is relevant instead of what is newest; `context_ranked_by`/`log_ranked_by` say which you got.",
       annotations: READ_ONLY,
     },
     {
@@ -823,7 +712,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Get task with full log",
       description:
-        "One task with its entry log (most recent 200; `entries_omitted` says if there were more) and its linked files, each marked fresh/changed/missing.",
+        "One task, its whole log (newest 200; `entries_omitted` if more) and its linked files marked fresh/changed/missing.",
       annotations: READ_ONLY,
     },
     { after: checkLinkedFiles },
@@ -835,7 +724,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Create task",
       description:
-        "Capture work that will not finish in this session. Pass `cwd` (your absolute working directory) and todox picks the right project. Registering a new one needs `repo_root` or `repo_url` as well — a bare `cwd` is a directory, not a repository, and the error says so and names both. Put the goal and the definition of done in `body`, not just a title.",
+        "Capture work that will not finish this session. Pass `cwd` and todox picks the project; registering a new one needs `repo_root` or `repo_url` too. Put the goal and the definition of done in `body`.",
     },
     // Local only. A process sitting next to the code can hash it, so the model
     // is asked for paths and nothing else -- asking it for a sha256 would be
@@ -867,7 +756,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("update_task", "updateTask", {
     title: "Update task",
     description:
-      "Change title, body, status or priority. Moving status to 'doing' starts the clock and moving it to 'done' stops it — that is where the duration in reports comes from, so keep it honest.",
+      "Change title, body, status or priority. 'doing' starts the clock, 'done' stops it; that is where report durations come from.",
   });
 
   /* ----------------------------------------------------------- the log */
@@ -875,13 +764,13 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("log_entry", "logEntry", {
     title: "Append to a task's log",
     description:
-      "Append one entry. kinds: 'decision' (what was chosen and why), 'dead_end' (approach tried that did NOT work -- highest value, prevents repeats), 'question' (needs the human), 'note', 'handoff' (state at end of session: what is done, what is next, what to watch out for). When what you are writing settles a question an earlier session asked, pass its id as `answers_entry_id`: the question stops being open and stops arriving in every briefing, while both it and your answer stay readable through get_task. Nothing else closes a question.",
+      "Append one entry: 'decision', 'dead_end', 'question', 'note' or 'handoff'. First line is the headline the briefing shows; keep the body to a screen. Settling an earlier question? Pass its id as `answers_entry_id` -- nothing else closes one.",
   });
 
   tool("delete_entry", "deleteEntry", {
     title: "Remove a log entry",
     description:
-      "For an entry that was wrong when it was written: a decision recorded before it was actually made, a handoff posted against the wrong task, a dead end that turned out to be your own mistake rather than the approach's. An entry that has merely been overtaken by later work is not wrong, it is history — and the history is the product here, so leave it and append what you now know. Do not use this to tidy a log.",
+      "For an entry that was wrong when written (wrong task, a decision never made). An entry overtaken by later work is history, not wrong: append instead. Not for tidying.",
   });
 
   tool(
@@ -890,7 +779,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Link files to a task or a note",
       description:
-        "Attach file paths to a task (`task_id`) or to a context note (`context_id`) — one or the other — and hash them now. Two things follow: todox can warn later that a note describes code which has since changed, and `get_file_context` can answer what is known about that file from the file's own name. Linking a standing rule to the files it governs is what makes it findable by the session that opens one of them.",
+        "Attach file paths to a task (`task_id`) or a note (`context_id`), one or the other. todox can then warn when the file changes, and get_file_context can find the task or note from the path.",
     },
     local
       ? {
@@ -915,13 +804,13 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("unlink_file", "unlinkRef", {
     title: "Remove a file link",
     description:
-      "For a path that is no longer what the task is about — the file was deleted, renamed, or attached by mistake. It removes the link only; nothing on disk is touched. A link left behind produces a stale warning nobody can ever clear, in every briefing from now on.",
+      "Remove a link whose file was deleted, renamed or attached by mistake. Nothing on disk is touched.",
   });
 
   tool("accept_file_change", "acceptRef", {
     title: "Accept a changed file as still correct",
     description:
-      "Clears the stale warning on a linked file once you have read the change and the note still holds. Nothing else can clear it: the server has no copy of the repository, so it can only ever see that the two hashes differ, never that the difference is fine. Report the file's current hash first — hosted, with report_file_hashes; locally that already happened when you read the briefing. If the note no longer holds, fix the note instead of accepting the file.",
+      "Clear the stale warning on a linked file once you have read the change and the note still holds (report its current hash first; hosted, via report_file_hashes). If the note no longer holds, fix the note instead.",
   });
 
   /**
@@ -938,7 +827,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     tool("report_file_hashes", "reportRefs", {
       title: "Report what linked files look like now",
       description:
-        "After get_context or get_task, hash each linked file you can read (sha256 of its bytes; null if it is gone) and send the results back with the ids you were given. This is how todox learns that a note describes code that has since changed — the server has no copy of the repository and cannot work it out on its own.",
+        "After get_context or get_task: sha256 each linked file you can read (null if gone) and send them back with their ids. The server has no copy of the code; this is how it learns a note went stale.",
     });
 
   /* -------------------------------------------------- durable knowledge */
@@ -946,26 +835,26 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("get_context_note", "getContextNote", {
     title: "Read one context note in full",
     description:
-      "The whole body of a single context NOTE. get_context carries every note's title but only as many bodies as its budget reaches -- newest first, or most relevant first when a focus was sent -- and reports the rest as `context_omitted`; this is how you read one of those, or how you read past the 240-character snippet a search hit gives you. A note body of null in a briefing means it was past that budget, never that it is empty. This does not read entries: a briefing entry whose body the budget did not reach is read with get_task.",
+      "The whole body of one context note -- for a note the briefing's budget did not reach (body null, never empty) or a search snippet you need the rest of. Entries are read with get_task.",
     annotations: READ_ONLY,
   });
 
   tool("add_context", "addContext", {
     title: "Record durable knowledge",
     description:
-      "Knowledge that outlives any single task. Omit both `project` and `cwd` to make it apply across every one of your projects (use for standing preferences and cross-project decisions). kinds: decision, convention, gotcha, preference.",
+      "Knowledge that outlives a task: decision, convention, gotcha, preference. Omit `project` and `cwd` to make it account-wide.",
   });
 
   tool("update_context", "updateContext", {
     title: "Correct a context note",
     description:
-      "Rewrite a note you or an earlier session recorded, once you find it is wrong or has gone out of date. `body` replaces the old one outright, so send the whole note rather than a diff. Correcting a note is worth more than adding a second one beside it: get_context hands every note to the next session, and two notes that disagree cost that session the time it takes to work out which one to believe.",
+      "Rewrite a note that is wrong or out of date; `body` replaces the whole thing. Correct rather than add a second note that disagrees.",
   });
 
   tool("delete_context", "deleteContext", {
     title: "Remove a context note",
     description:
-      "For a note that should never have been written — recorded against the wrong project, or superseded so completely that keeping it would mislead. If the note is merely out of date, use update_context: a corrected note still carries why the old answer looked right, and that is often the useful half.",
+      "For a note that should never have been written (wrong project, or so superseded it misleads). Merely out of date: update_context.",
   });
 
   /* -------------------------------------------------------------- search */
@@ -982,7 +871,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("search", "search", {
     title: "Search across every project",
     description:
-      "Full-text search over task titles and bodies, log entry bodies, and context note titles and bodies, across ALL of your projects, ranked by relevance. Ask it the question in words -- 'why did we choose scrypt over bcrypt' -- and it will find the note that answers it; the terms are matched independently and a record matching more of them ranks higher, so a whole sentence works and does not need narrowing. Quote a phrase to require it exactly. Stemming is applied in English and in Turkish, and a literal substring match runs underneath, so the middle of an identifier ('FileSync' inside readFileSync) is found too. Each hit carries a snippet taken from the part that matched, not from the top of the body. Two optional filters, both narrowing rather than searching: `kinds` keeps only records of those kinds -- ['dead_end'] answers 'has this been tried?', ['decision'] answers 'why is it like this?' -- and since tasks have no kind, asking for any leaves the log and the notes; `project` (a slug, a name, or a path inside it) stops it looking anywhere else, though account-wide notes still come back because a rule that applies everywhere applies here. Leave both out unless the question has a shape: searching everything is usually the point. Not searched as text: kinds, file paths, project names. Returns at most `limit` hits in total (default 30).",
+      "Full-text search over tasks, log entries and notes across ALL your projects, ranked by relevance. Ask in words -- 'why did we choose scrypt over bcrypt' -- terms match independently and more matches rank higher; quote a phrase to require it. Stemmed in English and Turkish, with a substring match underneath so 'FileSync' finds readFileSync. Each hit carries a snippet from the matching part. Filters narrow, never search: `kinds` (['dead_end'] = has this been tried?, ['decision'] = why is it like this?; tasks have no kind), `project` (account-wide notes still come back). Leave both out unless the question has a shape. Not searched: file paths, project names. At most `limit` hits (default 30).",
     annotations: READ_ONLY,
   });
 
@@ -994,7 +883,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "What got done (today / this week / any window)",
       description:
-        "A summary built from the log, not reconstructed from commits: tasks completed and opened, how long each took (time actually spent in 'doing', plus start-to-finish lead time), which models worked on them, their importance, the decisions made, the dead ends hit and the questions still open. Use format:'markdown' for something the developer can hand straight to a manager; 'json' when you need to reason over the numbers. Prefer a named period over 'all', which returns the whole account's history in one result.",
+        "What got done in a window, from the log: tasks completed and opened, time in 'doing' and lead time, models, decisions, dead ends, open questions. format:'markdown' to hand on, 'json' to reason over. Prefer a named period to 'all'.",
       annotations: READ_ONLY,
     },
     {

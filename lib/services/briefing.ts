@@ -106,8 +106,8 @@ const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
  * is also 83% filler at 48 tasks, which is a worse case than any real project
  * here: the widest measured in production has eight open tasks and 41 records.
  *
- * Effect on that project: 112 KB of log bodies becomes 24 KB, and the briefing
- * goes from 143 KB to roughly 55 KB.
+ * Effect on that project at the first setting (24 KB): 112 KB of log bodies
+ * became 24 KB, and the briefing went from 143 KB to roughly 55 KB.
  *
  * WHAT THIS DOES NOT BOUND, said out loud because the bench makes it visible:
  * at 48 open tasks 77.9 KB of the log section is heads and metadata, and no
@@ -116,7 +116,17 @@ const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
  * `BRIEFING_TASK_BYTES` below; the heads remain, real and smaller than what
  * the budgets fixed.
  */
-const BRIEFING_LOG_BYTES = 24_576;
+/**
+ * HALVED, all three budgets at once, 2026-09-12, on the developer's word
+ * rather than the bench's: "everything looks too long, it feels like todox
+ * burns tokens". The bench agrees that it can afford it -- recall of the
+ * answering note is flat from 60 bodies down to 8 KB, and the log's recall
+ * does not move between 64 KB and 4 KB -- and the measured briefing on this
+ * project was still 58 KB after the first budgets landed. What a budget buys
+ * is bodies; what it costs is a `get_task` or `get_context_note` for the one
+ * body that mattered. Heads are always there, so the agent can tell which.
+ */
+const BRIEFING_LOG_BYTES = 12_288;
 
 /**
  * The same budget, once somebody has said what the session is about.
@@ -129,7 +139,7 @@ const BRIEFING_LOG_BYTES = 24_576;
  * Two ceilings rather than one because the lower one is not safe without a
  * focus, which is the same shape the notes settled on and for the same reason.
  */
-const BRIEFING_LOG_BYTES_FOCUSED = 16_384;
+const BRIEFING_LOG_BYTES_FOCUSED = 8_192;
 
 /**
  * Context note bodies carried per scope -- account-wide and project each.
@@ -188,13 +198,14 @@ const BRIEFING_NOTES_FOCUSED = 25;
  *
  * The same shape as the log budget: whole bodies or none, spent in the order
  * the row ceiling already ranks them, `context_omitted` counting what neither
- * paid for. Sixteen rather than twenty-four because notes are shorter and
- * fewer than log entries and the two scopes each get one; twelve when aimed,
- * for the reason the focused row ceiling gives. `pnpm bench:memory` prints
- * the curve these were read off.
+ * paid for. Smaller than the log's because notes are shorter and fewer than
+ * log entries and the two scopes each get one; smaller again when aimed, for
+ * the reason the focused row ceiling gives. Started at 16 KB / 12 KB and was
+ * halved the same day, with the other two (see the log budget above). `pnpm
+ * bench:memory` prints the curve these were read off.
  */
-const BRIEFING_NOTE_BYTES = 16_384;
-const BRIEFING_NOTE_BYTES_FOCUSED = 12_288;
+const BRIEFING_NOTE_BYTES = 8_192;
+const BRIEFING_NOTE_BYTES_FOCUSED = 6_144;
 
 /**
  * Bytes of task bodies carried across the open tasks.
@@ -210,7 +221,7 @@ const BRIEFING_NOTE_BYTES_FOCUSED = 12_288;
  * paid for is still recognisable, the way a log entry is. Spent in list order,
  * which is priority then recency, so what loses its body is the least urgent.
  */
-const BRIEFING_TASK_BYTES = 12_288;
+const BRIEFING_TASK_BYTES = 6_144;
 
 /**
  * How long a task may sit in `doing` untouched before the briefing says so.
