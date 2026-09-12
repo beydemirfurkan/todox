@@ -52,7 +52,9 @@ const PROJECT = { id: 42, slug: "shared", name: "shared", user_id: 9 };
 
 vi.mock("./project-resolver", () => ({
   mustResolve: vi.fn(async () => PROJECT),
+  resolve: vi.fn(async () => PROJECT),
   resolveOrCreate: vi.fn(async () => ({ project: PROJECT })),
+  noMatch: vi.fn(async () => new Error("no project matches")),
 }));
 
 const { invoke } = await import("./rpc");

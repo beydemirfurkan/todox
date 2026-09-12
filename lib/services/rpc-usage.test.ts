@@ -81,6 +81,16 @@ describe("counting what an agent called", () => {
 });
 
 describe("never getting in the way", () => {
+  it("does not hold the answer until the count is written", async () => {
+    db.all.mockResolvedValue([]);
+    db.one.mockResolvedValue(undefined);
+    // A counter that never settles. The call has to come back anyway: the
+    // upsert is bookkeeping behind the reply, not a step in front of it.
+    usage.record.mockReturnValue(new Promise(() => {}));
+    await expect(invoke(CTX, "listProjects", {})).resolves.toBeDefined();
+    expect(usage.record).toHaveBeenCalledWith(7, "listProjects", true);
+  });
+
   it("returns the result even when the counter rejects", async () => {
     db.all.mockResolvedValue([]);
     db.one.mockResolvedValue(undefined);

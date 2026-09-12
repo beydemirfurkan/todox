@@ -22,7 +22,9 @@ export type RepoHints = {
 };
 
 /** Where this account has a project on disk: the first path, plus every other. */
-async function knownPaths(userId: number) {
+type KnownPaths = Map<number, { project: Project; paths: string[] }>;
+
+async function knownPaths(userId: number): Promise<KnownPaths> {
   const [rooted, extra] = await Promise.all([
     projects.withRootPath(userId),
     projectPaths.listAll(userId),
@@ -32,7 +34,7 @@ async function knownPaths(userId: number) {
   // meant to return only projects that have a path, and when it briefly did
   // not, the assertion turned a null column into a TypeError inside a filter --
   // so one bad row failed every lookup for the account instead of being skipped.
-  const byProject = new Map<number, { project: Project; paths: string[] }>();
+  const byProject: KnownPaths = new Map();
   for (const p of rooted) {
     if (typeof p.root_path !== "string") continue;
     byProject.set(p.id, { project: p, paths: [p.root_path] });
@@ -57,22 +59,50 @@ export async function resolve(
   ref: string,
   hints: RepoHints = {},
 ): Promise<Project | undefined> {
-  const bySlug = await projects.bySlug(userId, slugify(ref));
-  if (bySlug) return bySlug;
+  return (await locate(userId, ref, hints)).project;
+}
 
-  const byName = await projects.byName(userId, ref);
-  if (byName) return byName;
+/**
+ * `resolve`, keeping the path table it loaded so the caller can reuse it.
+ *
+ * Four sequential lookups for every reference, and the first two were
+ * guaranteed misses for the reference every session starts with: `cwd` is an
+ * absolute path, and no slug or name is ever one -- `slugify("/Users/me/x")`
+ * matching a project would be a defect, not a hit. A path now goes straight
+ * to the two reads that can answer it, and those two go out together. A slug
+ * or a name keeps its order: a hit on the slug is still one query and never
+ * touches the path table, which two tests hold it to.
+ *
+ * `known` comes back only when the path table was read, so `resolveOrCreate`
+ * -- which needs it for exactly the references that read it -- does not read
+ * it a second time. That second read used to happen twice more on the way to
+ * registering a project: once to look for an adoptable namesake and once in
+ * `remember`.
+ */
+async function locate(
+  userId: number,
+  ref: string,
+  hints: RepoHints,
+): Promise<{ project: Project | undefined; known?: KnownPaths }> {
+  if (!isAbsolutePath(ref)) {
+    const bySlug = await projects.bySlug(userId, slugify(ref));
+    if (bySlug) return { project: bySlug };
 
-  // Before the path, because the path is the thing that differs between two
-  // machines and the remote is the thing that does not.
-  const byUrl = await byRemote(userId, hints.repoUrl);
-  if (byUrl) return byUrl;
+    const byName = await projects.byName(userId, ref);
+    if (byName) return { project: byName };
+  }
+
+  // Both at once: the remote is still read first -- it is the thing that does
+  // not differ between two machines, so it wins -- but it is not waited for
+  // before the path table is asked for.
+  const [byUrl, known] = await Promise.all([byRemote(userId, hints.repoUrl), knownPaths(userId)]);
+  if (byUrl) return { project: byUrl, known };
 
   // Deepest root wins, so a nested repo beats the parent that contains it.
-  const candidates = [...(await knownPaths(userId)).values()].flatMap(({ project, paths }) =>
+  const candidates = [...known.values()].flatMap(({ project, paths }) =>
     paths.filter((path) => isInside(ref, path)).map((path) => ({ project, path })),
   );
-  return candidates.sort((a, b) => b.path.length - a.path.length)[0]?.project;
+  return { project: candidates.sort((a, b) => b.path.length - a.path.length)[0]?.project, known };
 }
 
 /**
@@ -92,7 +122,15 @@ export async function mustResolve(
 ): Promise<Project> {
   const p = await resolve(userId, ref, hints);
   if (p) return p;
+  throw await noMatch(userId, ref);
+}
 
+/**
+ * The refusal for a reference that matches nothing, built once so a caller
+ * that has already established the miss can throw it without resolving the
+ * reference a second time to reach the message.
+ */
+export async function noMatch(userId: number, ref: string): Promise<BadRequest> {
   const known = await knownSlugs(userId);
 
   // Nothing that reaches here can create anything. Most callers are reads, and
@@ -102,7 +140,7 @@ export async function mustResolve(
   // about finding the project rather than making one, and the remote is what
   // finds a repo the caller has already opened somewhere else: the thing most
   // likely to be missing when a path stops matching.
-  throw new BadRequest(
+  return new BadRequest(
     `no project matches "${ref}". ` +
       (known
         ? `${known} ` +
@@ -174,14 +212,15 @@ export async function resolveOrCreate(
   ref: string,
   hints: RepoHints = {},
 ): Promise<Resolution> {
-  const found = await resolve(userId, ref, hints);
+  const { project: found, known } = await locate(userId, ref, hints);
   if (found) {
-    await remember(userId, found, ref, hints);
+    await remember(userId, found, ref, hints, known);
     return { project: found, created: false };
   }
 
-  if (!isAbsolutePath(ref))
-    return { project: await mustResolve(userId, ref, hints), created: false };
+  // Already established as a miss; `mustResolve` here would look it all up
+  // again on the way to the same message.
+  if (!isAbsolutePath(ref)) throw await noMatch(userId, ref);
 
   // Normalised whichever branch it came from. Only the `repoRoot` one was, so
   // an agent that passed `cwd` alone -- which the tools explicitly allow --
@@ -229,14 +268,16 @@ export async function resolveOrCreate(
 
   const sameName = await projects.listByName(userId, name);
   if (sameName.length) {
-    const paths = await knownPaths(userId);
+    // `known` is always set on this branch: the reference is an absolute
+    // path, and `locate` reads the table for every one of those.
+    const paths = known ?? (await knownPaths(userId));
     const withPaths = sameName.map(
       (project) => paths.get(project.id) ?? { project, paths: [] },
     );
 
     const adopted = adoptable(withPaths, root);
     if (adopted) {
-      await remember(userId, adopted, ref, hints);
+      await remember(userId, adopted, ref, hints, paths);
       return { project: adopted, created: false };
     }
 
@@ -280,7 +321,13 @@ export async function resolveOrCreate(
  * created on and nowhere else. The first session that arrives with git access
  * is the chance to fix that, and it costs one write, once.
  */
-async function remember(userId: number, project: Project, ref: string, hints: RepoHints) {
+async function remember(
+  userId: number,
+  project: Project,
+  ref: string,
+  hints: RepoHints,
+  known?: KnownPaths,
+) {
   if (!project.repo_url && hints.repoUrl)
     await projects.update(userId, project.id, { repo_url: scrubRemote(hints.repoUrl) });
 
@@ -288,8 +335,12 @@ async function remember(userId: number, project: Project, ref: string, hints: Re
   const root = normalisePath(
     hints.repoRoot && isAbsolutePath(hints.repoRoot) ? hints.repoRoot : ref,
   );
-  const known = (await knownPaths(userId)).get(project.id)?.paths ?? [];
-  if (known.some((p) => isInside(root, p))) return;
+  // The table `locate` read for this same reference, when it read one. A
+  // project found by its remote or by a path has it in hand; only a slug or a
+  // name arrives here without it, and those are not absolute, so the guard
+  // above has already returned.
+  const paths = (known ?? (await knownPaths(userId))).get(project.id)?.paths ?? [];
+  if (paths.some((p) => isInside(root, p))) return;
   await projectPaths.add(userId, project.id, root);
 }
 

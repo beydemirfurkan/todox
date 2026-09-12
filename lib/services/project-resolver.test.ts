@@ -115,6 +115,19 @@ describe("resolve by path", () => {
     expect(repo.withRootPath).not.toHaveBeenCalled();
   });
 
+  /**
+   * `cwd` is an absolute path on every session start, and no slug or name is
+   * ever one, so the two lookups in front of the path table were two
+   * sequential round trips spent on a guaranteed miss.
+   */
+  it("answers a path without asking for a slug or a name", async () => {
+    repo.withRootPath.mockResolvedValue([project(9, "/Users/me/known")]);
+    const found = await resolve(1, "/Users/me/known/src/app.ts");
+    expect(found).toMatchObject({ id: 9 });
+    expect(repo.bySlug).not.toHaveBeenCalled();
+    expect(repo.byName).not.toHaveBeenCalled();
+  });
+
   it("falls through slug then name before trying paths", async () => {
     repo.byName.mockResolvedValue(project(8, null));
 
@@ -144,18 +157,22 @@ describe("resolve by path", () => {
  * as `todox-2`. Half the log then lived under each.
  */
 describe("the same repo, seen from a second machine", () => {
-  it("matches on the remote before it ever looks at a path", async () => {
+  it("lets the remote win over a path that also matches", async () => {
     repo.withRepoUrl.mockResolvedValue([
       project(5, "C:/Users/me/todox", { repo_url: "git@github.com:me/todox.git" }),
     ]);
+    // A different project whose path contains the reference. The remote is
+    // the identity that survives a second machine; the path is the thing
+    // that differs between them, so it must lose. The two reads now go out
+    // together -- the property is the order they are believed in, not the
+    // order they are asked in.
+    repo.withRootPath.mockResolvedValue([project(6, "/Users/me/todox")]);
 
     const found = await resolve(1, "/Users/me/todox", {
       repoUrl: "https://github.com/me/todox.git",
     });
 
     expect(found).toMatchObject({ id: 5 });
-    // The two URL forms are the same repository, and the paths agree on nothing.
-    expect(repo.withRootPath).not.toHaveBeenCalled();
   });
 
   it("adopts a project known only by paths from the other OS, and remembers the new one", async () => {
@@ -336,6 +353,33 @@ describe("registering needs evidence that the path is a repository", () => {
     const found = await resolveOrCreate(1, "/Users/me/known/src/app.ts");
     expect(found.created).toBe(false);
     expect(found.project.id).toBe(9);
+  });
+
+  /**
+   * The path table was read up to three times on one registration: once to
+   * resolve, once to look for an adoptable namesake, once in `remember`. The
+   * database is over the network; each read is a round trip.
+   */
+  it("reads the account's paths once when it resolves a known path", async () => {
+    repo.withRootPath.mockResolvedValue([project(9, "/Users/me/known")]);
+    await resolveOrCreate(1, "/Users/me/known/src/app.ts", { repoRoot: "/Users/me/known" });
+    expect(repo.withRootPath).toHaveBeenCalledTimes(1);
+    expect(paths.listAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the account's paths once when it adopts a namesake", async () => {
+    repo.listByName.mockResolvedValue([project(7, "C:/Users/me/todox")]);
+    repo.withRootPath.mockResolvedValue([project(7, "C:/Users/me/todox")]);
+    const { created } = await resolveOrCreate(1, "/Users/me/todox");
+    expect(created).toBe(false);
+    expect(repo.withRootPath).toHaveBeenCalledTimes(1);
+    expect(paths.listAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the account's paths once when it registers a new one", async () => {
+    await resolveOrCreate(1, "/Users/me/new", { repoRoot: "/Users/me/new" });
+    expect(repo.withRootPath).toHaveBeenCalledTimes(1);
+    expect(paths.listAll).toHaveBeenCalledTimes(1);
   });
 
   /**
