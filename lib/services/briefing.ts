@@ -546,9 +546,15 @@ function budgetBodies(open: Task[], budgetBytes: number): Set<number> {
   const kept = new Set<number>();
   let spent = 0;
   for (const t of open) {
+    // A task with no body costs nothing and cannot be "omitted": counting it
+    // would tell the agent a body is one get_task away when there is none.
+    if (!t.body) {
+      kept.add(t.id);
+      continue;
+    }
     if (spent >= budgetBytes) continue;
     kept.add(t.id);
-    spent += Buffer.byteLength(t.body ?? "");
+    spent += Buffer.byteLength(t.body);
   }
   return kept;
 }
