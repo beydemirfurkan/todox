@@ -7,8 +7,9 @@ your client reads as global instructions.
    the absolute path of the directory you are working in. It registers the
    project on first call and returns the briefing for that session.
 
-2. On every RPC method (writes and reads), pass `model` with your own model
-   id. Writes record it on the row; reads use it as telemetry.
+2. On the methods that write -- `create_task`, `update_task`, `log_entry` --
+   pass `model` with your own model id. It is stored on the row, so reports
+   can say which model did what. Nothing else reads it.
 
 3. When work that will not finish this session comes up, call `create_task`
    with `cwd` (or an explicit `project`) and the goal in `body`. Its compact

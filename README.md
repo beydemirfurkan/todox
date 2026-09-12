@@ -424,12 +424,12 @@ Details, and an honest list of what is **not** covered, in
 - Observations only see what git can tell them, so they answer "what changed"
   and never "why". The half that carries reasoning is a transcript, and the
   only hook API that exposes one belongs to a single client.
-- The briefing's byte budget covers log bodies and note bodies. Two axes are
-  still bounded only by a row count: the *heads* of carried entries (fifty
-  tasks' worth), and task bodies. Both are far smaller than what the budget
-  fixed — one project went from 143 KB to about 55 KB — but neither is bounded
-  in bytes, and `pnpm bench:memory` prints both so the next reader does not
-  have to discover it.
+- The briefing's byte budget covers log bodies, note bodies and task bodies.
+  One axis is still bounded only by a row count: the *heads* of carried
+  entries and tasks, fifty tasks' worth. It is far smaller than what the
+  budgets fixed — one project went from 143 KB to about 55 KB on the log
+  alone — but it is not bounded in bytes, and `pnpm bench:memory` prints it
+  so the next reader does not have to discover it.
 - **Observations are captured by the local process only.** Watching git means
   running on the machine that holds the checkout, and the hosted endpoint has
   none — so connected that way, the `observations` section of every briefing

@@ -374,7 +374,7 @@ export const SHAPES = {
     ref_id: z
       .number()
       .int()
-      .describe("From the `refs` of get_context or get_task. Removes the link, not the file."),
+      .describe("From the `files` of get_context or get_task. Removes the link, not the file."),
     model,
   },
 
@@ -412,12 +412,12 @@ export const SHAPES = {
   /**
    * The read the briefing's ceiling made necessary.
    *
-   * `get_context` carries every note's title and only the newest sixty
-   * bodies, so past that a note is a title and an id. Without a way to spend
-   * one call on the one that looks relevant, the cap would be a silent loss
-   * rather than a budget -- and `search` cannot stand in for it: it matches a
-   * literal substring and returns 240 characters of the body, which is a
-   * snippet, not the note.
+   * `get_context` carries every note's title and only the bodies its row
+   * ceiling and byte budget reach, so past that a note is a title and an id.
+   * Without a way to spend one call on the one that looks relevant, the cap
+   * would be a silent loss rather than a budget -- and `search` cannot stand
+   * in for it: a hit carries 240 characters of the body, which is a snippet,
+   * not the note.
    */
   getContextNote: {
     context_id: z

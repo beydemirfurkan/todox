@@ -26,6 +26,7 @@ vi.mock("../repositories/contexts", () => ({ pageByProject: mocks.pageNotes }));
 vi.mock("../repositories/entries", () => ({
   pageByTasksPerKind: mocks.pageByTasksPerKind,
   countsByTasks: mocks.countsByTasks,
+  HEAD_CHARS: 240,
 }));
 vi.mock("../repositories/refs", () => ({
   listByTasks: mocks.listRefs,
@@ -65,15 +66,23 @@ const logPage = (rows: Map<number, { body: string | null }[]>) => ({
   bodiesOmitted: [...rows.values()].flat().filter((e) => e.body === null).length,
 });
 
+/**
+ * Touched just now, so the stale-`doing` line in the hint stays quiet unless a
+ * test sets `updated_at` back on purpose. A fixed date here would have every
+ * task in the file drift into "stale" as the calendar moved past it.
+ */
 const task = (id: number, over: Record<string, unknown> = {}) => ({
   id,
   title: `task ${id}`,
   status: "doing",
   priority: 2,
   body: "b",
-  updated_at: "2026-08-16T00:00:00Z",
+  updated_at: new Date().toISOString(),
   ...over,
 });
+
+/** An ISO timestamp this many days ago. */
+const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
 /**
  * What `pageByTasksPerKind` answers. `head` is separate from `body` because the
@@ -324,6 +333,73 @@ describe("what each task carries", () => {
   });
 });
 
+/**
+ * The other unbounded axis. Fifty task bodies written as documents was the
+ * backlog read in full on the first call of every session, and no budget
+ * touched it. Cut the way the log and the notes are cut: whole or nothing,
+ * a head always, a count of what was not paid for.
+ */
+describe("the budget on task bodies", () => {
+  const big = "x".repeat(8_000);
+
+  it("carries every body while the budget lasts, and a head always", async () => {
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1, { body: "first line\nsecond" }), task(2, { body: "short" })],
+      total: 2,
+    });
+    const out = await brief();
+    expect(out.open_tasks[0]).toMatchObject({ head: "first line", body: "first line\nsecond" });
+    expect(out.open_tasks[1]).toMatchObject({ head: "short", body: "short" });
+    expect(out.task_bodies_omitted).toBe(0);
+  });
+
+  it("stops paying for bodies once the budget is spent, and says how many", async () => {
+    // 8 KB + 8 KB crosses 12 KB after the second, so the third loses its body
+    // and the second -- the row that crossed the line -- keeps it.
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1, { body: big }), task(2, { body: big }), task(3, { body: "late" })],
+      total: 3,
+    });
+    const out = await brief();
+    expect(out.open_tasks[0]!.body).toBe(big);
+    expect(out.open_tasks[1]!.body).toBe(big);
+    expect(out.open_tasks[2]).toMatchObject({ head: "late", body: null });
+    expect(out.task_bodies_omitted).toBe(1);
+  });
+
+  it("never truncates: a body arrives whole or not at all", async () => {
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1, { body: big }), task(2, { body: big }), task(3, { body: big })],
+      total: 3,
+    });
+    const out = await brief();
+    for (const t of out.open_tasks) expect(t.body === null || t.body === big).toBe(true);
+  });
+
+  it("keeps a task with no body distinguishable from one it could not afford", async () => {
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1, { body: null }), task(2, { body: big }), task(3, { body: big }), task(4, { body: "cut" })],
+      total: 4,
+    });
+    const out = await brief();
+    // No body: head empty, and it cost nothing, so it is not "omitted".
+    expect(out.open_tasks[0]).toMatchObject({ head: "", body: null });
+    // Past the budget: the head says what it was.
+    expect(out.open_tasks[3]).toMatchObject({ head: "cut", body: null });
+    expect(out.task_bodies_omitted).toBe(1);
+  });
+
+  it("cuts the head at the same width as a log entry's", async () => {
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1, { body: "y".repeat(300) })],
+      total: 1,
+    });
+    const out = await brief();
+    expect(out.open_tasks[0]!.head).toHaveLength(241);
+    expect(out.open_tasks[0]!.head.endsWith("…")).toBe(true);
+  });
+});
+
 describe("linked files", () => {
   const ref = { id: 4, path: "/repo/a.ts", note: null, hash: "abc", checked_at: "t" };
 
@@ -370,8 +446,8 @@ describe("context notes", () => {
 
   it("asks for the account-wide ones and the project's separately", async () => {
     await brief();
-    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 60, undefined);
-    expect(mocks.pageNotes).toHaveBeenCalledWith(7, PROJECT.id, 60, undefined);
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 60, 16_384, undefined);
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, PROJECT.id, 60, 16_384, undefined);
   });
 
   /**
@@ -384,11 +460,18 @@ describe("context notes", () => {
    */
   it("passes the focus to both scopes, or neither", async () => {
     await brief(7, "why is login redirecting in a loop");
-    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 25, "why is login redirecting in a loop");
+    expect(mocks.pageNotes).toHaveBeenCalledWith(
+      7,
+      null,
+      25,
+      12_288,
+      "why is login redirecting in a loop",
+    );
     expect(mocks.pageNotes).toHaveBeenCalledWith(
       7,
       PROJECT.id,
       25,
+      12_288,
       "why is login redirecting in a loop",
     );
   });
@@ -446,9 +529,24 @@ describe("context notes", () => {
   it("spends less when it knows what to spend it on", async () => {
     await brief();
     for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(60);
+    const [, , , unaimedBytes] = mocks.pageNotes.mock.calls[0]!;
     mocks.pageNotes.mockClear();
     await brief(7, "the login redirect loop");
     for (const call of mocks.pageNotes.mock.calls) expect(call[2]).toBe(25);
+    // Both ceilings, not just the row count: bytes are what the payload
+    // weighs, and an aimed budget can afford to be the smaller one.
+    for (const call of mocks.pageNotes.mock.calls) expect(call[3]).toBeLessThan(unaimedBytes);
+  });
+
+  it("hands the database a byte budget as well as a row ceiling", async () => {
+    // The row ceiling alone is a count, and twenty-three properly written
+    // notes measured 32 KB under it. Both go to the query so the bytes that
+    // are cut are bytes that never cross the network.
+    await brief();
+    for (const call of mocks.pageNotes.mock.calls) {
+      expect(typeof call[3]).toBe("number");
+      expect(call[3]).toBeGreaterThan(0);
+    }
   });
 
   it("hands back only the four fields a reader needs", async () => {
@@ -572,6 +670,55 @@ describe("the closing hint", () => {
     expect(out.hint).toContain("#5");
     expect(out.hint).not.toContain("#6");
     expect(out.hint).toContain("+4 more");
+  });
+
+  /**
+   * The column that is supposed to be current, going stale. Forty tasks sat in
+   * `doing` in production with nothing logged for a week or more; nothing
+   * anywhere said so, because the status was set by a session that ended.
+   * Said only when true, like the handoff line, and never by rewriting the
+   * task: the briefing points, the agent decides.
+   */
+  it("names the tasks that have sat in 'doing' untouched for a week", async () => {
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1, { updated_at: daysAgo(8) }), task(2, { updated_at: daysAgo(30) }), task(3)],
+      total: 3,
+    });
+    const out = await brief();
+    expect(out.hint).toContain("2 tasks have been 'doing' for 7+ days");
+    expect(out.hint).toContain("#1, #2");
+    expect(out.hint).toContain("'todo' or 'blocked'");
+  });
+
+  it("stays quiet about a task touched this week, or one that is not 'doing'", async () => {
+    mocks.pageByProject.mockResolvedValue({
+      rows: [
+        task(1, { updated_at: daysAgo(6) }),
+        task(2, { status: "todo", updated_at: daysAgo(40) }),
+        task(3, { status: "blocked", updated_at: daysAgo(40) }),
+      ],
+      total: 3,
+    });
+    const out = await brief();
+    expect(out.hint).not.toContain("'doing' for");
+  });
+
+  it("says one task in the singular", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: [task(1, { updated_at: daysAgo(9) })], total: 1 });
+    expect((await brief()).hint).toContain("1 task has been 'doing'");
+  });
+
+  it("caps the stale ids it lists, like the handoff ids", async () => {
+    const many = Array.from({ length: 8 }, (_, i) => task(i + 1, { updated_at: daysAgo(10) }));
+    mocks.pageByProject.mockResolvedValue({ rows: many, total: 8 });
+    mocks.pageByTasksPerKind.mockResolvedValue(
+      logPage(new Map(many.map((t) => [t.id, [entry("handoff", "left here")]]))),
+    );
+    const out = await brief();
+    expect(out.hint).not.toContain("no handoff");
+    expect(out.hint).toContain("8 tasks have been 'doing'");
+    expect(out.hint).toContain("#5, +3 more");
+    expect(out.hint).not.toContain("#6");
   });
 });
 
