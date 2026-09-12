@@ -340,7 +340,7 @@ describe("what each task carries", () => {
  * a head always, a count of what was not paid for.
  */
 describe("the budget on task bodies", () => {
-  const big = "x".repeat(8_000);
+  const big = "x".repeat(4_000);
 
   it("carries every body while the budget lasts, and a head always", async () => {
     mocks.pageByProject.mockResolvedValue({
@@ -354,7 +354,7 @@ describe("the budget on task bodies", () => {
   });
 
   it("stops paying for bodies once the budget is spent, and says how many", async () => {
-    // 8 KB + 8 KB crosses 12 KB after the second, so the third loses its body
+    // 4 KB + 4 KB crosses 6 KB after the second, so the third loses its body
     // and the second -- the row that crossed the line -- keeps it.
     mocks.pageByProject.mockResolvedValue({
       rows: [task(1, { body: big }), task(2, { body: big }), task(3, { body: "late" })],
@@ -446,8 +446,8 @@ describe("context notes", () => {
 
   it("asks for the account-wide ones and the project's separately", async () => {
     await brief();
-    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 60, 16_384, undefined);
-    expect(mocks.pageNotes).toHaveBeenCalledWith(7, PROJECT.id, 60, 16_384, undefined);
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, null, 60, 8_192, undefined);
+    expect(mocks.pageNotes).toHaveBeenCalledWith(7, PROJECT.id, 60, 8_192, undefined);
   });
 
   /**
@@ -464,14 +464,14 @@ describe("context notes", () => {
       7,
       null,
       25,
-      12_288,
+      6_144,
       "why is login redirecting in a loop",
     );
     expect(mocks.pageNotes).toHaveBeenCalledWith(
       7,
       PROJECT.id,
       25,
-      12_288,
+      6_144,
       "why is login redirecting in a loop",
     );
   });
