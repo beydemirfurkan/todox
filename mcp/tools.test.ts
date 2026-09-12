@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { SHAPES } from "@/lib/services/rpc-schemas";
@@ -114,6 +114,25 @@ describe("what each side fills in for itself", () => {
     const { tools, calls } = harness(localWs);
     await tools.get("get_context")!.handler({ cwd: "/repo/src" });
     expect(calls[0].params.repo_url).toBe("git@github.com:me/repo.git");
+  });
+
+  /**
+   * `git remote get-url` is a spawn, and it ran on every local get_context,
+   * get_file_context and create_task for a value that cannot change while
+   * the process lives. Once per reference per process.
+   */
+  it("asks git for the remote once per repository, not once per call", async () => {
+    const repoUrl = vi.fn(() => "git@github.com:me/repo.git");
+    const repoRoot = (path: string) => (path.startsWith("/repo") ? "/repo" : undefined);
+    const { tools, calls } = harness({ ...localWs, repoUrl, repoRoot });
+    await tools.get("get_context")!.handler({ cwd: "/repo/src" });
+    await tools.get("get_context")!.handler({ cwd: "/repo/src" });
+    await tools.get("get_file_context")!.handler({ cwd: "/repo/src", path: "/repo/a.ts" });
+    expect(repoUrl).toHaveBeenCalledTimes(1);
+    for (const c of calls) expect(c.params.repo_url).toBe("git@github.com:me/repo.git");
+    // A different repository is a different question.
+    await tools.get("get_context")!.handler({ cwd: "/elsewhere" });
+    expect(repoUrl).toHaveBeenCalledTimes(2);
   });
 
   it("sends no remote when this side cannot read one", async () => {
@@ -304,6 +323,82 @@ describe("who hashes the files", () => {
       paths: [{ path: "/repo/a.ts", hash }],
     });
     expect(calls[0].params.paths).toEqual([{ path: "/repo/a.ts", hash }]);
+  });
+});
+
+/**
+ * The report is a second HTTP round trip on every briefing, and it went out
+ * whenever the payload carried a linked file at all -- the same hash, for the
+ * same file, call after call. The hashes are still computed every time; what
+ * is spared is telling the server what it was told a minute ago.
+ */
+describe("reporting what a linked file hashes to", () => {
+  const briefing = (hash: string | null) => ({
+    open_tasks: [{ id: 1, files: [{ id: 7, path: "/repo/a.ts", hash, status: "fresh" }] }],
+    stale_refs: [],
+  });
+  const reports = (calls: { method: string }[]) =>
+    calls.filter((c) => c.method === "reportRefs").length;
+
+  it("reports a file the first time it sees it, then stays quiet", async () => {
+    const { tools, calls } = harness(localWs, briefing("a".repeat(64)));
+    const get = () => tools.get("get_context")!.handler({ cwd: "/repo/src" });
+    await get();
+    expect(reports(calls)).toBe(1);
+    await get();
+    await get();
+    expect(reports(calls)).toBe(1);
+  });
+
+  it("reports again when the file's hash changes", async () => {
+    let hash = "a".repeat(64);
+    const ws: Workspace = { ...localWs, hash: () => hash, checkRefs: (refs) => ({
+      checked: refs.map((r) => ({ ...r, status: r.hash === hash ? ("fresh" as const) : ("changed" as const) })),
+      seen: refs.map((r) => ({ id: r.id, hash })),
+    }) };
+    const { tools, calls } = harness(ws, briefing("a".repeat(64)));
+    const get = () => tools.get("get_context")!.handler({ cwd: "/repo/src" });
+    await get();
+    hash = "b".repeat(64);
+    await get();
+    expect(reports(calls)).toBe(2);
+    expect(calls.filter((c) => c.method === "reportRefs").at(-1)!.params).toEqual({
+      refs: [{ id: 7, hash }],
+    });
+    await get();
+    expect(reports(calls)).toBe(2);
+  });
+
+  it("reports again after a report that failed", async () => {
+    // The harness answers every method with one payload and never refuses, so
+    // the invoker is built here: it refuses the first report and accepts the
+    // next. A failed report is recorded as nothing, so it is made again.
+    const seen: { method: string }[] = [];
+    const registry = new Map<string, (a: Record<string, unknown>) => Promise<unknown>>();
+    const server = {
+      registerTool: (name: string, _c: unknown, h: (a: Record<string, unknown>) => Promise<unknown>) =>
+        registry.set(name, h),
+      registerPrompt: () => {},
+    } as unknown as McpServer;
+    let refuse = true;
+    registerTools(
+      server,
+      async (method) => {
+        seen.push({ method });
+        if (method === "reportRefs" && refuse) {
+          refuse = false;
+          throw new Error("refused once");
+        }
+        return briefing("a".repeat(64));
+      },
+      localWs,
+    );
+    const get = () => registry.get("get_context")!({ cwd: "/repo/src" });
+    await get();
+    await get();
+    expect(reports(seen)).toBe(2);
+    await get();
+    expect(reports(seen)).toBe(2);
   });
 });
 

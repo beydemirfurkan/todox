@@ -217,6 +217,65 @@ describe("the throttle", () => {
   });
 });
 
+/**
+ * What a tool call costs when nothing is happening.
+ *
+ * The interval gated the write and nothing else: every call still spawned
+ * git four times -- HEAD, status, rev-list, log -- synchronously, on the
+ * tool's own return path, and then the interval said no. A session that
+ * changes nothing is most of a session. The reads themselves are what these
+ * count, not the writes.
+ */
+describe("what a look costs", () => {
+  const reads = (git: ObserverGit) => ({
+    head: (git.head as ReturnType<typeof vi.fn>).mock.calls.length,
+    dirty: (git.dirty as ReturnType<typeof vi.fn>).mock.calls.length,
+    since: (git.since as ReturnType<typeof vi.fn>).mock.calls.length,
+  });
+
+  it("reads only HEAD inside the interval", async () => {
+    const { git, state } = fakeGit();
+    const h = harness({ git });
+    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    const first = reads(git);
+    expect(first.dirty).toBe(1);
+    expect(first.since).toBe(1);
+
+    h.advance(1_000);
+    state.dirty = 3;
+    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice({ cwd: `${ROOT}/sub` });
+
+    const after = reads(git);
+    expect(after.head).toBe(first.head + 2);
+    expect(after.dirty).toBe(first.dirty);
+    expect(after.since).toBe(first.since);
+  });
+
+  it("looks again once the interval has passed, and writes what it finds", async () => {
+    const { git, state } = fakeGit();
+    const h = harness({ git });
+    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    h.advance(THROTTLE_MS + 1);
+    state.dirty = 3;
+    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    expect(reads(git).dirty).toBe(2);
+    expect(lastWrite(h.calls)).toMatchObject({ files_changed: 3 });
+  });
+
+  it("looks at once when HEAD moves inside the interval", async () => {
+    const { git, state } = fakeGit();
+    const h = harness({ git });
+    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    h.advance(1_000);
+    state.head = "b".repeat(40);
+    state.since.set(HEAD_AT_START, { count: 1, subjects: ["done"] });
+    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    expect(reads(git).since).toBe(2);
+    expect(lastWrite(h.calls)).toMatchObject({ commits: 1 });
+  });
+});
+
 describe("finding the project", () => {
   /**
    * Most tools carry no `cwd`: `log_entry`, `update_task` and `search` all
