@@ -389,6 +389,19 @@ describe("the budget on task bodies", () => {
     expect(out.task_bodies_omitted).toBe(1);
   });
 
+  it("does not count a task with no body as omitted, wherever it sits in the list", async () => {
+    // Found in review: an empty body after the budget was spent was being
+    // counted as cut. Nothing was cut -- there was nothing to carry.
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1, { body: big }), task(2, { body: big }), task(3, { body: null }), task(4, { body: "" })],
+      total: 4,
+    });
+    const out = await brief();
+    expect(out.open_tasks[2]).toMatchObject({ head: "", body: null });
+    expect(out.open_tasks[3]).toMatchObject({ head: "", body: "" });
+    expect(out.task_bodies_omitted).toBe(0);
+  });
+
   it("cuts the head at the same width as a log entry's", async () => {
     mocks.pageByProject.mockResolvedValue({
       rows: [task(1, { body: "y".repeat(300) })],
