@@ -6,8 +6,8 @@ import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, logWarn, newRequestId } from "@/lib/server/log";
 import { normalise } from "@/lib/client-identity";
-import { lookup, record } from "@/lib/server/client-info";
-import { userForApiToken } from "@/lib/services/auth";
+import { clientDuringSetup, record } from "@/lib/server/client-info";
+import { agentForToken, type AgentIdentity } from "@/lib/services/auth";
 import { BadRequest, refusalReason } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
@@ -26,7 +26,7 @@ export const maxDuration = 30;
  * process serves many requests at once, and a module-level token slot would
  * race between them -- handing one agent's token to another agent's call.
  */
-function buildRemoteWorkspace(token: string): Workspace {
+function buildRemoteWorkspace(agent: AgentIdentity): Workspace {
   return {
     tz: () => undefined,
     repoRoot: () => undefined,
@@ -34,8 +34,12 @@ function buildRemoteWorkspace(token: string): Workspace {
     hash: () => null,
     checkRefs: () => null,
     // Stateless: consecutive requests land on different instances, so the
-    // row is the only place this can be read from.
-    clientInfo: () => lookup(token),
+    // token row is the only place this can come from -- and it was already
+    // read to authenticate this call, so nothing is looked up again. Only
+    // while the token is new: the answer feeds setup advice, and setup advice
+    // read for the hundredth time is the always-true sentence the briefing is
+    // built to avoid.
+    clientInfo: async () => clientDuringSetup(agent),
   };
 }
 
@@ -138,11 +142,12 @@ async function answer(req: Request, requestId: string): Promise<Response> {
       { "retry-after": String(gate.retryAfterSec) },
     );
 
-  const user = await userForApiToken(token);
-  if (!user) {
+  const agent = await agentForToken(token);
+  if (!agent) {
     await limit.penalise("badTokenPerIp", ip);
     return unauthorised("invalid or revoked token");
   }
+  const { user } = agent;
 
   // Same bucket as /api/rpc, keyed on the token: a valid one used to buy an
   // unlimited number of calls, and an agent loop is the likeliest thing on
@@ -218,7 +223,7 @@ async function answer(req: Request, requestId: string): Promise<Response> {
     }
   };
 
-  registerTools(server, safeInvoke, buildRemoteWorkspace(token));
+  registerTools(server, safeInvoke, buildRemoteWorkspace(agent));
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     // Stateless: consecutive requests land on different instances, so there is

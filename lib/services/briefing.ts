@@ -1,10 +1,12 @@
 import * as contexts from "../repositories/contexts";
 import * as entries from "../repositories/entries";
+import { HEAD_CHARS } from "../repositories/entries";
 import * as observations from "../repositories/observations";
 import * as projects from "../repositories/projects";
 import * as refs from "../repositories/refs";
 import * as tasks from "../repositories/tasks";
 import type { Project, Task } from "../types";
+import { firstLine } from "../util/headline";
 
 /**
  * Everything a cold agent needs to resume work on a project, in one payload.
@@ -110,8 +112,9 @@ const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
  * WHAT THIS DOES NOT BOUND, said out loud because the bench makes it visible:
  * at 48 open tasks 77.9 KB of the log section is heads and metadata, and no
  * budget here touches that. It is bounded only by BRIEFING_TASKS times
- * PER_KIND times HEAD_CHARS. Task bodies are the other unbounded axis. Both
- * are real, both are smaller than what this fixes, and neither is fixed here.
+ * PER_KIND times HEAD_CHARS. Task bodies were the other unbounded axis until
+ * `BRIEFING_TASK_BYTES` below; the heads remain, real and smaller than what
+ * the budgets fixed.
  */
 const BRIEFING_LOG_BYTES = 24_576;
 
@@ -174,6 +177,55 @@ const BRIEFING_NOTES = 60;
 const BRIEFING_NOTES_FOCUSED = 25;
 
 /**
+ * Bytes of note bodies carried per scope, under the row ceiling above.
+ *
+ * The row ceiling was the only one, and it was not a budget: sixty bodies is
+ * a count, and a project that writes its standing rules properly writes them
+ * long. Measured on this repository's own project, 2026-09-12: twenty-three
+ * notes, none past the ceiling, 32 KB of body on the call every session opens
+ * with -- more than the log budget below it, and the log is the part that
+ * has a budget. Two-thirds of that briefing was notes.
+ *
+ * The same shape as the log budget: whole bodies or none, spent in the order
+ * the row ceiling already ranks them, `context_omitted` counting what neither
+ * paid for. Sixteen rather than twenty-four because notes are shorter and
+ * fewer than log entries and the two scopes each get one; twelve when aimed,
+ * for the reason the focused row ceiling gives. `pnpm bench:memory` prints
+ * the curve these were read off.
+ */
+const BRIEFING_NOTE_BYTES = 16_384;
+const BRIEFING_NOTE_BYTES_FOCUSED = 12_288;
+
+/**
+ * Bytes of task bodies carried across the open tasks.
+ *
+ * The other unbounded axis the log budget's comment names and leaves alone.
+ * Task bodies are written as documents here -- goal, constraints, definition
+ * of done -- and fifty of them at a few KB each is the backlog read in full
+ * before a line of code. The cut happens after the read rather than in it:
+ * the fifty rows are already loaded for their titles, and what this bounds is
+ * the payload, not the query.
+ *
+ * Every task keeps a `head` -- its first line -- so a task whose body was not
+ * paid for is still recognisable, the way a log entry is. Spent in list order,
+ * which is priority then recency, so what loses its body is the least urgent.
+ */
+const BRIEFING_TASK_BYTES = 12_288;
+
+/**
+ * How long a task may sit in `doing` untouched before the briefing says so.
+ *
+ * Measured in production, 2026-09-12: forty tasks in `doing`, thirty-two of
+ * them older than a week, seventeen older than three. Nothing had happened to
+ * them; a session set the status and ended. A list that says "in progress"
+ * about work nobody is doing is the log going stale in the one column that
+ * is supposed to be current, and the briefing is the only place an agent
+ * will ever be told. `updated_at` is touched by every entry and every status
+ * change, so it is the last sign of life without another query.
+ */
+const STALE_DOING_DAYS = 7;
+
+/**
  * Unverified observations carried per briefing.
  *
  * Six, and small on purpose. Everything else in this payload is here because
@@ -199,6 +251,7 @@ const BRIEFING_OBSERVATIONS = 6;
 
 export async function briefing(userId: number, project: Project, focus?: string) {
   const notes = focus ? BRIEFING_NOTES_FOCUSED : BRIEFING_NOTES;
+  const noteBytes = focus ? BRIEFING_NOTE_BYTES_FOCUSED : BRIEFING_NOTE_BYTES;
   const logBytes = focus ? BRIEFING_LOG_BYTES_FOCUSED : BRIEFING_LOG_BYTES;
 
   // Cut in SQL rather than after the fact. This read every open task and then
@@ -207,8 +260,8 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const ids = open.map((t) => t.id);
 
   const [globalContext, projectContext, logs, counts, files, observed, sameName] = await Promise.all([
-    contexts.pageByProject(userId, null, notes, focus),
-    contexts.pageByProject(userId, project.id, notes, focus),
+    contexts.pageByProject(userId, null, notes, noteBytes, focus),
+    contexts.pageByProject(userId, project.id, notes, noteBytes, focus),
     entries.pageByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND, logBytes, focus),
     // The honest total, and what the caps dropped. Counting in the database is
     // what lets the log above be cut without `entry_count` starting to lie --
@@ -228,6 +281,8 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // tasks beside a namesake with one.
     projects.listByName(userId, project.name),
   ]);
+
+  const bodies = budgetBodies(open, BRIEFING_TASK_BYTES);
 
   const openTasks = open.map((t) => {
     const log = logs.rows.get(t.id) ?? [];
@@ -272,7 +327,11 @@ export async function briefing(userId: number, project: Project, focus?: string)
       title: t.title,
       status: t.status,
       priority: t.priority,
-      body: t.body,
+      // The first line always, the body while the budget lasts. A task the
+      // budget did not reach has `body: null` and a non-empty `head`; a task
+      // written without a body has both empty, and costs the budget nothing.
+      head: firstLine(t.body ?? "", HEAD_CHARS),
+      body: bodies.has(t.id) ? t.body : null,
       updated_at: t.updated_at,
       // The record, not its body. `null` here has always meant "this task has
       // no handoff", and `closingHint` below reads exactly that to decide
@@ -351,6 +410,12 @@ export async function briefing(userId: number, project: Project, focus?: string)
      */
     log_bodies_omitted: logs.bodiesOmitted,
     /**
+     * Open tasks carried with a head and no body, for the same reason and
+     * with the same meaning: the task is in the payload, `get_task` has the
+     * rest.
+     */
+    task_bodies_omitted: open.length - bodies.size,
+    /**
      * Which of the two orderings spent the log budget, said out loud for the
      * same reason `context_ranked_by` is: an agent reading a briefing with
      * bodies missing should be able to tell whether the ones it got were the
@@ -421,25 +486,60 @@ function duplicateOf(
  * always-true sentence back for every task whose handoff fell outside the
  * budget, which on a long log is most of them.
  */
-function closingHint(openTasks: { id: number; last_handoff: object | null }[]): string {
+function closingHint(
+  openTasks: { id: number; status: string; updated_at: string; last_handoff: object | null }[],
+): string {
   const naked = openTasks.filter((t) => t.last_handoff === null);
+  const stale = openTasks.filter((t) => t.status === "doing" && ageDays(t.updated_at) >= STALE_DOING_DAYS);
   const always =
     "Record dead ends as you hit them, so the next session does not repeat them.";
-
-  if (naked.length === 0) return always;
 
   // The ids, so the ask is actionable rather than a count to go and match up.
   // Capped: past a handful this is a statement about the backlog, not a list
   // of things to do before finishing.
-  const shown = naked.slice(0, 5).map((t) => `#${t.id}`).join(", ");
-  const rest = naked.length - 5;
+  const named = (list: { id: number }[]) => {
+    const shown = list.slice(0, 5).map((t) => `#${t.id}`).join(", ");
+    const rest = list.length - 5;
+    return `${shown}${rest > 0 ? `, +${rest} more` : ""}`;
+  };
 
-  return (
-    `${naked.length} of the open tasks below have no handoff at all (${shown}` +
-    `${rest > 0 ? `, +${rest} more` : ""}). If you touch one, leave one: ` +
-    `log_entry(kind:'handoff') is what makes the next session cheaper than yours. ` +
-    always
-  );
+  const lines: string[] = [];
+  if (naked.length)
+    lines.push(
+      `${naked.length} of the open tasks below have no handoff at all (${named(naked)}). ` +
+        `If you touch one, leave one: log_entry(kind:'handoff') is what makes the next ` +
+        `session cheaper than yours.`,
+    );
+  // Said only when true, for the reason the handoff line is: a sentence that
+  // applies to every briefing is one an agent learns to skip.
+  if (stale.length)
+    lines.push(
+      `${stale.length} task${stale.length === 1 ? " has" : "s have"} been 'doing' for ` +
+        `${STALE_DOING_DAYS}+ days with nothing logged since (${named(stale)}). Either ` +
+        `continue one, or set its status back to 'todo' or 'blocked' so the list stays true.`,
+    );
+  lines.push(always);
+  return lines.join(" ");
+}
+
+const ageDays = (iso: string): number => (Date.now() - Date.parse(iso)) / 86_400_000;
+
+/**
+ * Which open tasks keep their body, spent in list order until the budget is
+ * gone. Whole or nothing, the way the log and the notes are cut: half a task
+ * body reads as the whole of a shorter one. The row that crosses the line is
+ * still paid for, so the first task always arrives whole, and a task with no
+ * body costs nothing and keeps its empty string.
+ */
+function budgetBodies(open: Task[], budgetBytes: number): Set<number> {
+  const kept = new Set<number>();
+  let spent = 0;
+  for (const t of open) {
+    if (spent >= budgetBytes) continue;
+    kept.add(t.id);
+    spent += Buffer.byteLength(t.body ?? "");
+  }
+  return kept;
 }
 
 /**

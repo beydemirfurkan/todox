@@ -82,7 +82,13 @@ describe("publicUser", () => {
     // The agent lookup answers with the use alongside the row, so the caller
     // can record whether a token is being used for the first time or has come
     // back. What leaves this module is still only the public user.
-    apiTokensRepo.userForToken.mockResolvedValue({ user: USER, tokenId: 3, use: "same-day" });
+    apiTokensRepo.userForToken.mockResolvedValue({
+      user: USER,
+      tokenId: 3,
+      use: "same-day",
+      createdAt: "2026-09-12T00:00:00Z",
+      client: null,
+    });
 
     expect(await auth.userForSession("t")).not.toHaveProperty("password_hash");
     expect(await auth.userForApiToken("todox_x")).not.toHaveProperty("password_hash");
@@ -90,11 +96,34 @@ describe("publicUser", () => {
 
   it("hands out the account and never the token id it looked it up by", async () => {
     // The id is for the log line, not for the caller.
-    apiTokensRepo.userForToken.mockResolvedValue({ user: USER, tokenId: 3, use: "first" });
+    apiTokensRepo.userForToken.mockResolvedValue({
+      user: USER,
+      tokenId: 3,
+      use: "first",
+      createdAt: "2026-09-12T00:00:00Z",
+      client: null,
+    });
     const shown = (await auth.userForApiToken("todox_x")) as Record<string, unknown>;
     expect(shown.username).toBe("bob");
     expect(shown).not.toHaveProperty("tokenId");
     expect(shown).not.toHaveProperty("use");
+  });
+
+  it("hands the MCP route the token's age and client without the password", async () => {
+    // Read off the same row: the hosted briefing used to spend a second query
+    // on these three columns. The password hash still never leaves.
+    apiTokensRepo.userForToken.mockResolvedValue({
+      user: USER,
+      tokenId: 3,
+      use: "same-day",
+      createdAt: "2026-09-12T00:00:00Z",
+      client: { name: "claude-code", version: "2", seenAt: "2026-09-12T01:00:00Z" },
+    });
+    const agent = await auth.agentForToken("todox_x");
+    expect(agent?.createdAt).toBe("2026-09-12T00:00:00Z");
+    expect(agent?.client?.name).toBe("claude-code");
+    expect(agent?.user).not.toHaveProperty("password_hash");
+    expect(agent).not.toHaveProperty("tokenId");
   });
 
   it("answers undefined rather than throwing when there is no row", async () => {
