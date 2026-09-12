@@ -23,7 +23,7 @@ import {
 } from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
 import * as projectActivity from "./project-activity";
-import { mustResolve, resolve, resolveOrCreate } from "./project-resolver";
+import { mustResolve, noMatch, resolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { search } from "./search";
@@ -408,11 +408,11 @@ export const methods = {
     // whole answer when it was not.
     const project =
       (await resolve(userId, ref, hints)) ??
-      (isAbsolutePath(p.path) ? await resolve(userId, p.path, hints) : undefined) ??
-      // Nothing matched. This resolves `ref` a second time to do it, which is
-      // a round trip spent on the way to an error -- worth it to keep the
-      // message, and the list of slugs to choose from, written in one place.
-      (await mustResolve(userId, ref, hints));
+      (isAbsolutePath(p.path) ? await resolve(userId, p.path, hints) : undefined);
+    // Nothing matched. The message, and the list of slugs to choose from,
+    // stay written in one place; what this no longer does is resolve `ref` a
+    // third time on the way to it.
+    if (!project) throw await noMatch(userId, ref);
 
     return fileContext(userId, project, p.path);
   },
@@ -623,15 +623,22 @@ export async function invoke(ctx: RpcContext, method: string, params: unknown) {
   // tool call. On the failure path it matters twice over -- a counter that
   // rejected there would replace the error the caller actually needs to see
   // with one about bookkeeping.
-  const count = (ok: boolean) => toolUsage.record(ctx.userId, method, ok).catch(() => {});
+  //
+  // Not awaited. The upsert is bookkeeping and the answer is what the agent
+  // is waiting for; holding the answer until a counter row is written was a
+  // round trip on the critical path of every tool call, for a number nobody
+  // reads until `pnpm usage` runs. The process is a long-lived container,
+  // not a function frozen at the response, so the write completes behind the
+  // reply. What a crash between the two would lose is one count.
+  const count = (ok: boolean) => void toolUsage.record(ctx.userId, method, ok).catch(() => {});
 
   try {
     const clean = parseParams(method, params);
     const result = await methods[method](ctx, clean as Record<string, never>);
-    await count(true);
+    count(true);
     return result;
   } catch (error) {
-    await count(false);
+    count(false);
     throw error;
   }
 }
