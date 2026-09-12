@@ -71,7 +71,8 @@ export const listByProject = (userId: number, projectId: number | null) =>
       );
 
 /**
- * The briefing's read: every note's title, but only the newest `limit` bodies.
+ * The briefing's read: every note's title, but only the newest `limit` bodies,
+ * and only as many of those as `budgetBytes` pays for.
  *
  * `listByProject` above has no ceiling and must not get one -- `project-merge`
  * reads it to move a project's notes, and a LIMIT there would drop rows during
@@ -112,22 +113,53 @@ export async function pageByProject(
   userId: number,
   projectId: number | null,
   limit: number,
+  budgetBytes: number,
   focus?: string,
 ): Promise<{ rows: BriefingNote[]; omitted: number }> {
+  const scope = projectId === null ? [userId] : [userId, projectId, userId];
+
+  const rows = await all<BriefingNote>(
+    pageByProjectSql(projectId === null ? "account" : "project", Boolean(focus)),
+    [...(focus ? [focus, focus] : []), ...scope, limit, budgetBytes],
+  );
+
+  return { rows, omitted: rows.filter((r) => r.body === null).length };
+}
+
+/**
+ * The statement, apart from the call, so `contexts.test.ts` can assert its
+ * shape without a database -- the same split `entries.ts` makes, for the same
+ * reason: every mistake that lives in this string is a silent one.
+ *
+ * Two ceilings, one on rows and one on bytes, and the body comes back only
+ * under both. The row ceiling existed first and was the only one: sixty bodies
+ * sounds like a cap until the notes are the standing rules of a project that
+ * writes them properly, at which point twenty-three of them measured 32 KB on
+ * the call every session opens with -- more than the whole log budget, and
+ * uncounted. The bytes are spent the way `pageByTasksPerKind` spends them:
+ * `ROWS ... AND 1 PRECEDING` charges what every row BEFORE this one cost, so
+ * the row that crosses the line is still paid for and the first note always
+ * arrives whole. Whole or not at all, never truncated, for the reason the row
+ * ceiling gives above.
+ *
+ * `spent_before` is a second CTE over `rn` rather than a second window in the
+ * first: when a focus is sent the ordering carries two `ts_rank` calls per
+ * note, and ordering by the number already assigned keeps that at one pass.
+ */
+export function pageByProjectSql(scope: "account" | "project", focused: boolean): string {
   // Account-wide notes are owned by the row; a project's are owned through the
   // project. One string each, because the focus query below repeats whichever
   // it is -- ownership belongs in both halves, for the same reason it belongs
   // in both arms of `search`.
   const joins =
-    projectId === null
+    scope === "account"
       ? ``
       : `JOIN projects p ON p.id = c.project_id
          LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?`;
   const where =
-    projectId === null
+    scope === "account"
       ? `c.user_id = ? AND c.project_id IS NULL`
       : `c.project_id = ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)`;
-  const scope = projectId === null ? [userId] : [userId, projectId, userId];
 
   const doc = document("contexts", "c");
 
@@ -142,26 +174,29 @@ export async function pageByProject(
   // the pre-filter filtered nothing. `db/fts.ts` has since made the match
   // selective, so that idea is now worth retrying; it is not done here because
   // the numbers above were taken before it and re-taking them is the work.
-  const relevance = focus ? `WITH q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),` : `WITH`;
-  const order = focus
+  const relevance = focused ? `WITH q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),` : `WITH`;
+  const order = focused
     ? `${rank(doc)} DESC, c.updated_at DESC, c.id DESC`
     : `c.updated_at DESC, c.id DESC`;
 
-  const rows = await all<BriefingNote>(
-    `${relevance} ranked AS (
+  return `${relevance} ranked AS (
        SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at,
               row_number() OVER (ORDER BY ${order}) AS rn
-         FROM ${focus ? `q CROSS JOIN contexts c` : `contexts c`}
+         FROM ${focused ? `q CROSS JOIN contexts c` : `contexts c`}
          ${joins}
         WHERE ${where}
+     ),
+     spent AS (
+       SELECT *,
+              SUM(octet_length(body)) OVER (
+                ORDER BY rn
+                ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+              ) AS spent_before
+         FROM ranked
      )
      SELECT id, kind, title, created_at, updated_at,
-            CASE WHEN rn <= ? THEN body END AS body
-       FROM ranked ORDER BY rn`,
-    [...(focus ? [focus, focus] : []), ...scope, limit],
-  );
-
-  return { rows, omitted: rows.filter((r) => r.body === null).length };
+            CASE WHEN rn <= ? AND coalesce(spent_before, 0) < ? THEN body END AS body
+       FROM spent ORDER BY rn`;
 }
 
 /**

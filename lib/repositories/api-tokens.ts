@@ -54,13 +54,43 @@ export async function create(input: {
  */
 export type TokenUse = "first" | "return" | "same-day";
 
-export async function userForToken(
-  token: string,
-): Promise<{ user: User; tokenId: number; use: TokenUse } | undefined> {
-  const row = await one<User & { token_id: number; last_used_at: string | null }>(
-    `SELECT u.*, t.id AS token_id, t.last_used_at FROM api_tokens t
-     JOIN users u ON u.id = t.user_id
-     WHERE t.token_hash = ?`,
+/** The last MCP client that announced itself on a token. */
+export type ClientUse = { name: string; version: string; seenAt: string };
+
+/**
+ * What one authenticated call learns about its token, beyond who owns it.
+ *
+ * `client` is the last MCP client captured on this token, or null when none
+ * was. It rides along on the row every call already reads, rather than being
+ * looked up again by the one tool that wants it: `get_context` used to spend a
+ * second query on `api_tokens` for three columns the first query had just
+ * passed over.
+ */
+export type TokenIdentity = {
+  user: User;
+  tokenId: number;
+  use: TokenUse;
+  /** When the token was minted, so setup advice can stop once it is old. */
+  createdAt: string;
+  client: ClientUse | null;
+};
+
+type TokenRow = User & {
+  token_id: number;
+  token_created_at: string;
+  last_used_at: string | null;
+  last_client_name: string | null;
+  last_client_version: string | null;
+  last_client_seen_at: string | null;
+};
+
+export async function userForToken(token: string): Promise<TokenIdentity | undefined> {
+  const row = await one<TokenRow>(
+    `SELECT u.*, t.id AS token_id, t.created_at AS token_created_at, t.last_used_at,
+            t.last_client_name, t.last_client_version, t.last_client_seen_at
+       FROM api_tokens t
+       JOIN users u ON u.id = t.user_id
+      WHERE t.token_hash = ?`,
     [hashToken(token)],
   );
   if (!row) return undefined;
@@ -75,8 +105,20 @@ export async function userForToken(
 
   await run("UPDATE api_tokens SET last_used_at = ? WHERE id = ?", [at, row.token_id]);
 
-  const { token_id, last_used_at: _omit, ...user } = row;
-  return { user, tokenId: token_id, use };
+  const {
+    token_id,
+    token_created_at,
+    last_used_at: _omit,
+    last_client_name,
+    last_client_version,
+    last_client_seen_at,
+    ...user
+  } = row;
+  const client =
+    last_client_name && last_client_version && last_client_seen_at
+      ? { name: last_client_name, version: last_client_version, seenAt: last_client_seen_at }
+      : null;
+  return { user, tokenId: token_id, use, createdAt: token_created_at, client };
 }
 
 export const remove = (id: number, userId: number) =>
@@ -90,8 +132,6 @@ export const destroyAllForStmt = (userId: number): Statement => ({
 
 export const destroyAllFor = (userId: number) => runStmt(destroyAllForStmt(userId));
 
-export type ClientUse = { name: string; version: string; seenAt: string };
-
 export const recordClientUse = (tokenHash: string, use: ClientUse): Promise<number> =>
   run(
     `UPDATE api_tokens
@@ -100,13 +140,3 @@ export const recordClientUse = (tokenHash: string, use: ClientUse): Promise<numb
     [use.name, use.version, use.seenAt, tokenHash],
   );
 
-export const lastClientUse = (tokenHash: string): Promise<ClientUse | null> =>
-  one<ClientUse>(
-    `SELECT last_client_name    AS name,
-            last_client_version AS version,
-            last_client_seen_at AS "seenAt"
-       FROM api_tokens
-      WHERE token_hash = ?
-        AND last_client_seen_at IS NOT NULL`,
-    [tokenHash],
-  ).then((row) => row ?? null);
