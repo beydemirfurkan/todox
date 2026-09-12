@@ -392,6 +392,32 @@ describe("instructions", () => {
   });
 
   /**
+   * Two sentences that were not true. "Read tools use `model` as telemetry":
+   * `tool_usage` records a method, a day and two counts, and nothing else
+   * reads the parameter, so every read tool was asking for a value it then
+   * dropped. And "`pnpm install:mcp` can paste it" names a command in this
+   * repository's checkout to an agent working in somebody else's.
+   */
+  it("claims only what is done with `model`, and names no repo-local command", () => {
+    for (const local of [true, false]) {
+      const text = instructions({ local });
+      expect(text).not.toMatch(/telemetry/);
+      expect(text).not.toMatch(/pnpm install:mcp/);
+      expect(text).toMatch(/create_task,\s+update_task, log_entry/);
+    }
+  });
+
+  /**
+   * Forty tasks sat in `doing` in production with nothing logged for a week
+   * or more, because a session set the status and ended. The wrap-up rule is
+   * where an agent decides what state to leave, so it is where this belongs.
+   */
+  it("tells an agent to move a task back out of 'doing' when it stops", () => {
+    for (const local of [true, false])
+      expect(instructions({ local })).toMatch(/back to 'todo' or\s+'blocked'/);
+  });
+
+  /**
    * The one feature that does not work the same way on both transports.
    *
    * BASE described observations at length -- what they are, when they help,
@@ -487,6 +513,26 @@ describe("the briefing tool's description", () => {
 
   it("promises the head that makes an unpaid record usable", () => {
     expect(briefingDescription()).toMatch(/head/i);
+  });
+
+  /**
+   * The row ceiling on notes was the only ceiling, and it was described as
+   * if it were a budget. Twenty-three notes measured 32 KB under it. Now every
+   * body the briefing carries is on a byte budget, and the description has to
+   * say so for all three rather than for the log alone -- and must not go back
+   * to naming a count as if it bounded anything.
+   */
+  it("says every kind of body is budgeted, and names the task count that says so", () => {
+    const text = briefingDescription();
+    expect(text).toMatch(/notes, task bodies and log entries/);
+    expect(text).toMatch(/task_bodies_omitted/);
+    expect(text).not.toMatch(/sixty/);
+  });
+
+  it("does not describe a note ceiling as a count anywhere else either", () => {
+    const note = harness(remoteWs).tools.get("get_context_note")!.config.description!;
+    expect(note).not.toMatch(/sixty/);
+    expect(note).toMatch(/budget/);
   });
 
   it("is the same sentence on both transports", () => {

@@ -186,14 +186,18 @@ const BASE = [
   "apply across every project. Do not park these as notes on whichever task",
   "happened to be open.",
   "",
-  "ALWAYS pass `model` with your own model id on every method — write tools",
-  "record it on the row, read tools use it as telemetry. The full client-side",
-  "contract lives in docs/mcp.md; `pnpm install:mcp <client>` can paste it.",
+  "Pass `model` with your own model id on the tools that write -- create_task,",
+  "update_task, log_entry -- and it is stored on the row, so reports can say",
+  "which model did what. Nothing else reads it.",
   "",
   "BEFORE YOU FINISH: call log_entry(kind:'handoff') on every task you touched,",
   "detailed enough that a fresh session could continue without asking the",
   "human anything. Dead ends are the highest-value entries: they are what",
-  "stops the next session burning tokens on the same wall.",
+  "stops the next session burning tokens on the same wall. If you are stopping",
+  "without finishing a task you set to 'doing', set it back to 'todo' or",
+  "'blocked': a task left 'doing' by a session that ended is the log going",
+  "stale in the one column that is supposed to be current, and the next",
+  "briefing will say so.",
   "",
   "REPORTING: activity_report answers 'what did I get done today / this week'",
   "from the log itself, including how long each task took, which model worked",
@@ -342,6 +346,12 @@ function schemaWithProjectReference(shape: z.ZodRawShape): z.ZodType {
  * Adds the captured MCP client and a short list of client-specific notes to
  * a `get_context` result. The DB lookup is one extra round trip on the one
  * tool the agent is told to call first, which is the right place to pay it.
+ *
+ * The notes are setup advice, and the workspace decides whether it is still
+ * setup: the hosted side answers null once the token is a week old, so the
+ * paragraph that names the memory file is read while it is news and not at
+ * the top of every session for a month, which is what two accounts in
+ * production did before this was measured.
  *
  * Every step is best-effort: a failed lookup, an anonymous call, or any
  * exception must not cost the agent its briefing. The worst case is the
@@ -719,11 +729,12 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     "getContext",
     {
       title: "Get project context (call this first)",
-      // Repeats what the server instructions say, because not every client
-      // shows them -- a tool description is the one place an agent always
-      // looks.
+      // Overlaps with the server instructions on purpose: not every client
+      // shows them, and a tool description is the one place an agent always
+      // looks. What is here is what changes how the payload is read -- the
+      // caps, what null means, which counts mean what -- not the pitch.
       description:
-        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`. It is capped so it cannot grow without bound: fifty open tasks, three log entries of each kind per task (one handoff), sixty context-note bodies per scope, and a byte budget on the log bodies. Nothing is ever truncated. Every note and every entry comes back named whatever the budget did — an entry always carries its `id`, `kind`, `created_at` and `head`, which is the first line of what somebody wrote. A `body` of null means the budget was already spent, never that the record is empty: `get_task` returns the whole entry, `get_context_note` the whole note. Three counts say what you did not get, and they mean different things — `open_tasks_omitted` and `log_omitted` count records that are NOT in this payload, `context_omitted` and `log_bodies_omitted` count records that ARE, minus their bodies. Pass `focus` — one sentence about what this session is for — and the budget is spent on what is relevant rather than on whatever is newest; `context_ranked_by` and `log_ranked_by` tell you which of the two you got.",
+        "Read what previous sessions on this project already worked out, so you do not ask the developer to explain it again or repeat a mistake somebody already made. The session-start briefing: standing rules, decisions and why the alternatives lost, approaches that were tried and failed, open questions, in-flight tasks with their linked files, and the note the last session left behind. Also flags notes whose files have changed since they were written. Call this before planning any non-trivial work; pass your working directory as `cwd`. It is capped so it cannot grow without bound: fifty open tasks, three log entries of each kind per task (one handoff), a row ceiling on context-note bodies per scope, and a byte budget on every body it carries -- notes, task bodies and log entries -- smaller when you send a `focus`. Nothing is ever truncated. Every note, task and entry comes back named whatever the budget did: an entry always carries its `id`, `kind`, `created_at` and `head`, a task its `head`, and head is the first line of what somebody wrote. A `body` of null means the budget was already spent, never that the record is empty -- the `head` beside it is non-empty -- and `get_task` returns the whole task and its whole log, `get_context_note` the whole note. The omitted counts mean two different things -- `open_tasks_omitted` and `log_omitted` count records that are NOT in this payload; `context_omitted`, `task_bodies_omitted` and `log_bodies_omitted` count records that ARE, minus their bodies. Pass `focus` -- one sentence about what this session is for -- and the budget is spent on what is relevant rather than on whatever is newest; `context_ranked_by` and `log_ranked_by` tell you which of the two you got.",
       annotations: READ_ONLY,
     },
     {
@@ -894,7 +905,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("get_context_note", "getContextNote", {
     title: "Read one context note in full",
     description:
-      "The whole body of a single context NOTE. get_context carries every note's title but only the newest sixty bodies per scope, and reports the rest as `context_omitted`; this is how you read one of those, or how you read past the 240-character snippet a search hit gives you. A note body of null in a briefing means it was past that ceiling, never that it is empty. This does not read entries: a briefing entry whose body the budget did not reach is read with get_task.",
+      "The whole body of a single context NOTE. get_context carries every note's title but only as many bodies as its budget reaches -- newest first, or most relevant first when a focus was sent -- and reports the rest as `context_omitted`; this is how you read one of those, or how you read past the 240-character snippet a search hit gives you. A note body of null in a briefing means it was past that budget, never that it is empty. This does not read entries: a briefing entry whose body the budget did not reach is read with get_task.",
     annotations: READ_ONLY,
   });
 
@@ -919,16 +930,13 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   /* -------------------------------------------------------------- search */
 
   /**
-   * The description says "literal substring" because that is what the code
-   * does, and the old one said "full-text-ish", which is what an agent then
-   * assumed. The two failures compound: a model reads "use it to answer 'have
-   * I solved this before?'", sends that sentence, matches nothing, and
-   * concludes todox is empty -- the shape gotcha #13 is about, except here the
-   * tool is not broken, its own description asked for the query that fails.
-   *
-   * `README.md` has said "Search is `ILIKE`, not full-text" in its known-gaps
-   * list the whole time. Honest to the human, overselling to the agent, and
-   * the agent is the one making the call.
+   * The description says what the query does with a sentence, because an
+   * agent decides how to phrase the query from this text and nothing else.
+   * When search was a substring match its description said "full-text-ish",
+   * a model sent a whole question, matched nothing, and concluded todox was
+   * empty -- the shape gotcha #13 is about, except the tool was not broken,
+   * its own description had asked for the query that fails. Search has been
+   * full-text since PR #61; `tools.test.ts` holds the description to it.
    */
   tool("search", "search", {
     title: "Search across every project",

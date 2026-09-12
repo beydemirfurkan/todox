@@ -34,6 +34,19 @@ describe("what the briefing tells an agent about its memory file", () => {
     }
   });
 
+  it("names no command from this repository's checkout", () => {
+    // `pnpm install:mcp` exists here and nowhere an agent in another
+    // repository can run it; a note that names it is an instruction that
+    // cannot be followed. The same goes for how the client was captured --
+    // over which transport, from which body -- which is todox's plumbing and
+    // changes nothing the agent does next.
+    for (const family of [...FAMILIES, "unknown" as const]) {
+      const said = notesFor(family).join(" ");
+      expect(said, family).not.toMatch(/pnpm/);
+      expect(said, family).not.toMatch(/initialize|transport|TOML/);
+    }
+  });
+
   it("tells even an unrecognised client which kind of file to look for", () => {
     // No path to give, so the distinction has to be carried in words.
     const said = notesFor("unknown").join(" ");

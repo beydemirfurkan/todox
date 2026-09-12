@@ -152,6 +152,13 @@ async function reportBriefing(userId: number, project: Awaited<ReturnType<typeof
   console.log(
     row("left out", `${brief.context_omitted} notes, ${brief.open_tasks_omitted} tasks`),
   );
+  // Carried without a body: in the payload, headed, one call from the rest.
+  console.log(
+    row(
+      "carried as a head only",
+      `${brief.task_bodies_omitted} task bodies, ${brief.log_bodies_omitted} log bodies`,
+    ),
+  );
   return brief;
 }
 
@@ -321,23 +328,33 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
   console.log("\n  what the ceiling costs, at 90 notes and with a focus:\n");
   console.log(row("  bodies carried", "recall     note bytes"));
 
-  for (const budget of [60, 40, 25, 15, 8]) {
+  // Recall and payload for one setting of the two ceilings, over every
+  // question. One question's payload, since each is its own session. The
+  // median rather than the mean: one very long note should not describe the
+  // typical cost.
+  const measure = async (rows: number, budgetBytes: number) => {
     const pages = await Promise.all(
-      asked.map((q) => contextsRepo.pageByProject(userId, project.id, budget, q.asked)),
+      asked.map((q) => contextsRepo.pageByProject(userId, project.id, rows, budgetBytes, q.asked)),
     );
     const found = pages.filter((page, i) =>
       page.rows.some((n) => n.title === asked[i].answer && n.body !== null),
     ).length;
-    // One question's payload, since each is its own session. The median rather
-    // than the mean: one very long note should not describe the typical cost.
     const sizes = pages.map((p) => bytes(p.rows)).sort((a, b) => a - b);
-    console.log(
-      row(
-        `  ${budget}`,
-        `${String(found).padStart(2)}/${asked.length} (${String(Math.round((found / asked.length) * 100)).padStart(3)}%) ${kb(sizes[Math.floor(sizes.length / 2)])}`,
-      ),
-    );
-  }
+    return `${String(found).padStart(2)}/${asked.length} (${String(Math.round((found / asked.length) * 100)).padStart(3)}%) ${kb(sizes[Math.floor(sizes.length / 2)])}`;
+  };
+
+  // The row ceiling on its own, so this curve means what it did before the
+  // byte ceiling existed.
+  for (const rows of [60, 40, 25, 15, 8])
+    console.log(row(`  ${rows}`, await measure(rows, Number.MAX_SAFE_INTEGER)));
+
+  // The byte ceiling, at the row ceiling a focused briefing uses. The rows
+  // above are counted; these are what the payload actually weighs, and the
+  // constant in `briefing.ts` was picked off this curve.
+  console.log("\n  what the byte ceiling costs, at 25 bodies and with a focus:\n");
+  console.log(row("  bytes allowed", "recall     note bytes"));
+  for (const budgetBytes of [32_768, 24_576, 16_384, 12_288, 8_192])
+    console.log(row(`  ${kb(budgetBytes)}`, await measure(25, budgetBytes)));
 
   for (const id of added) await contextsRepo.remove(id);
 }
