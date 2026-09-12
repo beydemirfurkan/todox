@@ -8,8 +8,8 @@ import { FTS_INDEXES } from "./fts";
  * race waiting to happen, and a deploy step is the honest place for it.
  *
  * The SQLite-era column backfills are gone. Postgres is a clean start, and
- * anyone coming from the old local file goes through `scripts/import-sqlite.ts`
- * rather than dragging a migration history nobody else ever had.
+ * nobody is left on the old local file: the importer that read it needed a
+ * dependency this package no longer carries, so it went with it.
  */
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (

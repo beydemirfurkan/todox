@@ -178,10 +178,3 @@ export const revokeOwned = (ownerId: number, invitationId: number, revokedAt: st
         AND i.accepted_at IS NULL AND i.revoked_at IS NULL`,
     [revokedAt, invitationId, ownerId],
   );
-
-export const purgeExpired = (at: string) =>
-  run(
-    `DELETE FROM project_invitations
-      WHERE expires_at <= ? AND (accepted_at IS NOT NULL OR revoked_at IS NOT NULL)`,
-    [at],
-  );
