@@ -1,5 +1,6 @@
 import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
+import type { ClientUse } from "../repositories/api-tokens";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
 import { logInfo } from "../server/log";
@@ -266,6 +267,24 @@ export const revokeAllApiTokens = (userId: number) => apiTokens.destroyAllFor(us
  * address, nothing a log should not keep for a long time.
  */
 export async function userForApiToken(token: string): Promise<PublicUser | undefined> {
+  return (await agentForToken(token))?.user;
+}
+
+/** What the MCP endpoint needs from one authenticated call, and nothing secret. */
+export type AgentIdentity = {
+  user: PublicUser;
+  /** When the token was minted. */
+  createdAt: string;
+  client: ClientUse | null;
+};
+
+/**
+ * `userForApiToken`, keeping the two things the hosted MCP route reads off
+ * the same row: when the token was minted and which client last announced
+ * itself on it. The row is read once either way; this hands over what the
+ * narrower function drops.
+ */
+export async function agentForToken(token: string): Promise<AgentIdentity | undefined> {
   const found = await apiTokens.userForToken(token);
   if (!found) return undefined;
   if (found.use !== "same-day")
@@ -274,5 +293,5 @@ export async function userForApiToken(token: string): Promise<PublicUser | undef
       userId: found.user.id,
       tokenId: found.tokenId,
     });
-  return publicUser(found.user);
+  return { user: publicUser(found.user), createdAt: found.createdAt, client: found.client };
 }

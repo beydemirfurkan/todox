@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * envelope is not.
  */
 const mocks = vi.hoisted(() => ({
-  userForApiToken: vi.fn(),
+  agentForToken: vi.fn(),
   check: vi.fn(),
   consume: vi.fn(),
   penalise: vi.fn(),
@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   record: vi.fn(),
 }));
 
-vi.mock("@/lib/services/auth", () => ({ userForApiToken: mocks.userForApiToken }));
+vi.mock("@/lib/services/auth", () => ({ agentForToken: mocks.agentForToken }));
 vi.mock("@/lib/services/rate-limit", () => ({
   check: mocks.check,
   consume: mocks.consume,
@@ -32,6 +32,7 @@ vi.mock("@/lib/services/rpc", () => ({ invoke: mocks.invoke }));
 vi.mock("@/lib/server/client-info", () => ({
   normalise: () => ({ name: "claude-code", version: "1" }),
   record: mocks.record,
+  clientDuringSetup: () => null,
 }));
 vi.mock("@/mcp/tools", () => ({
   instructions: () => "instructions",
@@ -82,7 +83,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.check.mockResolvedValue(ALLOWED);
   mocks.consume.mockResolvedValue(ALLOWED);
-  mocks.userForApiToken.mockResolvedValue(USER);
+  mocks.agentForToken.mockResolvedValue({ user: USER, createdAt: "2026-09-12T00:00:00Z", client: null });
   mocks.connect.mockResolvedValue(undefined);
   mocks.close.mockResolvedValue(undefined);
   mocks.handleRequest.mockResolvedValue(new Response("{}", { status: 200 }));
@@ -111,14 +112,14 @@ describe("authentication", () => {
   });
 
   it("refuses a token that resolves to nobody", async () => {
-    mocks.userForApiToken.mockResolvedValue(null);
+    mocks.agentForToken.mockResolvedValue(undefined);
     const res = await post();
     expect(res.status).toBe(401);
     expect((await jsonRpcError(res)).message).toBe("invalid or revoked token");
   });
 
   it("charges a failed token to the address it came from", async () => {
-    mocks.userForApiToken.mockResolvedValue(null);
+    mocks.agentForToken.mockResolvedValue(undefined);
     await post({ headers: { "x-forwarded-for": "203.0.113.9" } });
     expect(mocks.penalise).toHaveBeenCalledWith("badTokenPerIp", "203.0.113.9");
   });
@@ -175,7 +176,7 @@ describe("a failure inside the request", () => {
   });
 
   it("answers in JSON-RPC when the token cannot be resolved", async () => {
-    mocks.userForApiToken.mockRejectedValue(DOWN);
+    mocks.agentForToken.mockRejectedValue(DOWN);
     const res = await post();
     expect(res.status).toBe(500);
     expect((await jsonRpcError(res)).message).toBe("the server could not complete that call");
