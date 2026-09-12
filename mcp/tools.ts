@@ -509,6 +509,26 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   registerPrompts(server);
 
   /**
+   * What `ws.repoUrl` answered for a reference, kept for the process.
+   *
+   * The remote is asked for on every local get_context, get_file_context and
+   * create_task, and each ask is a `git remote get-url` spawn -- for a value
+   * that only matters the first time a project is registered and does not
+   * change while a session runs. Per process, not per module: the hosted
+   * route builds a fresh workspace per request and answers undefined anyway.
+   * A remote added mid-session is seen when the process restarts.
+   */
+  const remotes = new Map<string, string | undefined>();
+  const repoUrl = (ref: string): string | undefined => {
+    // Keyed on the repository, not the reference: get_context asks with the
+    // root it just found and get_file_context with the working directory,
+    // and those are one checkout. The walk up to `.git` is a few stats.
+    const key = ws.repoRoot(ref) ?? ref;
+    if (!remotes.has(key)) remotes.set(key, ws.repoUrl(key));
+    return remotes.get(key);
+  };
+
+  /**
    * Every tool is the same shape: forward to the server, or report why not.
    *
    * The input schema is not written here — it comes from `SHAPES`, the same
@@ -607,7 +627,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       if (accepted.includes("repo_url") && params.repo_url === undefined) {
         const ref = (params.repo_root ?? params.cwd ?? params.project) as string | undefined;
         if (typeof ref === "string") {
-          const url = ws.repoUrl(ref);
+          const url = repoUrl(ref);
           if (url) params.repo_url = url;
         }
       }
@@ -623,6 +643,21 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       }
     });
   }
+
+  /**
+   * What this process last told the server about each linked file, so the
+   * same answer is not posted again on every briefing.
+   *
+   * `checkLinkedFiles` runs on every get_context and get_task, and the report
+   * it sends is a second HTTP round trip -- with the four authentication
+   * statements behind it -- that used to go out whenever the payload carried
+   * any linked file at all, changed or not. The hashes are still computed
+   * every call, because that is how the statuses in the payload are made true
+   * and a sha256 of a source file costs nothing; the round trip is what is
+   * spared. The first sight of a file in a session is always reported, so
+   * `checked_at` moves once per session even for a file nothing touched.
+   */
+  const reported = new Map<number, string | null>();
 
   /**
    * Hashes every linked file the payload mentions, rewrites its `status`, and
@@ -662,11 +697,17 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       if (hit) f.status = hit.status;
     }
 
-    // Best effort: a failed write-back must not cost the agent its briefing.
-    try {
-      await call("reportRefs", { refs: seen.seen });
-    } catch {
-      /* the status above is still correct for this call */
+    // Only what the server has not heard from this process yet. Recorded
+    // after the post, not before: a report that failed is one to make again.
+    const unreported = seen.seen.filter((r) => !reported.has(r.id) || reported.get(r.id) !== r.hash);
+    if (unreported.length) {
+      // Best effort: a failed write-back must not cost the agent its briefing.
+      try {
+        await call("reportRefs", { refs: unreported });
+        for (const r of unreported) reported.set(r.id, r.hash);
+      } catch {
+        /* the status above is still correct for this call */
+      }
     }
 
     // The briefing's own summary was built from what the server had on file.

@@ -22,12 +22,24 @@
  */
 
 /**
- * How long to wait between writes for the same state.
+ * How long to wait between writes for the same state -- and, since the same
+ * interval, between LOOKS.
  *
  * The observer runs inside the agent's tool calls and an agent in a busy
  * stretch makes a lot of them, all spending the same token bucket as its real
  * work. A commit is exempt: it is the event a dying session would otherwise
  * lose, and it is rare enough to be free.
+ *
+ * The interval used to gate only the write. Every tool call still ran the
+ * four git reads -- HEAD, `status --porcelain`, `rev-list --count`, `log` --
+ * synchronously, on the tool's own return path, and then decided not to
+ * write. On a session that changes nothing, which is most of a session, that
+ * was four spawns per call for a decision the interval had already made. Now
+ * HEAD alone is read every call, because a commit is the one thing worth
+ * being prompt about, and the other three wait for the interval or for HEAD
+ * to move. A tree that first becomes dirty inside the interval is noticed at
+ * the next look after it, up to a minute later, which the purpose here -- a
+ * session that dies without reporting -- can afford.
  */
 export const THROTTLE_MS = 60_000;
 
@@ -81,6 +93,9 @@ export function createObserver(options: ObserverOptions) {
   let lastWriteAt = 0;
   let lastHead: string | undefined;
   let lastDirty: number | undefined;
+  /** The last full look -- all four reads -- and the HEAD it saw. */
+  let lastLookAt: number | undefined;
+  let lastSeenHead: string | undefined;
 
   /**
    * At most one observation in flight, and at most one waiting behind it.
@@ -157,6 +172,14 @@ export function createObserver(options: ObserverOptions) {
     // against, and "0 commits" is a row that says nothing at all.
     if (!head) return;
     if (base === undefined) base = head;
+
+    // Inside the interval, with HEAD where it was, nothing below could end in
+    // a write -- so nothing below is read. One spawn per call instead of four.
+    const now = clock();
+    if (head === lastSeenHead && lastLookAt !== undefined && now - lastLookAt < THROTTLE_MS)
+      return;
+    lastLookAt = now;
+    lastSeenHead = head;
 
     const dirty = options.git.dirty(dir) ?? 0;
     const since = options.git.since(dir, base);
