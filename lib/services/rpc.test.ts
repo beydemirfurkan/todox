@@ -43,6 +43,18 @@ describe("invoke", () => {
     await expect(invoke(ctx, "getTask", {})).rejects.toBeInstanceOf(BadRequest);
   });
 
+  it("says which kind of refusal each was, in the word the log keeps", async () => {
+    // The message names the method or the parameter; the reason is what the
+    // route logs, so it has to be set on every exit or the log says "other".
+    await expect(invoke(ctx, "dropEverything", {})).rejects.toMatchObject({
+      reason: "unknown_method",
+    });
+    await expect(invoke(ctx, "getTask", {})).rejects.toMatchObject({ reason: "schema" });
+    // A missing project reference is caught by the schema's refine before
+    // `pickRef` ever runs, so it is a schema refusal too.
+    await expect(invoke(ctx, "listTasks", {})).rejects.toMatchObject({ reason: "schema" });
+  });
+
   it("gets past validation on a well-formed call", async () => {
     // Whether the handler then answers or fails on the database is none of this
     // test's business: both mean validation was not what stopped it. Only a

@@ -55,6 +55,8 @@ vi.mock("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js", () => (
 }));
 
 const route = await import("./route");
+const { BadRequest } = await import("@/lib/services/errors");
+const { NotYours } = await import("@/lib/services/ownership");
 
 const USER = { id: 7 };
 const ALLOWED = { allowed: true, retryAfterSec: 0 };
@@ -200,5 +202,65 @@ describe("a failure inside the request", () => {
     mocks.record.mockRejectedValue(DOWN);
     const res = await post();
     expect(res.status).toBe(200);
+  });
+});
+
+/**
+ * A refused call leaves a line, and the line carries a reason and never a
+ * message.
+ *
+ * `tool_usage` counted twenty-six refusals in ten days and the container log
+ * had nothing for any of them: `BadRequest` and `NotYours` are rethrown to the
+ * agent on purpose, and the only log call was for the failures that are ours.
+ * The message names a path or an id, which the log must not keep, so what
+ * goes out is the code alone. The invoker `registerTools` is handed is the
+ * one wrapped in the route's error split, so it is what these call.
+ */
+describe("what a refusal leaves in the log", () => {
+  const invoker = async () => {
+    await post();
+    return mocks.registerTools.mock.calls[0]![1] as (
+      method: string,
+      params: Record<string, unknown>,
+    ) => Promise<unknown>;
+  };
+
+  const lines = (spy: { mock: { calls: unknown[][] } }) =>
+    spy.mock.calls.map((c) => String(c[0])).filter((l) => l.includes('"event":"mcp.refused"'));
+
+  it("logs the reason of a bad request, and not its message", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    mocks.invoke.mockRejectedValue(new BadRequest("no repository at /Users/x/secret", "no_evidence"));
+    const call = await invoker();
+    await expect(call("getContext", {})).rejects.toThrow("no repository at /Users/x/secret");
+    const [line] = lines(log);
+    expect(line).toContain('"reason":"no_evidence"');
+    expect(line).toContain('"method":"getContext"');
+    expect(line).not.toContain("/Users/x");
+    log.mockRestore();
+  });
+
+  it("logs an ownership refusal under one word", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    mocks.invoke.mockRejectedValue(new NotYours("task", 12));
+    const call = await invoker();
+    await expect(call("getTask", {})).rejects.toThrow();
+    const [line] = lines(log);
+    const fields = JSON.parse(line!) as Record<string, unknown>;
+    expect(fields.reason).toBe("not_yours");
+    expect(fields).not.toHaveProperty("message");
+    expect(fields).not.toHaveProperty("error");
+    log.mockRestore();
+  });
+
+  it("still hides a failure that is ours behind the generic message", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.invoke.mockRejectedValue(new Error("connection terminated unexpectedly"));
+    const call = await invoker();
+    await expect(call("getTask", {})).rejects.toThrow("the server could not complete that call");
+    expect(lines(log)).toHaveLength(0);
+    log.mockRestore();
+    err.mockRestore();
   });
 });

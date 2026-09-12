@@ -2,9 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
-import { logError, newRequestId } from "@/lib/server/log";
+import { logError, logWarn, newRequestId } from "@/lib/server/log";
 import { userForApiToken } from "@/lib/services/auth";
-import { BadRequest, TooSlow } from "@/lib/services/errors";
+import { BadRequest, refusalReason, TooSlow } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
 import { invoke } from "@/lib/services/rpc";
@@ -79,7 +79,10 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     // Ownership failures are the caller's problem, not a server fault, and
     // they must not reveal whether the id exists for somebody else.
-    if (e instanceof NotYours) return fail(404, e.message, requestId);
+    if (e instanceof NotYours) {
+      logWarn("rpc.refused", { method: methodName(method), reason: refusalReason(e), requestId });
+      return fail(404, e.message, requestId);
+    }
 
     // A statement that ran out of time. 504 rather than 500 so a dashboard can
     // tell "we are broken" from "that question was too big", and so an HTTP
@@ -90,16 +93,20 @@ export async function POST(req: NextRequest) {
     // Things the agent can fix get the real message. Anything else is ours:
     // returning the raw text handed a caller Postgres' own parse errors, which
     // is exactly the feedback loop you want when probing a query.
-    if (e instanceof BadRequest) return fail(400, e.message, requestId);
+    if (e instanceof BadRequest) {
+      // The reason, never the message: it names paths and ids.
+      logWarn("rpc.refused", { method: methodName(method), reason: refusalReason(e), requestId });
+      return fail(400, e.message, requestId);
+    }
 
     // The method, never the params: those are the task bodies and the notes.
-    logError("rpc.failed", e, {
-      requestId,
-      method: typeof method === "string" ? method : null,
-    });
+    logError("rpc.failed", e, { requestId, method: methodName(method) });
     return fail(500, "the server could not complete that call", requestId);
   }
 }
+
+/** The method for a log line: the name if the body had one, null before the parse. */
+const methodName = (method: unknown): string | null => (typeof method === "string" ? method : null);
 
 /**
  * Echoed on every answer, so a report of "it returned 500" can name the exact

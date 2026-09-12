@@ -681,5 +681,5 @@ export function parseParams(method: MethodName, params: unknown): Record<string,
   const detail = result.error.issues
     .map((i) => (i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message))
     .join("; ");
-  throw new BadRequest(`invalid params for ${method} — ${detail}`);
+  throw new BadRequest(`invalid params for ${method} — ${detail}`, "schema");
 }

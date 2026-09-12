@@ -4,11 +4,11 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { instructions, registerTools, SERVER_INFO, type Workspace } from "@/mcp/tools";
 import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
-import { logError, newRequestId } from "@/lib/server/log";
+import { logError, logWarn, newRequestId } from "@/lib/server/log";
 import { normalise } from "@/lib/client-identity";
 import { lookup, record } from "@/lib/server/client-info";
 import { userForApiToken } from "@/lib/services/auth";
-import { BadRequest } from "@/lib/services/errors";
+import { BadRequest, refusalReason } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
 import { invoke } from "@/lib/services/rpc";
@@ -203,7 +203,15 @@ async function answer(req: Request, requestId: string): Promise<Response> {
       // Things the agent can act on keep their real message. Ownership
       // failures must not say whether the id exists for somebody else, and
       // `NotYours` is already worded for that.
-      if (e instanceof BadRequest || e instanceof NotYours) throw e;
+      //
+      // Logged by reason and never by message: the message names the path or
+      // the id, and the log keeps neither. Without this line twenty-six
+      // refused calls in ten days left no trace but a counter, and the
+      // counter could not say what kind of refusal they were.
+      if (e instanceof BadRequest || e instanceof NotYours) {
+        logWarn("mcp.refused", { method, reason: refusalReason(e), requestId });
+        throw e;
+      }
       // The method, never the params: those carry task bodies and notes.
       logError("mcp.tool", e, { method, requestId });
       throw new Error("the server could not complete that call");

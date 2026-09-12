@@ -7,7 +7,37 @@
  * feedback. Anything an agent can act on ("pass either `project` or `cwd`")
  * should be a `BadRequest`; anything that means we broke should not.
  */
-export class BadRequest extends Error {}
+export class BadRequest extends Error {
+  /**
+   * Why, in a word the log can keep.
+   *
+   * The message names paths and slugs, so the log never carries it, and for a
+   * month that meant the log carried nothing: production counted twenty-six
+   * refused agent calls in ten days and the container log had no line for any
+   * of them. A code says what kind of refusal it was -- a shape the schema
+   * rejected, a path no project matched, a directory nobody could show was a
+   * repository -- and nothing about whose.
+   */
+  constructor(
+    message: string,
+    readonly reason: RefusalReason = "other",
+  ) {
+    super(message);
+  }
+}
+
+export type RefusalReason =
+  /** The parameters did not fit the method's schema. */
+  | "schema"
+  /** No method by that name. */
+  | "unknown_method"
+  /** Neither `project` nor `cwd` was sent. */
+  | "no_ref"
+  /** The reference matched no project the caller can see. */
+  | "no_project"
+  /** A path nobody could show was a repository, so nothing was registered. */
+  | "no_evidence"
+  | "other";
 
 /**
  * The statement ran out of time and Postgres stopped it.
@@ -24,3 +54,15 @@ export class BadRequest extends Error {}
  * promise about how long an answer takes, which is ours.
  */
 export class TooSlow extends Error {}
+
+/**
+ * The word the log keeps for a refusal.
+ *
+ * Anything that is not a `BadRequest` and reached this is a `NotYours` from
+ * `ownership.ts`, which this module does not import -- it sits below the
+ * services, and the ownership check sits on top of the repositories. One word
+ * for every ownership failure on purpose: which kind of row was somebody
+ * else's is a fact about the row.
+ */
+export const refusalReason = (e: unknown): RefusalReason | "not_yours" =>
+  e instanceof BadRequest ? e.reason : "not_yours";
