@@ -136,6 +136,34 @@ describe("what a failure is allowed to say", () => {
     });
   });
 
+  /**
+   * The refusal leaves a line with a reason and no message. Production
+   * counted the refusals and could not say what kind any of them were; the
+   * message cannot be logged because it names paths and ids.
+   */
+  it("logs a refusal by reason, never by message", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    mocks.invoke.mockRejectedValue(new BadRequest('no project matches "/Users/x"', "no_project"));
+    await post();
+    const line = log.mock.calls.map((c) => String(c[0])).find((l) => l.includes("rpc.refused"));
+    expect(line).toContain('"reason":"no_project"');
+    expect(line).toContain('"method":"listProjects"');
+    expect(line).not.toContain("/Users/x");
+    log.mockRestore();
+  });
+
+  it("logs an ownership refusal under one word, without the id", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    mocks.invoke.mockRejectedValue(new NotYours("task", 12));
+    await post();
+    const line = log.mock.calls.map((c) => String(c[0])).find((l) => l.includes("rpc.refused"));
+    const fields = JSON.parse(line!) as Record<string, unknown>;
+    expect(fields.reason).toBe("not_yours");
+    // The id lives in the message, and the message is not a field here.
+    expect(fields).not.toHaveProperty("message");
+    log.mockRestore();
+  });
+
   it("replaces anything else, so a driver error is not a probe result", async () => {
     // Returning the raw text handed callers Postgres' own parse errors, which
     // is exactly the feedback loop you want when probing a query.

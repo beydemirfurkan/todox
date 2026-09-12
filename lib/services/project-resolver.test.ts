@@ -33,7 +33,7 @@ const paths = vi.hoisted(() => ({
 vi.mock("../repositories/projects", () => repo);
 vi.mock("../repositories/project-paths", () => paths);
 
-const { resolve, resolveOrCreate } = await import("./project-resolver");
+const { resolve, resolveOrCreate, mustResolve } = await import("./project-resolver");
 
 const project = (id: number, root_path: string | null, extra: Record<string, unknown> = {}) => ({
   id,
@@ -336,5 +336,39 @@ describe("registering needs evidence that the path is a repository", () => {
     const found = await resolveOrCreate(1, "/Users/me/known/src/app.ts");
     expect(found.created).toBe(false);
     expect(found.project.id).toBe(9);
+  });
+
+  /**
+   * "Pass `project`" with nothing to pass. One account in production hit this
+   * refusal on every session start -- its client opens a scratch directory
+   * per prompt -- and the message told it to name a project while naming
+   * none. `mustResolve` already lists the slugs on its exit; this one now does
+   * the same, so the retry can succeed.
+   */
+  it("names the projects an agent could pass instead", async () => {
+    repo.list.mockResolvedValue([project(1, "/a"), project(2, "/b")]);
+    const err = await resolveOrCreate(1, "/scratch/thing").catch((e: Error) => e);
+    expect((err as Error).message).toContain("Known slugs: p1, p2.");
+  });
+
+  it("does not invent a slug list for an account with no projects", async () => {
+    const err = await resolveOrCreate(1, "/scratch/thing").catch((e: Error) => e);
+    expect((err as Error).message).not.toContain("Known slugs");
+  });
+});
+
+/**
+ * The log keeps a word for a refusal, never the message, because the message
+ * carries the path. Each exit says which kind it was.
+ */
+describe("the reason a refusal carries", () => {
+  it("says no_evidence for a directory it will not register", async () => {
+    const err = await resolveOrCreate(1, "/scratch/thing").catch((e) => e);
+    expect(err).toMatchObject({ reason: "no_evidence" });
+  });
+
+  it("says no_project for a reference that matches nothing", async () => {
+    const err = await mustResolve(1, "nope").catch((e) => e);
+    expect(err).toMatchObject({ reason: "no_project" });
   });
 });

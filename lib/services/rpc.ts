@@ -51,7 +51,7 @@ type Handler = (ctx: RpcContext, params: Record<string, never>) => Promise<unkno
 
 const pickRef = (p: { project?: string; cwd?: string }) => {
   const ref = p.project ?? p.cwd;
-  if (!ref) throw new BadRequest("pass either `project` or `cwd`");
+  if (!ref) throw new BadRequest("pass either `project` or `cwd`", "no_ref");
   return ref;
 };
 
@@ -608,7 +608,7 @@ export type { MethodName };
  * their own.
  */
 export async function invoke(ctx: RpcContext, method: string, params: unknown) {
-  if (!isMethod(method)) throw new BadRequest(`unknown method "${method}"`);
+  if (!isMethod(method)) throw new BadRequest(`unknown method "${method}"`, "unknown_method");
 
   // Counted here because this is the one place both transports pass through --
   // the hosted endpoint and the stdio process reach the same function, so a

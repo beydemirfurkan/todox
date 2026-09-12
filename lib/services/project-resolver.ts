@@ -93,10 +93,7 @@ export async function mustResolve(
   const p = await resolve(userId, ref, hints);
   if (p) return p;
 
-  const all = await projects.list(userId);
-  const slugs = all.map((x) => x.slug);
-  const shown = slugs.slice(0, SUGGESTIONS).join(", ");
-  const rest = slugs.length - SUGGESTIONS;
+  const known = await knownSlugs(userId);
 
   // Nothing that reaches here can create anything. Most callers are reads, and
   // the one creating path that does call this (`resolveOrCreate`) only gets
@@ -107,11 +104,26 @@ export async function mustResolve(
   // likely to be missing when a path stops matching.
   throw new BadRequest(
     `no project matches "${ref}". ` +
-      (slugs.length
-        ? `Known slugs: ${shown}${rest > 0 ? ` (+${rest} more)` : ""}. ` +
+      (known
+        ? `${known} ` +
           "Pass `project`, or `repo_url` if this is the same repository under a different path."
         : "You have no projects yet. Call get_context with an absolute path to register one."),
+    "no_project",
   );
+}
+
+/**
+ * "Known slugs: a, b, c (+4 more)." -- or undefined when the account has no
+ * projects. Slugs only: the message used to carry every absolute `root_path`
+ * the account had, so one typo'd reference dumped the developer's directory
+ * layout into the transcript.
+ */
+async function knownSlugs(userId: number): Promise<string | undefined> {
+  const slugs = (await projects.list(userId)).map((x) => x.slug);
+  if (!slugs.length) return undefined;
+  const shown = slugs.slice(0, SUGGESTIONS).join(", ");
+  const rest = slugs.length - SUGGESTIONS;
+  return `Known slugs: ${shown}${rest > 0 ? ` (+${rest} more)` : ""}.`;
 }
 
 export type Resolution = {
@@ -228,7 +240,7 @@ export async function resolveOrCreate(
       return { project: adopted, created: false };
     }
 
-    if (!evidence) throw new BadRequest(noEvidence(ref));
+    if (!evidence) throw await refuseNoEvidence(userId, ref);
     return {
       project: await create(userId, name, root, hints.repoUrl),
       created: true,
@@ -236,7 +248,7 @@ export async function resolveOrCreate(
     };
   }
 
-  if (!evidence) throw new BadRequest(noEvidence(ref));
+  if (!evidence) throw await refuseNoEvidence(userId, ref);
   return {
     project: await create(userId, name, root, hints.repoUrl),
     created: true,
@@ -304,6 +316,22 @@ const noEvidence = (ref: string) =>
   `same call will register it. If this is a scratch directory rather than a ` +
   `checkout, pass \`project\` to work in an existing project, or ` +
   `\`create_project\` to name one deliberately.`;
+
+/**
+ * The refusal, with the account's slugs on the end.
+ *
+ * The advice above says "pass `project`" and used to stop there, so an agent
+ * whose working directory is not a checkout -- Codex opens one per prompt --
+ * was told to name a project and given nothing to name. In production that
+ * was the single largest source of refused calls: one account, a scratch
+ * directory, the same error on every session start. `mustResolve` already
+ * lists the slugs when a reference matches nothing; this is the same courtesy
+ * on the other exit.
+ */
+async function refuseNoEvidence(userId: number, ref: string): Promise<BadRequest> {
+  const known = await knownSlugs(userId);
+  return new BadRequest(known ? `${noEvidence(ref)} ${known}` : noEvidence(ref), "no_evidence");
+}
 
 /**
  * Registered by its path, because there was no remote to register it by.
