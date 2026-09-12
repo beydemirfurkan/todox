@@ -378,6 +378,8 @@ export const tr: Record<Key, string> = {
   observationsFileMany: "{n} dosya değişti",
   observationsAndMore: "ve {n} tane daha eski; agent için iki hafta tutuluyor.",
   inLog: "kayıt",
+  decisionCount: "karar",
+  decisionCountPlural: "karar",
   deadEndCount: "çıkmaz",
   deadEndCountPlural: "çıkmaz",
   askedCount: "soru",

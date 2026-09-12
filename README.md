@@ -394,9 +394,6 @@ whose slug is taken arrives under the next free one. Task events come across
 too, so durations in a report on the restored copy say what they said on the
 original.
 
-Coming from the old SQLite version? `pnpm db:import-sqlite [path]` copies a
-`~/.todox/todox.db` across.
-
 ## Security
 
 Passwords are scrypt; sessions, agent tokens and email links are stored as

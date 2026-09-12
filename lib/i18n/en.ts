@@ -387,6 +387,8 @@ export const en = {
   observationsFileMany: "{n} files changed",
   observationsAndMore: "and {n} older, kept for the agent for two weeks.",
   inLog: "in log",
+  decisionCount: "decision",
+  decisionCountPlural: "decisions",
   deadEndCount: "dead end",
   deadEndCountPlural: "dead ends",
   askedCount: "asked",

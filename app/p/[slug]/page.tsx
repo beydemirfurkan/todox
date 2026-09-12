@@ -639,6 +639,12 @@ export default async function ProjectPage({
                             {c.total} {t("inLog")}
                           </Chip>
                         )}
+                        {c && c.decisions > 0 && (
+                          <Chip color="var(--k-decision)">
+                            {c.decisions}{" "}
+                            {c.decisions > 1 ? t("decisionCountPlural") : t("decisionCount")}
+                          </Chip>
+                        )}
                         {c && c.dead_ends > 0 && (
                           <Chip color="var(--k-dead_end)">
                             {c.dead_ends}{" "}
