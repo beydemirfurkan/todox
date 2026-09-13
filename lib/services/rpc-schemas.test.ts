@@ -198,6 +198,7 @@ describe("model field round-trips through parseParams on every method", () => {
     search: { query: "x" },
     activityReport: { period: "today" },
     recordClientInfo: { name: "claude-code" },
+    sessionNudge: {},
     recordObservation: { cwd: "/repo", session_id: "s", commits: 0, files_changed: 0 },
   };
 

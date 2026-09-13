@@ -446,9 +446,11 @@ describe("the agent surface covers the method list", () => {
    * `recordObservation` reports what the session did to the tree, and it is
    * kept off the surface for a sharper reason than symmetry: an observation a
    * model could write is an observation a model could flatter. The value of
-   * the row is that nobody had to be asked for it.
+   * the row is that nobody had to be asked for it. `sessionNudge` is what the
+   * stdio process puts in front of its instructions at startup -- a sentence
+   * about the account's own silence, which a model has no business asking.
    */
-  const NEVER_A_TOOL = ["recordClientInfo", "recordObservation"];
+  const NEVER_A_TOOL = ["recordClientInfo", "recordObservation", "sessionNudge"];
   /** The local process checks its own files, so hosted is the only one that asks. */
   const HOSTED_ONLY = ["reportRefs"];
 
@@ -474,6 +476,16 @@ describe("the agent surface covers the method list", () => {
 });
 
 describe("instructions", () => {
+  it("puts the sentence about this account in front of everything else", () => {
+    // A silent account has been ignoring the end of these instructions in
+    // particular; the one paragraph it has to act on comes first.
+    const text = instructions({ local: false }, "THIS ACCOUNT HAS NOT CALLED A TOOL.");
+    expect(text.startsWith("THIS ACCOUNT HAS NOT CALLED A TOOL.")).toBe(true);
+    expect(text).toContain("START: call get_context");
+    // And nothing at all when there is nothing to say.
+    expect(instructions({ local: false }, null)).toBe(instructions({ local: false }));
+  });
+
   it("tells a hosted agent that the hashing is its job", () => {
     expect(instructions({ local: false })).toContain("report_file_hashes");
     expect(instructions({ local: true })).not.toContain("report_file_hashes");

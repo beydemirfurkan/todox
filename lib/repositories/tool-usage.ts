@@ -1,4 +1,4 @@
-import { all, run } from "../db/client";
+import { all, one, run } from "../db/client";
 import { now } from "../util/time";
 
 /**
@@ -52,6 +52,14 @@ export const QUERIES = {
            WHERE day >= ?
            GROUP BY user_id, method
            ORDER BY user_id, calls DESC`,
+
+  /**
+   * How many tools one account called inside a window. One number, for the
+   * one question the nudge asks: has this account used todox at all lately.
+   */
+  callsBy: `SELECT coalesce(sum(calls), 0) AS n
+              FROM tool_usage
+             WHERE user_id = ? AND day >= ?`,
 } as const;
 
 export type UsageRow = {
@@ -82,3 +90,9 @@ export async function record(userId: number, method: string, ok: boolean): Promi
 
 /** Everything counted on or after `day`, which is an ISO date. */
 export const since = (day: string) => all<UsageRow>(QUERIES.since, [day]);
+
+/** Tool calls by one account on or after `day`. */
+export const callsBy = async (userId: number, day: string): Promise<number> => {
+  const row = await one<{ n: string | number }>(QUERIES.callsBy, [userId, day]);
+  return Number(row?.n ?? 0);
+};

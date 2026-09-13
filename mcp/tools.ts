@@ -150,8 +150,20 @@ const REMOTE_NOTE = [
   "call fills it; the stdio server (todox-mcp) is the one that captures.",
 ];
 
-export function instructions(ws: { local: boolean }) {
-  return [...BASE, ...(ws.local ? LOCAL_NOTE : REMOTE_NOTE)].join("\n");
+/**
+ * The session instructions, with the one sentence that is about THIS account
+ * in front of them when there is one.
+ *
+ * `nudge` is what `lib/services/nudge.ts` has to say to an account that has
+ * been connecting and never calling -- measured from tool_usage, null for
+ * everyone else. First rather than last, because it is the one paragraph a
+ * silent account has to act on before it reads anything else, and because
+ * an agent that has been ignoring this server has been ignoring the end of
+ * these instructions in particular.
+ */
+export function instructions(ws: { local: boolean }, nudge: string | null = null) {
+  const body = [...BASE, ...(ws.local ? LOCAL_NOTE : REMOTE_NOTE)].join("\n");
+  return nudge ? `${nudge}\n\n${body}` : body;
 }
 
 /**

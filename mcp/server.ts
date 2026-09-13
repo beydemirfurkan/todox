@@ -106,8 +106,22 @@ async function main() {
     }
   }
 
+  // The same sentence the hosted endpoint puts in front of its instructions
+  // for an account that connects and never calls, asked for once here since
+  // this side has no row to read. Best-effort for the same reason the client
+  // record above is: a session must not fail to start over a measurement.
+  let nudge: string | null = null;
+  try {
+    const reply = (await call("sessionNudge", clientName ? { client: clientName } : {})) as {
+      nudge?: string | null;
+    } | null;
+    nudge = reply?.nudge ?? null;
+  } catch (e) {
+    console.error("mcp nudge", e instanceof Error ? e.message : e);
+  }
+
   const server = new McpServer(SERVER_INFO, {
-    instructions: instructions({ local: true }),
+    instructions: instructions({ local: true }, nudge),
   });
 
   /**

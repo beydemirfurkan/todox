@@ -208,6 +208,15 @@ idempotent — the block is fenced with an HTML comment, so a second run replace
 it instead of leaving two sets of instructions where the older one wins. Add
 `--dry-run` to see the exact block first.
 
+If you skip this and the account then connects for days without calling a
+tool, the server says so at the top of its instructions on the next session —
+"connected for N days and has not called a tool" — and hands the agent the
+four lines and the path of your client's memory file, telling it to append
+them and to tell you it did. Measured from `tool_usage`, so it is said only
+while it is true and stops the moment a tool is called. That is how an account
+whose client changed, or whose memory file was never written, comes back
+without anybody having to ask.
+
 **The user-level file, not the project one.** This is the same trap as the
 config above, one directory over:
 
