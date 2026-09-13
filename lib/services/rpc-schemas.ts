@@ -551,6 +551,21 @@ export const SHAPES = {
   },
 
   /**
+   * What the stdio process should put in front of its instructions, asked
+   * once at startup. Server-side and not agent-facing: the answer is about
+   * the account's own silence, measured from tool_usage, and a model asking
+   * whether it has been using todox is the thing the answer is for.
+   */
+  sessionNudge: {
+    client: z
+      .string()
+      .max(MAX.line)
+      .optional()
+      .describe("Client name, e.g. 'opencode'; picks the memory file the nudge names"),
+    model,
+  },
+
+  /**
    * What a session did to the tree, written by the process that can see it.
    *
    * Server-side and not agent-facing, for the same reason `recordClientInfo`

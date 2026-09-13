@@ -26,6 +26,7 @@ import * as projectActivity from "./project-activity";
 import { mustResolve, noMatch, resolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
+import { silentAccountNudge } from "./nudge";
 import { search } from "./search";
 import * as taskService from "./task-service";
 import { isAbsolutePath, normalisePath, scrubRemote } from "../util/paths";
@@ -520,6 +521,22 @@ export const methods = {
       seenAt: new Date().toISOString(),
     });
     return { ok: true };
+  },
+
+  sessionNudge: async ({ token, userId }, p: { client?: string }) => {
+    // The token's age is the "connected for N days" in the sentence, and the
+    // row that carries it is the one the transport already read to
+    // authenticate. Over `/api/rpc` the token is in the context; a call with
+    // none has nothing to be measured against.
+    if (!token) throw new BadRequest("missing token");
+    const identity = await apiTokensRepo.userForToken(token);
+    if (!identity) throw new BadRequest("missing token");
+    const nudge = await silentAccountNudge({
+      userId,
+      tokenCreatedAt: identity.createdAt,
+      client: p.client ?? identity.client?.name ?? null,
+    });
+    return { nudge };
   },
 
   /**

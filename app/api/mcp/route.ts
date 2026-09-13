@@ -5,9 +5,10 @@ import { instructions, registerTools, SERVER_INFO, type Workspace } from "@/mcp/
 import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, logWarn, newRequestId } from "@/lib/server/log";
-import { normalise } from "@/lib/client-identity";
+import { normalise, type ClientInfo } from "@/lib/client-identity";
 import { clientDuringSetup, record } from "@/lib/server/client-info";
 import { agentForToken, type AgentIdentity } from "@/lib/services/auth";
+import { silentAccountNudge } from "@/lib/services/nudge";
 import { BadRequest, refusalReason } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
@@ -73,20 +74,47 @@ const withId = (res: Response, requestId: string) => {
  * not break the request. The worst case is the briefing coming back without
  * the client-specific note, which is acceptable.
  */
-async function captureClientInfo(token: string, body: unknown): Promise<void> {
-  if (!body || typeof body !== "object") return;
-  const method = (body as { method?: unknown }).method;
-  if (method !== "initialize") return;
-  const params = (body as { params?: unknown }).params;
-  if (!params || typeof params !== "object") return;
-  const info = normalise(
-    (params as { clientInfo?: { name?: unknown; version?: unknown } }).clientInfo ?? {},
-  );
-  if (!info) return;
+async function captureClientInfo(token: string, body: unknown): Promise<ClientInfo | null> {
+  const info = initializeClient(body);
+  if (!info) return null;
   try {
     await record(token, info);
   } catch (e) {
     logError("mcp.clientInfo", e);
+  }
+  return info;
+}
+
+/** The client named in an `initialize` body; null for any other message. */
+function initializeClient(body: unknown): ClientInfo | null {
+  if (!body || typeof body !== "object") return null;
+  if ((body as { method?: unknown }).method !== "initialize") return null;
+  const params = (body as { params?: unknown }).params;
+  if (!params || typeof params !== "object") return null;
+  return normalise(
+    (params as { clientInfo?: { name?: unknown; version?: unknown } }).clientInfo ?? {},
+  );
+}
+
+/**
+ * What the instructions open with, for this account, on this `initialize`.
+ *
+ * Computed on `initialize` only -- the one message whose reply carries
+ * instructions -- and best-effort: an account that has been silent for weeks
+ * loses nothing if the sentence about it fails once more, and a session must
+ * not fail to start over a measurement.
+ */
+async function nudgeFor(agent: AgentIdentity, body: unknown, client: ClientInfo | null) {
+  if ((body as { method?: unknown } | null)?.method !== "initialize") return null;
+  try {
+    return await silentAccountNudge({
+      userId: agent.user.id,
+      tokenCreatedAt: agent.createdAt,
+      client: client?.name ?? agent.client?.name ?? null,
+    });
+  } catch (e) {
+    logError("mcp.nudge", e);
+    return null;
   }
 }
 
@@ -185,10 +213,10 @@ async function answer(req: Request, requestId: string): Promise<Response> {
   // server processes the body. Awaiting (not just calling) keeps the request
   // bound to the record attempt, which is what a `console.error` from the
   // helper then belongs to.
-  await captureClientInfo(token, body);
+  const client = await captureClientInfo(token, body);
 
   const server = new McpServer(SERVER_INFO, {
-    instructions: instructions({ local: false }),
+    instructions: instructions({ local: false }, await nudgeFor(agent, body, client)),
   });
   // In-process rather than a fetch back to /api/rpc: a request to our own
   // domain is a second billed invocation and a second cold start, and it is

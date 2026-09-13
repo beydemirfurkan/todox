@@ -62,6 +62,7 @@ const KIND = {
 
   recordObservation: "automatic",
   recordClientInfo: "automatic",
+  sessionNudge: "automatic",
   reportRefs: "automatic",
 } satisfies Record<MethodName, Kind>;
 

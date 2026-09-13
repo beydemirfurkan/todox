@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
   close: vi.fn(),
   record: vi.fn(),
+  nudge: vi.fn(),
+  instructions: vi.fn((_ws: unknown, nudge?: string | null) => nudge ?? "instructions"),
+  serverOptions: [] as unknown[],
 }));
 
 vi.mock("@/lib/services/auth", () => ({ agentForToken: mocks.agentForToken }));
@@ -34,8 +37,9 @@ vi.mock("@/lib/server/client-info", () => ({
   record: mocks.record,
   clientDuringSetup: () => null,
 }));
+vi.mock("@/lib/services/nudge", () => ({ silentAccountNudge: mocks.nudge }));
 vi.mock("@/mcp/tools", () => ({
-  instructions: () => "instructions",
+  instructions: mocks.instructions,
   registerTools: mocks.registerTools,
   // Stood in rather than passed through, like `instructions` above: what this
   // file tests is the route's behaviour around the server, not the identity it
@@ -45,6 +49,9 @@ vi.mock("@/mcp/tools", () => ({
 }));
 vi.mock("@modelcontextprotocol/sdk/server/mcp.js", () => ({
   McpServer: class {
+    constructor(_info: unknown, options: unknown) {
+      mocks.serverOptions.push(options);
+    }
     connect = mocks.connect;
     close = mocks.close;
   },
@@ -83,6 +90,8 @@ function post({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.serverOptions.length = 0;
+  mocks.nudge.mockResolvedValue(null);
   mocks.check.mockResolvedValue(ALLOWED);
   mocks.consume.mockResolvedValue(ALLOWED);
   mocks.agentForToken.mockResolvedValue({ user: USER, createdAt: "2026-09-12T00:00:00Z", client: null });
@@ -262,6 +271,44 @@ describe("what a refusal leaves in the log", () => {
     await expect(call("getTask", {})).rejects.toThrow("the server could not complete that call");
     expect(lines(log)).toHaveLength(0);
     log.mockRestore();
+    err.mockRestore();
+  });
+});
+
+/**
+ * The sentence for an account that connects and never calls, and where it
+ * goes. `initialize` is the one message whose reply carries instructions, so
+ * that is the only request that pays for the measurement -- and a session
+ * must never fail to start over it.
+ */
+describe("the nudge for a silent account", () => {
+  const given = () => (mocks.serverOptions[0] as { instructions: string }).instructions;
+
+  it("asks on initialize, with the client that message names, and puts the answer first", async () => {
+    mocks.nudge.mockResolvedValue("THIS ACCOUNT HAS NOT CALLED A TOOL.");
+    await post({
+      body: { jsonrpc: "2.0", id: 1, method: "initialize", params: { clientInfo: { name: "opencode", version: "1" } } },
+    });
+    expect(mocks.nudge).toHaveBeenCalledWith({
+      userId: USER.id,
+      tokenCreatedAt: "2026-09-12T00:00:00Z",
+      client: "opencode",
+    });
+    expect(given()).toBe("THIS ACCOUNT HAS NOT CALLED A TOOL.");
+  });
+
+  it("does not measure on any other message", async () => {
+    await post({ body: { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} } });
+    expect(mocks.nudge).not.toHaveBeenCalled();
+    expect(given()).toBe("instructions");
+  });
+
+  it("starts the session anyway when the measurement fails", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.nudge.mockRejectedValue(new Error("tool_usage is away"));
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(given()).toBe("instructions");
     err.mockRestore();
   });
 });
