@@ -19,6 +19,7 @@
     "smoke:auth": "tsx scripts/auth-smoke.ts",
     "smoke:collab": "tsx scripts/collab-smoke.ts",
     "smoke:observe": "tsx scripts/observe-smoke.ts",
+    "smoke:search": "tsx scripts/search-smoke.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:import": "tsx scripts/import-todox.ts",
     "install:mcp": "tsx scripts/install-mcp/index.ts",

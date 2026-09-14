@@ -415,12 +415,15 @@ Details, and an honest list of what is **not** covered, in
 
 ## Known gaps
 
-- Search's full-text half is indexed; its substring half is not. The two are
-  asked separately and merged, which is what lets the first one use an index at
-  all — measured on 110k rows, a search went from 5.7s to 0.16s. What is left is
-  one sequential scan for the `ILIKE` arm that finds identifiers full-text
-  cannot, and indexing that needs `pg_trgm`, which needs a `CREATE EXTENSION`
-  this project cannot assume it is allowed to run.
+- Search's substring half is indexed only where the database allows it. The
+  two halves are asked separately and merged, which is what lets either use an
+  index at all — measured on 110k rows, a search went from 5.7s to 0.16s on the
+  full-text arm alone. The `ILIKE` arm that finds identifiers full-text cannot
+  needs `pg_trgm`; `pnpm db:migrate` creates the extension and its five indexes
+  where the role may, and says so either way. Where it may not — a Postgres
+  without contrib, a managed service that refuses extensions — that arm stays
+  a sequential scan and `pnpm smoke:search` prints `SKIP` for it rather than
+  failing. The `postgres:18` image in `docker-compose.yml` has it.
 - Staleness is per-file hash; per-symbol would be the honest version. Hosted,
   it depends on the agent actually sending hashes — the instructions ask, and
   nothing can make it.

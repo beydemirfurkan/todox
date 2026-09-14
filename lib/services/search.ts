@@ -1,5 +1,5 @@
 import { all } from "../db/client";
-import { document, matches, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
+import { document, matches, rank, substring, TSQUERY, TSQUERY_FROM } from "../db/fts";
 
 export type SearchHit = {
   type: "task" | "entry" | "context";
@@ -123,6 +123,12 @@ type Searchable = {
  * arm is a cheap string comparison over the rows the reader owns. Measured on a
  * corpus of 110k rows: 2.5s to 25ms.
  *
+ * The substring arm has an index of its own where the database allows one:
+ * `pg_trgm`'s `gin_trgm_ops` does answer `ILIKE '%…%'`, and `db/fts.ts`
+ * generates one index per searched column from the same list `substring`
+ * builds its predicate from. Where the extension cannot be created the arm is
+ * the sequential scan described above, and nothing else changes.
+ *
  * Written from one description rather than typed twice on purpose. The rule
  * that matters is that **ownership is asserted in both arms** -- leaking
  * nothing either way, since the union feeds a join that re-derives the row, but
@@ -165,7 +171,7 @@ const TASKS: Searchable = {
               AND (q.project IS NULL OR t.project_id = q.project)
               AND q.kinds IS NULL`,
   doc: document("tasks", "t"),
-  substring: `t.title ILIKE q.pat OR t.body ILIKE q.pat`,
+  substring: substring("tasks", "t"),
   carried: `t.id, t.updated_at AS sort_key, ${SLUG} AS project_slug`,
   columns: `t.id, t.title, t.created_at`,
   join: `JOIN tasks t ON t.id = top.id`,
@@ -181,7 +187,7 @@ const ENTRIES: Searchable = {
               AND (q.project IS NULL OR p.id = q.project)
               AND (q.kinds IS NULL OR e.kind = ANY(q.kinds))`,
   doc: document("entries", "e"),
-  substring: `e.body ILIKE q.pat`,
+  substring: substring("entries", "e"),
   carried: `e.id, e.created_at AS sort_key, ${SLUG} AS project_slug`,
   columns: `e.id, e.task_id, e.kind, e.created_at, t.title`,
   join: `JOIN entries e ON e.id = top.id JOIN tasks t ON t.id = e.task_id`,
@@ -205,7 +211,7 @@ const CONTEXTS: Searchable = {
               AND (q.project IS NULL OR c.project_id = q.project OR c.project_id IS NULL)
               AND (q.kinds IS NULL OR c.kind = ANY(q.kinds))`,
   doc: document("contexts", "c"),
-  substring: `c.title ILIKE q.pat OR c.body ILIKE q.pat`,
+  substring: substring("contexts", "c"),
   carried: `c.id, c.updated_at AS sort_key, ${SLUG} AS project_slug`,
   columns: `c.id, c.kind, c.title, c.created_at`,
   join: `JOIN contexts c ON c.id = top.id`,

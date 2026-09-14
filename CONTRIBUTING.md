@@ -29,7 +29,7 @@ pnpm exec tsc --noEmit         # globals Next generates into .next/types
 pnpm smoke:auth                # if you touched anything under auth
 ```
 
-CI runs all of these, and the other three smoke suites with them: it starts its
+CI runs all of these, and the other smoke suites with them: it starts its
 own `postgres:18` service container, so nothing here depends on a secret and
 nothing is skipped. `pnpm test` needs no database of its own — it covers the
 logic that has none: column allow-lists, RPC parameter validation, report

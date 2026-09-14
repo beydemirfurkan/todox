@@ -134,8 +134,9 @@ export const TSQUERY = `replace(websearch_to_tsquery('english', cleaned.text)::t
  * goes from a sequential scan to a `Bitmap Index Scan` on both configurations,
  * which is what makes the indexes in `schema.ts` worth having at all; end to
  * end on the corpora measured here the wall clock barely moved, because the
- * substring arm is still a sequential scan (todox #163) and `ts_debug` costs
- * about 4ms of its own.
+ * substring arm was still a sequential scan at the time (`TRGM_INDEXES` below
+ * is what changed that, where `pg_trgm` exists) and `ts_debug` costs about 4ms
+ * of its own.
  *
  * So a token that either configuration calls a stopword is dropped before
  * either query is built. `ts_debug` is the only thing that will say which those
@@ -180,6 +181,50 @@ export const rank = (doc: string): string =>
 /** `idx_tasks_fts_english` and its five siblings, named the same way twice. */
 export const indexName = (table: SearchedTable, config: FtsConfig): string =>
   `idx_${table}_fts_${config}`;
+
+/**
+ * The substring arm: one `ILIKE` per searched column, joined by `OR`. Needs
+ * `q` in scope, like `matches` above.
+ *
+ * Per column rather than over `document()`, and the difference is what makes
+ * the trigram indexes below usable at all. An expression index on the joined
+ * document would need the query to `ILIKE` that same expression, and then the
+ * pattern could match across the seam between title and body -- a different
+ * answer from today's. One `ILIKE` per column keeps the answer byte for byte
+ * what it was, and Postgres turns the `OR` into a `BitmapOr` of one index
+ * scan per column.
+ */
+export function substring(table: SearchedTable, alias: string): string {
+  return SEARCHED[table].map((c) => `${alias}.${c} ILIKE q.pat`).join(" OR ");
+}
+
+/** `idx_tasks_title_trgm` and its four siblings, named the same way twice. */
+export const trgmIndexName = (table: SearchedTable, column: string): string =>
+  `idx_${table}_${column}_trgm`;
+
+/**
+ * The five trigram indexes, one per searched column, generated from `SEARCHED`
+ * for the reason the six above are.
+ *
+ * A list of statements rather than a block of the schema, and never spliced
+ * into `SCHEMA`: they need `pg_trgm`, and whether that extension can be
+ * created is a fact about the database rather than about this repository.
+ * `schema.ts` tries, and runs these only where it succeeded -- a self-hosted
+ * Postgres whose role cannot `CREATE EXTENSION` keeps the sequential scan and
+ * a working `db:migrate`, which is the better of the two things to keep.
+ *
+ * `gin_trgm_ops` answers `ILIKE '%…%'` directly; no expression, so nothing
+ * here has to agree with `substring` character for character -- only the
+ * column list does, and `search.test.ts` holds that.
+ */
+export const TRGM_INDEXES: readonly string[] = (Object.keys(SEARCHED) as SearchedTable[]).flatMap(
+  (table) =>
+    SEARCHED[table].map(
+      (column) =>
+        `CREATE INDEX IF NOT EXISTS ${trgmIndexName(table, column)} ` +
+        `ON ${table} USING GIN (${column} gin_trgm_ops)`,
+    ),
+);
 
 /**
  * The six GIN indexes, generated so that adding a searchable column to

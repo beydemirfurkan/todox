@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { TRGM_INDEXES } from "./fts";
 import { SCHEMA, statements } from "./schema";
 
 /**
@@ -66,6 +67,24 @@ describe("the schema survives being split on semicolons", () => {
     for (const statement of statements()) {
       if (!statement.toUpperCase().startsWith("CREATE")) continue;
       expect(statement.toUpperCase(), statement.slice(0, 60)).toContain("IF NOT EXISTS");
+    }
+  });
+});
+
+/**
+ * The statements `migrate()` runs after the schema, under the same two rules
+ * the schema is held to: each one resumable on its own, and no `?` anywhere
+ * `lib/db/client.ts` would rewrite it -- `exec` sends the text verbatim, and
+ * the rewrite is positional and does not parse strings, so the cheapest place
+ * to keep a placeholder out of a literal is here.
+ */
+describe("the trigram indexes migrate() adds on its own", () => {
+  it("are each idempotent and free of placeholders", () => {
+    expect(TRGM_INDEXES.length).toBeGreaterThan(0);
+    for (const statement of TRGM_INDEXES) {
+      expect(statement).toMatch(/^CREATE INDEX IF NOT EXISTS idx_[a-z]+_[a-z]+_trgm ON /);
+      expect(statement).not.toContain("?");
+      expect(statement).not.toContain(";");
     }
   });
 });
