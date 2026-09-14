@@ -33,6 +33,7 @@ import {
   memoryFileFor,
   openCodeContract,
   type ServerLayout,
+  skillFileFor,
   vsCodeContract,
 } from "../scripts/install-mcp/clients/contract";
 import { findStaleEntries, readServerEntry } from "../scripts/install-mcp/clients/json-http";
@@ -40,6 +41,7 @@ import { readTomlServerSection } from "../scripts/install-mcp/clients/toml";
 import { hasMemoryBlock } from "../scripts/install-mcp/memory";
 import { maskToken } from "../scripts/install-mcp/prompt";
 import { runDoctor } from "../scripts/install-mcp/reachability";
+import { isCurrentSkill } from "../scripts/install-mcp/skill";
 
 /**
  * One line of the report. `fail` is something the client will not read or
@@ -146,6 +148,30 @@ async function inspectMemory(client: McpClientId): Promise<Finding> {
       );
 }
 
+/**
+ * The skill beside the habit. Optional, so its absence is a fact rather than
+ * a warning; a file that is there but says something other than this build
+ * does is worth a line, because it loads and teaches a protocol that has
+ * since moved.
+ */
+async function inspectSkill(client: McpClientId): Promise<Finding> {
+  const file = skillFileFor(client);
+  let text: string;
+  try {
+    text = await fs.readFile(file, "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    return finding(client, "info", `no skill at ${tilde(file)} (install:mcp --write-skill adds one)`);
+  }
+  return isCurrentSkill(text)
+    ? finding(client, "ok", `${tilde(file)} is this todox's session protocol`)
+    : finding(
+        client,
+        "warn",
+        `${tilde(file)} differs from this todox's text -- re-run install:mcp --write-skill`,
+      );
+}
+
 async function inspectJsonClient(
   client: McpClientId,
   contract: JsonClientContract,
@@ -162,7 +188,7 @@ async function inspectJsonClient(
     if (read.kind === "present") {
       const judged = judgeEntry(client, layout.file, read.entry, contract.httpType);
       findings.push(...judged.findings);
-      if (judged.reachable) findings.push(await inspectMemory(client));
+      if (judged.reachable) findings.push(await inspectMemory(client), await inspectSkill(client));
       return { findings, reachable: judged.reachable };
     }
     fileExists ||= read.kind === "absent";
@@ -235,6 +261,7 @@ async function inspectCodex(): Promise<{ findings: Finding[]; reachable?: Reacha
     findings: [
       finding("codex", "ok", `${tilde(file)}: entry ok (${section.url}, ${maskToken(token)})`),
       await inspectMemory("codex"),
+      await inspectSkill("codex"),
     ],
     reachable: { url: section.url, token },
   };

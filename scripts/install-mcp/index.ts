@@ -4,7 +4,7 @@
  * Usage:
  *   pnpm install:mcp <client> [--url URL] [--token TOKEN] [--transport http|stdio]
  *                             [--opencode-layout v1|v2] [--write-memory]
- *                             [--dry-run] [--verbose]
+ *                             [--write-skill] [--dry-run] [--verbose]
  *
  * Where <client> is one of: claude-code, codex, cursor, vscode, opencode.
  *
@@ -21,6 +21,11 @@
  * habit in the client's user-level memory file is what makes an agent reach for
  * them. Off by default because that file is the user's own, and every run says
  * which file it would be either way.
+ *
+ * --write-skill puts the whole session protocol -- the text the server sends at
+ * initialize -- in the client's user-level skills directory, where the client
+ * loads it by description when the moment matches. Also off by default; the
+ * file is todox's own, but the directory is the user's.
  */
 import * as os from "node:os";
 
@@ -29,11 +34,12 @@ import { client as codex } from "./clients/codex";
 import { client as cursor } from "./clients/cursor";
 import { client as opencode } from "./clients/opencode";
 import { client as vscode } from "./clients/vscode";
-import { memoryFileFor } from "./clients/contract";
+import { memoryFileFor, skillFileFor } from "./clients/contract";
 import { runDoctor } from "./reachability";
 import { memoryBlock, planMemoryWrite, readMemoryFile, writeMemoryFile } from "./memory";
 import { parseArgs } from "./parse";
 import { maskToken, promptForToken } from "./prompt";
+import { planSkillWrite, readSkillFile, writeSkillFile } from "./skill";
 import type { McpClientId } from "../../lib/mcp-clients";
 
 const CLIENTS = {
@@ -97,11 +103,25 @@ async function main() {
     );
   }
 
+  // Named beside the memory file, for the same reason: a dry run says what
+  // every half would do, and a real run says what it did not do.
+  const skillFile = skillFileFor(args.client as McpClientId);
+  console.error(
+    args.writeSkill
+      ? `[todox] skill  : ${skillFile}`
+      : `[todox] skill  : not written. --write-skill puts the whole session protocol in ${skillFile}.`,
+  );
+
   if (args.dryRun) {
     if (args.writeMemory) {
       const plan = planMemoryWrite(await readMemoryFile(memoryFile));
       console.error(`[todox] memory : would be ${plan.status}; the block it adds:`);
       for (const l of memoryBlock().split("\n")) console.error(`[todox]          ${l}`);
+    }
+    if (args.writeSkill) {
+      const plan = planSkillWrite(await readSkillFile(skillFile));
+      console.error(`[todox] skill  : would be ${plan.status}; the file:`);
+      for (const l of plan.contents.trimEnd().split("\n")) console.error(`[todox]          ${l}`);
     }
     console.error("[todox] dry-run; nothing written");
     return;
@@ -133,6 +153,10 @@ async function main() {
   if (args.writeMemory) {
     const written = await writeMemoryFile(memoryFile);
     console.error(`[todox] memory : ${memoryFile} (${written.status})`);
+  }
+  if (args.writeSkill) {
+    const written = await writeSkillFile(skillFile);
+    console.error(`[todox] skill  : ${skillFile} (${written.status})`);
   }
 
   // Only run the doctor on http transports. Stdio spawns a child process

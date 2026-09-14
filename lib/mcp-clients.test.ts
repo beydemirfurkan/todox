@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   MCP_CONFIG_PATHS,
   MCP_SHAPES,
+  MCP_SKILL_PATHS,
   mcpEntry,
   mcpEntryDocument,
+  SKILL_DIR_NAME,
+  SKILL_FILE_NAME,
   type McpJsonShape,
 } from "./mcp-clients";
 
@@ -39,6 +42,21 @@ describe("MCP_SHAPES", () => {
     for (const [id, shape] of Object.entries(MCP_SHAPES)) {
       expect(shape.rootKeys.length, id).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("MCP_SKILL_PATHS", () => {
+  it("names a directory per client, the same on every platform, under home", () => {
+    for (const [client, location] of Object.entries(MCP_SKILL_PATHS)) {
+      expect(location.darwin, client).toBe(location.linux);
+      expect(location.win32, client).toBe(location.linux);
+      expect(location.linux, client).toMatch(/^~\/.+skills$/);
+    }
+  });
+
+  it("names the skill directory and file every client agrees on", () => {
+    expect(SKILL_DIR_NAME).toBe("todox");
+    expect(SKILL_FILE_NAME).toBe("SKILL.md");
   });
 });
 

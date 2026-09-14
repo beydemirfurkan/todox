@@ -176,6 +176,42 @@ export function instructions(ws: { local: boolean }, nudge: string | null = null
 }
 
 /**
+ * The same text as a skill file, for a client that loads skills by
+ * description.
+ *
+ * The body is `BASE` verbatim -- not a paraphrase, not a summary -- because a
+ * skill and the server's `instructions` describe the same protocol to the
+ * same agent, and two wordings of one protocol is how the config snippets
+ * drifted before `lib/mcp-clients.ts` existed. Transport-neutral: neither
+ * LOCAL_NOTE nor REMOTE_NOTE, since a skill file cannot know which transport
+ * the client's config names, and the server says that half at `initialize`.
+ *
+ * Frontmatter is `name` and `description` and nothing else: the two fields
+ * all five clients require, and the only two they all understand. The
+ * description is written to match the moments this text is for -- a session
+ * starting, work being captured, a session ending -- because the description
+ * is what a client reads to decide whether to load the rest. One line, not a
+ * folded scalar: five parsers read this, and `key: value` is the one shape
+ * none of them can get wrong.
+ */
+export function skillDocument(): string {
+  return [
+    "---",
+    "name: todox",
+    "description: Persistent working memory for this developer's projects over the todox MCP server. " +
+      "Use at the start of a session (get_context), whenever a decision, dead end, question or task " +
+      "worth keeping comes up, and before finishing (handoff). Says which tool to call when, and what to write.",
+    "---",
+    "",
+    "<!-- Written by `pnpm install:mcp --write-skill`. The same text the todox",
+    "MCP server sends at initialize; re-run after upgrading. -->",
+    "",
+    ...BASE,
+    "",
+  ].join("\n");
+}
+
+/**
  * What both transports answer `initialize` with. Here rather than at each
  * `new McpServer(...)` for the same reason the tools are: there is one agent
  * surface, and a client that connects to the hosted endpoint and a client that

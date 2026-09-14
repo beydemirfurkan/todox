@@ -24,6 +24,14 @@ export type ParsedArgs = {
    */
   writeMemory: boolean;
   /**
+   * Also write the session protocol as a skill in the client's user-level
+   * skills directory. Off by default like `--write-memory`, and for the
+   * opposite reason: this file is entirely todox's, but a directory of skills
+   * is something the user curates, and a skill appearing in it because they
+   * registered a server is still a surprise. `--dry-run` prints the file.
+   */
+  writeSkill: boolean;
+  /**
    * OpenCode only. Undefined means "work it out from the existing config",
    * which is what almost every run does; the flag is for the case where there
    * is no config to read yet and the user knows which major they run.
@@ -41,7 +49,7 @@ const KNOWN_CLIENTS = ["claude-code", "codex", "cursor", "vscode", "opencode"] a
  * what follows, and `pnpm install:mcp --dry-run claude-code` is the natural
  * order for a one-shot script.
  */
-const BOOLEAN_FLAGS = new Set(["dry-run", "verbose", "write-memory"]);
+const BOOLEAN_FLAGS = new Set(["dry-run", "verbose", "write-memory", "write-skill"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const positional: string[] = [];
@@ -103,5 +111,6 @@ export function parseArgs(argv: string[]): ParsedArgs {
     dryRun: Boolean(flags["dry-run"]),
     verbose: Boolean(flags.verbose),
     writeMemory: Boolean(flags["write-memory"]),
+    writeSkill: Boolean(flags["write-skill"]),
   };
 }

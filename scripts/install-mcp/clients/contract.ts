@@ -4,7 +4,10 @@ import * as path from "node:path";
 import {
   MCP_MEMORY_PATHS,
   MCP_SHAPES,
+  MCP_SKILL_PATHS,
   MEMORY_FILE_NAME,
+  SKILL_DIR_NAME,
+  SKILL_FILE_NAME,
   type McpClientId,
   type McpConfigLocation,
 } from "../../../lib/mcp-clients";
@@ -143,6 +146,16 @@ export function memoryFileFor(client: McpClientId): string {
   return target.kind === "directory"
     ? path.join(resolved, MEMORY_FILE_NAME)
     : resolved;
+}
+
+/**
+ * The absolute `SKILL.md` for a client: its skills directory, then a directory
+ * named for the skill, then the file every client looks for. Wholly todox's,
+ * unlike the memory file -- nothing of the user's lives inside it.
+ */
+export function skillFileFor(client: McpClientId): string {
+  const dir = expandHome(MCP_SKILL_PATHS[client][platformKey()]);
+  return path.join(dir, SKILL_DIR_NAME, SKILL_FILE_NAME);
 }
 
 function platformKey(): keyof McpConfigLocation {

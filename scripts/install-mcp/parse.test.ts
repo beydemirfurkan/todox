@@ -56,6 +56,7 @@ describe("parseArgs", () => {
       dryRun: false,
       verbose: false,
       writeMemory: false,
+      writeSkill: false,
     });
   });
 
@@ -80,6 +81,7 @@ describe("parseArgs", () => {
       dryRun: true,
       verbose: true,
       writeMemory: false,
+      writeSkill: false,
     });
   });
 
@@ -105,6 +107,14 @@ describe("parseArgs", () => {
     // the next argv as its value and the client name disappears.
     expect(parseArgs(["--write-memory", "codex"]).client).toBe("codex");
     expect(parseArgs(["--write-memory", "codex"]).writeMemory).toBe(true);
+    // The skill flag is boolean for the same reason, and independent of the
+    // memory one: either half can be asked for without the other.
+    expect(parseArgs(["--write-skill", "codex"]).writeSkill).toBe(true);
+    expect(parseArgs(["--write-skill", "codex"]).writeMemory).toBe(false);
+    expect(parseArgs(["codex", "--write-memory", "--write-skill"])).toMatchObject({
+      writeMemory: true,
+      writeSkill: true,
+    });
   });
 
   it("does not consume the next argv as a value for boolean flags", () => {
@@ -119,6 +129,7 @@ describe("parseArgs", () => {
       dryRun: true,
       verbose: false,
       writeMemory: false,
+      writeSkill: false,
     });
     expect(parseArgs(["--verbose", "codex"]).verbose).toBe(true);
     expect(parseArgs(["--verbose", "codex"]).client).toBe("codex");

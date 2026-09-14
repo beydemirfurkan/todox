@@ -246,6 +246,29 @@ A repository's own `AGENTS.md`, and the per-project rules files the editors also
 read, apply inside that checkout only. A cross-project memory installed into one
 project is the thing this whole section exists to avoid.
 
+**The longer version, as a skill.** The four lines are the habit; the whole
+session protocol — the same text the server sends at `initialize` — can also
+sit in the client's user-level skills directory, where every one of these
+clients loads a `SKILL.md` by its description when the moment matches, and
+spends nothing on it otherwise:
+
+```bash
+pnpm install:mcp claude-code --write-skill
+```
+
+| Agent | The skill file it loads |
+| --- | --- |
+| Claude Code | `~/.claude/skills/todox/SKILL.md` |
+| Codex | `~/.agents/skills/todox/SKILL.md` |
+| Cursor | `~/.cursor/skills/todox/SKILL.md` |
+| VS Code | `~/.copilot/skills/todox/SKILL.md` |
+| OpenCode | `~/.config/opencode/skills/todox/SKILL.md` |
+
+The file is wholly todox's — a directory of its own, nothing of yours inside —
+so a second run after an upgrade replaces it. It is generated from the same
+text as the server instructions rather than written twice, which is what keeps
+the two from disagreeing.
+
 The token stays out of that file — it lives in your MCP config. This is the
 habit, not the credential.
 
