@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MEMORY_SNIPPET } from "../../lib/mcp-clients";
-import { memoryBlock, planMemoryWrite } from "./memory";
+import { hasMemoryBlock, memoryBlock, planMemoryWrite } from "./memory";
 
 /**
  * The file this plans an edit to is the user's, and usually one they wrote by
@@ -84,5 +84,26 @@ describe("planning the memory write", () => {
   it("carries no token", () => {
     // The habit, not the credential. Memory files get committed.
     expect(memoryBlock()).not.toMatch(/todox_|Bearer|Authorization/i);
+  });
+});
+
+/**
+ * The doctor's question. Both handwritings count: the installer's fence and
+ * the README's first line pasted by hand, because a doctor that recognised
+ * only its own would tell everyone who followed the README that the habit is
+ * missing.
+ */
+describe("hasMemoryBlock", () => {
+  it("sees the fenced block", () => {
+    expect(hasMemoryBlock(`# mine\n\n${memoryBlock()}\n`)).toBe(true);
+  });
+
+  it("sees the snippet pasted by hand", () => {
+    expect(hasMemoryBlock(`# mine\n\n${MEMORY_SNIPPET}\n`)).toBe(true);
+  });
+
+  it("does not see a file that merely mentions todox", () => {
+    expect(hasMemoryBlock("# mine\n\nI use todox sometimes.\n")).toBe(false);
+    expect(hasMemoryBlock("")).toBe(false);
   });
 });

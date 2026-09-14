@@ -56,6 +56,32 @@ function serverSectionPattern(name: string): RegExp {
   );
 }
 
+/**
+ * The two fields of a `[mcp_servers.<name>]` section the doctor cares about,
+ * or undefined when the section is not there.
+ *
+ * Read with the same pattern the writer replaces by, so the section ends
+ * where the writer thinks it ends. Inside it, `url` and the `Authorization`
+ * header are picked out by line: the header may be a key in the
+ * `.http_headers` sub-table (what todox writes, with the key quoted) or a
+ * member of an inline table (what the README shows), and both are one
+ * `Authorization = "…"` pair. Not a TOML parser, and not trying to be: the
+ * question is whether todox's own two lines are there.
+ */
+export function readTomlServerSection(
+  text: string,
+  name: string,
+): { url?: string; authorization?: string } | undefined {
+  const section = serverSectionPattern(name).exec(text)?.[0];
+  if (section === undefined) return undefined;
+  const value = (key: string) =>
+    new RegExp(`^\\s*"?${key}"?\\s*=\\s*"((?:[^"\\\\]|\\\\.)*)"`, "m").exec(section)?.[1] ??
+    new RegExp(`[{,]\\s*"?${key}"?\\s*=\\s*"((?:[^"\\\\]|\\\\.)*)"`).exec(section)?.[1];
+  const unescape = (s: string | undefined) =>
+    s?.replace(/\\(["\\])/g, "$1");
+  return { url: unescape(value("url")), authorization: unescape(value("Authorization")) };
+}
+
 function tomlString(s: string): string {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }

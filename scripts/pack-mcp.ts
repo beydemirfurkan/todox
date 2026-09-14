@@ -21,6 +21,11 @@
  * is the guard: `mcp/tools.ts` is shared with the server, and the last time
  * something database-shaped leaked into it, the local transport lost a feature
  * silently for weeks.
+ *
+ * The graph reaches into `scripts/install-mcp/` on purpose: `todox-mcp doctor`
+ * reads client configs through the same contract the installer writes them
+ * with, so those modules ship too. They are node built-ins and
+ * `lib/mcp-clients` all the way down, which is what lets them.
  */
 import "./env";
 

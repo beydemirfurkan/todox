@@ -35,6 +35,20 @@ export function memoryBlock(): string {
   return `${BEGIN}\n${MEMORY_SNIPPET}\n${END}`;
 }
 
+/**
+ * Whether a memory file carries the habit: todox's fenced block, or the
+ * snippet's first line pasted by hand from the README or the Account page.
+ * The fence is what the installer writes; the first line is the one sentence
+ * of the snippet that has not changed since it was written, and a doctor
+ * that recognised only its own handwriting would tell everyone who followed
+ * the README that the habit is missing.
+ */
+export function hasMemoryBlock(text: string): boolean {
+  const begin = text.indexOf(BEGIN);
+  if (begin !== -1 && text.indexOf(END) > begin) return true;
+  return text.includes(MEMORY_SNIPPET.split("\n")[0]!);
+}
+
 export type MemoryWrite = {
   /** What the file will contain. Returned so `--dry-run` can show it. */
   readonly contents: string;

@@ -75,6 +75,40 @@ function readContainer(
   return node as Record<string, unknown>;
 }
 
+/** What a read of one entry can find, each case a different sentence. */
+export type ServerEntryRead =
+  | { kind: "no-file" }
+  | { kind: "unreadable"; error: string }
+  | { kind: "absent" }
+  | { kind: "present"; entry: Record<string, unknown> };
+
+/**
+ * Read `name` at a layout without writing anything -- for the doctor, which
+ * inspects a machine it was not asked to change. The four outcomes are kept
+ * apart because they call for four different sentences: a file that is not
+ * there is a client that was never set up, a file that cannot be parsed is a
+ * hand edit that broke it, and an entry that is a string rather than an
+ * object is reported as present so the caller can say what is wrong with it.
+ */
+export async function readServerEntry(
+  layout: ServerLayout,
+  name: string,
+): Promise<ServerEntryRead> {
+  let doc: Record<string, unknown> | null;
+  try {
+    doc = await readJsonFile<Record<string, unknown>>(layout.file);
+  } catch (e) {
+    return { kind: "unreadable", error: e instanceof Error ? e.message : String(e) };
+  }
+  if (doc === null) return { kind: "no-file" };
+  const entry = readContainer(doc, layout.rootKeys)?.[name];
+  if (entry === undefined) return { kind: "absent" };
+  return {
+    kind: "present",
+    entry: typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>) : {},
+  };
+}
+
 /**
  * Insert or replace `name` at the target layout, leaving sibling entries
  * alone. Returns `updated` when the entry already existed; `created`

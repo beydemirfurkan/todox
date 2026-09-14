@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { upsertTomlServerSection } from "./toml";
+import { readTomlServerSection, upsertTomlServerSection } from "./toml";
 
 const install = (text: string, url: string, headerValue: string) =>
   upsertTomlServerSection(text, "todox", {
@@ -114,5 +114,51 @@ describe("upsertTomlServerSection", () => {
     const out = install(first.text, "https://x/mcp", "Bearer a$&b");
     expect(out.text).toContain('"Authorization" = "Bearer a$&b"');
     expect(out.text).not.toContain("Bearer old");
+  });
+});
+
+/**
+ * The read that pairs with the write above, plus the one shape todox never
+ * writes but the README shows: the header as an inline table.
+ */
+describe("readTomlServerSection", () => {
+  it("reads back what the writer wrote, quotes and escapes included", () => {
+    const { text } = upsertTomlServerSection("", "todox", {
+      url: "https://www.todox.dev/api/mcp",
+      headerName: "Authorization",
+      headerValue: 'Bearer to"ken\\x',
+    });
+    expect(readTomlServerSection(text, "todox")).toEqual({
+      url: "https://www.todox.dev/api/mcp",
+      authorization: 'Bearer to"ken\\x',
+    });
+  });
+
+  it("reads the inline-table form the README shows", () => {
+    const text = [
+      "[mcp_servers.todox]",
+      'url = "https://www.todox.dev/api/mcp"',
+      'http_headers = { Authorization = "Bearer todox_abc" }',
+      "",
+    ].join("\n");
+    expect(readTomlServerSection(text, "todox")).toEqual({
+      url: "https://www.todox.dev/api/mcp",
+      authorization: "Bearer todox_abc",
+    });
+  });
+
+  it("stops at the next section, and is undefined when there is none", () => {
+    const text = [
+      "[mcp_servers.other]",
+      'url = "https://other"',
+      "",
+      "[mcp_servers.todox]",
+      "",
+      "[mcp_servers.after]",
+      'url = "https://after"',
+      "",
+    ].join("\n");
+    expect(readTomlServerSection(text, "todox")).toEqual({ url: undefined, authorization: undefined });
+    expect(readTomlServerSection("[mcp_servers.other]\nurl = \"x\"\n", "todox")).toBeUndefined();
   });
 });
