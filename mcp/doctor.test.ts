@@ -31,9 +31,17 @@ vi.mock("../scripts/install-mcp/reachability", () => ({
 }));
 
 const { inspectInstalls, runInstallDoctor } = await import("./doctor");
-const { claudeCodeContract, codexConfigFile, cursorContract, memoryFileFor, openCodeContract, vsCodeContract } =
-  await import("../scripts/install-mcp/clients/contract");
+const {
+  claudeCodeContract,
+  codexConfigFile,
+  cursorContract,
+  memoryFileFor,
+  openCodeContract,
+  skillFileFor,
+  vsCodeContract,
+} = await import("../scripts/install-mcp/clients/contract");
 const { memoryBlock } = await import("../scripts/install-mcp/memory");
+const { skillDocument } = await import("./tools");
 
 const root = mkdtempSync(path.join(tmpdir(), "todox-doctor-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -100,6 +108,20 @@ describe("a good entry", () => {
 
     // A client with no entry is not told about its memory file at all.
     expect(about((await inspectInstalls(state.home)).findings, "cursor")).toHaveLength(1);
+  });
+
+  it("is followed by the skill's verdict: absent is a fact, stale is a warning, current is fine", async () => {
+    await writeJson(claudeCodeContract().current.file, { mcpServers: { todox: httpEntry("http") } });
+    const third = async () => about((await inspectInstalls(state.home)).findings, "claude-code")[2];
+    expect(await third()).toMatchObject({ level: "info", detail: expect.stringMatching(/no skill at/) });
+
+    const file = skillFileFor("claude-code");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, "---\nname: todox\ndescription: old\n---\nold\n");
+    expect(await third()).toMatchObject({ level: "warn", detail: expect.stringMatching(/differs from this todox/) });
+
+    await fs.writeFile(file, skillDocument());
+    expect(await third()).toMatchObject({ level: "ok", detail: expect.stringMatching(/session protocol/) });
   });
 
   it("is reached once per distinct url and token, however many clients share it", async () => {

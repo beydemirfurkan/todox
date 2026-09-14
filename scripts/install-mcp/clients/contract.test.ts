@@ -6,7 +6,10 @@ import {
   MCP_CONFIG_PATHS,
   MCP_MEMORY_PATHS,
   MCP_SHAPES,
+  MCP_SKILL_PATHS,
   MEMORY_FILE_NAME,
+  SKILL_DIR_NAME,
+  SKILL_FILE_NAME,
 } from "../../../lib/mcp-clients";
 import {
   claudeCodeContract,
@@ -14,6 +17,7 @@ import {
   cursorContract,
   memoryFileFor,
   openCodeContract,
+  skillFileFor,
   vsCodeContract,
   type JsonClientContract,
 } from "./contract";
@@ -285,6 +289,47 @@ describe("the memory file each client reads", () => {
     expect(memoryFileFor("claude-code")).not.toBe(claudeCodeContract().current.file);
     expect(memoryFileFor("cursor")).not.toBe(cursorContract().current.file);
     expect(memoryFileFor("codex")).not.toBe(codexConfigFile());
+  });
+});
+
+/**
+ * The skill file gets the matrix too, and needs it more: `--write-skill`
+ * writes a file that no test can watch a client load, and a skill in a
+ * directory the client does not scan is a file that appears, says exactly
+ * what we meant, and teaches nobody.
+ */
+describe("the skill file each client reads", () => {
+  const CLIENTS = ["claude-code", "codex", "cursor", "vscode", "opencode"] as const;
+
+  it("resolves under the home directory on every platform", () => {
+    for (const client of CLIENTS) {
+      for (const platform of PLATFORMS) {
+        withPlatform(platform, () => {
+          const file = skillFileFor(client);
+          expect(path.isAbsolute(file), `${client} on ${platform}`).toBe(true);
+          expect(file.startsWith(os.homedir()), `${client} on ${platform}`).toBe(true);
+        });
+      }
+    }
+  });
+
+  it("resolves to the documented directory, then the skill's own directory, then SKILL.md", () => {
+    for (const client of CLIENTS) {
+      const documented = MCP_SKILL_PATHS[client].linux;
+      const expanded = path.join(os.homedir(), ...documented.replace("~/", "").split("/"));
+      const file = skillFileFor(client);
+      expect(file, client).toBe(path.join(expanded, SKILL_DIR_NAME, SKILL_FILE_NAME));
+      expect(path.basename(file), client).toBe("SKILL.md");
+    }
+  });
+
+  it("is never the memory file or the MCP config", () => {
+    for (const client of CLIENTS) {
+      expect(skillFileFor(client), client).not.toBe(memoryFileFor(client));
+      expect(path.dirname(skillFileFor(client)), client).not.toBe(path.dirname(memoryFileFor(client)));
+    }
+    expect(skillFileFor("claude-code")).not.toBe(claudeCodeContract().current.file);
+    expect(skillFileFor("codex")).not.toBe(codexConfigFile());
   });
 });
 

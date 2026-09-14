@@ -145,6 +145,48 @@ export const MCP_MEMORY_PATHS = {
 } as const satisfies Record<McpClientId, McpMemoryTarget>;
 
 /**
+ * Where a client reads skills that apply to every project.
+ *
+ * A skill is the other half of the habit. The memory file is four lines that
+ * are always in front of the agent; a skill is a directory holding a
+ * `SKILL.md` the client loads when its `description` matches what the agent
+ * is doing, so it can carry the whole session protocol -- the same text the
+ * server sends at `initialize` -- without spending the always-on budget on
+ * it. The five clients agree on the shape (a directory named for the skill,
+ * `SKILL.md` inside, `name` and `description` in the frontmatter) and differ
+ * on the directory, so the directory is the only thing written down here.
+ *
+ * User-level, as with the memory paths and for the same reason. Every entry
+ * is a claim about somebody else's software, checked against its own
+ * documentation on 2026-09-15:
+ *   claude-code  code.claude.com/docs/en/skills — ~/.claude/skills
+ *   codex        developers.openai.com/codex/skills — ~/.agents/skills
+ *   cursor       cursor.com/docs/skills — ~/.cursor/skills; also reads
+ *                ~/.agents/skills and ~/.claude/skills
+ *   vscode       docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills
+ *                — ~/.copilot/skills; also reads ~/.agents/skills
+ *   opencode     opencode.ai/docs/skills — ~/.config/opencode/skills; also
+ *                reads ~/.claude/skills and ~/.agents/skills
+ * The client's own directory is written, never one of the "also reads"
+ * fallbacks: those are compatibility paths a client may stop honouring, and
+ * a skill that quietly stops loading is the failure this table exists to
+ * prevent.
+ */
+export const MCP_SKILL_PATHS = {
+  "claude-code": everywhere("~/.claude/skills"),
+  codex: everywhere("~/.agents/skills"),
+  cursor: everywhere("~/.cursor/skills"),
+  vscode: everywhere("~/.copilot/skills"),
+  opencode: everywhere("~/.config/opencode/skills"),
+} as const satisfies Record<McpClientId, McpConfigLocation>;
+
+/** The directory todox's skill lives in, under each of the above. */
+export const SKILL_DIR_NAME = "todox";
+
+/** The file every client looks for inside a skill directory. */
+export const SKILL_FILE_NAME = "SKILL.md";
+
+/**
  * The entry todox writes, for a client that takes JSON over HTTP.
  *
  * Returned rather than stringified so callers can nest it wherever their shape

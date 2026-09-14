@@ -11,6 +11,7 @@ import {
   cursorContract,
   memoryFileFor,
   openCodeContract,
+  skillFileFor,
   vsCodeContract,
 } from "./clients/contract";
 
@@ -125,6 +126,19 @@ describe("README prints the habit the installer writes", () => {
 
   it("documents the flag that writes it", () => {
     expect(README).toContain("--write-memory");
+  });
+
+  /**
+   * The skill is the second copy-paste surface the habit has, and the one
+   * with the most directories to get wrong: five clients, five places, and
+   * a file in the wrong one is loaded by nothing.
+   */
+  it("prints the user-level skill file for every client, and the flag that writes it", () => {
+    for (const client of ["claude-code", "codex", "cursor", "vscode", "opencode"] as const) {
+      const file = skillFileFor(client);
+      expect(README, `${client}: ${file}`).toContain(tildeForm(file));
+    }
+    expect(README).toContain("--write-skill");
   });
 
   it("does not offer a project-level file as the place for it", () => {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { SHAPES } from "@/lib/services/rpc-schemas";
-import { instructions, registerTools, type Workspace } from "./tools";
+import { instructions, registerTools, skillDocument, type Workspace } from "./tools";
 
 type Registered = {
   name: string;
@@ -620,6 +620,44 @@ describe("instructions", () => {
       expect(text).toMatch(/Ask it in words/);
       expect(text).toMatch(/parsed and ranked/);
     }
+  });
+});
+
+/**
+ * The skill file is the instructions again, for a client that loads skills by
+ * description. Two wordings of one protocol is how the config snippets
+ * drifted before `lib/mcp-clients.ts` existed, so the body has to BE the
+ * shared text rather than resemble it -- and the frontmatter has to be the
+ * two fields all five clients read, and no more.
+ */
+describe("the skill document", () => {
+  const doc = skillDocument();
+  const [, frontmatter, body] = doc.split("---\n");
+
+  it("opens with frontmatter naming the skill and describing when to load it", () => {
+    expect(doc.startsWith("---\n")).toBe(true);
+    expect(frontmatter).toMatch(/^name: todox$/m);
+    // One line: `key: value` is the one shape five parsers agree on.
+    expect(frontmatter).toMatch(/^description: \S.*\S$/m);
+    expect(frontmatter).not.toMatch(/^description: [>|]/m);
+    // The moments the text is for, so a client matching on the description
+    // loads it at the right times.
+    expect(frontmatter).toMatch(/get_context/);
+    expect(frontmatter).toMatch(/handoff/);
+    // Nothing else: a third key is one some client rejects the file over.
+    expect(frontmatter!.split("\n").filter((l) => /^[a-z]+:/.test(l))).toHaveLength(2);
+  });
+
+  it("carries the shared instructions verbatim, and neither transport note", () => {
+    const shared = instructions({ local: false }).split("\nTHIS SERVER HAS NO FILESYSTEM")[0]!;
+    expect(body).toContain(shared);
+    expect(body).not.toContain("THIS SERVER HAS NO FILESYSTEM");
+    expect(body).not.toContain("this process is the one that writes them");
+  });
+
+  it("says where it came from and that an upgrade means re-running", () => {
+    expect(body).toMatch(/Written by `pnpm install:mcp --write-skill`/);
+    expect(body).toMatch(/re-run after upgrading/);
   });
 });
 
