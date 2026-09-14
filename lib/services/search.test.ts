@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { SEARCHED, TRGM_INDEXES } from "../db/fts";
 import { SCHEMA } from "../db/schema";
 import { escapeLike, QUERIES } from "./search";
 
@@ -84,6 +85,43 @@ describe("the index and the query ask for the same expression", () => {
     for (const table of TABLES)
       for (const config of ["english", "turkish"])
         expect(SCHEMA).toContain(`idx_${table}_fts_${config}`);
+  });
+});
+
+/**
+ * The substring arm's witness, held the same way. A trigram index is not an
+ * expression index, so nothing here has to match character for character --
+ * but the index is per column, and a column the predicate reads without an
+ * index of its own is a sequential scan that fails nothing. Both lists come
+ * from `SEARCHED`; this asserts they still do.
+ */
+describe("the substring arm has a trigram index per column it reads", () => {
+  for (const table of TABLES) {
+    it(`${table}: one ILIKE per searched column, each indexed`, () => {
+      const columns = [...QUERIES[table].matchAll(/\b[a-z]\.([a-z_]+) ILIKE q\.pat/g)].map(
+        (m) => m[1],
+      );
+      expect(columns).toEqual([...SEARCHED[table]]);
+      for (const column of columns)
+        expect(TRGM_INDEXES).toContainEqual(
+          expect.stringContaining(`ON ${table} USING GIN (${column} gin_trgm_ops)`),
+        );
+    });
+  }
+
+  /**
+   * The indexes need an extension the schema cannot assume, so `migrate()`
+   * runs them on their own after trying to create it. Splicing them into
+   * `SCHEMA` would make every self-hosted `db:migrate` without `pg_trgm` fail
+   * at the first of them -- and, being the last statements, silently after
+   * every table had already been created.
+   */
+  it("keeps the trigram indexes out of the schema string", () => {
+    expect(SCHEMA).not.toContain("gin_trgm_ops");
+    expect(SCHEMA).not.toContain("pg_trgm");
+    expect(TRGM_INDEXES).toHaveLength(
+      TABLES.reduce((n, table) => n + SEARCHED[table].length, 0),
+    );
   });
 });
 

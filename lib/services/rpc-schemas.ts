@@ -504,7 +504,8 @@ export const SHAPES = {
       .describe(
         "Only these kinds: 'dead_end' (has this been tried?), 'decision' (why is it like this?), 'gotcha' (what will bite me?). Tasks have no kind and are excluded.",
       ),
-    // Unbounded, this is three unindexed ILIKE scans with no ceiling.
+    // Unbounded, this is three table scans with no ceiling on a database
+    // without `pg_trgm`, and three merges with no ceiling on one with it.
     limit: z.number().int().min(1).max(100).optional(),
     model,
   },

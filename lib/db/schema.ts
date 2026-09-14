@@ -1,5 +1,5 @@
-import { exec } from "./client";
-import { FTS_INDEXES } from "./fts";
+import { exec, one } from "./client";
+import { FTS_INDEXES, TRGM_INDEXES } from "./fts";
 
 /**
  * One idempotent schema, applied by `pnpm db:migrate`.
@@ -528,6 +528,51 @@ export function statements(): string[] {
     .filter(Boolean);
 }
 
-export async function migrate() {
+/**
+ * The SQLSTATEs that mean "this database will not take the extension", each
+ * one a way somebody self-hosts:
+ *
+ *   42501  insufficient_privilege  a role without CREATE on the database
+ *   58P01  undefined_file          a Postgres built without contrib
+ *   0A000  feature_not_supported   a managed service that refuses extensions
+ *
+ * Anything else is a real error and is thrown like one.
+ */
+const NO_EXTENSION = new Set(["42501", "58P01", "0A000"]);
+
+/**
+ * The substring arm's indexes, created only where `pg_trgm` can be.
+ *
+ * Sequenced here in JavaScript rather than as a `DO $$ ... $$` block in the
+ * schema, because `statements()` splits on `;` and a block's body is full of
+ * them. This is not a transaction and none of the rule about JavaScript
+ * between statements applies: each `CREATE` is idempotent on its own, and a
+ * run cut off halfway resumes on the next.
+ *
+ * `pg_trgm` has been a trusted extension since Postgres 13, so a database
+ * owner can create it without being superuser -- which is most self-hosts, and
+ * is todox.dev. Where that fails for one of the reasons above, the answer is a
+ * line in the migration output and a search that still works, slower. A
+ * `db:migrate` that refuses to run at all because of an index is the wrong
+ * trade.
+ */
+export async function ensureTrigramIndexes(): Promise<"indexed" | "skipped"> {
+  try {
+    await exec("CREATE EXTENSION IF NOT EXISTS pg_trgm");
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (!code || !NO_EXTENSION.has(code)) throw e;
+    console.log(
+      `NOTICE: pg_trgm not available (${code}); search's substring arm stays a sequential scan`,
+    );
+  }
+  const installed = await one("SELECT 1 AS present FROM pg_extension WHERE extname = 'pg_trgm'");
+  if (!installed) return "skipped";
+  for (const statement of TRGM_INDEXES) await exec(statement);
+  return "indexed";
+}
+
+export async function migrate(): Promise<{ trigram: "indexed" | "skipped" }> {
   for (const statement of statements()) await exec(statement);
+  return { trigram: await ensureTrigramIndexes() };
 }

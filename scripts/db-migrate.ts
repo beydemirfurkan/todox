@@ -12,8 +12,8 @@ import { migrate } from "../lib/db/schema";
 async function main() {
   const host = new URL(connectionString().replace(/^postgres/, "http")).host;
   console.log(`applying schema to ${host}`);
-  await migrate();
-  console.log("done");
+  const { trigram } = await migrate();
+  console.log(`done (substring search indexes: ${trigram})`);
 }
 
 main().catch((e) => {

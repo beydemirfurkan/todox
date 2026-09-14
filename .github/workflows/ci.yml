@@ -114,6 +114,13 @@ jobs:
       - name: Migrate
         run: pnpm db:migrate
 
+      # Query plans, not answers: an index Postgres cannot use fails nothing
+      # and changes no result. The service container has `pg_trgm`, so this is
+      # where the substring arm's indexes are proved usable; on a database
+      # without the extension the suite prints SKIP for them and passes.
+      - name: Search plans
+        run: pnpm smoke:search
+
       - name: Auth guarantees
         run: pnpm smoke:auth
 
