@@ -478,6 +478,25 @@ describe("recordObservation", () => {
   });
 
   /**
+   * Task ids are the one thing an observation carries that names a row in
+   * the curated half. Positive integers and no more than fifty: the carrier
+   * caps at the same number, and the two agreeing is what keeps a session
+   * that took on many tasks from losing its whole observation to a refusal.
+   */
+  it("takes a bounded list of positive integer task ids, and nothing looser", () => {
+    const with_ = (task_ids: unknown) => () =>
+      parseParams("recordObservation", { ...base, task_ids });
+    expect(with_([1, 2, 3])).not.toThrow();
+    expect(with_([])).not.toThrow();
+    expect(with_(undefined)).not.toThrow();
+    expect(with_(Array.from({ length: 51 }, (_, i) => i + 1))).toThrow();
+    expect(with_([1.5])).toThrow();
+    expect(with_([0])).toThrow();
+    expect(with_(["12"])).toThrow();
+    expect(with_(12)).toThrow();
+  });
+
+  /**
    * The session id is the upsert's key. An empty one would collapse every
    * session in the project onto a single row, which is the opposite of the
    * bug it exists to prevent.

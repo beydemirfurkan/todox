@@ -375,7 +375,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_refs_context ON refs (context_id, path)
 -- ONE ROW PER SESSION PER PROJECT, upserted on session_id. The alternative was
 -- one row per observation, which would have made the noisiest table in the
 -- database out of the feature most at risk of being noise. A session that
--- changes nothing writes nothing at all.
+-- changes nothing writes nothing at all -- and a task moved to 'doing' is a
+-- change, which is what task_ids below records.
 --
 -- The summary an agent reads is NOT stored. Only the scalars are, and the
 -- sentence is built by whoever is reading -- the briefing in English, the web
@@ -437,6 +438,15 @@ CREATE INDEX IF NOT EXISTS idx_observations_briefing
 
 -- The sweep. Cheap, and it runs on a write path rather than a timer.
 CREATE INDEX IF NOT EXISTS idx_observations_expiry ON observations (expires_at);
+
+-- The tasks this session set to 'doing', seen by the carrier on the way out of
+-- the update_task call. The briefing intersects them with the tasks that are
+-- still open and have no handoff newer than started_at, and names those: a
+-- session that took a task, touched the tree or not, and stopped without a
+-- word is exactly the session this table exists for, and until now the git
+-- half of that sentence and the task half could not be put together. Ids and
+-- nothing else -- still evidence, never intent.
+ALTER TABLE observations ADD COLUMN IF NOT EXISTS task_ids INTEGER[] NOT NULL DEFAULT '{}';
 
 -- Which tools an agent actually reached for, and which it never did.
 --

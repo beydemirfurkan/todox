@@ -74,6 +74,19 @@ describe("the session upsert", () => {
     const update = QUERIES.record.slice(QUERIES.record.indexOf("DO UPDATE"));
     expect(update).not.toContain("started_at");
   });
+
+  /**
+   * The list of tasks a session took on goes in as an array parameter, is
+   * replaced whole on every write, and comes back to the briefing. A column
+   * written and never read is the shape `repo_url` and `refs.context_id` each
+   * had for months; the third assertion is what keeps this one honest.
+   */
+  it("writes, replaces and reads the tasks the session took on", () => {
+    expect(QUERIES.record).toMatch(/commit_subjects, task_ids,/);
+    expect(QUERIES.record).toContain("?::int[]");
+    expect(QUERIES.record).toContain("task_ids        = EXCLUDED.task_ids");
+    expect(QUERIES.page).toContain("task_ids");
+  });
 });
 
 /**

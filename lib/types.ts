@@ -210,6 +210,8 @@ export type Observation = {
   files_changed: number;
   /** Subject lines, newest first, capped by the writer. */
   commit_subjects: string | null;
+  /** Tasks this session set to 'doing', so a missing handoff can be named. */
+  task_ids: number[];
   started_at: string;
   observed_at: string;
   expires_at: string;
@@ -243,6 +245,7 @@ export type NewObservation = {
   base_sha?: string | null;
   head_sha?: string | null;
   commit_subjects?: string | null;
+  task_ids?: number[];
   started_at?: string;
   observed_at?: string;
 };

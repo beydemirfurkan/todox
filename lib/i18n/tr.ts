@@ -376,6 +376,8 @@ export const tr: Record<Key, string> = {
   observationsCommitMany: "{n} commit",
   observationsFileOne: "1 dosya değişti",
   observationsFileMany: "{n} dosya değişti",
+  // Arkasından görev bağlantıları gelir: "başlanan #12, #13".
+  observationsStarted: "başlanan",
   observationsAndMore: "ve {n} tane daha eski; agent için iki hafta tutuluyor.",
   inLog: "kayıt",
   decisionCount: "karar",

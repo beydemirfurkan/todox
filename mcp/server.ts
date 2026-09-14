@@ -163,7 +163,9 @@ async function main() {
       // `notice` resolves whatever happens -- never rejecting is the contract
       // that makes this `void` safe. Work lost to a process dying mid-write is
       // picked up by the next session, which is what the widening is for.
-      void observer.notice(params);
+      // After the call rather than before it, so a refused update_task never
+      // marks a task as taken on.
+      void observer.notice(method, params);
       return result;
     },
     localWorkspace,

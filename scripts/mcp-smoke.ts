@@ -1008,9 +1008,20 @@ async function observerActuallyWrote(userId: number) {
   if (row!.head_sha === null || row!.base_sha === null)
     throw new Error(`observation ${row!.id} carries no git state: ${JSON.stringify(row)}`);
 
+  // The stdio suite sets a task to 'doing'; the carrier is the only thing
+  // that can turn that call into an id on this row, and this is the only
+  // assertion that can tell whether it did.
+  const withTask = rows.find((r) => r.task_ids.length > 0);
+  if (!withTask)
+    throw new Error(
+      "the stdio carrier recorded no task_ids, though the suite set a task to " +
+        "'doing' through it -- the observer is not seeing the method name.",
+    );
+
   console.log(
     `observer wrote: ${rows.length} row(s), branch ${row!.branch ?? "(none)"}, ` +
-      `${row!.commits} commit(s), ${row!.files_changed} file(s) dirty`,
+      `${row!.commits} commit(s), ${row!.files_changed} file(s) dirty, ` +
+      `took on ${withTask.task_ids.map((id) => `#${id}`).join(" ")}`,
   );
 }
 

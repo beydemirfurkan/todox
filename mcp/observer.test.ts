@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createObserver, THROTTLE_MS, type ObserverGit } from "./observer";
+import { createObserver, MAX_TASK_IDS, THROTTLE_MS, type ObserverGit } from "./observer";
 
 /**
  * The automatic write path, and the only code in todox that runs without
@@ -79,8 +79,8 @@ beforeEach(() => vi.clearAllMocks());
 describe("staying quiet", () => {
   it("writes nothing when the session has changed nothing", async () => {
     const { observer, calls } = harness();
-    await observer.notice({ cwd: `${ROOT}/sub` });
-    await observer.notice({ cwd: `${ROOT}/sub` });
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(calls).toHaveLength(0);
   });
 
@@ -88,7 +88,7 @@ describe("staying quiet", () => {
     const h = harness({ enabled: false });
     h.state!.since.set(HEAD_AT_START, { count: 3, subjects: ["x"] });
     h.state!.head = "b".repeat(40);
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(h.calls).toHaveLength(0);
   });
 
@@ -96,7 +96,7 @@ describe("staying quiet", () => {
     const { git } = fakeGit();
     (git.root as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const h = harness({ git });
-    await h.observer.notice({ cwd: "/somewhere/else" });
+    await h.observer.notice("getContext", { cwd: "/somewhere/else" });
     expect(h.calls).toHaveLength(0);
   });
 
@@ -109,7 +109,7 @@ describe("staying quiet", () => {
     const { git } = fakeGit();
     (git.head as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const h = harness({ git });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(h.calls).toHaveLength(0);
   });
 });
@@ -120,7 +120,7 @@ describe("noticing work", () => {
     h.state!.since.set(HEAD_AT_START, { count: 2, subjects: ["second", "first"] });
     h.state!.head = "b".repeat(40);
 
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     expect(h.calls).toHaveLength(1);
     expect(lastWrite(h.calls)).toMatchObject({
@@ -137,7 +137,7 @@ describe("noticing work", () => {
   it("reports uncommitted work even with no commits", async () => {
     const h = harness();
     h.state!.dirty = 4;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(lastWrite(h.calls)).toMatchObject({ commits: 0, files_changed: 4 });
   });
 
@@ -145,7 +145,7 @@ describe("noticing work", () => {
     const h = harness();
     h.state!.since.set(HEAD_AT_START, { count: 2, subjects: ["second", "first"] });
     h.state!.head = "b".repeat(40);
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(lastWrite(h.calls)!.commit_subjects).toContain("second");
     expect(lastWrite(h.calls)!.commit_subjects).toContain("first");
   });
@@ -160,9 +160,9 @@ describe("the throttle", () => {
   it("does not write twice in a row for the same state", async () => {
     const h = harness();
     h.state!.dirty = 1;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(h.calls).toHaveLength(1);
   });
 
@@ -178,13 +178,13 @@ describe("the throttle", () => {
   it("suppresses a changed state inside the interval", async () => {
     const h = harness();
     h.state!.dirty = 1;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     h.advance(THROTTLE_MS / 2);
     h.state!.dirty = 2;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     h.state!.dirty = 3;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     expect(h.calls).toHaveLength(1);
   });
@@ -192,10 +192,10 @@ describe("the throttle", () => {
   it("writes again once the interval has passed", async () => {
     const h = harness();
     h.state!.dirty = 1;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     h.advance(THROTTLE_MS + 1);
     h.state!.dirty = 2;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(h.calls).toHaveLength(2);
   });
 
@@ -206,11 +206,11 @@ describe("the throttle", () => {
   it("ignores the interval when HEAD moves", async () => {
     const h = harness();
     h.state!.dirty = 1;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     h.state!.head = "b".repeat(40);
     h.state!.since.set(HEAD_AT_START, { count: 1, subjects: ["done"] });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     expect(h.calls).toHaveLength(2);
     expect(lastWrite(h.calls)).toMatchObject({ commits: 1 });
@@ -236,15 +236,15 @@ describe("what a look costs", () => {
   it("reads only HEAD inside the interval", async () => {
     const { git, state } = fakeGit();
     const h = harness({ git });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     const first = reads(git);
     expect(first.dirty).toBe(1);
     expect(first.since).toBe(1);
 
     h.advance(1_000);
     state.dirty = 3;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     const after = reads(git);
     expect(after.head).toBe(first.head + 2);
@@ -255,10 +255,10 @@ describe("what a look costs", () => {
   it("looks again once the interval has passed, and writes what it finds", async () => {
     const { git, state } = fakeGit();
     const h = harness({ git });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     h.advance(THROTTLE_MS + 1);
     state.dirty = 3;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(reads(git).dirty).toBe(2);
     expect(lastWrite(h.calls)).toMatchObject({ files_changed: 3 });
   });
@@ -266,11 +266,11 @@ describe("what a look costs", () => {
   it("looks at once when HEAD moves inside the interval", async () => {
     const { git, state } = fakeGit();
     const h = harness({ git });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     h.advance(1_000);
     state.head = "b".repeat(40);
     state.since.set(HEAD_AT_START, { count: 1, subjects: ["done"] });
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(reads(git).since).toBe(2);
     expect(lastWrite(h.calls)).toMatchObject({ commits: 1 });
   });
@@ -285,15 +285,15 @@ describe("finding the project", () => {
   it("uses a path from whichever tool call carries one", async () => {
     const h = harness();
     h.state!.dirty = 1;
-    await h.observer.notice({ task_id: 4, kind: "note", body: "x" });
-    await h.observer.notice({ path: `${ROOT}/lib/thing.ts` });
+    await h.observer.notice("getContext", { task_id: 4, kind: "note", body: "x" });
+    await h.observer.notice("getContext", { path: `${ROOT}/lib/thing.ts` });
     expect(lastWrite(h.calls)).toMatchObject({ cwd: ROOT });
   });
 
   it("falls back to the directory it was launched in", async () => {
     const h = harness();
     h.state!.dirty = 1;
-    await h.observer.notice({ task_id: 4 });
+    await h.observer.notice("getContext", { task_id: 4 });
     expect(lastWrite(h.calls)).toMatchObject({ cwd: ROOT });
   });
 });
@@ -330,7 +330,7 @@ describe("work the last session never reported", () => {
       clock: () => 1_000_000,
     });
 
-    await observer.notice({ cwd: `${ROOT}/sub` });
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     expect(calls).toHaveLength(2);
     expect(calls[1]!.params).toMatchObject({
@@ -360,10 +360,10 @@ describe("work the last session never reported", () => {
       clock: () => clock,
     });
 
-    await observer.notice({ cwd: `${ROOT}/sub` });
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
     clock += THROTTLE_MS + 1;
     state.dirty = 2;
-    await observer.notice({ cwd: `${ROOT}/sub` });
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     // Two for the first notice (the write and its correction), one for the
     // second. Not four.
@@ -373,7 +373,7 @@ describe("work the last session never reported", () => {
   it("does not widen when the server is already up to date", async () => {
     const h = harness({ reply: { ok: true, last_head_sha: HEAD_AT_START } });
     h.state!.dirty = 1;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(h.calls).toHaveLength(1);
   });
 
@@ -385,7 +385,7 @@ describe("work the last session never reported", () => {
   it("does not widen to a baseline git cannot resolve", async () => {
     const h = harness({ reply: { ok: true, last_head_sha: "f".repeat(40) } });
     h.state!.dirty = 1;
-    await h.observer.notice({ cwd: `${ROOT}/sub` });
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
     expect(h.calls).toHaveLength(1);
   });
 });
@@ -408,7 +408,7 @@ describe("never getting in the way", () => {
       cwd: `${ROOT}/sub`,
     });
 
-    await expect(observer.notice({ cwd: `${ROOT}/sub` })).resolves.toBeUndefined();
+    await expect(observer.notice("getContext", { cwd: `${ROOT}/sub` })).resolves.toBeUndefined();
   });
 
   /**
@@ -427,7 +427,7 @@ describe("never getting in the way", () => {
       cwd: `${ROOT}/sub`,
     });
 
-    await expect(observer.notice({ cwd: `${ROOT}/sub` })).resolves.toBeUndefined();
+    await expect(observer.notice("getContext", { cwd: `${ROOT}/sub` })).resolves.toBeUndefined();
   });
 
   it("swallows a checkout that throws while being read", async () => {
@@ -436,7 +436,7 @@ describe("never getting in the way", () => {
       throw new Error("the disk went away");
     });
     const h = harness({ git });
-    await expect(h.observer.notice({ cwd: `${ROOT}/sub` })).resolves.toBeUndefined();
+    await expect(h.observer.notice("getContext", { cwd: `${ROOT}/sub` })).resolves.toBeUndefined();
   });
 
   /** One failure must not stop it trying again later. */
@@ -458,11 +458,11 @@ describe("never getting in the way", () => {
       clock: () => clock,
     });
 
-    await observer.notice({ cwd: `${ROOT}/sub` });
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
     fail = false;
     clock += THROTTLE_MS + 1;
     state.dirty = 2;
-    await observer.notice({ cwd: `${ROOT}/sub` });
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
 
     expect(calls).toHaveLength(2);
   });
@@ -483,8 +483,8 @@ describe("tool calls that arrive together", () => {
     h.state!.dirty = 1;
 
     await Promise.all([
-      h.observer.notice({ cwd: `${ROOT}/sub` }),
-      h.observer.notice({ cwd: `${ROOT}/sub` }),
+      h.observer.notice("getContext", { cwd: `${ROOT}/sub` }),
+      h.observer.notice("getContext", { cwd: `${ROOT}/sub` }),
     ]);
 
     expect(h.calls).toHaveLength(1);
@@ -499,9 +499,9 @@ describe("tool calls that arrive together", () => {
     h.state!.dirty = 1;
 
     await Promise.all([
-      h.observer.notice({ cwd: `${ROOT}/sub` }),
-      h.observer.notice({ cwd: `${ROOT}/sub` }),
-      h.observer.notice({ cwd: `${ROOT}/sub` }),
+      h.observer.notice("getContext", { cwd: `${ROOT}/sub` }),
+      h.observer.notice("getContext", { cwd: `${ROOT}/sub` }),
+      h.observer.notice("getContext", { cwd: `${ROOT}/sub` }),
     ]);
 
     expect(h.calls).toHaveLength(1);
@@ -536,8 +536,8 @@ describe("tool calls that arrive together", () => {
     });
 
     await Promise.all([
-      observer.notice({ cwd: `${ROOT}/sub` }),
-      observer.notice({ cwd: `${ROOT}/sub` }),
+      observer.notice("getContext", { cwd: `${ROOT}/sub` }),
+      observer.notice("getContext", { cwd: `${ROOT}/sub` }),
     ]);
 
     // The write and its correction, and nothing after them.
@@ -559,9 +559,133 @@ describe("tool calls that arrive together", () => {
 
     await expect(
       Promise.all([
-        observer.notice({ cwd: `${ROOT}/sub` }),
-        observer.notice({ cwd: `${ROOT}/sub` }),
+        observer.notice("getContext", { cwd: `${ROOT}/sub` }),
+        observer.notice("getContext", { cwd: `${ROOT}/sub` }),
       ]),
     ).resolves.toBeDefined();
+  });
+});
+
+/**
+ * The one thing the observer notices that is not git: a task taken on.
+ *
+ * `updateTask` to 'doing' is the call that says which task a session is
+ * about, and the row it writes is the pairing the briefing could not make
+ * before -- this branch, these commits, that task, and no handoff. It counts
+ * as a change of its own, so a session that takes a task and touches nothing
+ * on disk still leaves a row; and it is exempt from the interval, like a
+ * commit, because it is the event a dying session would otherwise lose.
+ */
+describe("noticing a task taken on", () => {
+  const doing = (task_id: unknown) => ({ task_id, status: "doing", model: "m" });
+
+  it("writes a row for a session that took a task and changed nothing on disk", async () => {
+    const { observer, calls } = harness();
+    await observer.notice("updateTask", doing(12));
+
+    expect(lastWrite(calls)).toMatchObject({ commits: 0, files_changed: 0, task_ids: [12] });
+  });
+
+  it("does not count a status other than 'doing', or a different tool", async () => {
+    const { observer, calls } = harness();
+    await observer.notice("updateTask", { task_id: 12, status: "done", model: "m" });
+    await observer.notice("logEntry", { task_id: 12, kind: "handoff", body: "x" });
+    await observer.notice("createTask", { title: "t", status: "doing", cwd: `${ROOT}/sub` });
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses an id that is not a positive integer", async () => {
+    const { observer, calls } = harness();
+    for (const id of ["12", 1.5, 0, -3, null, undefined])
+      await observer.notice("updateTask", doing(id));
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it("leaves the key out entirely when no task was taken on", async () => {
+    // Strict schemas on a server that predates the field would refuse the
+    // whole call; an absent key is what keeps an older self-host working.
+    const h = harness();
+    h.state!.dirty = 1;
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
+
+    expect(lastWrite(h.calls)).toBeDefined();
+    expect(lastWrite(h.calls)).not.toHaveProperty("task_ids");
+  });
+
+  it("writes again for a second task inside the interval, and once for the same one", async () => {
+    const { observer, calls } = harness();
+    await observer.notice("updateTask", doing(12));
+    await observer.notice("updateTask", doing(12));
+    expect(calls).toHaveLength(1);
+
+    await observer.notice("updateTask", doing(13));
+    expect(calls).toHaveLength(2);
+    expect(lastWrite(calls)).toMatchObject({ task_ids: [12, 13] });
+  });
+
+  it("sends the whole list every time, so no write can narrow it", async () => {
+    const h = harness();
+    await h.observer.notice("updateTask", doing(12));
+    h.state!.dirty = 3;
+    h.advance(THROTTLE_MS + 1);
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
+
+    expect(h.calls).toHaveLength(2);
+    expect(lastWrite(h.calls)).toMatchObject({ files_changed: 3, task_ids: [12] });
+  });
+
+  it("stops at the cap the schema enforces", async () => {
+    const { observer, calls } = harness();
+    for (let id = 1; id <= MAX_TASK_IDS + 5; id++) await observer.notice("updateTask", doing(id));
+
+    const sent = lastWrite(calls)?.task_ids as number[];
+    expect(sent).toHaveLength(MAX_TASK_IDS);
+    expect(sent.at(-1)).toBe(MAX_TASK_IDS);
+  });
+
+  it("tries once when the server refuses, then falls back to the interval", async () => {
+    // An older self-hosted server refuses the strict schema; the observer
+    // swallows that. What must not happen is every later call retrying.
+    const { git } = fakeGit();
+    let attempts = 0;
+    const observer = createObserver({
+      call: async () => {
+        attempts++;
+        throw new Error("unrecognized key task_ids");
+      },
+      git,
+      sessionId: "session-1",
+      cwd: `${ROOT}/sub`,
+    });
+
+    await observer.notice("updateTask", doing(12));
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
+    await observer.notice("getContext", { cwd: `${ROOT}/sub` });
+
+    expect(attempts).toBe(1);
+  });
+
+  it("carries the list on the widened write too", async () => {
+    const older = "0".repeat(40);
+    const { git, state } = fakeGit();
+    state.since.set(HEAD_AT_START, { count: 0, subjects: [] });
+    state.since.set(older, { count: 5, subjects: ["a", "b"] });
+    const calls: Call[] = [];
+    const observer = createObserver({
+      call: async (method, params) => {
+        calls.push({ method, params });
+        return { ok: true, last_head_sha: older };
+      },
+      git,
+      sessionId: "session-1",
+      cwd: `${ROOT}/sub`,
+    });
+
+    await observer.notice("updateTask", doing(12));
+
+    expect(calls).toHaveLength(2);
+    for (const c of calls) expect(c.params).toMatchObject({ task_ids: [12] });
   });
 });

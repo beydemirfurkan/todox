@@ -572,6 +572,7 @@ export const methods = {
       commits: number;
       files_changed: number;
       commit_subjects?: string;
+      task_ids?: number[];
       started_at?: string;
     },
   ) => {
@@ -594,6 +595,10 @@ export const methods = {
       commits: p.commits,
       files_changed: p.files_changed,
       commit_subjects: p.commit_subjects ?? null,
+      // Not checked against the project here: the briefing only ever shows an
+      // id that is among the project's own open tasks, so a wrong one is
+      // stored and never seen. Ownership stays in ownership.ts.
+      task_ids: p.task_ids ?? [],
       started_at: p.started_at,
     });
 
