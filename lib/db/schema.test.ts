@@ -38,6 +38,13 @@ describe("observations", () => {
   it("indexes the expiry sweep", () => {
     expect(SCHEMA).toContain("idx_observations_expiry");
   });
+
+  /** Added after the table existed, so it has to be an idempotent ALTER. */
+  it("carries the tasks a session took on, as an array with a default", () => {
+    expect(SCHEMA).toContain(
+      "ALTER TABLE observations ADD COLUMN IF NOT EXISTS task_ids INTEGER[] NOT NULL DEFAULT '{}'",
+    );
+  });
 });
 
 /**

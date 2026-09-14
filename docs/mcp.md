@@ -90,8 +90,12 @@ The stdio transport does one thing nobody asks it to. While a session runs it
 watches the checkout it was started in and keeps a single row describing what
 that session did to the tree: the branch, where `HEAD` was when it opened and
 where it is now, how many commits landed, the first few subject lines, and how
-many files carry uncommitted changes. `get_context` hands those back to the
-next session in an `observations` section.
+many files carry uncommitted changes — and, because it rides on every tool
+call, the ids of the tasks that session set to `doing`. `get_context` hands
+those back to the next session in an `observations` section, and beside each
+row names the tasks it took on that are still open with no handoff written
+since (`handoff_missing`): the branch, the commits and the task a session left
+without a word, finally on one line.
 
 The reason is the session that ends without a handoff — the agent stops, or
 the process is killed, and everything about what was in flight is gone. This
@@ -105,15 +109,17 @@ noise:
   section of the briefing, labelled unverified. Nothing an agent reads there
   becomes a decision or a dead end unless an agent decides it should and
   writes one, in its own words.
-- **A quiet session writes nothing.** No commits and no uncommitted changes
-  means no row at all, and repeated writes during one session replace that
-  row rather than adding to it.
+- **A quiet session writes nothing.** No commits, no uncommitted changes and
+  no task set to `doing` means no row at all, and repeated writes during one
+  session replace that row rather than adding to it.
 - **It expires.** Two weeks, unless something promotes it first. The git
   history it describes is still in git, which is the better copy.
 
-What leaves your machine is a branch name, commit hashes, commit subject lines
-and a count of changed files. No file contents, no diffs, and nothing from the
-conversation. Turn it off with an environment variable on the MCP server entry:
+What leaves your machine is a branch name, commit hashes, commit subject lines,
+a count of changed files and the ids of tasks set to `doing` — ids todox
+issued, naming rows it already holds. No file contents, no diffs, and nothing
+from the conversation. Turn it off with an environment variable on the MCP
+server entry:
 
 ```json
 "env": { "TODOX_TOKEN": "todox_…", "TODOX_OBSERVE": "off" }

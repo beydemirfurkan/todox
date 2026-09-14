@@ -603,6 +603,13 @@ export const SHAPES = {
       .max(MAX.text)
       .optional()
       .describe("Subject lines, newest first, capped by the caller"),
+    task_ids: z
+      .array(z.number().int().positive())
+      .max(50)
+      .optional()
+      .describe(
+        "Tasks this session set to 'doing', so the next briefing can name the ones that got no handoff",
+      ),
     started_at: z.string().max(MAX.line).optional(),
     model,
   },

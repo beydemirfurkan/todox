@@ -395,7 +395,10 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * with `from_observation_id`, which writes the real record and stops the
      * observation coming back.
      */
-    observations: observed.rows,
+    observations: observed.rows.map((o) => ({
+      ...o,
+      handoff_missing: handoffMissing(o, openTasks),
+    })),
     observations_omitted: observed.omitted,
     stale_refs: stale,
     /**
@@ -534,6 +537,33 @@ function closingHint(
 }
 
 const ageDays = (iso: string): number => (Date.now() - Date.parse(iso)) / 86_400_000;
+
+/**
+ * Which of the tasks a session set to 'doing' are still open with no handoff
+ * written since that session began.
+ *
+ * Beside the observation rather than in `closingHint`, because the hint
+ * already names every open task with no handoff at all, and what this adds is
+ * the pairing: THIS branch, THESE commits, and the task the same session took
+ * and never wrote up. Derived here from `open_tasks`, which the briefing has
+ * in hand -- no query, and a task that has since closed or been dropped is
+ * simply not named, because a handoff on a finished task is not owed.
+ *
+ * "Since that session began" rather than "at all": a handoff older than the
+ * observation was left by an earlier session, and the one this row describes
+ * still said nothing.
+ */
+export function handoffMissing(
+  observation: { task_ids: number[]; started_at: string },
+  openTasks: { id: number; last_handoff: { created_at: string } | null }[],
+): number[] {
+  const since = Date.parse(observation.started_at);
+  return observation.task_ids.filter((id) => {
+    const task = openTasks.find((t) => t.id === id);
+    if (!task) return false;
+    return task.last_handoff === null || Date.parse(task.last_handoff.created_at) < since;
+  });
+}
 
 /**
  * Which open tasks keep their body, spent in list order until the budget is

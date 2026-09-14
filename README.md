@@ -430,9 +430,10 @@ Details, and an honest list of what is **not** covered, in
 - Coverage sits around 39%, and the shape matters more than the number: the
   agent surface, the auth boundary and the repositories that answer "is this
   yours" are covered, while much of the UI is not.
-- Observations only see what git can tell them, so they answer "what changed"
-  and never "why". The half that carries reasoning is a transcript, and the
-  only hook API that exposes one belongs to a single client.
+- Observations see what git can tell them and which task a session set to
+  `doing`, so they answer "what changed" and "on what" — and never "why". The
+  half that carries reasoning is a transcript, and the only hook API that
+  exposes one belongs to a single client.
 - The briefing's byte budget covers log bodies, note bodies and task bodies.
   One axis is still bounded only by a row count: the *heads* of carried
   entries and tasks, fifty tasks' worth. It is far smaller than what the

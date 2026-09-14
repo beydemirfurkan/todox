@@ -12,6 +12,13 @@
  * every tool call on its way out, so the observer rides along on work the
  * agent was doing anyway.
  *
+ * Git is not the only thing it notices. It rides on every tool call, so it
+ * also sees the one call that says which task a session took on --
+ * `updateTask` to 'doing' -- and records the id beside the git evidence. That
+ * is what lets the next briefing pair "3 commits on feat/x" with "took #12 and
+ * left no handoff", which neither half could say alone. An id and nothing
+ * else: evidence, never intent, the same as the commit count.
+ *
  * Two properties matter more than anything this file computes:
  *
  *   - it never throws. It sits inside somebody else's tool call, so an
@@ -67,6 +74,20 @@ export type ObserverOptions = {
 /** Tools that carry a path carry it under one of these. */
 const PATH_KEYS = ["cwd", "path", "root_path"] as const;
 
+/**
+ * How many tasks one session may be recorded as having started. The schema
+ * refuses more, and a session that sets fifty tasks to 'doing' is not one
+ * whose next handoff is going to be saved by naming a fifty-first.
+ */
+export const MAX_TASK_IDS = 50;
+
+/** The one call that says a session took a task on. */
+function startedTask(method: string, params: Record<string, unknown>): number | undefined {
+  if (method !== "updateTask" || params.status !== "doing") return undefined;
+  const id = params.task_id;
+  return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : undefined;
+}
+
 const pathFrom = (params: Record<string, unknown>): string | undefined => {
   for (const key of PATH_KEYS) {
     const value = params[key];
@@ -93,6 +114,14 @@ export function createObserver(options: ObserverOptions) {
   let lastWriteAt = 0;
   let lastHead: string | undefined;
   let lastDirty: number | undefined;
+  /**
+   * Every task this session has set to 'doing', in the order it did. The whole
+   * list goes out with every write and the server replaces its copy, so the
+   * set only grows inside a session and no write can narrow it.
+   */
+  const started: number[] = [];
+  /** A task was taken on since the last write: a change that earns one. */
+  let startedSinceWrite = false;
   /** The last full look -- all four reads -- and the HEAD it saw. */
   let lastLookAt: number | undefined;
   let lastSeenHead: string | undefined;
@@ -159,6 +188,13 @@ export function createObserver(options: ObserverOptions) {
       commits,
       files_changed: dirty,
       commit_subjects: subjects.length ? subjects.join("\n") : undefined,
+      // Absent rather than empty when there is nothing to say. The schemas
+      // are strict, so a self-hosted server that predates this field refuses
+      // the whole call -- and the observer swallows the refusal, which would
+      // lose every observation of every session against that server. Sending
+      // the key only when it carries something keeps the old server working
+      // for the sessions that never take a task on, which is most of them.
+      ...(started.length ? { task_ids: [...started] } : {}),
       started_at: startedAt,
     });
   }
@@ -175,8 +211,15 @@ export function createObserver(options: ObserverOptions) {
 
     // Inside the interval, with HEAD where it was, nothing below could end in
     // a write -- so nothing below is read. One spawn per call instead of four.
+    // A task taken on is the exception, like a commit: it is the event a
+    // dying session would otherwise lose, and it is rare enough to be free.
     const now = clock();
-    if (head === lastSeenHead && lastLookAt !== undefined && now - lastLookAt < THROTTLE_MS)
+    if (
+      !startedSinceWrite &&
+      head === lastSeenHead &&
+      lastLookAt !== undefined &&
+      now - lastLookAt < THROTTLE_MS
+    )
       return;
     lastLookAt = now;
     lastSeenHead = head;
@@ -185,15 +228,25 @@ export function createObserver(options: ObserverOptions) {
     const since = options.git.since(dir, base);
     const commits = since?.count ?? 0;
 
-    if (commits === 0 && dirty === 0) return;
+    // A session that changes nothing writes nothing -- and taking a task on is
+    // a change. "Set #12 to doing, touched nothing on disk, left no handoff" is
+    // exactly the row a stranger needs, and it is a row git alone cannot write.
+    if (commits === 0 && dirty === 0 && started.length === 0) return;
 
     if (wrote) {
       const headMoved = head !== lastHead;
-      const stateChanged = headMoved || dirty !== lastDirty;
+      const stateChanged = headMoved || dirty !== lastDirty || startedSinceWrite;
       const throttled = clock() - lastWriteAt < THROTTLE_MS;
-      if (!headMoved && (throttled || !stateChanged)) return;
+      if (!headMoved && !startedSinceWrite && (throttled || !stateChanged)) return;
     }
 
+    // Cleared before the write rather than after it. A server that refuses
+    // the call -- one that predates `task_ids`, say -- would otherwise leave
+    // the flag set, and every later tool call would skip the interval and try
+    // again: four git reads and a round trip per call, for the rest of the
+    // session. One attempt is what a task taken on earns; the id itself stays
+    // in `started` and rides out with whatever write comes next.
+    startedSinceWrite = false;
     const reply = await send(dir, base, head, commits, since?.subjects ?? [], dirty);
 
     wrote = true;
@@ -239,12 +292,22 @@ export function createObserver(options: ObserverOptions) {
 
   return {
     /**
-     * Called after every tool call the agent makes. Fire-and-forget by
-     * contract: it resolves whatever happens, so a caller can `void` it
-     * without wrapping it.
+     * Called after every tool call the agent makes, with the RPC method it
+     * was. Fire-and-forget by contract: it resolves whatever happens, so a
+     * caller can `void` it without wrapping it.
+     *
+     * The task id is taken here, before any waiting, so that a notice that
+     * ends up coalesced behind another still leaves its mark: the state is
+     * what gets written, not the notice.
      */
-    async notice(params: Record<string, unknown>): Promise<void> {
+    async notice(method: string, params: Record<string, unknown>): Promise<void> {
       if (!enabled) return;
+
+      const id = startedTask(method, params);
+      if (id !== undefined && !started.includes(id) && started.length < MAX_TASK_IDS) {
+        started.push(id);
+        startedSinceWrite = true;
+      }
 
       if (inFlight) {
         // Somebody is already lined up to look again once the current write

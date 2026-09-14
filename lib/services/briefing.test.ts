@@ -755,9 +755,69 @@ describe("unverified observations", () => {
     commits: 3,
     files_changed: 7,
     commit_subjects: "fix the thing",
+    task_ids: [] as number[],
     started_at: "2026-09-01T09:00:00Z",
     observed_at: "2026-09-01T11:00:00Z",
     ...over,
+  });
+
+  /**
+   * The pairing the row exists for: the task a session took on, named beside
+   * the branch and the commits it left, when that session wrote no handoff.
+   * Derived from the open tasks the briefing already holds -- no query -- and
+   * the rule is "no handoff since the session began", not "no handoff ever":
+   * one older than the observation was somebody else's.
+   */
+  describe("names the tasks a session took on and left without a handoff", () => {
+    const handoffAt = (created_at: string) => ({
+      last_handoff_entries: new Map([[1, [entry("handoff", "h", { created_at })]]]),
+    });
+
+    it("when the task is still open and has no handoff at all", async () => {
+      mocks.pageObservations.mockResolvedValue({
+        rows: [observation(1, { task_ids: [1] })],
+        omitted: 0,
+      });
+      const out = await brief();
+      expect(out.observations[0]).toMatchObject({ task_ids: [1], handoff_missing: [1] });
+    });
+
+    it("but not when a handoff was written after the session began", async () => {
+      mocks.pageByTasksPerKind.mockResolvedValue(
+        logPage(handoffAt("2026-09-01T10:00:00Z").last_handoff_entries),
+      );
+      mocks.pageObservations.mockResolvedValue({
+        rows: [observation(1, { task_ids: [1] })],
+        omitted: 0,
+      });
+      expect((await brief()).observations[0]).toMatchObject({ handoff_missing: [] });
+    });
+
+    it("and still when the only handoff predates the session", async () => {
+      mocks.pageByTasksPerKind.mockResolvedValue(
+        logPage(handoffAt("2026-08-30T10:00:00Z").last_handoff_entries),
+      );
+      mocks.pageObservations.mockResolvedValue({
+        rows: [observation(1, { task_ids: [1] })],
+        omitted: 0,
+      });
+      expect((await brief()).observations[0]).toMatchObject({ handoff_missing: [1] });
+    });
+
+    it("never names a task that is no longer open", async () => {
+      // A handoff on a finished task is not owed, and a closed one is not in
+      // `open_tasks` to be found.
+      mocks.pageObservations.mockResolvedValue({
+        rows: [observation(1, { task_ids: [1, 99] })],
+        omitted: 0,
+      });
+      expect((await brief()).observations[0]).toMatchObject({ handoff_missing: [1] });
+    });
+
+    it("is an empty list on a row that took no task on", async () => {
+      mocks.pageObservations.mockResolvedValue({ rows: [observation(1)], omitted: 0 });
+      expect((await brief()).observations[0]).toMatchObject({ handoff_missing: [] });
+    });
   });
 
   it("carries what the session before it did", async () => {

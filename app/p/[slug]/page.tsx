@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, Fragment } from "react";
 
 import { CONTEXT_KINDS, type Status } from "@/lib/constants";
 import { ago } from "@/lib/i18n";
@@ -520,6 +520,9 @@ export default async function ProjectPage({
           <ul className="mt-3 space-y-2.5">
             {observed.rows.map((o) => {
               const subjects = (o.commit_subjects ?? "").split("\n").filter(Boolean);
+              // Only tasks this page already lists: an id the carrier sent
+              // for a task since deleted is nothing to link to.
+              const started = o.task_ids.filter((id) => all.some((x) => x.id === id));
               return (
                 <li key={o.id} className="border-l-2 border-line pl-3">
                   {/* Four items, so it wraps: on a phone this row is wider than
@@ -540,6 +543,19 @@ export default async function ProjectPage({
                         ? t("observationsFileOne")
                         : t("observationsFileMany", { n: o.files_changed })}
                     </span>
+                    {started.length > 0 && (
+                      <span>
+                        {t("observationsStarted")}{" "}
+                        {started.map((id, i) => (
+                          <Fragment key={id}>
+                            {i > 0 && ", "}
+                            <Link href={`/p/${slug}/t/${id}`} className="link-more">
+                              #{id}
+                            </Link>
+                          </Fragment>
+                        ))}
+                      </span>
+                    )}
                     <span className="text-[12px] text-faint">{ago(o.observed_at, t)}</span>
                   </div>
                   {subjects.length > 0 && (

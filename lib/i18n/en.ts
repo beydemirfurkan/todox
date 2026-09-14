@@ -385,6 +385,8 @@ export const en = {
   observationsCommitMany: "{n} commits",
   observationsFileOne: "1 file changed",
   observationsFileMany: "{n} files changed",
+  // Followed by the task links, so it reads "started #12, #13".
+  observationsStarted: "started",
   observationsAndMore: "and {n} older, kept for the agent for two weeks.",
   inLog: "in log",
   decisionCount: "decision",

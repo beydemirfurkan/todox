@@ -162,6 +162,31 @@ async function main() {
     ).length === 1,
   );
 
+  // ------------------------------------------------- 3b. the task it took on
+  line("a task set 'doing' and left without a handoff is named beside the row");
+
+  const taken = `session-${rnd()}`;
+  await invoke({ userId: owner.id }, "recordObservation", {
+    project: slug,
+    ...observation({ session_id: taken, commits: 0, files_changed: 0, task_ids: [task.id] }),
+  });
+  const withTask = (await briefFor(owner.id)).observations.find((o) => o.commits === 0);
+  expect("the row carries the task id", withTask?.task_ids.includes(task.id) === true);
+  expect(
+    "and names it as missing a handoff",
+    withTask?.handoff_missing.includes(task.id) === true,
+  );
+
+  await invoke({ userId: owner.id }, "logEntry", {
+    task_id: task.id,
+    kind: "handoff",
+    body: "left for the next session",
+    model: "smoke",
+  });
+  const afterHandoff = (await briefFor(owner.id)).observations.find((o) => o.commits === 0);
+  expect("a handoff written since clears it", afterHandoff?.handoff_missing.length === 0);
+  expect("while the id itself stays", afterHandoff?.task_ids.includes(task.id) === true);
+
   // ------------------------------------------------------------- 4. promotion
   line("promoting one writes a real record and stops it coming back");
 

@@ -39,7 +39,7 @@ export const expiryFrom = (at: string) =>
  * `repo_url` and `refs.context_id` both were.
  */
 const COLUMNS = `id, client, branch, base_sha, head_sha, commits,
-                 files_changed, commit_subjects, started_at, observed_at`;
+                 files_changed, commit_subjects, task_ids, started_at, observed_at`;
 
 /**
  * The SQL, named so it can be read by a test that has no database.
@@ -59,9 +59,9 @@ export const QUERIES = {
    */
   record: `INSERT INTO observations
              (user_id, project_id, session_id, source, client, branch, base_sha,
-              head_sha, commits, files_changed, commit_subjects, started_at,
-              observed_at, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              head_sha, commits, files_changed, commit_subjects, task_ids,
+              started_at, observed_at, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::int[], ?, ?, ?)
            ON CONFLICT (user_id, project_id, session_id) DO UPDATE
               SET source          = EXCLUDED.source,
                   client          = EXCLUDED.client,
@@ -71,6 +71,7 @@ export const QUERIES = {
                   commits         = EXCLUDED.commits,
                   files_changed   = EXCLUDED.files_changed,
                   commit_subjects = EXCLUDED.commit_subjects,
+                  task_ids        = EXCLUDED.task_ids,
                   observed_at     = EXCLUDED.observed_at,
                   expires_at      = EXCLUDED.expires_at
            RETURNING *`,
@@ -124,6 +125,10 @@ export async function record(input: NewObservation): Promise<Observation> {
     input.commits,
     input.files_changed,
     input.commit_subjects ?? null,
+    // The carrier sends the whole list every time and the upsert replaces it,
+    // so an id is never lost to a later, narrower write -- the set only grows
+    // inside a session.
+    input.task_ids ?? [],
     input.started_at ?? at,
     at,
     // Never taken from the caller. The clock that matters is this one: a
