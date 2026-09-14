@@ -16,15 +16,23 @@ type Registered = {
   handler: (args: Record<string, unknown>) => Promise<unknown>;
 };
 
+type RegisteredPrompt = {
+  config: { title?: string; description?: string };
+  /** Builds the message list from the prompt's arguments. */
+  build: (args: Record<string, unknown>) => { messages: { content: { text?: string } }[] };
+};
+
 /** Captures registrations instead of speaking the protocol. */
 function harness(ws: Workspace, answer: unknown = { ok: true }) {
   const tools = new Map<string, Registered>();
+  const prompts = new Map<string, RegisteredPrompt>();
   const calls: { method: string; params: Record<string, unknown> }[] = [];
 
   const server = {
     registerTool: (name: string, config: Registered["config"], handler: Registered["handler"]) =>
       tools.set(name, { name, config, handler }),
-    registerPrompt: () => {},
+    registerPrompt: (name: string, config: RegisteredPrompt["config"], build: RegisteredPrompt["build"]) =>
+      prompts.set(name, { config, build }),
   } as unknown as McpServer;
 
   registerTools(server, async (method, params) => {
@@ -32,7 +40,7 @@ function harness(ws: Workspace, answer: unknown = { ok: true }) {
     return answer;
   }, ws);
 
-  return { tools, calls };
+  return { tools, prompts, calls };
 }
 
 const localWs: Workspace = {
@@ -525,6 +533,51 @@ describe("instructions", () => {
   });
 
   /**
+   * The wrap-up used to be a paragraph, and a paragraph is advice. What an
+   * agent that is about to stop needs is a contract: numbered, ordered, and
+   * ending in a sentence that says the session is not over until every line
+   * is done. Both transports, because the end of a session is the one moment
+   * that does not differ between them.
+   */
+  it("ends with a numbered contract rather than a paragraph", () => {
+    for (const local of [true, false]) {
+      const text = instructions({ local });
+      expect(text).toMatch(/BEFORE YOU FINISH, in this order:\n1\. update_task/);
+      expect(text).toMatch(/\n2\. log_entry\(kind:'dead_end'\)/);
+      expect(text).toMatch(/\n3\. log_entry\(kind:'handoff'\)/);
+      expect(text).toMatch(/Not finished until all three are done\./);
+    }
+  });
+
+  /**
+   * The most common wasted call in `tool_usage` is the same write refused
+   * twice with the same message -- a `create_task` with a bare `cwd`, resent
+   * with the same bare `cwd`. The refusal already names what to send, so the
+   * rule is: send it once, and if that is refused too, stop and say so rather
+   * than trying a third wording.
+   */
+  it("tells an agent when to stop retrying a refused write", () => {
+    for (const local of [true, false]) {
+      const text = instructions({ local });
+      expect(text).toMatch(/A REFUSED WRITE names what is missing/);
+      expect(text).toMatch(/Refused twice\s+with the same message, stop/);
+    }
+  });
+
+  /**
+   * Nothing else watches this number. `initialize` pays for the whole text on
+   * every session, on every client, before the agent has asked for anything,
+   * and `pnpm bench:memory` measures the briefing rather than this. The
+   * ceilings are a little above where the contract landed (4,923 and 4,207
+   * bytes on 2026-09-15) so a sentence can still be added, and a paragraph
+   * cannot be.
+   */
+  it("stays under a byte ceiling on both transports", () => {
+    expect(Buffer.byteLength(instructions({ local: false }))).toBeLessThanOrEqual(5120);
+    expect(Buffer.byteLength(instructions({ local: true }))).toBeLessThanOrEqual(4608);
+  });
+
+  /**
    * The one feature that does not work the same way on both transports.
    *
    * BASE described observations at length -- what they are, when they help,
@@ -567,6 +620,37 @@ describe("instructions", () => {
       expect(text).toMatch(/Ask it in words/);
       expect(text).toMatch(/parsed and ranked/);
     }
+  });
+});
+
+/**
+ * The `wrap_up` prompt is the same contract, said to a client that shows it
+ * in a menu. It has to agree with BASE on the order and on the stopping rule,
+ * because a client that offers the prompt and an agent that read the
+ * instructions must not be told two different things about the same moment.
+ */
+describe("the wrap_up prompt", () => {
+  const wrapUp = () => {
+    const prompt = harness(remoteWs).prompts.get("wrap_up")!;
+    return prompt.build({ cwd: "/repo" }).messages[0]!.content.text!;
+  };
+
+  it("is registered on both transports", () => {
+    expect(harness(remoteWs).prompts.has("wrap_up")).toBe(true);
+    expect(harness(localWs).prompts.has("wrap_up")).toBe(true);
+  });
+
+  it("is numbered, in the order the instructions give", () => {
+    const text = wrapUp();
+    expect(text).toMatch(/in this order:/);
+    expect(text).toMatch(/\n1\. update_task/);
+    expect(text).toMatch(/\n2\. log_entry\(kind:'dead_end'\)/);
+    expect(text).toMatch(/\n4\. log_entry\(kind:'handoff'\)/);
+    expect(text).toContain('"/repo"');
+  });
+
+  it("carries the stopping rule for a refused write", () => {
+    expect(wrapUp()).toMatch(/refused twice with the same message: stop/);
   });
 });
 
