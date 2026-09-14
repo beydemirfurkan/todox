@@ -174,7 +174,9 @@ describe("the silent failures, named", () => {
     await writeJson(path.join(cwd, ".mcp.json"), { mcpServers: { todox: httpEntry("http") } });
     const checkout = about((await inspectInstalls(cwd)).findings, "checkout");
     expect(checkout).toHaveLength(2);
-    expect(checkout.map((f) => f.detail).join("\n")).toMatch(/\.cursor\/mcp\.json carries a todox entry that cursor/);
+    // The path is printed as the platform spells it, so the separator is
+    // whatever `path.relative` produced -- a backslash on the Windows runner.
+    expect(checkout.map((f) => f.detail).join("\n")).toMatch(/\.cursor[\\/]mcp\.json carries a todox entry that cursor/);
     expect(checkout.map((f) => f.detail).join("\n")).toMatch(/\.mcp\.json carries a todox entry that claude-code/);
     for (const f of checkout) expect(f.level).toBe("warn");
   });
