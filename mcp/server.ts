@@ -19,6 +19,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { normalise, type ClientInfo } from "../lib/client-identity";
 import type { MethodName } from "../lib/services/rpc-schemas";
 import { isAbsolutePath } from "../lib/util/paths";
+import { runInstallDoctor } from "./doctor";
 import { createObserver } from "./observer";
 import { createClient, readConfig } from "./rpc-client";
 import { instructions, registerTools, SERVER_INFO, type Workspace } from "./tools";
@@ -174,7 +175,25 @@ async function main() {
   return server.connect(new StdioServerTransport());
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+/**
+ * `todox-mcp doctor [cwd]` is the one thing this binary does that is not
+ * being an MCP server. Dispatched before `readConfig()`, because the doctor's
+ * job is to find the token in the client configs -- it must not need one in
+ * the environment to start. A static import above rather than a dynamic one
+ * here: `pack-mcp` walks `require(...)` to decide what ships, and a dynamic
+ * import would be pruned from the package and throw on the first run.
+ */
+if (process.argv[2] === "doctor") {
+  runInstallDoctor(process.argv[3] ?? process.cwd()).then(
+    (code) => process.exit(code),
+    (e) => {
+      console.error("[todox] doctor:", e instanceof Error ? e.message : e);
+      process.exit(1);
+    },
+  );
+} else {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}

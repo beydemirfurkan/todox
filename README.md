@@ -208,6 +208,20 @@ idempotent — the block is fenced with an HTML comment, so a second run replace
 it instead of leaving two sets of instructions where the older one wins. Add
 `--dry-run` to see the exact block first.
 
+When the tools do not show up at all, the silent failure is usually one of
+the two tables above, and there is a command that reads the files the way each
+client does and says which:
+
+```bash
+npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz doctor
+```
+
+Per client: the entry, its `type`, its root key, a leftover in a location the
+client never reads, whether the memory file carries the habit, and whether the
+server answers the token it found (masked in the output). It also names a
+todox entry sitting in the current checkout's own config for what it is.
+Nothing is changed; [docs/mcp.md](docs/mcp.md) has the detail.
+
 If you skip this and the account then connects for days without calling a
 tool, the server says so at the top of its instructions on the next session —
 "connected for N days and has not called a tool" — and hands the agent the

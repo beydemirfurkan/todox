@@ -13,6 +13,10 @@
  * not land in the scrollback). --dry-run prints the plan and exits without
  * writing. The doctor pass at the end is what makes a silent failure loud.
  *
+ * For an install that already exists, `pnpm mcp:doctor` with no arguments --
+ * or `todox-mcp doctor` from the package, with no clone -- reads every
+ * client's config and says what it found; see `mcp/doctor.ts`.
+ *
  * --write-memory does the other half: the config makes the tools exist, and the
  * habit in the client's user-level memory file is what makes an agent reach for
  * them. Off by default because that file is the user's own, and every run says
@@ -26,7 +30,7 @@ import { client as cursor } from "./clients/cursor";
 import { client as opencode } from "./clients/opencode";
 import { client as vscode } from "./clients/vscode";
 import { memoryFileFor } from "./clients/contract";
-import { runDoctor } from "./doctor";
+import { runDoctor } from "./reachability";
 import { memoryBlock, planMemoryWrite, readMemoryFile, writeMemoryFile } from "./memory";
 import { parseArgs } from "./parse";
 import { maskToken, promptForToken } from "./prompt";

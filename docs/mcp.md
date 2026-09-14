@@ -72,6 +72,8 @@ pnpm install:mcp opencode --opencode-layout v1
 
 ## Check an install
 
+Two questions, two commands. "Does this server answer this token from here?":
+
 ```bash
 pnpm mcp:doctor https://www.todox.dev/api/mcp todox_…
 ```
@@ -79,6 +81,28 @@ pnpm mcp:doctor https://www.todox.dev/api/mcp todox_…
 `initialize`, then `tools/list`, then a real `get_context` call — so auth,
 schema and project resolution are all exercised rather than assumed. The
 install CLI runs the same pass at the end of an `http` install.
+
+And the question that arrives weeks later, "I set it up and the tools do not
+show" — which needs no clone and no token in the environment:
+
+```bash
+npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz doctor
+```
+
+It reads the config file each of the five clients actually reads, on this
+platform, and says per client what it found: an entry that is fine (token
+masked), an entry with a `type` the client ignores, one under a root key the
+client does not look at, one in a file an older todox wrote to the wrong place,
+or none. Beside a working entry it says whether the client's memory file
+carries the habit, because a connected server nobody reaches for is the failure
+this whole page is about. It also looks in the directory it was run from for
+the per-checkout files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`,
+`opencode.json`) and names a todox entry there for what it is: a memory that
+exists in one repository. Then it reaches the server with every token it saw.
+Exit code 0 when at least one entry is usable, nothing is broken and every
+server answered; 1 otherwise. It changes nothing.
+
+`pnpm mcp:doctor` with no arguments does the same from a clone.
 
 If you install by hand, the JSON / TOML shape per client is documented in
 `scripts/install-mcp/clients/`, and the per-platform paths are in the README's

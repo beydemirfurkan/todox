@@ -7,6 +7,7 @@ import {
   detectJsonHttp,
   findStaleEntries,
   installJsonHttp,
+  readServerEntry,
   verifyJsonHttp,
 } from "./json-http";
 
@@ -256,5 +257,49 @@ describe("detectJsonHttp", () => {
     expect(await detectJsonHttp(file)).toBe(false);
     await fs.writeFile(file, "{}", "utf8");
     expect(await detectJsonHttp(file)).toBe(true);
+  });
+});
+
+/**
+ * The doctor's read. Four outcomes rather than "found or not", because each
+ * is a different sentence to a person: never set up, broken by hand, set up
+ * without todox, and present -- where "present" includes an entry that is
+ * not even an object, so the caller can say what is wrong with it rather
+ * than calling it absent.
+ */
+describe("readServerEntry", () => {
+  it("tells a missing file from a file without the entry", async () => {
+    const dir = await caseDir("read-missing");
+    const file = path.join(dir, "mcp.json");
+    expect(await readServerEntry(TARGET(file), "todox")).toEqual({ kind: "no-file" });
+    await fs.writeFile(file, '{"mcpServers":{"other":{}}}', "utf8");
+    expect(await readServerEntry(TARGET(file), "todox")).toEqual({ kind: "absent" });
+  });
+
+  it("returns the entry where there is one, at a nested key path too", async () => {
+    const dir = await caseDir("read-present");
+    const file = path.join(dir, "opencode.json");
+    await fs.writeFile(file, '{"mcp":{"servers":{"todox":{"type":"remote","url":"u"}}}}', "utf8");
+    expect(await readServerEntry(NESTED(file), "todox")).toEqual({
+      kind: "present",
+      entry: { type: "remote", url: "u" },
+    });
+    // The v1 layout of the same file does not hold it.
+    expect(await readServerEntry({ file, rootKeys: ["mcp"] }, "todox")).toEqual({ kind: "absent" });
+  });
+
+  it("reports a file it cannot parse rather than throwing", async () => {
+    const dir = await caseDir("read-broken");
+    const file = path.join(dir, "mcp.json");
+    await fs.writeFile(file, "{ nope", "utf8");
+    const read = await readServerEntry(TARGET(file), "todox");
+    expect(read.kind).toBe("unreadable");
+  });
+
+  it("calls a non-object entry present, with nothing in it", async () => {
+    const dir = await caseDir("read-scalar");
+    const file = path.join(dir, "mcp.json");
+    await fs.writeFile(file, '{"mcpServers":{"todox":"https://x"}}', "utf8");
+    expect(await readServerEntry(TARGET(file), "todox")).toEqual({ kind: "present", entry: {} });
   });
 });
