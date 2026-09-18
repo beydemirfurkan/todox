@@ -330,7 +330,7 @@ you are changing the tools themselves.
 | `log_entry` | Append one of the five kinds. `answers_entry_id` closes a `question` — the only thing that does. |
 | `delete_entry` | For an entry that was wrong when it was written. One overtaken by later work is history, not an error — append instead. |
 | `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
-| `link_files` | Attach paths with their hashes to a task or a context note. Safe to call again for the same file. |
+| `link_files` | Attach paths with their hashes to a task or a context note — the files the work touches, and the plan it follows, wherever that lives: a path outside the repository is hashed like any other, a URL (a claude.ai artifact, say) is kept as written and never hashed. Safe to call again for the same file. |
 | `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
 | `accept_file_change` · `unlink_file` | Clear a stale warning once you have read the change, or drop a link that has stopped meaning anything. Nothing else can clear it — the server never sees the file. |
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |

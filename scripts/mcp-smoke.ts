@@ -362,6 +362,13 @@ async function runSuite(mode: Mode, token: string) {
   });
   const linked = JSON.parse(await text("get_task", { task_id: taskId }));
   const refId = linked.files[0].id;
+  // The task carries more links than this one further down, so every later
+  // read finds the marker by its id rather than by its position.
+  const byRef = (files: { id: number; status: string }[], id: number) => {
+    const ref = files.find((f) => f.id === id);
+    if (!ref) throw new Error(`ref #${id} is no longer on the task`);
+    return ref;
+  };
 
   // The other end of the same link. `refs.path` was write-only until now:
   // every read went in by task id, so the one question a coding agent actually
@@ -479,10 +486,45 @@ async function runSuite(mode: Mode, token: string) {
     // "unknown" for ever and the staleness feature never ran.
     await text("report_file_hashes", { refs: [{ id: refId, hash: sha256(marker) }] });
     const seen = JSON.parse(await text("get_task", { task_id: taskId }));
-    if (seen.files[0].status !== "fresh")
-      throw new Error(`after reporting, remote should read fresh, got ${seen.files[0].status}`);
-    console.log("after the agent reported:", seen.files[0].status);
+    const seenRef = byRef(seen.files, refId);
+    if (seenRef.status !== "fresh")
+      throw new Error(`after reporting, remote should read fresh, got ${seenRef.status}`);
+    console.log("after the agent reported:", seenRef.status);
   }
+
+  console.log("\n--- the plan a task follows is linkable, wherever it lives ---");
+  // Every task in a month of production data had `files: []`, while their
+  // bodies pointed at plan files under ~/.claude/plans and at claude.ai
+  // artifacts. A plan outside the repository is hashed like any other file;
+  // a URL is kept as written and never hashed. Both must survive a `get_task`,
+  // and the file must be found again by the path it was linked with --
+  // which on Windows it was not, because the path was stored with backslashes
+  // and compared against a folded one.
+  const plan = join(TMP, "todox-smoke-plan.md");
+  writeFileSync(plan, "# the plan\n\n1. link it\n");
+  const artifact = "https://claude.ai/code/artifact/00000000-smoke";
+  await text("link_files", {
+    task_id: taskId,
+    paths: [
+      { path: plan, note: "the plan", ...(mode.local ? {} : { hash: sha256(plan) }) },
+      { path: artifact, note: "the design", ...(mode.local ? {} : { hash: null }) },
+    ],
+  });
+  const withPlan = JSON.parse(await text("get_task", { task_id: taskId }));
+  const planRef = withPlan.files.find((f: { path: string }) => f.path === normalisePath(plan));
+  const urlRef = withPlan.files.find((f: { path: string }) => f.path === artifact);
+  if (!planRef) throw new Error(`the plan outside the repo is not on the task: ${JSON.stringify(withPlan.files)}`);
+  if (!urlRef) throw new Error(`the artifact URL is not on the task: ${JSON.stringify(withPlan.files)}`);
+  if (planRef.status !== (mode.local ? "fresh" : "unknown"))
+    throw new Error(`a plan outside the repo should read ${mode.local ? "fresh" : "unknown"} here, got ${planRef.status}`);
+  if (urlRef.status !== "unknown")
+    throw new Error(`a URL can never be checked and must read unknown, got ${urlRef.status}`);
+  // Windows spelling on the way in, folded spelling stored: the same file
+  // asked about with either finds the task.
+  const byPlan = JSON.parse(await text("get_file_context", { path: plan, cwd: SCRATCH }));
+  if (!byPlan.tasks.some((t: { id: number }) => t.id === taskId))
+    throw new Error(`get_file_context did not find task #${taskId} on the plan ${plan}`);
+  console.log("plan:", planRef.status, "| artifact:", urlRef.status, "| found again by path");
 
   console.log("\n--- and an edit is caught ---");
   writeFileSync(marker, '{"name":"smoke-repo","edited":true}\n');
@@ -490,7 +532,7 @@ async function runSuite(mode: Mode, token: string) {
     await text("report_file_hashes", { refs: [{ id: refId, hash: sha256(marker) }] });
 
   const rechecked = JSON.parse(await text("get_task", { task_id: taskId }));
-  const after = rechecked.files[0].status;
+  const after = byRef(rechecked.files, refId).status;
   if (after !== "changed")
     throw new Error(`an edited file should read changed in ${mode.label}, got ${after}`);
   console.log("after editing the file:", after);
@@ -506,7 +548,7 @@ async function runSuite(mode: Mode, token: string) {
   if (!accepted.accepted)
     throw new Error(`accept_file_change refused: ${accepted.reason ?? "no reason given"}`);
 
-  const settled = JSON.parse(await text("get_task", { task_id: taskId })).files[0].status;
+  const settled = byRef(JSON.parse(await text("get_task", { task_id: taskId })).files, refId).status;
   if (settled === "changed") throw new Error("the warning survived being accepted");
   console.log("after accepting:", settled);
 

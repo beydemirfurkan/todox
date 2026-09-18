@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAbsolutePath,
   isInside,
+  isUrl,
   lastSegment,
   normalisePath,
   relativeTo,
@@ -14,6 +15,7 @@ import {
   shareToken,
   slugify,
   slugifyOr,
+  storedPath,
 } from "./paths";
 
 /**
@@ -351,5 +353,50 @@ describe("relativeTo", () => {
 
   it("is case-sensitive on posix, where the filesystem is", () => {
     expect(relativeTo("/Repo/lib/auth.ts", "/repo")).toBeNull();
+  });
+});
+
+/**
+ * How a linked path is stored. `refs.path` was written verbatim while
+ * `get_file_context` compared it against folded roots, so a file linked from
+ * Windows with backslashes was never found again -- the reason every task in
+ * a month of production data had `files: []` was partly that the one agent
+ * that did link files could not see them afterwards.
+ */
+describe("storedPath", () => {
+  it("folds a Windows path the way the roots it will be compared against are folded", () => {
+    expect(storedPath("C:\\Users\\me\\repo\\lib\\a.ts")).toBe("C:/Users/me/repo/lib/a.ts");
+  });
+
+  it("leaves a POSIX path alone, minus a trailing separator", () => {
+    expect(storedPath("/Users/me/repo/lib/a.ts")).toBe("/Users/me/repo/lib/a.ts");
+    expect(storedPath("/Users/me/repo/docs/")).toBe("/Users/me/repo/docs");
+  });
+
+  it("keeps a plan outside the repository as an absolute path, folded", () => {
+    expect(storedPath("C:\\Users\\me\\.claude\\plans\\x.md")).toBe("C:/Users/me/.claude/plans/x.md");
+  });
+
+  it("stores a URL as written", () => {
+    // A trailing slash is part of a URL and `normalisePath` would eat it.
+    expect(storedPath("https://claude.ai/code/artifact/abc/")).toBe("https://claude.ai/code/artifact/abc/");
+    expect(storedPath("notion://page/xyz")).toBe("notion://page/xyz");
+  });
+});
+
+describe("isUrl", () => {
+  it("recognises a scheme followed by //", () => {
+    expect(isUrl("https://claude.ai/x")).toBe(true);
+    expect(isUrl("HTTP://example.com")).toBe(true);
+    expect(isUrl("s3+https://bucket/key")).toBe(true);
+  });
+
+  it("does not mistake a path for one", () => {
+    expect(isUrl("/Users/me/repo")).toBe(false);
+    expect(isUrl("C:/Users/me/repo")).toBe(false);
+    expect(isUrl("C:\\Users\\me\\repo")).toBe(false);
+    expect(isUrl("lib/auth.ts")).toBe(false);
+    // A drive letter is one character; a scheme needs `://`.
+    expect(isUrl("c:foo")).toBe(false);
   });
 });

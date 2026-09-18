@@ -117,6 +117,20 @@ describe("checkRefs across machines", () => {
     const { seen } = checkRefs([{ id: 1, path: foreign, hash: "a".repeat(64) }]);
     expect(seen).toEqual([]);
   });
+
+  /**
+   * A plan can live in an artifact. Nothing can read it, and `hashFile` on
+   * the string would answer null -- "missing", about a plan that is right
+   * there in a browser. Unknown, and never written back.
+   */
+  it("calls a URL unknown, and never reports a hash for it", () => {
+    const { checked, seen } = checkRefs([
+      { id: 1, path: "https://claude.ai/code/artifact/abc", hash: null },
+      { id: 2, path: "notion://page/xyz", hash: "a".repeat(64) },
+    ]);
+    expect(checked.map((c) => c.status)).toEqual(["unknown", "unknown"]);
+    expect(seen).toEqual([]);
+  });
 });
 
 describe("gitRemote", () => {
