@@ -195,6 +195,7 @@ describe("model field round-trips through parseParams on every method", () => {
     deleteContext: { context_id: 1 },
     getContextNote: { context_id: 1 },
     getFileContext: { path: "lib/auth.ts", cwd: "/repo" },
+    sessionStatus: { cwd: "/repo" },
     search: { query: "x" },
     activityReport: { period: "today" },
     recordClientInfo: { name: "claude-code" },
@@ -276,6 +277,44 @@ describe("linkFiles takes one end or the other", () => {
 
   it("refuses neither, rather than writing an orphan", () => {
     expect(() => parseParams("linkFiles", { paths })).toThrow(/exactly one/);
+  });
+});
+
+/**
+ * The read an agent makes at the moment the wrap-up habit gets dropped. It
+ * has to be cheap to call right: one reference, an optional window, nothing
+ * else to get wrong.
+ */
+describe("sessionStatus", () => {
+  it("needs a project or a cwd, like every project-scoped read", () => {
+    expect(() => parseParams("sessionStatus", {})).toThrow(/either `project` or `cwd`/);
+  });
+
+  it("takes a cwd alone", () => {
+    expect(() => parseParams("sessionStatus", { cwd: "/repo" })).not.toThrow();
+  });
+
+  it("refuses a window that is not a whole number of hours in range", () => {
+    // A string "12" would be a client serialising a number as text and then
+    // reading a default it never asked for; zero would be a window nothing
+    // falls in and an empty list that reads as "nothing owed".
+    expect(() => parseParams("sessionStatus", { cwd: "/repo", hours: "12" })).toThrow(
+      /invalid params/,
+    );
+    expect(() => parseParams("sessionStatus", { cwd: "/repo", hours: 0 })).toThrow(
+      /invalid params/,
+    );
+    expect(() => parseParams("sessionStatus", { cwd: "/repo", hours: 1.5 })).toThrow(
+      /invalid params/,
+    );
+    expect(() => parseParams("sessionStatus", { cwd: "/repo", hours: 169 })).toThrow(
+      /invalid params/,
+    );
+  });
+
+  it("accepts a window inside a week", () => {
+    for (const hours of [1, 12, 168])
+      expect(() => parseParams("sessionStatus", { cwd: "/repo", hours })).not.toThrow();
   });
 });
 

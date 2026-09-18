@@ -218,6 +218,34 @@ export const activeBetween = (
   );
 
 /**
+ * The tasks one user has left a status change or an entry on since `since`,
+ * inside one project -- what `session_status` calls "yours". Any status: a
+ * task moved to 'done' an hour ago is owed a handoff as much as one still
+ * 'doing', and BASE asks for one on every task touched.
+ *
+ * `user_id` rather than `actor`: `actor` is free text a client chooses, and
+ * two agents on one account share it. The column that says who is the one
+ * the token resolved. Rows from before it existed have null and count for
+ * nobody, which is right -- nothing this session did is that old.
+ */
+export const touchedByUserSince = (
+  projectId: number,
+  userId: number,
+  since: string,
+  limit: number,
+) =>
+  all<Task>(
+    `SELECT DISTINCT t.* FROM tasks t
+     LEFT JOIN entries e     ON e.task_id = t.id AND e.user_id = ? AND e.created_at >= ?
+     LEFT JOIN task_events v ON v.task_id = t.id AND v.user_id = ? AND v.at         >= ?
+      WHERE t.project_id = ?
+        AND (e.id IS NOT NULL OR v.id IS NOT NULL)
+     ORDER BY t.updated_at DESC
+     LIMIT ?`,
+    [userId, since, userId, since, projectId, limit],
+  );
+
+/**
  * Creates the task and its opening event in one statement.
  *
  * This is the one place a repository writes another module's table, and the

@@ -414,7 +414,16 @@ describe("annotations", () => {
   /** Without this a client cannot auto-approve the call every session starts with. */
   it("marks the reads as read-only", () => {
     const { tools } = harness(remoteWs);
-    for (const name of ["get_context", "get_task", "list_tasks", "list_projects", "search"])
+    for (const name of [
+      "get_context",
+      "get_task",
+      "list_tasks",
+      "list_projects",
+      "search",
+      // The one read that runs at the moment the habit gets dropped: a
+      // permission prompt here is one more reason to skip it.
+      "session_status",
+    ])
       expect(tools.get(name)!.config.annotations?.readOnlyHint).toBe(true);
   });
 
@@ -542,7 +551,8 @@ describe("instructions", () => {
   it("ends with a numbered contract rather than a paragraph", () => {
     for (const local of [true, false]) {
       const text = instructions({ local });
-      expect(text).toMatch(/BEFORE YOU FINISH, in this order:\n1\. update_task/);
+      expect(text).toMatch(/BEFORE YOU FINISH: call session_status\(cwd\)/);
+      expect(text).toMatch(/in this order:\n1\. update_task/);
       expect(text).toMatch(/\n2\. log_entry\(kind:'dead_end'\)/);
       expect(text).toMatch(/\n3\. log_entry\(kind:'handoff'\)/);
       expect(text).toMatch(/Not finished until all three are done\./);
@@ -676,6 +686,18 @@ describe("the wrap_up prompt", () => {
   it("is registered on both transports", () => {
     expect(harness(remoteWs).prompts.has("wrap_up")).toBe(true);
     expect(harness(localWs).prompts.has("wrap_up")).toBe(true);
+  });
+
+  /**
+   * The list the contract assumed the agent would remember. Measured: it did
+   * not, and 'doing' tasks nobody was doing piled up for weeks. The prompt
+   * and BASE both send the agent to session_status first, so the two agree
+   * on where the list comes from as well as on the order.
+   */
+  it("sends the agent to session_status before the list", () => {
+    const text = wrapUp();
+    expect(text).toMatch(/Call session_status with cwd "\/repo" first/);
+    expect(text.indexOf("session_status")).toBeLessThan(text.indexOf("1. update_task"));
   });
 
   it("is numbered, in the order the instructions give", () => {

@@ -552,6 +552,27 @@ export const SHAPES = {
   },
 
   /**
+   * What a session still owes before it stops: the tasks this user touched
+   * inside a window, with whether each has a handoff since, and the ones an
+   * earlier session left 'doing' and never came back to. The wrap-up rule
+   * asks for three things on "every task you touched"; this is the list the
+   * rule assumed the agent would remember.
+   */
+  sessionStatus: {
+    project: ref.optional().describe("Slug, name, or a path inside the project"),
+    cwd: ref.optional().describe("Absolute working directory, used if project is omitted"),
+    hours: z
+      .number()
+      .int()
+      .min(1)
+      .max(168)
+      .optional()
+      .describe("How far back counts as this session. Default 12."),
+    repo_url: repoIdentity,
+    model,
+  },
+
+  /**
    * What the stdio process should put in front of its instructions, asked
    * once at startup. Server-side and not agent-facing: the answer is about
    * the account's own silence, measured from tool_usage, and a model asking
@@ -681,7 +702,16 @@ const OBJECTS: Record<string, z.ZodType> = {
   // the right place to say. It used to be a runtime throw halfway through the
   // handler, so the tool advertised a call it would always refuse.
   ...Object.fromEntries(
-    (["getContext", "listTasks", "getFileContext", "createTask", "recordObservation"] as const).map((name) => [
+    (
+      [
+        "getContext",
+        "listTasks",
+        "getFileContext",
+        "createTask",
+        "recordObservation",
+        "sessionStatus",
+      ] as const
+    ).map((name) => [
       name,
       z
         .object(SHAPES[name])
