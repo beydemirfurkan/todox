@@ -58,3 +58,38 @@ export async function create(input: NewEvent): Promise<TaskEvent> {
   const row = await one<TaskEvent>(stmt.text, stmt.params);
   return row!;
 }
+
+/**
+ * One row per task: when its status last changed and to what, and when this
+ * user last changed it. `session_status` reads it beside the entries' twin to
+ * decide what a session still owes, so the two answer the same shape of
+ * question on the two tables that record activity.
+ *
+ * `user_id` is null on every event written before the column existed and on
+ * events whose account is gone; `FILTER (WHERE user_id = ?)` treats those as
+ * nobody's, which is the honest answer.
+ */
+export type TaskActivity = {
+  task_id: number;
+  latest_at: string;
+  latest_to_status: Status;
+  last_by_user_at: string | null;
+};
+
+export async function activityByTasks(
+  taskIds: number[],
+  userId: number,
+): Promise<Map<number, TaskActivity>> {
+  if (!taskIds.length) return new Map();
+  const rows = await all<TaskActivity>(
+    `SELECT task_id,
+            max(at) AS latest_at,
+            (array_agg(to_status ORDER BY id DESC))[1] AS latest_to_status,
+            max(at) FILTER (WHERE user_id = ?) AS last_by_user_at
+       FROM task_events
+      WHERE task_id IN (${taskIds.map(() => "?").join(",")})
+      GROUP BY task_id`,
+    [userId, ...taskIds],
+  );
+  return new Map(rows.map((r) => [r.task_id, r]));
+}

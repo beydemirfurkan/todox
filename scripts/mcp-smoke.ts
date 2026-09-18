@@ -312,6 +312,39 @@ async function runSuite(mode: Mode, token: string) {
   const full = JSON.parse(await text("get_task", { task_id: taskId }));
   console.log("status:", full.status, "| entries:", full.entries.length);
 
+  console.log("\n--- what this session still owes ---");
+  // The task was moved twice and written on once, and none of it was a
+  // handoff: it is this session's and a handoff is owed on it. `cwd` alone
+  // has to be enough, because this is the call made at the moment the
+  // habit gets dropped.
+  const owed = JSON.parse(await text("session_status", { cwd: SCRATCH }));
+  const owedTask = owed.yours.find((t: { id: number }) => t.id === taskId);
+  if (!owedTask || owedTask.status !== "done" || owedTask.handoff_missing !== true)
+    throw new Error(
+      `session_status should list #${taskId} as done and owed a handoff, got ${JSON.stringify(owed.yours)}`,
+    );
+  if (!owed.hint.includes(`#${taskId}`) || !/handoff/.test(owed.hint))
+    throw new Error(`session_status hint should name #${taskId} and ask for a handoff: ${owed.hint}`);
+  console.log("owed:", owed.yours.length, "| hint:", owed.hint.slice(0, 60) + "…");
+
+  await text("log_entry", {
+    task_id: taskId,
+    kind: "handoff",
+    body: "SMOKE: done; nothing left to continue.",
+    model: MODEL,
+  });
+  const afterHandoff = JSON.parse(await text("session_status", { cwd: SCRATCH }));
+  const cleared = afterHandoff.yours.find((t: { id: number }) => t.id === taskId);
+  if (!cleared || cleared.handoff_missing !== false)
+    throw new Error(
+      `a handoff written since should clear the debt, got ${JSON.stringify(afterHandoff.yours)}`,
+    );
+  // The other task this session created is still owed one, so the sentence
+  // may stay; what must go is this task's id from it.
+  if (afterHandoff.hint.includes(`#${taskId}`))
+    throw new Error(`the hint should stop naming #${taskId} once its handoff is written: ${afterHandoff.hint}`);
+  console.log("cleared: handoff_missing =", cleared.handoff_missing);
+
   console.log("\n--- linked files ---");
   const marker = join(SCRATCH, "package.json");
   await text("link_files", {

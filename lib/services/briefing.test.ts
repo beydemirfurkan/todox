@@ -35,7 +35,7 @@ vi.mock("../repositories/refs", () => ({
 vi.mock("../repositories/observations", () => ({ pageByProject: mocks.pageObservations }));
 vi.mock("../repositories/projects", () => ({ listByName: mocks.listByName }));
 
-const { briefing } = await import("./briefing");
+const { briefing, handoffMissing, lacksHandoffSince } = await import("./briefing");
 
 /** Cast where it is used, not here: the tests read `PROJECT.id`. */
 const PROJECT = {
@@ -946,5 +946,37 @@ describe("a project with a namesake", () => {
       { id: 99, slug: "todox-shared", user_id: 4242 },
     ]);
     expect(await brief()).not.toHaveProperty("duplicate");
+  });
+});
+
+/**
+ * The one predicate behind both the observation's `handoff_missing` and
+ * `session_status`'s: a handoff is owed when none exists or the last one
+ * predates the moment the work began. Pinned here so the two callers cannot
+ * come to mean different things by "since".
+ */
+describe("lacksHandoffSince", () => {
+  it("is owed when no handoff was ever written", () => {
+    expect(lacksHandoffSince(null, "2026-09-18T10:00:00Z")).toBe(true);
+  });
+
+  it("is owed when the last handoff predates the work", () => {
+    expect(lacksHandoffSince("2026-09-18T09:00:00Z", "2026-09-18T10:00:00Z")).toBe(true);
+  });
+
+  it("is settled by a handoff at or after the moment", () => {
+    expect(lacksHandoffSince("2026-09-18T10:00:00Z", "2026-09-18T10:00:00Z")).toBe(false);
+    expect(lacksHandoffSince("2026-09-18T11:00:00Z", "2026-09-18T10:00:00Z")).toBe(false);
+  });
+
+  it("is what handoffMissing reads for an observation's tasks", () => {
+    const open = [
+      { id: 1, last_handoff: null },
+      { id: 2, last_handoff: { created_at: "2026-09-18T09:00:00Z" } },
+      { id: 3, last_handoff: { created_at: "2026-09-18T11:00:00Z" } },
+    ];
+    expect(
+      handoffMissing({ task_ids: [1, 2, 3, 4], started_at: "2026-09-18T10:00:00Z" }, open),
+    ).toEqual([1, 2]);
   });
 });

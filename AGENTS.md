@@ -274,6 +274,7 @@ not connected.
   its own.
 - `create_task` for anything that will not finish this session. Pass
   `cwd`.
-- Before stopping, `log_entry(kind: "handoff")` on every task you
-  touched, and `dead_end` for approaches that failed.
+- Before stopping, `session_status` lists what you touched; leave a
+  `log_entry(kind: "handoff")` on each, and `dead_end` for approaches that
+  failed.
 - Always pass your own model id on write tools.

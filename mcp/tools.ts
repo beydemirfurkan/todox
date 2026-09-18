@@ -102,17 +102,16 @@ const BASE = [
   "to the developer as a recorded decision. Worth keeping? Write the real",
   "record with from_observation_id; otherwise it expires. `handoff_missing`",
   "names tasks that session set 'doing' and never wrote up: continue or reset",
-  "them. Whether you see any depends on the transport -- the note at the end",
-  "says.",
+  "them.",
   "",
   "Pass `model` (your model id) on create_task, update_task, log_entry; it is",
   "stored on the row so reports can say which model did what.",
   "",
-  "BEFORE YOU FINISH, in this order:",
+  "BEFORE YOU FINISH: call session_status(cwd). It names the tasks you touched",
+  "this session and what each still lacks; work through it, in this order:",
   "1. update_task: every task you touched shows its true status. One set to",
   "   'doing' and not finished goes back to 'todo' or 'blocked' -- a task left",
-  "   'doing' by a session that ended is the log going stale, and the next",
-  "   briefing will say so.",
+  "   'doing' by a session that ended is the log going stale.",
   "2. log_entry(kind:'dead_end') for each approach that failed, if not logged",
   "   yet.",
   "3. log_entry(kind:'handoff') on every task you touched -- state, next step,",
@@ -400,7 +399,9 @@ function registerPrompts(server: McpServer) {
           content: {
             type: "text",
             text: [
-              `We are finishing. For every task you touched in "${cwd}", in this order:`,
+              `We are finishing. Call session_status with cwd "${cwd}" first: it lists`,
+              "the tasks you touched and what each still lacks. Then, for every task",
+              "it names or you touched, in this order:",
               "",
               "1. update_task to its true status: 'done', or back to 'todo'/'blocked'",
               "   if you set it 'doing' and did not finish.",
@@ -749,6 +750,18 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     // Same as get_context: locally the process reads the remote off the
     // checkout, so asking the model for it would be asking it to shell out to
     // git for something already on disk.
+    { referenceRequirement: "project-or-cwd", localInternal: ["repo_url"] },
+  );
+
+  tool(
+    "session_status",
+    "sessionStatus",
+    {
+      title: "What this session still owes",
+      description:
+        "Call before finishing. `yours`: the tasks you changed or wrote on in this project within `hours` (default 12), any status, each with whether a handoff was written since the last thing you did there. `stale`: tasks 'doing' for 7+ days with nothing logged, by anyone. Ids, titles, dates and one boolean -- small on purpose. Empty lists mean nothing is owed. `hint` says what to do about each list.",
+      annotations: READ_ONLY,
+    },
     { referenceRequirement: "project-or-cwd", localInternal: ["repo_url"] },
   );
 

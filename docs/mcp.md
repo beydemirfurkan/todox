@@ -16,8 +16,10 @@ your client reads as global instructions.
    receipt confirms the task path and saved body length without echoing the
    body. Status moves with `update_task`.
 
-4. Before stopping, call `log_entry(kind:'handoff')` on every task you
-   touched, and `log_entry(kind:'dead_end')` for every approach that did not
+4. Before stopping, call `session_status` with `cwd`: it lists the tasks you
+   touched this session and whether each has a handoff since, plus any left
+   `doing` for a week. Then `log_entry(kind:'handoff')` on every task it
+   names, and `log_entry(kind:'dead_end')` for every approach that did not
    work. The next session is the consumer; write for them, not for yourself.
 
 ## Install

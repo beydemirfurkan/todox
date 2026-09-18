@@ -192,8 +192,8 @@ todox MCP is installed here — persistent memory across projects.
 - Call `get_context` before starting non-trivial work (cwd = your working
   directory). It registers a new repo by itself.
 - `create_task` for anything that will not finish this session.
-- Before stopping, `log_entry(kind:'handoff')` on every task you touched,
-  and `dead_end` for approaches that failed.
+- Before stopping, `session_status` lists what you touched; leave a
+  `log_entry(kind:'handoff')` on each, and `dead_end` for approaches that failed.
 - Always pass your own model id.
 ```
 
@@ -334,6 +334,7 @@ you are changing the tools themselves.
 | `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
 | `get_context_note` | One **note** in full, for the ones whose body the briefing capped and for reading past a search snippet. An entry the budget did not reach is read with `get_task`. |
 | `get_file_context` | What is known about one file: the tasks that touched it with their dead ends, and the notes attached to it. Absolute or repo-relative; both find a link made on another machine. |
+| `session_status` | **Call before finishing.** The tasks you changed or wrote on in this project within the last 12 hours (any status), each with whether a handoff was written since the last thing you did there — plus tasks left `doing` for 7+ days with nothing logged. Ids, titles, dates and one boolean; the `hint` says what each list still needs. The wrap-up rule asks for a handoff on every task touched, and this is the list it assumed the agent would remember. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
 | `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier.  Words that only one of the two languages treats as noise are dropped, so a question does not match every record containing the word "a". `kinds` narrows to dead ends or decisions; `project` stops it looking elsewhere.|
 | `get_task` | One task with its log and linked files. |

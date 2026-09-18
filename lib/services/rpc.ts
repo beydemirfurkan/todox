@@ -28,6 +28,7 @@ import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { silentAccountNudge } from "./nudge";
 import { search } from "./search";
+import { sessionStatus } from "./session-status";
 import * as taskService from "./task-service";
 import { isAbsolutePath, normalisePath, scrubRemote } from "../util/paths";
 import { resolvePeriod, type PeriodName } from "../util/time";
@@ -385,6 +386,16 @@ export const methods = {
           reason:
             "nothing has been reported for this file yet, so there is no state to accept — hash it and send report_file_hashes first",
         };
+  },
+
+  sessionStatus: async (
+    { userId },
+    p: { project?: string; cwd?: string; hours?: number; repo_url?: string },
+  ) => {
+    // A read, and one that runs at the end of a session: resolution only, the
+    // same as get_file_context. A project todox has never seen owes nothing.
+    const project = await mustResolve(userId, pickRef(p), { repoUrl: p.repo_url });
+    return sessionStatus(userId, project, { hours: p.hours });
   },
 
   getFileContext: async (

@@ -552,3 +552,41 @@ export async function create(input: NewEntry): Promise<Entry> {
 }
 
 export const remove = (id: number) => run("DELETE FROM entries WHERE id = ?", [id]);
+
+/**
+ * One row per task: the last entry of any kind, the last handoff, and this
+ * user's last entry with and without handoffs counted. The twin of
+ * `events.activityByTasks`; `session_status` needs both because "did I leave
+ * a handoff after the last thing I did here" is a question about two tables.
+ *
+ * `last_non_handoff_by_user_at` is the moment a handoff is owed from: a
+ * handoff written before it was left by an earlier session and says nothing
+ * about this one.
+ */
+export type TaskEntryActivity = {
+  task_id: number;
+  last_at: string;
+  last_handoff_at: string | null;
+  last_by_user_at: string | null;
+  last_non_handoff_by_user_at: string | null;
+};
+
+export async function activityByTasks(
+  taskIds: number[],
+  userId: number,
+): Promise<Map<number, TaskEntryActivity>> {
+  if (!taskIds.length) return new Map();
+  const rows = await all<TaskEntryActivity>(
+    `SELECT task_id,
+            max(created_at) AS last_at,
+            max(created_at) FILTER (WHERE kind = 'handoff') AS last_handoff_at,
+            max(created_at) FILTER (WHERE user_id = ?) AS last_by_user_at,
+            max(created_at) FILTER (WHERE user_id = ? AND kind <> 'handoff')
+              AS last_non_handoff_by_user_at
+       FROM entries
+      WHERE task_id IN (${taskIds.map(() => "?").join(",")})
+      GROUP BY task_id`,
+    [userId, userId, ...taskIds],
+  );
+  return new Map(rows.map((r) => [r.task_id, r]));
+}

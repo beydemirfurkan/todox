@@ -234,7 +234,7 @@ const BRIEFING_TASK_BYTES = 6_144;
  * will ever be told. `updated_at` is touched by every entry and every status
  * change, so it is the last sign of life without another query.
  */
-const STALE_DOING_DAYS = 7;
+export const STALE_DOING_DAYS = 7;
 
 /**
  * Unverified observations carried per briefing.
@@ -557,12 +557,21 @@ export function handoffMissing(
   observation: { task_ids: number[]; started_at: string },
   openTasks: { id: number; last_handoff: { created_at: string } | null }[],
 ): number[] {
-  const since = Date.parse(observation.started_at);
   return observation.task_ids.filter((id) => {
     const task = openTasks.find((t) => t.id === id);
     if (!task) return false;
-    return task.last_handoff === null || Date.parse(task.last_handoff.created_at) < since;
+    return lacksHandoffSince(task.last_handoff?.created_at ?? null, observation.started_at);
   });
+}
+
+/**
+ * Whether a handoff is owed: none was ever written, or the last one predates
+ * `since` -- the moment the work it would describe began. The one predicate
+ * behind both the observation's `handoff_missing` and `session_status`, so
+ * the two cannot disagree about what "since" means.
+ */
+export function lacksHandoffSince(lastHandoffAt: string | null, since: string): boolean {
+  return lastHandoffAt === null || Date.parse(lastHandoffAt) < Date.parse(since);
 }
 
 /**

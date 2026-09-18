@@ -44,6 +44,7 @@ const KIND = {
   listProjects: "read",
   search: "read",
   activityReport: "read",
+  sessionStatus: "read",
 
   createTask: "write",
   updateTask: "write",
