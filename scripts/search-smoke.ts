@@ -138,6 +138,57 @@ async function main() {
   expect("the entry", found("entry", entry.id));
   expect("the note", found("context", note.id));
 
+  // ---------------------------------------------- 1b. what a query may not do
+  line("a stopword is not a query, and a snippet is highlighted on the terms, not the noise");
+
+  // A record that answers a question phrased with function words. The query
+  // has four of them ("why", "was", "in", "of") and the answer has "of" three
+  // times: highlighted against the raw query with `simple`, the snippet used
+  // to be the fragment densest in "of", bolded, with none of the terms.
+  const answer = await contextsRepo.create({
+    user_id: user.id,
+    project_id: project.id,
+    kind: "decision",
+    title: `search: postgres full text, embedding${marker} rejected`,
+    body:
+      `The cost of an embedding service and the cost of a key for every self-hoster ` +
+      `were the two halves of the case against it. Postgres full text needs neither.`,
+  });
+  const asked = await search(user.id, `why was embedding${marker} rejected in favour of full text`);
+  expect("the question still finds the decision", asked.some((h) => h.type === "context" && h.id === answer.id));
+  expect(
+    "and no snippet bolds a stopword",
+    asked.every((h) => !/<b>(of|was|in|why)<\/b>/.test(h.snippet)),
+  );
+  expect(
+    "the decision's snippet points at a term of the question",
+    asked.find((h) => h.type === "context" && h.id === answer.id)?.snippet.includes("<b>") === true,
+  );
+
+  // "of" stripped is nothing, so both arms are off; it used to be every row
+  // containing the letters o-f, scored zero, filling the limit.
+  expect("a stopword alone finds nothing", (await search(user.id, "of")).length === 0);
+  expect("a Turkish stopword alone finds nothing either", (await search(user.id, "bir")).length === 0);
+
+  // Two characters: a whole word still matches through full text; the inside
+  // of an identifier no longer does, because the substring arm is off.
+  const whole = await entriesRepo.create({
+    task_id: task.id,
+    kind: "note",
+    body: `tx() takes a list of statements ${marker}`,
+  });
+  const inside = await entriesRepo.create({
+    task_id: task.id,
+    kind: "note",
+    body: `runTx${marker} wraps the same call`,
+  });
+  const two = await search(user.id, "tx");
+  expect("a two-letter query matches the whole word", two.some((h) => h.type === "entry" && h.id === whole.id));
+  expect(
+    "and not the middle of an identifier",
+    !two.some((h) => h.type === "entry" && h.id === inside.id),
+  );
+
   // --------------------------------------------------------------- 2. plans
   const trigram = await one("SELECT 1 AS present FROM pg_extension WHERE extname = 'pg_trgm'");
   line(`the plans name their indexes (pg_trgm ${trigram ? "installed" : "absent"})`);

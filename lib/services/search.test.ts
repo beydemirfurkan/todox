@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SEARCHED, TRGM_INDEXES } from "../db/fts";
+import { MIN_SUBSTRING_CHARS, SEARCHED, TRGM_INDEXES, TSQUERY } from "../db/fts";
 import { SCHEMA } from "../db/schema";
 import { escapeLike, QUERIES } from "./search";
 
@@ -127,16 +127,47 @@ describe("the substring arm has a trigram index per column it reads", () => {
 
 /**
  * `lib/db/client.ts` rewrites `?` to `$n` positionally, and all three queries
- * are handed the *same* six-element array. A seventh placeholder in one of them
- * does not fail to compile and does not fail to run -- it shifts every
- * parameter after it, so the search runs as somebody else's user id.
+ * are handed the *same* array. An extra placeholder in one of them does not
+ * fail to compile and does not fail to run -- it shifts every parameter after
+ * it, so the search runs as somebody else's user id.
  */
 describe("all three queries take the same parameters", () => {
   const placeholders = (sql: string) => (sql.match(/\?/g) ?? []).length;
 
-  it("eight, in the same order, everywhere", () => {
-    for (const table of TABLES) expect(placeholders(QUERIES[table])).toBe(8);
+  it("seven, in the same order, everywhere", () => {
+    for (const table of TABLES) expect(placeholders(QUERIES[table])).toBe(7);
   });
+});
+
+/**
+ * Two ways a short or empty query used to leak through.
+ *
+ * The snippet was highlighted against the raw query with the `simple`
+ * configuration, which has no stopword list: every "of" in the document was
+ * bolded and the densest fragment in function words won. And the substring
+ * arm ran `ILIKE '%of%'` for a query that, stripped, was nothing -- every row
+ * containing those two letters, scored zero, filling the limit. Both are
+ * fixed at the source of the query text, so this asserts the SQL reads it.
+ */
+describe("what a short or stopword-only query may not do", () => {
+  it("exposes the stripped query as a column of q", () => {
+    expect(TSQUERY).toMatch(/cleaned\.text AS text/);
+  });
+
+  for (const table of TABLES) {
+    it(`${table}: highlights against the stripped query, never the raw one`, () => {
+      expect(QUERIES[table]).toContain("plainto_tsquery('simple', q.text)");
+      expect(QUERIES[table]).not.toContain("plainto_tsquery('simple', ?)");
+      // The outer select has to be able to see q for that to work.
+      expect(QUERIES[table]).toMatch(/FROM top CROSS JOIN q\b/);
+    });
+
+    it(`${table}: turns the substring arm off under ${MIN_SUBSTRING_CHARS} stripped characters`, () => {
+      expect(QUERIES[table]).toContain(
+        `CASE WHEN length(btrim(cleaned.text)) >= ${MIN_SUBSTRING_CHARS} THEN ?::text END AS pat`,
+      );
+    });
+  }
 });
 
 /**

@@ -1,5 +1,13 @@
 import { all } from "../db/client";
-import { document, matches, rank, substring, TSQUERY, TSQUERY_FROM } from "../db/fts";
+import {
+  document,
+  matches,
+  MIN_SUBSTRING_CHARS,
+  rank,
+  substring,
+  TSQUERY,
+  TSQUERY_FROM,
+} from "../db/fts";
 
 export type SearchHit = {
   type: "task" | "entry" | "context";
@@ -63,7 +71,7 @@ const BINDINGS = `WITH q AS (
   SELECT ?::int    AS uid,
          ?::int    AS project,
          ?::text[] AS kinds,
-         ?::text   AS pat,
+         CASE WHEN length(btrim(cleaned.text)) >= ${MIN_SUBSTRING_CHARS} THEN ?::text END AS pat,
          ${TSQUERY}
          ${TSQUERY_FROM}
 )`;
@@ -78,12 +86,20 @@ const BINDINGS = `WITH q AS (
  * point at the text, and highlighting `karar` inside `kararların` reads as a
  * typo rather than as a match.
  *
+ * Highlighted against `q.text` -- the stripped query -- and not the raw one.
+ * `simple` has no stopword list, so given the raw string it bolded every
+ * "of", "in" and "was" in the document and picked the two fragments densest
+ * in them: measured on a real question, the snippet that came back was the
+ * one paragraph of the answer with the most function words in it and none
+ * of the terms. The match was made on the stripped query; the highlight has
+ * to be too, or it points at the wrong text.
+ *
  * It runs in the outer query, after the limit, because it is the most
  * expensive thing on this page and there is no reason to build a fragment for
  * a row nobody will be shown.
  */
 const HEADLINE = (doc: string) =>
-  `ts_headline('simple', ${doc}, plainto_tsquery('simple', ?),
+  `ts_headline('simple', ${doc}, plainto_tsquery('simple', q.text),
      'MaxWords=32, MinWords=12, ShortWord=2, MaxFragments=2, FragmentDelimiter= … ')`;
 
 /**
@@ -152,7 +168,7 @@ function buildQuery(t: Searchable): string {
     )
     SELECT ${t.columns}, top.rank, top.project_slug,
            ${HEADLINE(t.doc)} AS snippet
-      FROM top ${t.join}
+      FROM top CROSS JOIN q ${t.join}
      ORDER BY top.rank DESC, top.sort_key DESC, top.id DESC`;
 }
 
@@ -236,7 +252,7 @@ export const QUERIES = {
  * different placeholder counts, and they share one parameter array -- which
  * `lib/db/client.ts` rewrites positionally. Binding them as columns of `q`
  * instead means null is a real value meaning "no filter", every query takes
- * the same eight parameters in the same order, and the planner still sees a
+ * the same seven parameters in the same order, and the planner still sees a
  * constant it can fold.
  */
 export type SearchFilters = {
@@ -254,9 +270,8 @@ export async function search(
 ): Promise<SearchHit[]> {
   // The order is the order the placeholders appear in, which is the same for
   // all three because `BINDINGS` is the same for all three. Everything after
-  // the CTE reads `q.uid`, `q.pat`, `q.project` and `q.kinds`; the two loose
-  // ones are the limit inside `top` and the query the headline is highlighted
-  // against.
+  // the CTE reads `q.uid`, `q.pat`, `q.project`, `q.kinds` and `q.text`; the
+  // one loose placeholder is the limit inside `top`.
   const params = [
     userId,
     filters.projectId ?? null,
@@ -265,7 +280,6 @@ export async function search(
     query,
     query,
     limit,
-    query,
   ];
 
   const [taskRows, entryRows, contextRows] = await Promise.all([
