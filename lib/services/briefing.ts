@@ -435,6 +435,15 @@ export async function briefing(userId: number, project: Project, focus?: string)
       root_path: project.root_path,
       summary: project.summary,
     },
+    /**
+     * Absent when there is a summary, so the key means something when it is
+     * there -- the same rule as `duplicate` below. Twenty-five of thirty-one
+     * projects on one account had none: nothing had ever prompted an agent to
+     * write one, and a briefing that opens with `summary: null` tells a cold
+     * reader nothing about what the repository is. The hint at the end says
+     * what to do; this is the field a program can read.
+     */
+    ...(project.summary?.trim() ? {} : { summary_missing: true }),
     global_context: globalContext.rows,
     project_context: projectContext.rows,
     // One number for both scopes: an agent reads it to decide whether to go
@@ -506,7 +515,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * relevant ones or merely the newest.
      */
     log_ranked_by: focus ? "focus" : "recency",
-    hint: closingHint(allOpen),
+    hint: closingHint(allOpen, project),
   };
 }
 
@@ -572,6 +581,7 @@ function duplicateOf(
  */
 function closingHint(
   openTasks: { id: number; status: string; updated_at: string; last_handoff: object | null }[],
+  project: { slug: string; summary: string | null },
 ): string {
   const naked = openTasks.filter((t) => t.last_handoff === null);
   const stale = openTasks.filter((t) => t.status === "doing" && ageDays(t.updated_at) >= STALE_DOING_DAYS);
@@ -588,6 +598,14 @@ function closingHint(
   };
 
   const lines: string[] = [];
+  // First, because it is the one line here about the project rather than a
+  // task, and the one most likely to be true on a repository opened for the
+  // first time. Said only when true, like every other line.
+  if (!project.summary?.trim())
+    lines.push(
+      `This project has no summary: update_project(project:'${project.slug}', ` +
+        `summary:'one or two sentences on what this repository is'), once you know.`,
+    );
   if (naked.length)
     lines.push(
       `${naked.length} of the open tasks below have no handoff at all (${named(naked)}). ` +

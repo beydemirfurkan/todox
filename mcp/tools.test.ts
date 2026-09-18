@@ -691,6 +691,14 @@ describe("what get_context says about idle tasks", () => {
     expect(desc).toMatch(/14\+ days/);
     expect(desc).toMatch(/cost no budget/);
   });
+
+  it("says what summary_missing asks for", () => {
+    // Twenty-five of thirty-one projects on one account had no summary, and
+    // nothing had ever told an agent to write one.
+    const desc = harness(remoteWs).tools.get("get_context")!.config.description!;
+    expect(desc).toMatch(/summary_missing/);
+    expect(desc).toMatch(/update_project/);
+  });
 });
 
 describe("the wrap_up prompt", () => {
