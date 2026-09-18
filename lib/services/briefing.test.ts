@@ -1093,3 +1093,29 @@ describe("the idle tier", () => {
     expect(b.idle_tasks).toEqual([]);
   });
 });
+
+/**
+ * A project with no summary. Twenty-five of thirty-one on one account, and
+ * nothing in the payload said so in a way a program could read or an agent
+ * would act on -- `summary: null` is a value, not a request.
+ */
+describe("a project with no summary", () => {
+  const bare = (summary: string | null) => briefing(USER, { ...PROJECT, summary } as never);
+
+  it("says so with a flag and a line in the hint", async () => {
+    const b = await bare(null);
+    expect(b.summary_missing).toBe(true);
+    expect(b.hint).toMatch(/This project has no summary: update_project\(project:'todox'/);
+  });
+
+  it("treats whitespace as no summary", async () => {
+    const b = await bare("   ");
+    expect(b.summary_missing).toBe(true);
+  });
+
+  it("carries neither when there is one", async () => {
+    const b = await bare("A memory for developers and their agents.");
+    expect(b).not.toHaveProperty("summary_missing");
+    expect(b.hint).not.toMatch(/no summary/);
+  });
+});

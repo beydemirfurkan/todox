@@ -275,7 +275,9 @@ export const SHAPES = {
       .min(MIN_PRIORITY)
       .max(MAX_PRIORITY)
       .optional()
-      .describe("1 high, 2 normal (default), 3 low. This is what reports call importance."),
+      .describe(
+        "1 high, 2 normal (default), 3 low. High-priority tasks are carried first in the briefing and keep their bodies longest; reports label it importance. Every task at 1 is the same as every task at 2.",
+      ),
     files: z
       .array(
         z.object({
