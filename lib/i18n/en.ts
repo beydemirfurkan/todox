@@ -492,6 +492,10 @@ export const en = {
   partialNote:
     "Timings marked ~ are a lower bound, not a measurement: the task was closed without ever being set to `doing`, or it predates transition tracking. Setting a task to `doing` when work starts is what makes the number real.",
   totalsUnmeasured: "{n} not measured",
+  totalsDiscounted: "{d} unattended, not counted",
+  discountedSuffix: "{d} unattended left out",
+  discountedNote:
+    "Time marked unattended was spent in `doing` with nothing else in the log to show anyone was there: a task set in flight and left. It is left out of every figure here. A stretch under a day counts whole; past that, four hours either side of each entry or status change still count. Setting a task back to `todo` or `blocked` when you stop is what keeps the number honest.",
   copyReport: "copy as markdown",
   reportCopied: "copied",
   reportForManager: "The markdown copy is written to be pasted straight into an update.",

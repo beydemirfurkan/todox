@@ -35,6 +35,7 @@ const report = (over: Partial<ActivityReport> = {}): ActivityReport => ({
     questions: 0,
     active_ms: 0,
     unmeasured: 0,
+    discounted_ms: 0,
   },
   by_project: [],
   by_model: [],
@@ -131,8 +132,10 @@ describe("renderMarkdown", () => {
             closed_at: "2026-09-03T10:00:00.000Z",
             lead_ms: 0,
             active_ms: 0,
+            discounted_ms: 0,
             partial: false,
             active_ms_in_period: 0,
+            discounted_ms_in_period: 0,
           },
         ],
       }),
@@ -182,5 +185,86 @@ describe("what the report could not measure", () => {
     // The note named one cause -- records predating the feature -- and the
     // common cause today is the other one: closed without ever being started.
     expect(t("partialNote")).toMatch(/without ever being set to/i);
+  });
+});
+
+/**
+ * The other caveat, in the other direction. `unmeasured` says the headline
+ * is a floor; the discount says how much was cut from a ceiling: `doing` time
+ * with nothing in the log to show anyone was there. Measured 1-18 September
+ * 2026 on one account: 5,430 hours in eighteen days, three weeks of it from
+ * tasks somebody set 'doing' and walked away from.
+ */
+describe("what the report left out on purpose", () => {
+  const HOUR = 3_600_000;
+  const completedTask = (discountedInPeriod: number): ActivityReport["completed"][number] => ({
+    id: 7,
+    title: "Ship the report",
+    body: null,
+    project_slug: "todox",
+    project_name: "todox",
+    status: "done",
+    priority: 2,
+    importance: "normal",
+    created_at: "2026-09-01T09:00:00.000Z",
+    models: [],
+    authors: [],
+    entry_counts: { note: 0, decision: 0, dead_end: 0, question: 0, handoff: 0 },
+    decisions: [],
+    dead_ends: [],
+    open_questions: [],
+    last_handoff: null,
+    started_at: "2026-09-01T10:00:00.000Z",
+    closed_at: "2026-09-03T10:00:00.000Z",
+    lead_ms: 0,
+    active_ms: 4 * HOUR,
+    discounted_ms: 44 * HOUR,
+    partial: false,
+    active_ms_in_period: 4 * HOUR,
+    discounted_ms_in_period: discountedInPeriod,
+  });
+
+  it("says on the headline how much was not counted, and why below", () => {
+    const md = renderMarkdown(
+      report({
+        totals: { ...report().totals, active_ms: 4 * HOUR, discounted_ms: 44 * HOUR },
+        completed: [completedTask(44 * HOUR)],
+      }),
+      t,
+    );
+    expect(md).toMatch(/unattended, not counted/);
+    expect(md).toMatch(/> .*unattended/);
+  });
+
+  it("marks the task line with what was left out of it", () => {
+    const md = renderMarkdown(
+      report({
+        totals: { ...report().totals, discounted_ms: 44 * HOUR },
+        completed: [completedTask(44 * HOUR)],
+      }),
+      t,
+    );
+    expect(md).toMatch(/worked: .*\(.*unattended left out\)/);
+  });
+
+  it("says nothing about it when nothing was left out", () => {
+    const md = renderMarkdown(
+      report({ totals: { ...report().totals, discounted_ms: 0 }, completed: [completedTask(0)] }),
+      t,
+    );
+    expect(md).not.toMatch(/unattended/);
+  });
+
+  it("does not confuse the discount with the floor", () => {
+    // A discounted task is not a partial one: no tilde, no partial note.
+    const md = renderMarkdown(
+      report({
+        totals: { ...report().totals, discounted_ms: 44 * HOUR },
+        completed: [completedTask(44 * HOUR)],
+      }),
+      t,
+    );
+    expect(md).not.toMatch(/worked: ~/);
+    expect(md).not.toMatch(/lower bound/);
   });
 });

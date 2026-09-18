@@ -66,7 +66,7 @@ await taskService.update(task.id, { status: "done" }, { model: MODEL });
 const events = await eventsRepo.listByTask(task.id);
 console.log("events:", events.map((e) => `${e.from_status ?? "-"}>${e.to_status}`).join(" "));
 
-const timing = timingFor((await tasksRepo.byId(task.id))!, events);
+const timing = timingFor((await tasksRepo.byId(task.id))!, events, []);
 console.log("started_at set:", Boolean(timing.started_at));
 console.log("closed_at set:", Boolean(timing.closed_at));
 console.log("active_ms is a number:", typeof timing.active_ms === "number");
@@ -214,6 +214,56 @@ assert(
 assert(
   !yesterdaysTasks.some((t) => t.id === onBoundary.id),
   "and not in the one that ends there",
+);
+
+console.log("\n--- a task left 'doing' for three days is a morning of work, not three days ---");
+// Measured 1-18 September 2026 on one account: 5,430 hours of `active_ms` in
+// eighteen days, from tasks set 'doing' and walked away from. The rule that
+// stops it lives in `doingSpans`, and the unit tests pin its arithmetic; what
+// only a database can show is that the report carries the discount through
+// -- per task, on the headline, and into the markdown a manager reads.
+//
+// Nothing in the app writes history, so the event is pushed back through SQL.
+const HOUR = 3_600_000;
+const threeDaysAgo = new Date(Date.now() - 72 * HOUR).toISOString();
+const abandoned = await taskService.create({
+  project_id: project.id,
+  title: "REPORT-SMOKE: set doing and walked away",
+  status: "doing",
+  model: MODEL,
+});
+await run("UPDATE task_events SET at = ? WHERE task_id = ? AND to_status = ?", [
+  threeDaysAgo,
+  abandoned.id,
+  "doing",
+]);
+await run("UPDATE tasks SET created_at = ? WHERE id = ?", [threeDaysAgo, abandoned.id]);
+
+const lastFourDays = {
+  from: new Date(Date.now() - 96 * HOUR).toISOString(),
+  to: new Date(Date.now() + HOUR).toISOString(),
+  label: "custom",
+  tz: "UTC",
+};
+const withAbandoned = await activityReport(user.id, lastFourDays);
+const walkedAway = withAbandoned.in_progress.find((r) => r.id === abandoned.id);
+assert(Boolean(walkedAway), "the abandoned task is in the window at all");
+assert(
+  (walkedAway?.active_ms_in_period ?? 0) <= 4 * HOUR,
+  "it is worth the morning it was set, not the three days since",
+);
+assert(
+  (walkedAway?.discounted_ms_in_period ?? 0) > 60 * HOUR,
+  "and the report says how much it left out on that task",
+);
+assert(walkedAway?.partial === false, "a discount is not a floor: the task is not partial");
+assert(
+  withAbandoned.totals.discounted_ms >= (walkedAway?.discounted_ms_in_period ?? 0),
+  "the headline carries the discount",
+);
+assert(
+  renderMarkdown(withAbandoned, translator("en")).includes("unattended, not counted"),
+  "and the markdown says so where a manager reads it",
 );
 
 // clean up so the demo data stays honest
