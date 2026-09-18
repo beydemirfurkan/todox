@@ -279,7 +279,11 @@ export const SHAPES = {
     files: z
       .array(
         z.object({
-          path: z.string().min(1).max(MAX.path),
+          path: z
+            .string()
+            .min(1)
+            .max(MAX.path)
+            .describe("Absolute path, or a URL. The plan this task follows belongs here."),
           hash: z
             .string()
             .regex(/^[a-f0-9]{64}$/)
@@ -356,7 +360,13 @@ export const SHAPES = {
     paths: z
       .array(
         z.object({
-          path: z.string().min(1).max(MAX.path),
+          path: z
+            .string()
+            .min(1)
+            .max(MAX.path)
+            .describe(
+              "Absolute path -- inside the repository or not; the plan file a task follows, wherever it lives, is the one most worth linking -- or a URL such as a claude.ai artifact, which is kept as written and never hashed.",
+            ),
           note: z.string().max(MAX.line).optional(),
           hash: z
             .string()

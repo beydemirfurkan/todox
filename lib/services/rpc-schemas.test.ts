@@ -318,6 +318,32 @@ describe("sessionStatus", () => {
   });
 });
 
+/**
+ * A plan can be a file outside the repository or a URL, and both are worth a
+ * link: the task that says where its plan is has said something the next
+ * session needs. Neither is hashed on the server, which has no copy of
+ * anything; the hosted agent sends one for a file and null for a URL.
+ */
+describe("linkFiles takes a plan wherever it lives", () => {
+  it("accepts a path outside the repository", () => {
+    expect(() =>
+      parseParams("linkFiles", {
+        task_id: 1,
+        paths: [{ path: "C:/Users/me/.claude/plans/x.md", hash: "a".repeat(64) }],
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts a URL with no hash", () => {
+    expect(() =>
+      parseParams("linkFiles", {
+        task_id: 1,
+        paths: [{ path: "https://claude.ai/code/artifact/abc", hash: null, note: "the plan" }],
+      }),
+    ).not.toThrow();
+  });
+});
+
 describe("getFileContext", () => {
   it("needs a project or a cwd to fold the path against", () => {
     // Without one there is no set of roots, so an absolute path could not be

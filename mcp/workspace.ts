@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { isInside, isWindowsPath, scrubRemote } from "../lib/util/paths";
+import { isInside, isUrl, isWindowsPath, scrubRemote } from "../lib/util/paths";
 
 /**
  * The half of todox that needs a filesystem.
@@ -231,8 +231,10 @@ export function checkRefs(refs: RefLike[]): { checked: Checked[]; seen: { id: nu
 
   for (const r of refs) {
     // Left out of `seen` as well as marked unknown: reporting a null hash back
-    // would overwrite what the machine that *can* read the file last saw.
-    if (onAnotherMachine(r.path)) {
+    // would overwrite what the machine that *can* read the file last saw. A
+    // URL is the same case for a different reason: nothing can read it, and
+    // "missing" would be a lie about a plan that is right there in a browser.
+    if (onAnotherMachine(r.path) || isUrl(r.path)) {
       checked.push({ ...r, status: "unknown" });
       continue;
     }

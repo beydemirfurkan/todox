@@ -1,5 +1,6 @@
 import { all, groupBy, one, run } from "../db/client";
 import type { Ref, RefStatus } from "../types";
+import { storedPath } from "../util/paths";
 import { now } from "../util/time";
 
 export const listByTask = (taskId: number) =>
@@ -72,8 +73,15 @@ export async function link(input: {
 
   // Deduplicated before the statement is built: the same path listed twice in
   // one call would otherwise be inserted twice by the same command, which no
-  // constraint can catch.
-  const byPath = new Map(input.paths.map((p) => [p.path, p]));
+  // constraint can catch. Folded first, so `a\b` and `a/b` are one path here
+  // and one row in the table -- and so `get_file_context`, which compares
+  // against folded roots, can find what was linked (see `storedPath`).
+  const byPath = new Map(
+    input.paths.map((p) => {
+      const path = storedPath(p.path);
+      return [path, { ...p, path }];
+    }),
+  );
   const paths = [...byPath.values()];
 
   const ts = now();

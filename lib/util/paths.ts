@@ -89,6 +89,26 @@ export const isAbsolutePath = (p: string) => p.startsWith("/") || isWindowsPath(
 /** Backslashes folded to slashes and any trailing separator dropped. */
 export const normalisePath = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
 
+/**
+ * A link that is not a file: `https://claude.ai/…`, `notion://…`.
+ *
+ * A plan can live in an artifact as readily as in a file, and a task that
+ * says where its plan is has said something worth keeping. What a URL cannot
+ * be is hashed or folded, so it is stored as written and stays `unknown`.
+ */
+export const isUrl = (p: string) => /^[a-z][a-z0-9+.-]*:\/\//i.test(p);
+
+/**
+ * How a linked path is stored: folded, unless it is a URL.
+ *
+ * `refs.path` was stored verbatim while `get_file_context` compared it against
+ * roots that `normalisePath` had folded -- so a file linked from Windows as
+ * `C:\Users\me\repo\lib\a.ts` was never found by `C:/Users/me/repo/lib/a.ts`,
+ * on the machine that linked it or any other. One shape at write time is what
+ * makes equality at read time mean anything.
+ */
+export const storedPath = (p: string) => (isUrl(p) ? p : normalisePath(p));
+
 /** The last segment of a path, whichever separator it was written with. */
 export function lastSegment(p: string) {
   const parts = normalisePath(p).split("/");
