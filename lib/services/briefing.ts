@@ -237,6 +237,34 @@ const BRIEFING_TASK_BYTES = 6_144;
 export const STALE_DOING_DAYS = 7;
 
 /**
+ * How long an open task may go untouched before the briefing carries it as
+ * a head alone -- title, status, how long, the last handoff's first line --
+ * and spends none of its budget on it.
+ *
+ * Measured on one project, 2026-09-18: nineteen open tasks, and the briefing
+ * left forty-eight log bodies and sixteen task bodies out of the payload.
+ * Most of those tasks had not been touched in two weeks or more. They were
+ * paying for their bodies in a budget the live work then ran out of, and
+ * the omission counters said "cut" about the tasks nobody was going to read
+ * and about the ones the session had come for in the same breath.
+ *
+ * Fourteen days, twice `STALE_DOING_DAYS`: that one is a claim about status
+ * ("in progress" is false), this one is a claim about bytes. A 'doing' task
+ * idle for ten days is still named by the hint and still carried in full;
+ * one idle for three weeks is named by the hint and carried as a line.
+ * `updated_at` moves with every entry and every status change, so it is the
+ * last sign of life without another query -- the same measure the hint and
+ * `session_status` read.
+ *
+ * What it buys, on `pnpm bench:memory`'s corpus with six tasks idle for
+ * three weeks: 37.9 KB to 25.6 KB. As records those six cost 12.9 KB --
+ * 13.7 KB of the payload was last handoffs -- and the log budget ran out
+ * with eleven bodies of the live tasks' log carried as heads. As lines
+ * they cost 3.0 KB and the live log arrives whole.
+ */
+export const IDLE_DAYS = 14;
+
+/**
  * Unverified observations carried per briefing.
  *
  * Six, and small on purpose. Everything else in this payload is here because
@@ -268,18 +296,34 @@ export async function briefing(userId: number, project: Project, focus?: string)
   // Cut in SQL rather than after the fact. This read every open task and then
   // took fifty, on the first query of every session.
   const { rows: open, total } = await tasks.pageByProject(project.id, "open", BRIEFING_TASKS);
+  // Two tiers of the same fifty rows. The live ones get the log and the body
+  // budget; the idle ones get a head and their last handoff's first line, and
+  // cost nothing -- see `IDLE_DAYS`.
+  const idle: Task[] = [];
+  const live: Task[] = [];
+  for (const t of open) (ageDays(t.updated_at) >= IDLE_DAYS ? idle : live).push(t);
   const ids = open.map((t) => t.id);
+  const liveIds = live.map((t) => t.id);
+  const idleIds = idle.map((t) => t.id);
 
-  const [globalContext, projectContext, logs, counts, files, observed, sameName] = await Promise.all([
-    contexts.pageByProject(userId, null, notes, noteBytes, focus),
-    contexts.pageByProject(userId, project.id, notes, noteBytes, focus),
-    entries.pageByTasksPerKind(ids, BRIEFING_KINDS, PER_KIND, logBytes, focus),
-    // The honest total, and what the caps dropped. Counting in the database is
-    // what lets the log above be cut without `entry_count` starting to lie --
-    // and a number that lies about how much it is hiding is worse here than a
-    // big payload, because the agent stops knowing to go and look.
-    entries.countsByTasks(ids),
-    refs.listByTasks(ids),
+  const [globalContext, projectContext, logs, idleHandoffs, counts, files, observed, sameName] =
+    await Promise.all([
+      contexts.pageByProject(userId, null, notes, noteBytes, focus),
+      contexts.pageByProject(userId, project.id, notes, noteBytes, focus),
+      entries.pageByTasksPerKind(liveIds, BRIEFING_KINDS, PER_KIND, logBytes, focus),
+      // A budget of zero is a request for heads: the SQL pays for a body only
+      // while what was spent before it is under the budget, and nothing is
+      // under zero. Same connection as the query above, not a second round
+      // trip.
+      entries.pageByTasksPerKind(idleIds, ["handoff"], { handoff: 1 }, 0),
+      // The honest total, and what the caps dropped. Counting in the database is
+      // what lets the log above be cut without `entry_count` starting to lie --
+      // and a number that lies about how much it is hiding is worse here than a
+      // big payload, because the agent stops knowing to go and look.
+      entries.countsByTasks(ids),
+      // Live tasks only: an idle record carries no files, so a link on one is
+      // neither hashed nor warned about until the task is touched again.
+      refs.listByTasks(liveIds),
     // Sixth query, and it rides along rather than costing a round trip of its
     // own: the page and its honest total come back together.
     observations.pageByProject(project.id, BRIEFING_OBSERVATIONS),
@@ -293,9 +337,9 @@ export async function briefing(userId: number, project: Project, focus?: string)
     projects.listByName(userId, project.name),
   ]);
 
-  const bodies = budgetBodies(open, BRIEFING_TASK_BYTES);
+  const bodies = budgetBodies(live, BRIEFING_TASK_BYTES);
 
-  const openTasks = open.map((t) => {
+  const openTasks = live.map((t) => {
     const log = logs.rows.get(t.id) ?? [];
     // `hash` and `id` go out so the agent can check the file itself and report
     // back — this process has no copy of the repository, so the status here is
@@ -359,6 +403,25 @@ export async function briefing(userId: number, project: Project, focus?: string)
     };
   });
 
+  // A line each: what it is, how long it has sat, and where it was left.
+  // `updated_at` and `last_handoff` are here for `closingHint` and
+  // `handoffMissing`, which read the union of both tiers so nothing goes
+  // quiet for having gone idle.
+  const idleTasks = idle.map((t) => {
+    const handoff = idleHandoffs.rows.get(t.id)?.[0];
+    return {
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      idle_days: Math.floor(ageDays(t.updated_at)),
+      updated_at: t.updated_at,
+      last_handoff: handoff ? { id: handoff.id, created_at: handoff.created_at, head: handoff.head } : null,
+      entry_count: counts.get(t.id)?.total ?? 0,
+    };
+  });
+  const allOpen = [...openTasks, ...idleTasks];
+
   const stale = openTasks.flatMap((t) =>
     t.files
       .filter((f) => f.status === "changed" || f.status === "missing")
@@ -384,6 +447,13 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // newest. Recent: nobody said what this session is about.
     context_ranked_by: focus ? "focus" : "recency",
     open_tasks: openTasks,
+    /**
+     * Open tasks untouched for `IDLE_DAYS` or more, carried as a line each
+     * and outside every budget. Not "omitted": each is in the payload, named,
+     * dated and headed, and `get_task` has the rest. A count of them is the
+     * array's length, so there is no separate counter to keep in step.
+     */
+    idle_tasks: idleTasks,
     open_tasks_omitted: total - open.length,
     /**
      * What a process saw, as opposed to what anybody wrote down.
@@ -397,7 +467,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
      */
     observations: observed.rows.map((o) => ({
       ...o,
-      handoff_missing: handoffMissing(o, openTasks),
+      handoff_missing: handoffMissing(o, allOpen),
     })),
     observations_omitted: observed.omitted,
     stale_refs: stale,
@@ -428,7 +498,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * with the same meaning: the task is in the payload, `get_task` has the
      * rest.
      */
-    task_bodies_omitted: open.length - bodies.size,
+    task_bodies_omitted: live.length - bodies.size,
     /**
      * Which of the two orderings spent the log budget, said out loud for the
      * same reason `context_ranked_by` is: an agent reading a briefing with
@@ -436,7 +506,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * relevant ones or merely the newest.
      */
     log_ranked_by: focus ? "focus" : "recency",
-    hint: closingHint(openTasks),
+    hint: closingHint(allOpen),
   };
 }
 
