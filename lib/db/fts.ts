@@ -106,7 +106,26 @@ export const vector = (config: FtsConfig, doc: string): string =>
 export const TSQUERY = `replace(websearch_to_tsquery('english', cleaned.text)::text, ' & ', ' | ')::tsquery AS en,
          replace(websearch_to_tsquery('turkish', cleaned.text)::text, ' & ', ' | ')::tsquery AS tr,
          replace(websearch_to_tsquery('english', cleaned.raw)::text, ' & ', ' | ')::tsquery AS en_all,
-         replace(websearch_to_tsquery('turkish', cleaned.raw)::text, ' & ', ' | ')::tsquery AS tr_all`;
+         replace(websearch_to_tsquery('turkish', cleaned.raw)::text, ' & ', ' | ')::tsquery AS tr_all,
+         cleaned.text AS text`;
+
+/**
+ * The shortest stripped query the substring arm will run for.
+ *
+ * `ILIKE '%…%'` over the whole query string is the arm that finds identifiers
+ * full-text splits apart -- `Clause` inside `setClause` -- and for a query of
+ * one or two characters it is something else: every row containing those
+ * letters, scored zero, filling the limit behind whatever the ranked arm
+ * found. Measured on one account: a two-letter query returned the limit. The
+ * length is taken of the *stripped* text, so a query that is nothing but
+ * stopwords in either language -- "of", "bir" -- turns the arm off too,
+ * rather than matching the middle of every word that contains them.
+ *
+ * What a two-character identifier loses is only the inside-a-word case:
+ * `tx` still finds `tx()` as a whole word through full-text, because neither
+ * configuration calls it a stopword. What it stops finding is `runTx`.
+ */
+export const MIN_SUBSTRING_CHARS = 3;
 
 /**
  * Where `TSQUERY` reads its text from, and the reason it is not just `?`.

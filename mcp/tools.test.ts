@@ -843,6 +843,18 @@ describe("the search tool's description", () => {
     expect(searchDescription()).toMatch(/substring/i);
   });
 
+  it("says which language to ask in, and what to retry with", () => {
+    // Full-text stems each language; it does not translate. An English
+    // question does not find the Turkish note that answers it, and the
+    // description is the one place an agent learns that before wasting the
+    // call. Under three stripped characters the substring arm is off, so a
+    // retry with identifiers has to know how short is too short.
+    const text = searchDescription();
+    expect(text).toMatch(/language the log is written in/);
+    expect(text).toMatch(/distinctive identifiers/);
+    expect(text).toMatch(/3\+ characters/);
+  });
+
   it("is offered on both transports, and identically", () => {
     // It touches no filesystem, so there is no reason for it to differ -- and
     // if it ever does, the agent surface has stopped being defined once.
