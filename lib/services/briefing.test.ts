@@ -130,13 +130,16 @@ describe("what the briefing costs", () => {
     expect(mocks.pageByProject).toHaveBeenCalledWith(PROJECT.id, "open", 50);
   });
 
-  it("loads every task's log in one query, not one per task", async () => {
+  it("loads every task's log in one query per tier, not one per task", async () => {
     // A round trip per task is the shape this was written to avoid, on the
-    // call every session makes first.
+    // call every session makes first. Two calls, not one: the live tier with
+    // the log budget, the idle tier for handoff heads alone -- and both sit
+    // in the same Promise.all, so they cost a connection, not a round trip.
     mocks.pageByProject.mockResolvedValue({ rows: [task(1), task(2), task(3)], total: 3 });
     await brief();
-    expect(mocks.pageByTasksPerKind).toHaveBeenCalledTimes(1);
+    expect(mocks.pageByTasksPerKind).toHaveBeenCalledTimes(2);
     expect(mocks.pageByTasksPerKind.mock.calls[0]![0]).toEqual([1, 2, 3]);
+    expect(mocks.pageByTasksPerKind.mock.calls[1]![0]).toEqual([]);
     expect(mocks.countsByTasks).toHaveBeenCalledTimes(1);
     expect(mocks.listRefs).toHaveBeenCalledTimes(1);
   });
@@ -978,5 +981,115 @@ describe("lacksHandoffSince", () => {
     expect(
       handoffMissing({ task_ids: [1, 2, 3, 4], started_at: "2026-09-18T10:00:00Z" }, open),
     ).toEqual([1, 2]);
+  });
+});
+
+/**
+ * Two tiers of the same fifty rows.
+ *
+ * Measured on one project, 2026-09-18: nineteen open tasks, and the briefing
+ * left forty-eight log bodies and sixteen task bodies out. Most of those
+ * tasks had not been touched in two weeks. They were spending the budget the
+ * live work then ran out of, and the omission counters said "cut" about the
+ * tasks nobody was going to read and the ones the session came for alike. A
+ * task idle for `IDLE_DAYS` now comes back as a line -- title, status, how
+ * long, the last handoff's first line -- outside every budget.
+ */
+describe("the idle tier", () => {
+  const DAY = 86_400_000;
+  const idleFor = (days: number) => new Date(Date.now() - days * DAY).toISOString();
+
+  it("carries a task untouched for two weeks as a line, not a record", async () => {
+    const when = idleFor(15);
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1), task(2, { status: "todo", updated_at: when, body: "a long plan nobody reads" })],
+      total: 2,
+    });
+    mocks.pageByTasksPerKind
+      .mockResolvedValueOnce(logPage(new Map()))
+      .mockResolvedValueOnce(
+        logPage(new Map([[2, [{ id: 9, kind: "handoff", head: "left it here", body: null, created_at: when }]]])),
+      );
+    mocks.countsByTasks.mockResolvedValue(new Map([[2, { total: 4 }]]));
+
+    const b = await brief();
+    expect(b.open_tasks.map((t) => t.id)).toEqual([1]);
+    expect(b.idle_tasks).toEqual([
+      {
+        id: 2,
+        title: "task 2",
+        status: "todo",
+        priority: 2,
+        idle_days: 15,
+        updated_at: when,
+        last_handoff: { id: 9, created_at: when, head: "left it here" },
+        entry_count: 4,
+      },
+    ]);
+    expect(b.idle_tasks[0]).not.toHaveProperty("body");
+    expect(b.idle_tasks[0]).not.toHaveProperty("files");
+  });
+
+  it("asks for the idle tier's handoff heads with no budget, and the live tier's log with one", async () => {
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(1), task(2, { updated_at: idleFor(20) })],
+      total: 2,
+    });
+    await brief();
+    const [live, idle] = mocks.pageByTasksPerKind.mock.calls;
+    expect(live!.slice(0, 4)).toEqual([[1], ["handoff", "dead_end", "question", "decision"], expect.any(Object), 12_288]);
+    expect(idle!.slice(0, 4)).toEqual([[2], ["handoff"], { handoff: 1 }, 0]);
+  });
+
+  it("spends the body budget on the live tier alone, and counts only that tier as cut", async () => {
+    // Fifteen idle tasks with big bodies would have taken the whole budget
+    // before the one live task was reached. Now they take none of it.
+    const big = "x".repeat(6_000);
+    const idle = Array.from({ length: 15 }, (_, i) => task(10 + i, { updated_at: idleFor(30), body: big }));
+    mocks.pageByProject.mockResolvedValue({ rows: [...idle, task(1, { body: "live" })], total: 16 });
+    const b = await brief();
+    expect(b.open_tasks[0]!.body).toBe("live");
+    expect(b.task_bodies_omitted).toBe(0);
+  });
+
+  it("does not count an idle head as an omitted log body", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: [task(2, { updated_at: idleFor(20) })], total: 1 });
+    mocks.pageByTasksPerKind
+      .mockResolvedValueOnce(logPage(new Map()))
+      .mockResolvedValueOnce(
+        logPage(new Map([[2, [{ id: 9, kind: "handoff", head: "h", body: null, created_at: idleFor(20) }]]])),
+      );
+    const b = await brief();
+    expect(b.log_bodies_omitted).toBe(0);
+    expect(b.idle_tasks).toHaveLength(1);
+  });
+
+  it("keeps naming an idle 'doing' task in the hint", async () => {
+    // The tier is a claim about bytes; the hint is a claim about status
+    // truth. Going idle must not make a false 'doing' go quiet.
+    mocks.pageByProject.mockResolvedValue({
+      rows: [task(2, { status: "doing", updated_at: idleFor(20) })],
+      total: 1,
+    });
+    const b = await brief();
+    expect(b.hint).toMatch(/'doing' for 7\+ days/);
+    expect(b.hint).toContain("#2");
+  });
+
+  it("still finds an idle task for an observation that set it 'doing'", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: [task(2, { updated_at: idleFor(20) })], total: 1 });
+    mocks.pageObservations.mockResolvedValue({
+      rows: [{ id: 1, task_ids: [2], started_at: idleFor(19) }],
+      omitted: 0,
+    });
+    const b = await brief();
+    expect(b.observations[0]!.handoff_missing).toEqual([2]);
+  });
+
+  it("keeps a task touched thirteen days ago in the live tier", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: [task(3, { updated_at: idleFor(13) })], total: 1 });
+    const b = await brief();
+    expect(b.open_tasks.map((t) => t.id)).toEqual([3]);
+    expect(b.idle_tasks).toEqual([]);
   });
 });

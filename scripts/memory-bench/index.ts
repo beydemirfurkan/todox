@@ -30,6 +30,7 @@ import { localDatabaseOnly } from "../local-only";
 
 localDatabaseOnly("bench:memory");
 
+import { run } from "../../lib/db/client";
 import * as contextsRepo from "../../lib/repositories/contexts";
 import * as entriesRepo from "../../lib/repositories/entries";
 import * as observationsRepo from "../../lib/repositories/observations";
@@ -47,6 +48,17 @@ const SLUG = "memory-bench";
 const AT = 5;
 /** A full briefing of observations, which is what BRIEFING_OBSERVATIONS allows. */
 const OBSERVATIONS = 6;
+/**
+ * Open tasks nobody has touched in weeks, each with a body and a handoff.
+ *
+ * Measured on one project, 2026-09-18: nineteen open tasks, most of them
+ * idle for two weeks or more, and the briefing left forty-eight log bodies
+ * and sixteen task bodies out. These are what the idle tier exists for, and
+ * the BRIEFING section below says what they cost as a line each instead of
+ * a record each.
+ */
+const IDLE_TASKS = 6;
+const IDLE_FOR_DAYS = 21;
 
 const row = (label: string, value: string) => `  ${label.padEnd(34)}${value.padStart(12)}`;
 
@@ -88,6 +100,29 @@ async function seed() {
       await taskService.addEntry({ task_id: task.id, kind: e.kind, body: e.body, user_id: user.id });
   }
 
+  for (let i = 0; i < IDLE_TASKS; i++) {
+    // The same shape as the log filler -- a body and a handoff at the p50 --
+    // because what these cost is the question, not what they say.
+    const shape = logFiller(1_000 + i);
+    const task = await taskService.create({
+      project_id: project.id,
+      title: `Idle task ${i}: ${shape.title}`,
+      body: shape.body,
+      user_id: user.id,
+    });
+    await taskService.addEntry({
+      task_id: task.id,
+      kind: "handoff",
+      body: shape.entries[0]!.body,
+      user_id: user.id,
+    });
+    // Nothing in the app writes history, so the age is set through SQL.
+    await run("UPDATE tasks SET updated_at = ? WHERE id = ?", [
+      new Date(Date.now() - IDLE_FOR_DAYS * 86_400_000).toISOString(),
+      task.id,
+    ]);
+  }
+
   /**
    * A full briefing's worth of unverified observations.
    *
@@ -124,7 +159,9 @@ async function reportBriefing(userId: number, project: Awaited<ReturnType<typeof
 
   const sum = (pick: (t: (typeof tasks)[number]) => unknown) => tasks.reduce((n, t) => n + bytes(pick(t)), 0);
 
-  console.log(`\nBRIEFING  —  ${brief.open_tasks.length} open tasks, ${brief.project_context.length} notes\n`);
+  console.log(
+    `\nBRIEFING  —  ${brief.open_tasks.length} open tasks, ${brief.idle_tasks.length} idle, ${brief.project_context.length} notes\n`,
+  );
   console.log(row("global_context", kb(bytes(brief.global_context))));
   console.log(row("project_context", kb(bytes(brief.project_context))));
   console.log(row("open_tasks", kb(bytes(tasks))));
@@ -144,6 +181,9 @@ async function reportBriefing(userId: number, project: Awaited<ReturnType<typeof
       kb(sum((t) => [t.last_handoff, t.dead_ends, t.decisions, t.open_questions])),
     ),
   );
+  // Heads only, outside every budget: what fourteen idle days cost instead
+  // of a body each.
+  console.log(row("idle_tasks", kb(bytes(brief.idle_tasks))));
   console.log(row("observations", kb(bytes(brief.observations))));
   console.log(row("stale_refs", kb(bytes(brief.stale_refs))));
   console.log(row("─".repeat(20), ""));

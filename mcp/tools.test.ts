@@ -677,6 +677,22 @@ describe("the skill document", () => {
  * because a client that offers the prompt and an agent that read the
  * instructions must not be told two different things about the same moment.
  */
+/**
+ * What the briefing tool promises about its idle tier. Asserted here rather
+ * than in `briefing.test.ts` for the reason the other description blocks give:
+ * the defect this guards is between the payload and the sentence an agent
+ * reads before calling, and a sentence drifts the moment somebody improves
+ * the wording.
+ */
+describe("what get_context says about idle tasks", () => {
+  it("names the tier and says it costs nothing", () => {
+    const desc = harness(remoteWs).tools.get("get_context")!.config.description!;
+    expect(desc).toMatch(/idle_tasks/);
+    expect(desc).toMatch(/14\+ days/);
+    expect(desc).toMatch(/cost no budget/);
+  });
+});
+
 describe("the wrap_up prompt", () => {
   const wrapUp = () => {
     const prompt = harness(remoteWs).prompts.get("wrap_up")!;
