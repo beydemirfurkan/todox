@@ -73,6 +73,13 @@ export function renderMarkdown(r: ActivityReport, t: T): string {
       // the one place this report was not honest.
       (r.totals.unmeasured
         ? ` · ${t("totalsUnmeasured", { n: r.totals.unmeasured })}`
+        : "") +
+      // The other caveat, in the other direction: `unmeasured` says the
+      // figure is a floor, this says how much was cut from a ceiling. A
+      // task set 'doing' and left for three weeks used to put three weeks
+      // here, and the headline was the one place nobody could see it.
+      (r.totals.discounted_ms
+        ? ` · ${t("totalsDiscounted", { d: duration(r.totals.discounted_ms, t) })}`
         : ""),
   );
   out.push("");
@@ -103,10 +110,12 @@ export function renderMarkdown(r: ActivityReport, t: T): string {
   if (r.in_progress.length) {
     out.push(`## ${t("inProgressTasks")}`);
     out.push("");
+    // The in-flight list is where the abandoned 'doing' tasks live, so this
+    // line, more than the completed one, has to say what was left out.
     for (const task of r.in_progress) {
       out.push(
         `- **${task.title}** (${task.project_slug}) — ${t(`st_${task.status}` as Key)}, ` +
-          `${t("activeTime")} ${duration(task.active_ms_in_period, t)}`,
+          `${t("activeTime")} ${duration(task.active_ms_in_period, t)}${discounted(task, t)}`,
       );
     }
     out.push("");
@@ -145,15 +154,25 @@ export function renderMarkdown(r: ActivityReport, t: T): string {
     out.push(`> ${t("partialNote")}`);
     out.push("");
   }
+  if (r.totals.discounted_ms) {
+    out.push(`> ${t("discountedNote")}`);
+    out.push("");
+  }
 
   return out.join("\n").trimEnd();
 }
+
+/** What a task line says beside its worked time when some of it was cut. */
+const discounted = (task: TaskReport, t: T): string =>
+  task.discounted_ms_in_period
+    ? ` (${t("discountedSuffix", { d: duration(task.discounted_ms_in_period, t) })})`
+    : "";
 
 function taskLines(task: TaskReport, t: T): string[] {
   const tilde = task.partial ? "~" : "";
   const meta = [
     `${t("importance")}: ${t(`imp_${task.importance}` as Key)}`,
-    `${t("activeTime")}: ${tilde}${duration(task.active_ms_in_period, t)}`,
+    `${t("activeTime")}: ${tilde}${duration(task.active_ms_in_period, t)}${discounted(task, t)}`,
     `${t("leadTime")}: ${duration(task.lead_ms, t)}`,
     task.models.length ? `${t("modelLabel")}: ${task.models.join(", ")}` : null,
   ].filter(Boolean);

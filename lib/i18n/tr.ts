@@ -480,6 +480,10 @@ export const tr: Record<Key, string> = {
   partialNote:
     "~ ile işaretli süreler ölçüm değil, alt sınır: görev hiç `doing` yapılmadan kapatılmış ya da geçiş kaydından önceye ait. Sayıyı gerçek yapan şey, işe başlarken görevi `doing` yapmak.",
   totalsUnmeasured: "{n} tanesi ölçülemedi",
+  totalsDiscounted: "{d} sahipsiz, sayılmadı",
+  discountedSuffix: "{d} sahipsiz süre düşüldü",
+  discountedNote:
+    "Sahipsiz diye işaretlenen süre, görev `doing`'deyken log'da kimsenin orada olduğunu gösteren hiçbir şeyin bulunmadığı süredir: uçuşa alınıp bırakılmış bir görev. Buradaki hiçbir sayıya girmez. Bir günün altındaki aralık bütünüyle sayılır; daha uzununda her kaydın ve durum değişikliğinin dört saat öncesi ve sonrası sayılmaya devam eder. Durduğunda görevi `todo` ya da `blocked`'a geri çekmek, sayıyı dürüst tutan şeydir.",
   copyReport: "markdown olarak kopyala",
   reportCopied: "kopyalandı",
   reportForManager:

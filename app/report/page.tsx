@@ -113,9 +113,18 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                 // contributes a clean zero to this figure, and until now the
                 // headline rolled every one of those in and said nothing --
                 // 43 of 78 completed tasks, measured in production.
-                report.totals.unmeasured
-                  ? `${t("totalsActive")} · ${t("totalsUnmeasured", { n: report.totals.unmeasured })}`
-                  : t("totalsActive")
+                [
+                  t("totalsActive"),
+                  report.totals.unmeasured
+                    ? t("totalsUnmeasured", { n: report.totals.unmeasured })
+                    : null,
+                  // The other caveat: what was cut, not what was never there.
+                  report.totals.discounted_ms
+                    ? t("totalsDiscounted", { d: duration(report.totals.discounted_ms, t) })
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
               }
               fill="var(--accent)"
             />
@@ -295,6 +304,12 @@ function TaskRow({ task, t }: { task: TaskReport; t: T }) {
           {t("activeTime")}: {approx && <span aria-hidden="true">~</span>}
           {duration(task.active_ms_in_period, t)}
           {approx && <span className="sr-only"> ({t("approxWhy")})</span>}
+          {task.discounted_ms_in_period > 0 && (
+            <span title={t("discountedNote")}>
+              {" "}
+              ({t("discountedSuffix", { d: duration(task.discounted_ms_in_period, t) })})
+            </span>
+          )}
         </span>
         <span>
           {t("leadTime")}: {duration(task.lead_ms, t)}

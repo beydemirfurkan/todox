@@ -41,7 +41,9 @@ Two things fall out of treating the log as the product:
   that includes lying about how sure we are.
 - **Reports come from the log, not from commits.** Every status change is an
   event, so *what did I finish today, how long did it take, which model did it*
-  is a query rather than archaeology.
+  is a query rather than archaeology. A task set `doing` and walked away from
+  counts as the morning it was set, not the weeks since -- and the report
+  says how much it left out, rather than folding it into the headline.
 - **A file can be asked what is known about it.** The same links that carry the
   hashes are readable from the other end: `get_file_context` takes a path and
   answers with the tasks that touched it, their dead ends, and any standing

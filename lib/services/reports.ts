@@ -14,6 +14,12 @@ export type TaskTiming = {
   lead_ms: number | null;
   /** Time actually spent in `doing`, over the task's whole life. */
   active_ms: number;
+  /**
+   * Time in `doing` that nobody was plausibly attending, left out of
+   * `active_ms`. The opposite caveat to `partial`: that one says the figure
+   * is a floor, this one says how much was cut from a ceiling.
+   */
+  discounted_ms: number;
   /** True when active_ms is a floor: backfilled, or closed without ever starting. */
   partial: boolean;
 };
@@ -40,6 +46,8 @@ export type TaskReport = TaskTiming & {
    * This is what the totals sum, so it is what a per-task line should show.
    */
   active_ms_in_period: number;
+  /** The slice of `discounted_ms` inside the window, for the same reason. */
+  discounted_ms_in_period: number;
 };
 
 export type ActivityReport = {
@@ -71,6 +79,18 @@ export type ActivityReport = {
      * which lies is worse than none.
      */
     unmeasured: number;
+    /**
+     * `doing` time inside the window that was not counted, summed over every
+     * task, because nobody was attending it -- see `doingSpans`.
+     *
+     * Measured on one account, 1-18 September 2026: `active_ms` came to
+     * 5,430 hours in eighteen days. Tasks had been set 'doing' and left
+     * there for three weeks, and every one of those weeks was on the
+     * headline. A duration that can only grow is not a measurement, and
+     * the product's claim is that the report comes from the log rather
+     * than from a guess.
+     */
+    discounted_ms: number;
   };
   by_project: {
     slug: string;
@@ -144,52 +164,150 @@ const EMPTY_COUNTS = (): Record<EntryKind, number> => ({
 });
 
 /**
+ * How long a `doing` span may run before only its attended stretches count.
+ *
+ * A working day is the unit here: a span shorter than this closed with a
+ * status event, and that closing is the evidence that somebody was there.
+ * Nobody spends a day writing todox entries about the work while doing it,
+ * so a day with no entry in it is a day of work, not a day of absence.
+ */
+export const WHOLE_SPAN_MS = 24 * 3_600_000;
+
+/**
+ * How far either side of a sign of life a longer span counts as attended.
+ *
+ * Symmetric, because the entry usually comes *after* the work it describes:
+ * a handoff at 17:00 is what the four hours before it looked like. Four
+ * hours is half a working day -- two signs of life a day cover the day, and
+ * a session that set a task 'doing' and vanished is worth a morning, not a
+ * month.
+ */
+export const ATTENDED_GRACE_MS = 4 * 3_600_000;
+
+/** One stretch in `doing`, and the parts of it somebody was plausibly there for. */
+export type DoingSpan = {
+  start: number;
+  end: number;
+  /** Disjoint, ordered, inside [start, end). */
+  attended: [number, number][];
+};
+
+/**
+ * Replays a task's status transitions into its `doing` spans, and says of
+ * each which parts count.
+ *
+ * The rule the whole report rests on. A span is counted whole while it is
+ * shorter than a day (`WHOLE_SPAN_MS`). Past that, only the stretches around
+ * signs of life count -- the moment it was set 'doing', every entry written
+ * inside it, every repeated 'doing', and the status change that ended it --
+ * each worth `ATTENDED_GRACE_MS` either side, clipped to the span, overlaps
+ * merged. The rest is `discounted`: time the status column said was work and
+ * nothing else in the log agrees with.
+ *
+ * Why a union rather than "start to the last entry": a thirty-day span with
+ * one entry on day twenty would otherwise count twenty days, which is exactly
+ * the shape that put 1,316 hours on one project in eighteen days. And why
+ * the whole-span rule at all: without it, "09:00 doing, 17:00 done, nothing
+ * logged between" -- an honest day -- would count as four hours.
+ *
+ * An open span ends at `until`, or at `closed_at` for a task whose closing
+ * event was lost -- the task row and its event are two writes, and counting
+ * a dangling 'doing' up to now once added a day to every report forever.
+ */
+export function doingSpans(
+  task: Task,
+  events: TaskEvent[],
+  entries: Pick<Entry, "created_at">[],
+  until = Date.now(),
+): DoingSpan[] {
+  const ordered = [...events].sort((a, b) => ms(a.at) - ms(b.at));
+  const ceiling = task.closed_at ? Math.min(ms(task.closed_at), until) : until;
+  const entryTimes = entries.map((e) => ms(e.created_at)).sort((a, b) => a - b);
+
+  const spans: DoingSpan[] = [];
+  let start: number | null = null;
+  let signs: number[] = [];
+
+  const close = (end: number, closedByEvent: boolean) => {
+    if (start !== null && end > start) {
+      const from = start;
+      const inside = entryTimes.filter((t) => t >= from && t < end);
+      const points = [...signs, ...inside, ...(closedByEvent ? [end] : [])];
+      spans.push({ start: from, end, attended: attendedWithin(from, end, points) });
+    }
+    start = null;
+  };
+
+  for (const e of ordered) {
+    const at = ms(e.at);
+    if (e.to_status === "doing") {
+      if (start === null) {
+        start = at;
+        signs = [at];
+      } else signs.push(at);
+    } else if (start !== null) close(at, true);
+  }
+  if (start !== null) close(ceiling, false);
+  return spans;
+}
+
+/**
+ * The stretches of [start, end) that count, given the moments somebody was
+ * demonstrably there. Whole when the span is under a day; otherwise the
+ * merged union of a grace window around each moment.
+ */
+function attendedWithin(start: number, end: number, points: number[]): [number, number][] {
+  if (end - start < WHOLE_SPAN_MS) return [[start, end]];
+  const windows = points
+    .map((p): [number, number] => [
+      Math.max(start, p - ATTENDED_GRACE_MS),
+      Math.min(end, p + ATTENDED_GRACE_MS),
+    ])
+    .filter(([a, b]) => b > a)
+    .sort((x, y) => x[0] - y[0]);
+
+  const merged: [number, number][] = [];
+  for (const w of windows) {
+    const last = merged[merged.length - 1];
+    if (last && w[0] <= last[1]) last[1] = Math.max(last[1], w[1]);
+    else merged.push([w[0], w[1]]);
+  }
+  return merged;
+}
+
+const spanLength = (s: DoingSpan) => s.end - s.start;
+const attendedLength = (s: DoingSpan) => s.attended.reduce((n, [a, b]) => n + (b - a), 0);
+
+/**
  * Reconstruct how long a task was actually being worked on by replaying its
- * status transitions. An open `doing` interval is counted up to `until`.
+ * status transitions -- see `doingSpans` for what "actually" means here.
  */
 export function timingFor(
   task: Task,
   events: TaskEvent[],
+  entries: Pick<Entry, "created_at">[],
   until = Date.now(),
 ): TaskTiming {
+  const spans = doingSpans(task, events, entries, until);
+  const active = spans.reduce((n, s) => n + attendedLength(s), 0);
+  const whole = spans.reduce((n, s) => n + spanLength(s), 0);
+
   const ordered = [...events].sort((a, b) => ms(a.at) - ms(b.at));
+  const first = ordered.find((e) => e.to_status === "doing");
   const closedAt = task.closed_at;
 
-  // A closed task stops accruing when it closed, not now.
-  //
-  // The task row and its status event are two separate writes, so a dropped
-  // second write leaves a task marked `done` whose last event is `doing`.
-  // Counting that interval up to `Date.now()` meant one lost event added a
-  // fresh 24 hours to every daily report from then on, forever.
-  const ceiling = closedAt ? Math.min(ms(closedAt), until) : until;
-
-  let active = 0;
-  let doingSince: number | null = null;
-  let startedAt: string | null = null;
-  let sawDoing = false;
-
-  for (const e of ordered) {
-    if (e.to_status === "doing" && doingSince === null) {
-      doingSince = ms(e.at);
-      startedAt ??= e.at;
-      sawDoing = true;
-    } else if (e.to_status !== "doing" && doingSince !== null) {
-      active += ms(e.at) - doingSince;
-      doingSince = null;
-    }
-  }
-  if (doingSince !== null) active += Math.max(0, ceiling - doingSince);
-
   return {
-    started_at: startedAt,
+    started_at: first?.at ?? null,
     closed_at: closedAt,
     lead_ms: closedAt ? ms(closedAt) - ms(task.created_at) : null,
     active_ms: active,
+    discounted_ms: whole - active,
     // Partial when the numbers cannot be trusted at face value: a backfilled
     // task has no real history, and one that closed without ever being `doing`
-    // reports zero for work that plainly took time.
-    partial:
-      ordered.some((e) => e.actor === "backfill") || (!sawDoing && Boolean(closedAt)),
+    // reports zero for work that plainly took time. A discount is the other
+    // caveat and never sets this: it says the figure was cut, not that it is
+    // a floor.
+    partial: ordered.some((e) => e.actor === "backfill") || (!first && Boolean(closedAt)),
   };
 }
 
@@ -236,12 +354,12 @@ function reportFor(
       .filter((e) => e.kind === "question" && !answered.has(e.id))
       .map((e) => e.body),
     last_handoff: handoff?.body ?? null,
-    ...timingFor(task, events),
+    ...timingFor(task, events, log),
     // Both figures, because they answer different questions and mixing them up
     // is what made the markdown report show line items summing to several
     // times its own header: `active_ms` is the task's whole life, this one is
     // only the part that falls inside the window being reported on.
-    active_ms_in_period: activeMsWithin(task.closed_at, events, period),
+    ...withinPeriodOf(doingSpans(task, events, log), period),
   };
 }
 
@@ -380,6 +498,7 @@ export async function activityReport(
       // the window, and saying "not measured" about it would be its own small
       // lie in the other direction.
       unmeasured: reports.filter((r) => r.partial).length,
+      discounted_ms: reports.reduce((n, r) => n + r.discounted_ms_in_period, 0),
     },
     by_project: byProject,
     by_model: byModel,
@@ -393,33 +512,28 @@ export async function activityReport(
 
 /**
  * Time in `doing` clipped to the reporting window, so a task started last
- * month doesn't dump all its hours into today's summary.
+ * month doesn't dump all its hours into today's summary -- and the part of
+ * that clipped time which was discounted, so the window's headline can say
+ * how much it left out.
  *
- * Takes the task, not just its events, for the same reason `timingFor` does: a
- * dangling `doing` on a closed task has to stop at `closed_at`. Without it the
- * phantom interval runs to now, which means it overlaps *every* window and
- * quietly adds a full day to each one.
+ * The spans come from `doingSpans`, so a dangling `doing` on a closed task
+ * already stops at `closed_at`. Without that the phantom interval runs to
+ * now, which means it overlaps *every* window and quietly adds a full day to
+ * each one.
  */
-function activeMsWithin(
-  closedAt: string | null,
-  events: TaskEvent[],
+export function withinPeriodOf(
+  spans: DoingSpan[],
   period: Period,
-): number {
+): { active_ms_in_period: number; discounted_ms_in_period: number } {
   const from = ms(period.from);
   const to = ms(period.to);
-  const ceiling = closedAt ? Math.min(ms(closedAt), Date.now()) : Date.now();
-
-  let total = 0;
-  let doingSince: number | null = null;
-  for (const e of [...events].sort((a, b) => ms(a.at) - ms(b.at))) {
-    if (e.to_status === "doing" && doingSince === null) doingSince = ms(e.at);
-    else if (e.to_status !== "doing" && doingSince !== null) {
-      total += overlap(doingSince, ms(e.at), from, to);
-      doingSince = null;
-    }
+  let active = 0;
+  let whole = 0;
+  for (const s of spans) {
+    whole += overlap(s.start, s.end, from, to);
+    for (const [a, b] of s.attended) active += overlap(a, b, from, to);
   }
-  if (doingSince !== null) total += overlap(doingSince, ceiling, from, to);
-  return total;
+  return { active_ms_in_period: active, discounted_ms_in_period: whole - active };
 }
 
 const overlap = (a1: number, a2: number, b1: number, b2: number) =>
