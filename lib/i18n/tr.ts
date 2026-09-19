@@ -284,7 +284,11 @@ export const tr: Record<Key, string> = {
     "Tek bir get_context çağrısı ve sıfırdan açılan agent öncekinin bildiğini bilir — hangi duvara tekrar toslamayacağı dahil.",
   kindsSummary: "kayda tam olarak ne girer — beş tür",
   projects: "Projeler",
-  newProject: "+ yeni proje",
+  newProject: "Yeni proje",
+  projectsCount: "proje",
+  quietProjects: "Sessiz",
+  liveProjectsEmpty: "Hiçbir projede uçuşta iş yok.",
+  quietEmpty: "Her projede uçuşta bir iş var.",
   projectNamePh: "ad",
   projectPathPh: "/repo/için/mutlak/yol (isteğe bağlı)",
   projectSummaryPh: "bu proje ne? hiçbir şey bilmeyen bir agent için yaz",
@@ -292,7 +296,7 @@ export const tr: Record<Key, string> = {
   globalContextSub: "— her projede geçerli",
   globalEmpty:
     "Henüz boş. Projeler arası bilgi burada yaşar: değişmeyen tercihlerin, her repoyu bağlayan kararlar, sürekli düştüğün tuzaklar.",
-  addGlobalNote: "+ genel not ekle",
+  addGlobalNote: "Yeni genel not",
   noteBodyPh: "notun kendisi",
   hookTitle: "Agentını bağla",
   hookBody:
@@ -300,7 +304,7 @@ export const tr: Record<Key, string> = {
   hookCta: "Hesap sayfasına git →",
   firstRunTitle: "Burası henüz boş",
   firstRunBody:
-    "Aşağıdan ilk projeni ekle — bir ad ver ve bir repo yolu göster. Sonra todox'u agent'ına bağla, yazma işini ona bırak.",
+    "İlk projeni buradan ekle — bir ad ver ve bir repo yolu göster. Sonra todox'u agent'ına bağla, yazma işini ona bırak.",
   countInFlight: "uçuşta",
   countStuck: "takıldı",
   countQueued: "sırada",

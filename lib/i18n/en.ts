@@ -292,7 +292,11 @@ export const en = {
     "One get_context call and a cold agent knows what the last one knew — including which walls not to walk into again.",
   kindsSummary: "what actually goes in a log — the five kinds",
   projects: "Projects",
-  newProject: "+ new project",
+  newProject: "New project",
+  projectsCount: "projects",
+  quietProjects: "Quiet",
+  liveProjectsEmpty: "Nothing in flight in any project.",
+  quietEmpty: "Every project has something in flight.",
   projectNamePh: "name",
   projectPathPh: "/absolute/path/to/repo (optional)",
   projectSummaryPh: "what is this project? written for a cold agent",
@@ -300,7 +304,7 @@ export const en = {
   globalContextSub: "— true in every project",
   globalEmpty:
     "Nothing yet. This is where cross-project knowledge lives: standing preferences, decisions that bind every repo, traps you keep falling into.",
-  addGlobalNote: "+ add global note",
+  addGlobalNote: "New global note",
   noteBodyPh: "the note itself",
   hookTitle: "Hook up your agent",
   hookBody:
@@ -308,7 +312,7 @@ export const en = {
   hookCta: "go to Account →",
   firstRunTitle: "Nothing here yet",
   firstRunBody:
-    "Add your first project below — name it and point it at a repo path. After that, hook todox up to your agent and let it do the writing.",
+    "Add your first project here — name it and point it at a repo path. After that, hook todox up to your agent and let it do the writing.",
   countInFlight: "in flight",
   countStuck: "stuck",
   countQueued: "queued",

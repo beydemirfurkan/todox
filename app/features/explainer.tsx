@@ -129,12 +129,13 @@ export function VsNative({ t }: { t: T }) {
   );
 }
 
-export function FirstRun({ t }: { t: T }) {
+export function FirstRun({ t, children }: { t: T; children?: React.ReactNode }) {
   return (
     <div className="sticker pop flex flex-col items-center gap-3 p-8 text-center">
       <Blob mood="happy" size={64} className="bob" />
       <h2 className="display text-[21px] font-bold">{t("firstRunTitle")}</h2>
       <p className="max-w-sm text-[14px] text-muted">{t("firstRunBody")}</p>
+      {children}
     </div>
   );
 }
