@@ -1,0 +1,16 @@
+{
+  "description": "Reminders, not capture: what todox asks of a session, said where a session cannot miss it.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on every task it names.\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

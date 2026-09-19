@@ -74,6 +74,19 @@ Create a token on the Account page and it hands you text you can paste straight
 into whichever agent you use, plus the config snippet for the four common ones.
 The shape is always the same — one URL, one header:
 
+**Claude Code has a shorter path.** The plugin carries the server, the session
+protocol as a skill, and one reminder at session start; it asks for the token
+once and keeps it in your Claude Code settings:
+
+```bash
+claude plugin marketplace add beydemirfurkan/todox
+claude plugin install todox@todox
+```
+
+Everything else below still applies to it — the plugin is the same four lines,
+installed rather than pasted. See [`plugin/README.md`](plugin/README.md) for
+what it does and does not do.
+
 ```bash
 # Claude Code. --scope user, because the default is this directory only.
 claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp \

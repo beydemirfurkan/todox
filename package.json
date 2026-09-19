@@ -27,6 +27,7 @@
     "og": "tsx scripts/make-og.tsx",
     "favicon": "tsx scripts/make-favicon.tsx",
     "pack:mcp": "tsx scripts/pack-mcp.ts",
+    "plugin:sync": "tsx scripts/plugin-sync.ts",
     "bench:memory": "tsx scripts/memory-bench/index.ts"
   },
   "dependencies": {
