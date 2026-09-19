@@ -1254,6 +1254,26 @@ async function main() {
     console.log(`${label}: ${refused.status} ${body.error} · row survived`);
   }
 
+  console.log("\n--- the token is accepted bare, for a gateway that cannot add the scheme ---");
+  // Smithery's gateway forwards a configured value as the whole header. The
+  // token's own prefix says what it is, so `Authorization: todox_…` is the
+  // documented form minus the word, and a header with neither is still refused.
+  const bare = await fetch(new URL("/api/rpc", URL_BASE), {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: token },
+    body: JSON.stringify({ method: "listProjects" }),
+  });
+  if (bare.status !== 200)
+    throw new Error(`/api/rpc answered ${bare.status} to a bare token, not 200: ${await bare.text()}`);
+  const stray = await fetch(new URL("/api/rpc", URL_BASE), {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "not-a-token" },
+    body: JSON.stringify({ method: "listProjects" }),
+  });
+  if (stray.status !== 401)
+    throw new Error(`/api/rpc answered ${stray.status} to a stray header, not 401`);
+  console.log("bare todox_ token:", bare.status, "· stray value:", stray.status);
+
   console.log("\n--- an unauthenticated call is refused, on both surfaces ---");
   const anon = await rpc(null, { method: "listProjects" });
   const anonBody = await anon.json();

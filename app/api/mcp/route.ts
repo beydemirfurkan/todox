@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 
 import { instructions, registerTools, SERVER_INFO, type Workspace } from "@/mcp/tools";
 import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
+import { bearerToken } from "@/lib/server/bearer";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, logWarn, newRequestId } from "@/lib/server/log";
 import { normalise, type ClientInfo } from "@/lib/client-identity";
@@ -157,8 +158,7 @@ export async function POST(req: Request): Promise<Response> {
 async function answer(req: Request, requestId: string): Promise<Response> {
   const ip = clientIp(req.headers);
 
-  const auth = req.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  const token = bearerToken(req.headers);
   if (!token) return unauthorised("missing bearer token");
 
   // Same bucket as /api/rpc: one token surface, one brute-force budget.
