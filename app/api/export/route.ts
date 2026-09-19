@@ -1,3 +1,4 @@
+import { bearerToken } from "@/lib/server/bearer";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, logInfo, newRequestId } from "@/lib/server/log";
 import { currentUser } from "@/lib/session";
@@ -30,8 +31,7 @@ export async function GET(req: Request): Promise<Response> {
   const headers = { "x-request-id": requestId };
 
   try {
-    const auth = req.headers.get("authorization") ?? "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const token = bearerToken(req.headers);
 
     // The cookie first: a browser hitting this has no Authorization header, and
     // asking `userForApiToken("")` would be a lookup for nothing.

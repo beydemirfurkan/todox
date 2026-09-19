@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
+import { bearerToken } from "@/lib/server/bearer";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, logWarn, newRequestId } from "@/lib/server/log";
 import { userForApiToken } from "@/lib/services/auth";
@@ -33,8 +34,7 @@ export async function POST(req: NextRequest) {
   try {
     const ip = clientIp(req.headers);
 
-    const auth = req.headers.get("authorization") ?? "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const token = bearerToken(req.headers);
     if (!token) return fail(401, "missing bearer token", requestId);
 
     // Tokens are long random strings, but nothing should be free to brute force.
