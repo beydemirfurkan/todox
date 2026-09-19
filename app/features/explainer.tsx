@@ -96,6 +96,39 @@ export function Differences({ t }: { t: T }) {
   );
 }
 
+/**
+ * The objection a newcomer raises first, answered before the evidence.
+ *
+ * Since February 2026 Claude Code has written its own notes by default, and
+ * Cursor and Codex have theirs. The landing said "a memory for you and your
+ * agents" -- the one word every tool in the category now owns -- and never
+ * mentioned the built-in one, so the first question anyone deciding would ask
+ * had no answer on the page. The answer is the built-in memory's own
+ * documentation: per repository, per machine, per tool, shared with nobody.
+ * Each line here is one of those lines crossed, said in the product's terms.
+ */
+export function VsNative({ t }: { t: T }) {
+  const lines = [t("vsNative1"), t("vsNative2"), t("vsNative3"), t("vsNative4")];
+  return (
+    <section className="sticker pop p-5" style={{ animationDelay: "220ms" }}>
+      <h2 className="display text-[19px] font-bold">{t("vsNativeTitle")}</h2>
+      <p className="mt-1.5 text-[14.5px] leading-relaxed text-muted">{t("vsNativeBody")}</p>
+      <ul className="mt-3 space-y-2">
+        {lines.map((line) => (
+          <li key={line} className="flex items-start gap-2.5 text-[14px] leading-snug">
+            <span
+              aria-hidden="true"
+              className="mt-[7px] block size-2 shrink-0 rounded-full border-[1.5px] border-line"
+              style={{ background: "var(--accent)", borderColor: "var(--edge-dark)" }}
+            />
+            <span>{line}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function FirstRun({ t }: { t: T }) {
   return (
     <div className="sticker pop flex flex-col items-center gap-3 p-8 text-center">

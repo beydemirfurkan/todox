@@ -41,6 +41,8 @@ export const en = {
   whatItIsNot1: "A kanban board. There is no swimlane, no sprint, no Gantt.",
   whatItIsNot2: "A team chat. Comments live next to the change they describe.",
   whatItIsNot3: "A wiki. Notes are short and dated.",
+  whatItIsNot4:
+    "A replacement for your agent's built-in memory. Claude Code's auto memory is per repository, per machine and shared with nobody, by its own documentation; todox is the log that crosses those lines — machines, agents and people.",
   builtBy: "Built by",
   builtByBody:
     "todox is built and maintained by Furkan Beydemir. The repository is open source under the MIT license, and contributions are welcome on GitHub.",
@@ -276,7 +278,7 @@ export const en = {
   none: "none",
 
   /* home */
-  heroTitle: "A memory for you and your agents",
+  heroTitle: "The log your next session resumes from",
   heroBody:
     "todox is not a checklist. Each task carries a log — the decisions behind it, the approaches that failed, the questions still open, and the note the last session left behind. A fresh agent reads it with one get_context call and continues without asking you anything.",
   step1Title: "It gets written down",
@@ -568,6 +570,14 @@ export const en = {
   diff3Title: "The report is a query, not archaeology",
   diff3Body:
     "Every status change is an event, so what got finished today, how long it took and which model did it are read from the log rather than reconstructed from commits.",
+  /* the objection a newcomer raises first, answered in the product's own terms */
+  vsNativeTitle: "Why not the memory your agent already has?",
+  vsNativeBody:
+    "Claude Code writes its own notes now, and Cursor and Codex have theirs. Use them: they are good at remembering that you prefer pnpm. What they say, in their own documentation, is that they are per repository, per machine and per tool, and shared with nobody. todox is for what falls outside that line.",
+  vsNative1: "Two machines, one log. A repository is identified by its remote, so the note left on the laptop is read on the desktop.",
+  vsNative2: "Every agent, one log. Claude Code, Codex, Cursor and VS Code all speak MCP, and the handoff one leaves is what the next one reads — whichever it is.",
+  vsNative3: "The people, too. A project can be shared, and the log carries who wrote what and which model did it.",
+  vsNative4: "A shape a note in a file does not have: tasks that open and close, dead ends as their own kind, a report read from the log, and a stale note that says so.",
   briefingTitle: "What your agent reads, in one call",
   briefingBody:
     "This is the shape of `get_context` — the first call every session makes. Not a summary of the product: the payload.",

@@ -42,6 +42,7 @@ export default async function AboutPage() {
         <li>{t("whatItIsNot1")}</li>
         <li>{t("whatItIsNot2")}</li>
         <li>{t("whatItIsNot3")}</li>
+        <li>{t("whatItIsNot4")}</li>
       </ul>
 
       <h2 className="display mt-8 text-[20px] font-bold">{t("builtBy")}</h2>
