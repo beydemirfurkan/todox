@@ -39,6 +39,7 @@ import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
 import {
   Blob,
   Chip,
+  Composer,
   Empty,
   ExpandableText,
   Field,
@@ -506,65 +507,53 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
         title={t("projectContext")}
         count={projectContext.length}
         countLabel={t("notes")}
-        open
-        delay={100}
-      >
-        {/* Same rule as the task composer: the form sits where the note will
-            appear. */}
-        <details className="text-right">
-          <summary className="link-more">{t("newNote")}</summary>
-          <form action={addContextAction} className="mt-3 space-y-2 text-left">
+        action={
+          <Composer id="new-note" label={t("newNote")} action={addContextAction}>
             <input type="hidden" name="slug" value={slug} />
-            <Field label={t("projectContext")}>
-              <Picker
-                name="kind"
-                value={CONTEXT_KINDS[0]}
-                options={kindOptions(t)}
-                label={t("projectContext")}
-              />
-            </Field>
             <Field label={t("title")}>
-              <input name="title" required />
+              <input name="title" autoFocus required />
             </Field>
             <Field label={t("noteBodyPh")}>
               <textarea name="body" required />
             </Field>
-            <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
-              {t("save")}
-            </SubmitButton>
-          </form>
-        </details>
-
+            <div className="flex flex-wrap items-end gap-2">
+              <Field label={t("projectContext")} className="w-full min-w-0 sm:w-40">
+                <Picker
+                  name="kind"
+                  value={CONTEXT_KINDS[0]}
+                  options={kindOptions(t)}
+                  label={t("projectContext")}
+                />
+              </Field>
+              <SubmitButton pendingLabel={t("saving")}>{t("save")}</SubmitButton>
+            </div>
+          </Composer>
+        }
+        open
+        delay={100}
+      >
         {projectContext.length === 0 ? (
           <Empty>{t("projectContextEmpty")}</Empty>
         ) : (
-          <div className="mt-3">
-            <NoteGroups notes={projectContext} t={t} deleteAction={deleteContextAction} />
-          </div>
+          <NoteGroups notes={projectContext} t={t} deleteAction={deleteContextAction} />
         )}
       </Group>
 
       {/* Open when nothing is in flight, because then the queue is the work
           and a page that opens with two folded groups says nothing. */}
+      {/* The composer is on this group, not the in-flight one: a new task is
+          queued, and from the in-flight group it vanished into a fold the
+          moment it was saved. */}
       <Group
         id="queued"
         title={t("queued")}
         count={groups.queued.total}
         countLabel={t("tasks")}
-        open={groups.inFlight.length === 0}
-        delay={140}
-      >
-        {/* The composer lives with the group its result lands in: a new task
-            is queued, and from the in-flight group it vanished into a fold
-            the moment it was saved. First in the body and not in the header,
-            because a control inside a summary is nested interactive content,
-            which Safari answers by toggling the group. */}
-        <details className="text-right">
-          <summary className="link-more">{t("newTask")}</summary>
-          <form action={createTaskAction} className="mt-3 space-y-2 text-left">
+        action={
+          <Composer id="new-task" label={t("newTask")} action={createTaskAction}>
             <input type="hidden" name="slug" value={slug} />
             <Field label={t("taskTitlePh")}>
-              <input name="title" required />
+              <input name="title" autoFocus required />
             </Field>
             <Field label={t("taskBodyPh")}>
               <textarea name="body" />
@@ -580,13 +569,15 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
               </Field>
               <SubmitButton pendingLabel={t("working")}>{t("add")}</SubmitButton>
             </div>
-          </form>
-        </details>
-
+          </Composer>
+        }
+        open={groups.inFlight.length === 0}
+        delay={140}
+      >
         {groups.queued.shown.length === 0 ? (
           <Empty>{t("queuedEmpty")}</Empty>
         ) : (
-          <ul className="mt-3 space-y-2">
+          <ul className="space-y-2">
             {groups.queued.shown.map((task) => (
               <TaskRow key={task.id} task={task} count={counts.get(task.id)} slug={slug} t={t} />
             ))}

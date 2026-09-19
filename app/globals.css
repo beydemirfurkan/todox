@@ -431,6 +431,71 @@ summary {
   border-color: var(--ink);
 }
 
+/* The "+" on a group's header and the form it opens (`Composer`). The trigger
+   is drawn over the header's right edge but is a sibling of the details, not
+   a child of its summary: a button in a summary is nested interactive content,
+   and Safari toggles the group instead of pressing it. The form is a native
+   popover, so it needs no script, closes on Esc or a click outside, and opens
+   while the group is folded. */
+.composer-trigger {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--inset);
+  color: var(--muted);
+  font-family: var(--font-shantell), cursive;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.13s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.composer-trigger:hover,
+.composer-trigger:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink);
+  transform: rotate(90deg);
+}
+/* The UA sheet gives a popover a border, a padding, Canvas colours and
+   overflow: auto; the sticker replaces the first three and the Picker's
+   panel needs the last one gone. Centred unless anchored below. */
+.composer {
+  width: min(28rem, calc(100vw - 2rem));
+  margin: auto;
+  padding: 1rem;
+  color: inherit;
+  overflow: visible;
+}
+.composer::backdrop {
+  background: rgba(5, 7, 12, 0.5);
+}
+/* Under the "+" like a menu, where the browser can anchor a popover to the
+   button that opened it (the invoker is the implicit anchor). No dim there:
+   it reads as part of the page, not a dialog over it. */
+@supports (position-area: block-end) {
+  @media (min-width: 641px) {
+    .composer {
+      inset: auto;
+      margin: 0.5rem 0 0;
+      position-area: block-end span-inline-start;
+      position-try-fallbacks: flip-block;
+    }
+    .composer::backdrop {
+      background: transparent;
+    }
+  }
+}
+
 input,
 textarea,
 select {
@@ -1466,6 +1531,13 @@ pre {
   .disclosure > summary::before {
     transition: none;
   }
+  .composer-trigger {
+    transition: none;
+  }
+  .composer-trigger:hover,
+  .composer-trigger:focus-visible {
+    transform: none;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -1505,6 +1577,12 @@ pre {
   }
   .disclosure > summary {
     min-height: 44px;
+  }
+  .composer-trigger {
+    top: 2px;
+    right: 6px;
+    width: 44px;
+    height: 44px;
   }
   .pill {
     min-height: 44px;

@@ -20,7 +20,10 @@ import { PANEL_HEADER } from "./panel";
  *
  * `right` is for a fact beside the count -- a chip that says "1 stuck" -- and
  * never a control: a button inside a `<summary>` is nested interactive
- * content, which is invalid and in Safari toggles the details instead.
+ * content, which is invalid and in Safari toggles the details instead. The
+ * control a group needs, the "+" that adds to it, is `action`: it is drawn
+ * over the header's right edge but lives outside the details, so the summary
+ * stays a summary and the "+" works while the group is folded.
  */
 export function Group({
   id,
@@ -28,6 +31,7 @@ export function Group({
   count,
   countLabel,
   right,
+  action,
   open = false,
   delay = 0,
   className = "",
@@ -40,26 +44,27 @@ export function Group({
   /** What `count` counts, for the counter's accessible name: "9 tasks". */
   countLabel: string;
   right?: React.ReactNode;
+  /** A `Composer`, placed over the header's right edge. */
+  action?: React.ReactNode;
   open?: boolean;
   delay?: number;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <details
-      className={`disclosure sticker pop ${className}`}
-      open={open}
-      aria-labelledby={id}
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <summary className={PANEL_HEADER}>
-        <h2 id={id} className="display min-w-0 text-[16px] font-bold">
-          {title}
-        </h2>
-        <Counter n={count} label={countLabel} />
-        {right}
-      </summary>
-      <div className="border-t border-dashed border-rule p-4">{children}</div>
-    </details>
+    <div className={`pop relative ${className}`} style={{ animationDelay: `${delay}ms` }}>
+      <details className="disclosure sticker" open={open} aria-labelledby={id}>
+        {/* Room on the right for the "+", which is absolutely placed. */}
+        <summary className={`${PANEL_HEADER} ${action ? "pr-14" : ""}`}>
+          <h2 id={id} className="display min-w-0 text-[16px] font-bold">
+            {title}
+          </h2>
+          <Counter n={count} label={countLabel} />
+          {right}
+        </summary>
+        <div className="border-t border-dashed border-rule p-4">{children}</div>
+      </details>
+      {action}
+    </div>
   );
 }
