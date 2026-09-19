@@ -76,6 +76,38 @@ w.scrollWidth > w.clientWidth                                                // 
 
 Both true means it is working as intended. Either one false is the bug.
 
+## Contrast and the type floor
+
+Two greys: `text-muted` is for sentences, `text-faint` for metadata (a
+timestamp, an id, a path, a slug) — and nothing goes under `text-meta`
+(12px). Sizes come from the scale (`text-meta`, `text-small`, `text-body`,
+`text-lead`), not from `text-[11px]`. The dashboard once had a hundred and
+twenty nodes at 11–13px in the metadata grey and read as texture.
+
+To check a page, on the real thing (the tokens are runtime CSS variables, so
+the dev server is the same):
+
+```js
+const ch=c=>c.match(/\d+/g).slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});
+const lum=c=>{const[r,g,b]=ch(c);return .2126*r+.7152*g+.0722*b};
+const okL=c=>{const[r,g,b]=ch(c);const l=.4122214708*r+.5363325363*g+.0514459929*b,m=.2119034982*r+.6806995451*g+.1073969566*b,s=.0883024619*r+.2817188376*g+.6299787005*b;return .2104542553*Math.cbrt(l)+.793617785*Math.cbrt(m)-.0040720468*Math.cbrt(s)};
+const cr=(a,b)=>((Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05)).toFixed(2);
+const bg=e=>getComputedStyle(e).backgroundColor, paper=bg(document.body), card=bg(document.querySelector('.sticker')), row=bg(document.querySelector('.sticker-flat')||document.querySelector('.sticker')), line=getComputedStyle(document.querySelector('.sticker')).borderColor;
+const m=new Map();for(const e of document.querySelectorAll('main *')){if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;const s=getComputedStyle(e);const k=s.fontSize+' '+s.color;m.set(k,(m.get(k)||0)+1)}
+({stepCardOverPaper:(okL(card)-okL(paper)).toFixed(3), stepRowUnderCard:(okL(card)-okL(row)).toFixed(3), outlineOnPaper:cr(line,paper), under12px:[...m].filter(([k])=>parseFloat(k)<12), rows:[...m].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>n+'× '+k+' → '+cr(k.match(/rgb.*/)[0],card))})
+```
+
+The surfaces are near black, and the WCAG ratio is near-useless there (it
+reports 1.17:1 for a step the eye sees fine), so the surface steps are
+measured in OKLab lightness: `stepCardOverPaper` stays at or above 0.08,
+`stepRowUnderCard` at or above 0.05 (a `.sticker-flat` row is a well cut
+into the card, so it sits a step below it), and the sticker outline reads at 2:1 or
+better against the paper, because on this paper the outline is what cuts a
+sticker out — the hard shadow does not show. `under12px` is empty, and any
+row that is a sentence (not `.mono`) reads at 6:1 or better against the
+card. The `--on-fill` rows (dark text on chips) will show a low number
+against the card — they sit on a bright fill, not on the card, and are fine.
+
 ## Accessibility
 
 - **Colour never carries meaning alone.** Every status, kind and badge has a

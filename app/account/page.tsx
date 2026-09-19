@@ -332,7 +332,7 @@ export default async function AccountPage({
                               : t("neverUsed")}
                           </Chip>
                         </td>
-                        <td className="mono text-[11px] text-faint">
+                        <td className="mono text-meta text-faint">
                           {ago(tok.created_at, t)}
                         </td>
                         <td className="text-right">

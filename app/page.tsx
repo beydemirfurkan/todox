@@ -182,7 +182,7 @@ export default async function Home() {
             >
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <h3 className="display text-[20px] font-bold">{p.name}</h3>
-                <span className="mono text-[12px] text-faint">{p.slug}</span>
+                <span className="mono text-meta text-faint">{p.slug}</span>
                 {/* Somebody else's project, or one of yours that is not only
                     yours. Two cards used to look identical either way. */}
                 {p.access_role === "member" && p.owner_name ? (
@@ -211,7 +211,7 @@ export default async function Home() {
                   that always carries a line saying nothing happened is the
                   always-true sentence this page already removed once. */}
               {leftOff.get(p.id) && (
-                <p className="mt-1.5 line-clamp-2 text-[13px] text-faint">
+                <p className="mt-1.5 line-clamp-2 text-small text-muted">
                   <span className="mono">{t("lastLeftOff")} </span>
                   {firstLine(leftOff.get(p.id)!.body, 110)}
                 </p>
@@ -236,11 +236,11 @@ export default async function Home() {
                   </Chip>
                 )}
               </div>
-              <p className="mono mt-2 text-[11px] text-faint">
+              <p className="mono mt-2 text-meta text-faint">
                 {t("updated")} {ago(p.activity_at, t)}
               </p>
               {p.root_path && (
-                <p className="mono mt-3 truncate text-[12px] text-faint">{p.root_path}</p>
+                <p className="mono mt-3 truncate text-meta text-faint">{p.root_path}</p>
               )}
             </Link>
           );
@@ -278,7 +278,7 @@ export default async function Home() {
               ? t("emptyProjectsTitleOne")
               : t("emptyProjectsTitleMany", { n: emptyProjects.length })}
           </summary>
-          <p className="mt-1.5 text-[13px] text-faint">{t("emptyProjectsBody")}</p>
+          <p className="mt-1.5 text-small text-muted">{t("emptyProjectsBody")}</p>
           <ul className="mt-3 space-y-1.5">
             {emptyProjects.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-2">

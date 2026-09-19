@@ -152,7 +152,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
                     {h.project_slug ?? t("globalScope")}
                   </span>
                   <span className="text-[15px] font-medium">{h.title}</span>
-                  <span className="mono ml-auto shrink-0 text-[11px] text-faint">
+                  <span className="mono ml-auto shrink-0 text-meta text-faint">
                     {ago(h.created_at, t)}
                   </span>
                 </div>

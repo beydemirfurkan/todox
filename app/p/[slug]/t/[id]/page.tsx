@@ -201,7 +201,7 @@ export default async function TaskPage({
                   {task.priority === 1 ? t("p1") : t("p3")}
                 </Chip>
               )}
-              <span className="mono text-[11px] text-faint">
+              <span className="mono text-meta text-faint">
                 {t("updated")} {ago(task.updated_at, t)}
               </span>
             </div>
@@ -270,7 +270,7 @@ export default async function TaskPage({
                       >
                         {kindLabel(t, e.kind)}
                       </Chip>
-                      <span className="mono text-[11px] text-faint">
+                      <span className="mono text-meta text-faint">
                         {byline(t, e)}{ago(e.created_at, t)}
                       </span>
                       <form action={deleteEntryAction} className="ml-auto">
@@ -322,7 +322,7 @@ export default async function TaskPage({
                   )}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <RefBadge status={r.state} t={t} />
-                    <span className="mono text-[11px] text-faint">
+                    <span className="mono text-meta text-faint">
                       {t("linkedAt")} {ago(r.linked_at, t)}
                       {/* Whose answer this is, and how old. The server cannot
                           read the file; an agent looked and told us. */}
