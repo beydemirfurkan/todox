@@ -17,6 +17,9 @@ const PUBLIC = [
   "/verify",
   "/invite",
   "/s/",
+  // Posts are the one public thing with children: the index and every slug
+  // under it. Prefix on purpose, and nothing signed-in lives under /blog.
+  "/blog",
   // Both agent surfaces carry their own bearer token and have no session
   // cookie. Leave either out and the redirect below turns every agent call
   // into an HTML login page, which reads to a client as a broken server
