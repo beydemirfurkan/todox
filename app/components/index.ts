@@ -3,6 +3,7 @@ export { Chip, Counter } from "./chip";
 export { EntryBody } from "./entry-body";
 export { ExpandableText } from "./expandable-text";
 export { Field } from "./field";
+export { Composer } from "./composer";
 export { Group } from "./group";
 export { MarkdownPreview } from "./markdown-preview";
 export { NoteGroups } from "./note-list";

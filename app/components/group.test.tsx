@@ -45,4 +45,13 @@ describe("Group", () => {
   it("carries a fact beside the count when given one", () => {
     expect(render({ right: <span>1 stuck</span> })).toContain("1 stuck");
   });
+
+  it("keeps the action outside the details, and out of the summary", () => {
+    // A button in a summary is nested interactive content; Safari toggles
+    // the group instead of pressing it. The "+" is drawn over the header
+    // but is a sibling of the details.
+    const html = render({ action: <button type="button">+</button> });
+    expect(html.indexOf("<button")).toBeGreaterThan(html.indexOf("</details>"));
+    expect(html).toMatch(/<summary[^>]*pr-14/);
+  });
 });
