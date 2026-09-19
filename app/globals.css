@@ -2,9 +2,9 @@
 
 /*
   todox — "lab notebook, drawn by hand", at night.
-  Cut-paper stickers on dark stock: 2px light outlines, hard offset shadows,
-  flat marker colours, nothing blurred. Dark-only on purpose — this is a tool
-  developers stare at all day.
+  Cut-paper stickers on near-black stock: 1.5px light outlines, flat marker
+  colours, nothing blurred. Dark-only on purpose — this is a tool developers
+  stare at all day.
 
   Two text colours exist for a reason: --ink sits on dark surfaces, --on-fill
   sits on the bright marker colours. Never mix them up; that is where dark
@@ -18,25 +18,30 @@
 */
 
 :root {
-  /* Three surfaces, and the steps between them have to be visible without
-     the border doing all the work. Measured on the dashboard before this
-     ladder was widened: card over paper 1.12:1, row over card 1.08:1 -- the
-     same grey three times, and the eye had only the 1.5px outline to go on.
-     Now card over paper is 1.32:1 and row over card 1.21:1. */
-  --paper: #121418;
-  --card: #282c37;
-  --inset: #1a1d24;
+  /* Three surfaces, near black and neutral. The first cut of this ladder
+     lifted the card to a mid blue-grey (#282c37) to buy separation, and the
+     cards read as grey slabs -- so the whole ladder went down instead, and
+     the steps are kept by lightness rather than by a lighter card. In OKLab
+     L, card over paper is 0.083 and the row's well under the card 0.059,
+     against 0.042 and 0.026 before; the WCAG ratio is near-useless this close to black (it
+     says 1.17:1), so measure the steps in L and the outline against the
+     paper (2.0:1). The hard shadow cannot be seen on this paper; the
+     outline is what cuts a sticker out now, which is why --line is a step
+     brighter than it was. */
+  --paper: #0a0b0d;
+  --card: #1c1d22;
+  --inset: #0f1013;
 
   --ink: #f1eee5;
   --on-fill: #17181d;
-  --line: #444b59;
-  --line-strong: #5e6576;
+  --line: #41444d;
+  --line-strong: #575b66;
   /* bright marker fills get a dark hairline, not a glowing white one */
   --edge-dark: rgba(0, 0, 0, 0.42);
   --muted: #bfb9a9;
   --faint: #a09a8c;
-  --rule: #383d4a;
-  --shadow-col: #0a0b0f;
+  --rule: #292c32;
+  --shadow-col: #000000;
 
   --accent: #ffd84d;
   --k-decision: #6cb7f5;
