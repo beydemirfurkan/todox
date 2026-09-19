@@ -165,7 +165,7 @@ export function AgentSetup({
         <pre className={pre}>{prompt}</pre>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <CopyMarkdown markdown={prompt} label={labels.copy} copiedLabel={labels.copied} />
-          <p className="text-[12.5px] text-faint">{labels.promptWarning}</p>
+          <p className="text-small text-muted">{labels.promptWarning}</p>
         </div>
       </div>
 
@@ -197,7 +197,7 @@ export function AgentSetup({
 
         {current && (
           <div className="mt-2.5">
-            <p className="mono mb-1 text-[11.5px] text-faint">{current.target}</p>
+            <p className="mono mb-1 text-meta text-faint">{current.target}</p>
             {current.paths && (
               // Labelled per platform rather than guessed from the browser: the
               // machine reading this page is not always the machine the config
@@ -206,7 +206,7 @@ export function AgentSetup({
               // `break-all` because these are paths: the longest is 46
               // characters of unbroken text, which is wider than a 320px
               // viewport at this size and would scroll the page sideways.
-              <ul className="mono mb-1 space-y-0.5 text-[11.5px] break-all text-faint">
+              <ul className="mono mb-1 space-y-0.5 text-meta break-all text-faint">
                 {(
                   [
                     ["macOS", current.paths.darwin],

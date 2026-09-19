@@ -325,7 +325,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
             // in production have no summary, so for two thirds of pages the
             // line that answers "what is this" is simply absent -- and nothing
             // anywhere invites one.
-            <p className="prose text-[13.5px] leading-relaxed text-faint">
+            <p className="prose text-small leading-relaxed text-muted">
               {t("noSummary")}
             </p>
           )
@@ -360,7 +360,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
             registers again. It says it in half the words: the consequence
             fits here, and the reasoning is a drawer away under
             `projectRepoNote`, where the field that fixes it is. */}
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11.5px]">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-meta">
           {repo ? (
             <a
               href={repo}
@@ -625,7 +625,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
           countLabel={t("observationsLabel")}
           delay={220}
         >
-          <p className="prose text-[14px] text-faint">{t("observationsBody")}</p>
+          <p className="prose text-[14px] text-muted">{t("observationsBody")}</p>
 
           <ul className="mt-3 space-y-2.5">
             {observed.rows.map((o) => {
@@ -683,7 +683,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
           </ul>
 
           {observed.omitted > 0 && (
-            <p className="mt-2.5 text-[13px] text-faint">
+            <p className="mt-2.5 text-small text-muted">
               {t("observationsAndMore", { n: observed.omitted })}
             </p>
           )}
@@ -721,7 +721,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                 {/* The owner sees addresses because the owner invited
                     them. Between collaborators a name and a handle answer
                     "who am I working with"; an inbox is not that. */}
-                <span className="mono block text-[11.5px] break-all text-faint">
+                <span className="mono block text-meta break-all text-faint">
                   {owner ? member.email : `@${member.username}`}
                 </span>
               </span>
@@ -750,7 +750,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
                 <span className="mono block text-[12.5px] break-all">
                   {invitation.email}
                 </span>
-                <span className="block text-[11.5px] text-faint">
+                <span className="block text-meta text-faint">
                   {t("teamPending")}
                 </span>
               </span>
@@ -818,7 +818,7 @@ function TaskRow({
         <span className="pt-1">
           <StatusDot status={task.status} t={t} />
         </span>
-        <span className="mono pt-0.5 text-[12px] text-faint">#{task.id}</span>
+        <span className="mono pt-0.5 text-meta text-faint">#{task.id}</span>
         <span
           className={`line-clamp-2 min-w-0 flex-1 basis-56 text-[15px] font-medium break-words ${closed ? "text-muted line-through decoration-1" : ""}`}
         >
@@ -846,7 +846,7 @@ function TaskRow({
               {count.decisions > 1 ? t("decisionCountPlural") : t("decisionCount")}
             </Chip>
           )}
-          <span className="mono text-[11px] text-faint">{ago(task.updated_at, t)}</span>
+          <span className="mono text-meta text-faint">{ago(task.updated_at, t)}</span>
         </span>
       </Link>
     </li>

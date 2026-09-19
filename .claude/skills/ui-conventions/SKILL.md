@@ -76,6 +76,30 @@ w.scrollWidth > w.clientWidth                                                // 
 
 Both true means it is working as intended. Either one false is the bug.
 
+## Contrast and the type floor
+
+Two greys: `text-muted` is for sentences, `text-faint` for metadata (a
+timestamp, an id, a path, a slug) — and nothing goes under `text-meta`
+(12px). Sizes come from the scale (`text-meta`, `text-small`, `text-body`,
+`text-lead`), not from `text-[11px]`. The dashboard once had a hundred and
+twenty nodes at 11–13px in the metadata grey and read as texture.
+
+To check a page, on the real thing (the tokens are runtime CSS variables, so
+the dev server is the same):
+
+```js
+const lum=c=>{const[r,g,b]=c.match(/\d+/g).map(v=>{v/=255;return v<=.03928?v/12.92:((v+.055)/1.055)**2.4});return .2126*r+.7152*g+.0722*b};
+const cr=(a,b)=>((Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05)).toFixed(2);
+const card=getComputedStyle(document.querySelector('.sticker')).backgroundColor, paper=getComputedStyle(document.body).backgroundColor;
+const m=new Map();for(const e of document.querySelectorAll('main *')){if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;const s=getComputedStyle(e);const k=s.fontSize+' '+s.color;m.set(k,(m.get(k)||0)+1)}
+({cardVsPaper:cr(card,paper), under12px:[...m].filter(([k])=>parseFloat(k)<12), rows:[...m].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>n+'× '+k+' → '+cr(k.match(/rgb.*/)[0],card))})
+```
+
+`cardVsPaper` stays at or above 1.3, `under12px` is empty, and any row that
+is a sentence (not `.mono`) reads at 6:1 or better against the card. The
+`--on-fill` rows (dark text on chips) will show a low number against the
+card — they sit on a bright fill, not on the card, and are fine.
+
 ## Accessibility
 
 - **Colour never carries meaning alone.** Every status, kind and badge has a

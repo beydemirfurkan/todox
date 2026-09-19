@@ -279,7 +279,7 @@ export default function SixWeeksOnOurOwnLog() {
         <div className="overflow-x-auto">
           <table className="w-full text-[14px]">
             <thead>
-              <tr className="mono text-left text-[11.5px] tracking-[.06em] text-faint uppercase">
+              <tr className="mono text-left text-meta tracking-[.06em] text-faint uppercase">
                 <th className="py-1.5 pr-3 font-medium">Finding</th>
                 <th className="py-1.5 pr-3 font-medium">Change</th>
                 <th className="py-1.5 font-medium">Measured</th>

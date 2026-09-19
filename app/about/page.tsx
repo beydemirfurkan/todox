@@ -50,7 +50,7 @@ export default async function AboutPage() {
         {t("builtByBody")}
       </p>
 
-      <p className="mt-8 text-[14px] text-faint">
+      <p className="mt-8 text-[14px] text-muted">
         <a href={`${base}/llms.txt`} className="link-more">{t("forAgents")}</a>
       </p>
     </article>

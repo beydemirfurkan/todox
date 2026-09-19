@@ -9,23 +9,34 @@
   Two text colours exist for a reason: --ink sits on dark surfaces, --on-fill
   sits on the bright marker colours. Never mix them up; that is where dark
   cartoon UIs usually fall apart.
+
+  Two greys exist for a reason too: --muted is for sentences, --faint is for
+  metadata -- timestamps, ids, paths, slugs -- and nothing under 12px. They
+  used to be one ratio point apart and read as the same grey, so the line a
+  card was really there to say was set in the quieter of two identical greys.
+  A sentence in --faint is the bug.
 */
 
 :root {
-  --paper: #191b22;
-  --card: #22252e;
-  --inset: #1c1f27;
+  /* Three surfaces, and the steps between them have to be visible without
+     the border doing all the work. Measured on the dashboard before this
+     ladder was widened: card over paper 1.12:1, row over card 1.08:1 -- the
+     same grey three times, and the eye had only the 1.5px outline to go on.
+     Now card over paper is 1.32:1 and row over card 1.21:1. */
+  --paper: #121418;
+  --card: #282c37;
+  --inset: #1a1d24;
 
   --ink: #f1eee5;
   --on-fill: #17181d;
-  --line: #3e4451;
-  --line-strong: #565d6d;
+  --line: #444b59;
+  --line-strong: #5e6576;
   /* bright marker fills get a dark hairline, not a glowing white one */
   --edge-dark: rgba(0, 0, 0, 0.42);
-  --muted: #a9a394;
-  --faint: #9b9587;
-  --rule: #333844;
-  --shadow-col: #0e1016;
+  --muted: #bfb9a9;
+  --faint: #a09a8c;
+  --rule: #383d4a;
+  --shadow-col: #0a0b0f;
 
   --accent: #ffd84d;
   --k-decision: #6cb7f5;
@@ -61,10 +72,12 @@
      arbitrary value and between them invented five different "small":
      12, 12.5, 13, 13.5 and 14px, all written as `!text-[…]` because the base
      control rule defines a single size and no variant. Four names is enough
-     for this app, and `text-body` matches what a field renders at. */
-  --text-meta: 11.5px;
+     for this app, and `text-body` matches what a field renders at.
+     12px is the floor: the dashboard once set a hundred and twenty nodes at
+     11-13px in the quieter grey, and the page read as texture. */
+  --text-meta: 12px;
   --text-meta--line-height: 1.4;
-  --text-small: 13px;
+  --text-small: 13.5px;
   --text-small--line-height: 1.45;
   --text-body: 15px;
   --text-body--line-height: 1.6;
@@ -166,10 +179,12 @@ body {
   position: relative;
   background-color: var(--paper);
   /* faint grain over a pencil dot grid, both as plain background layers --
-     a fixed blend-mode overlay here caused repaint tearing while scrolling */
+     a fixed blend-mode overlay here caused repaint tearing while scrolling.
+     The dot is --rule pulled halfway back to the paper, not --rule itself:
+     at full strength it competed with 12px metadata in the gutters. */
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
-    radial-gradient(var(--rule) 1.2px, transparent 1.2px);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"),
+    radial-gradient(color-mix(in oklab, var(--rule) 55%, var(--paper)) 1.2px, transparent 1.2px);
   background-size:
     160px 160px,
     22px 22px;
@@ -769,7 +784,7 @@ pre {
   font-size: 13.5px;
   line-height: 1;
   color: var(--ink);
-  background: rgba(34, 37, 46, 0.62);
+  background: color-mix(in srgb, var(--card) 62%, transparent);
   border: 1px solid var(--line);
   border-radius: 999px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
@@ -784,7 +799,7 @@ pre {
 }
 .user-menu-trigger:hover {
   border-color: var(--line-strong);
-  background: rgba(34, 37, 46, 0.78);
+  background: color-mix(in srgb, var(--card) 78%, transparent);
 }
 .user-menu-trigger[aria-expanded="true"] {
   border-color: var(--accent);
@@ -809,7 +824,7 @@ pre {
   z-index: 50;
   min-width: 200px;
   padding: 6px;
-  background: rgba(28, 31, 39, 0.66);
+  background: color-mix(in srgb, var(--inset) 66%, transparent);
   border: 1px solid rgba(241, 238, 229, 0.08);
   border-radius: 14px;
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.45);
@@ -937,7 +952,7 @@ pre {
   /* Heavier than the menus beside it, and deliberately. Those hold two-word
      labels; this holds sentences that wrap, and at the shared opacity the
      page underneath read straight through them. */
-  background: rgba(24, 27, 34, 0.94);
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
 }
 /* Items here are two lines and wrap, unlike the one-line menu items above. */
 .bell-item {
@@ -1101,7 +1116,7 @@ pre {
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
-  background: rgba(28, 31, 39, 0.56);
+  background: color-mix(in srgb, var(--inset) 56%, transparent);
   border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);

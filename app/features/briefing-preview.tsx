@@ -36,7 +36,7 @@ export function BriefingPreview({ t }: { t: T }) {
         </pre>
       </div>
 
-      <p className="mt-2 text-[13px] text-faint">{t("briefingCaption")}</p>
+      <p className="mt-2 text-small text-muted">{t("briefingCaption")}</p>
     </section>
   );
 }

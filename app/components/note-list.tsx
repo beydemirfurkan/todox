@@ -78,12 +78,12 @@ function NoteRow({
           <span className="display line-clamp-2 min-w-0 flex-1 basis-48 text-[14.5px] font-bold break-words">
             {note.title}
           </span>
-          <span className="mono ml-auto shrink-0 text-[11px] text-faint">
+          <span className="mono ml-auto shrink-0 text-meta text-faint">
             {ago(note.updated_at, t)}
           </span>
         </summary>
         <div className="px-3 pb-3">
-          <p className="text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-muted">
+          <p className="text-small leading-relaxed break-words whitespace-pre-wrap text-muted">
             {note.body}
           </p>
           <form action={deleteAction} className="mt-2">

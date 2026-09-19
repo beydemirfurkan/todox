@@ -38,7 +38,7 @@ export function Chip({
 export function Counter({ n, label }: { n: number; label?: string }) {
   return (
     <span
-      className="mono flex size-6 items-center justify-center rounded-full border-[1.5px] border-line bg-paper text-[11px]"
+      className="mono flex size-6 items-center justify-center rounded-full border-[1.5px] border-line bg-paper text-meta"
       aria-label={label ? `${n} ${label}` : undefined}
     >
       {n}

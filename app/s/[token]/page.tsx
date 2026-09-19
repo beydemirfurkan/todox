@@ -148,7 +148,7 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
                       p1
                     </Chip>
                   )}
-                  <span className="mono ml-auto text-[11px] text-faint">
+                  <span className="mono ml-auto text-meta text-faint">
                     {ago(task.updated_at, t)}
                   </span>
                 </div>
@@ -170,7 +170,7 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
                           <span className="display text-[13px] font-bold">
                             {kindLabel(t, e.kind)}
                           </span>
-                          <span className="mono ml-2 text-[11px] text-faint">
+                          <span className="mono ml-2 text-meta text-faint">
                             {ago(e.created_at, t)}
                           </span>
                           <p className="text-[14px] leading-relaxed break-words whitespace-pre-wrap text-muted">
