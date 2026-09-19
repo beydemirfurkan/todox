@@ -402,6 +402,35 @@ summary {
   list-style: none;
 }
 
+/* A <details> whose summary is a row -- a group header on the project page, a
+   note's head line -- rather than the wavy text button the composers use.
+   The native marker is hidden for every summary above, so a row that wants
+   one draws its own chevron: a border, not a glyph, so nothing is announced
+   and forced-colors repaints it with the text. */
+.disclosure > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  cursor: pointer;
+}
+.disclosure > summary::before {
+  content: "";
+  flex: none;
+  width: 0.5em;
+  height: 0.5em;
+  margin-inline-end: 0.35em;
+  border-right: 2px solid var(--faint);
+  border-bottom: 2px solid var(--faint);
+  transform: translateY(-0.1em) rotate(-45deg);
+  transition: transform 0.12s ease;
+}
+.disclosure[open] > summary::before {
+  transform: translateY(-0.25em) rotate(45deg);
+}
+.disclosure > summary:hover::before {
+  border-color: var(--ink);
+}
+
 input,
 textarea,
 select {
@@ -1434,6 +1463,9 @@ pre {
   .lift:hover {
     transform: none;
   }
+  .disclosure > summary::before {
+    transition: none;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -1469,6 +1501,9 @@ pre {
   .link-more {
     display: inline-flex;
     align-items: center;
+    min-height: 44px;
+  }
+  .disclosure > summary {
     min-height: 44px;
   }
   .pill {

@@ -1,5 +1,12 @@
 import { Blob, type Mood } from "./blob";
 
+/**
+ * The header row a panel and a group share, so the two read as one family.
+ * Wraps, because `right` is a status select and a button on the task pages
+ * and that never fitted beside a heading on a phone.
+ */
+export const PANEL_HEADER = "flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5";
+
 export function Panel({
   title,
   right,
@@ -25,9 +32,7 @@ export function Panel({
           counter dropped it silently -- the search page has shown no result
           count since it was written. */}
       {(title || right) && (
-        // Wraps, because `right` is a status select and a button on the task
-        // pages and that never fitted beside a heading on a phone.
-        <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-dashed border-rule px-4 py-2.5">
+        <header className={`${PANEL_HEADER} border-b border-dashed border-rule`}>
           {title && (
             <h2 id={headingId} className="display min-w-0 text-[16px] font-bold">
               {title}

@@ -307,7 +307,6 @@ export const tr: Record<Key, string> = {
   countDone: "bitti",
 
   inFlight: "Uçuşta",
-  stuck: "Takılanlar",
   queued: "Sırada",
   doneDropped: "Bitenler ve bırakılanlar",
   projectContext: "Proje bağlamı",
@@ -327,10 +326,9 @@ export const tr: Record<Key, string> = {
   noRemote: "uzak adres yok — ikinci bir bilgisayar yeniden kaydeder",
   allClear: "Her şey temiz.",
   tasks: "görev",
-  taskFilterLabel: "Duruma göre filtrele",
-  filterOpen: "açık",
-  noTasksHere: "Bu durumda görev yok.",
-  andMore: "{n} tane daha var, gösterilmedi. Yukarıdaki filtrelerle daralt.",
+  queuedEmpty: "Sırada bir şey yok.",
+  closedEmpty: "Henüz biten ya da bırakılan yok.",
+  andMore: "{n} tane daha var, gösterilmedi. Arama hepsine ulaşır.",
   projectSettings: "Proje ayarları",
   team: "Ekip",
   teamOwner: "sahibi",
@@ -359,7 +357,9 @@ export const tr: Record<Key, string> = {
   noSummary:
     "Henüz bir açıklama yok. Bu deponun ne olduğunu anlatan bir iki cümle, onu açan her oturumu ucuzlatır — proje ayarlarından ekleyebilirsin.",
   lastLeftOff: "en son şurada kalındı:",
-  notesAndMore: "ve {n} tane daha; soran agent hepsini alıyor.",
+  notes: "not",
+  newNote: "+ yeni not",
+  notesMore: "{n} tane daha",
   emptyProjectsTitleOne: "1 proje henüz boş",
   emptyProjectsTitleMany: "{n} proje henüz boş",
   emptyProjectsBody:
@@ -381,6 +381,7 @@ export const tr: Record<Key, string> = {
   // Arkasından görev bağlantıları gelir: "başlanan #12, #13".
   observationsStarted: "başlanan",
   observationsAndMore: "ve {n} tane daha eski; agent için iki hafta tutuluyor.",
+  observationsLabel: "gözlem",
   inLog: "kayıt",
   decisionCount: "karar",
   decisionCountPlural: "karar",
