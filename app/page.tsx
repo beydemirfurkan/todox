@@ -25,8 +25,8 @@ import { Explainer, FirstRun } from "./features/explainer";
 import { Landing } from "./features/landing";
 import { Picker } from "./features/picker";
 import { SubmitButton } from "./features/submit";
-import { contextKindLabel, kindOptions } from "./kinds";
-import { Blob, Chip, Counter, Empty, ExpandableText, Field, Panel } from "./components";
+import { kindOptions } from "./kinds";
+import { Blob, Chip, Counter, Empty, Field, NoteGroups, Panel } from "./components";
 import { pageOpenGraph } from "./metadata-shared";
 
 export const dynamic = "force-dynamic";
@@ -318,41 +318,14 @@ export default async function Home() {
         right={<Counter n={globalContext.length} label={t("globalContext")} />}
       >
         <div className="space-y-3">
-          {globalContext.length === 0 && <Empty>{t("globalEmpty")}</Empty>}
-          {globalContext.map((c) => (
-            <div key={c.id} className="sticker-flat group p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Chip color="var(--k-decision)" tilt={-2}>
-                  {contextKindLabel(t, c.kind)}
-                </Chip>
-                <span className="display min-w-0 text-[15.5px] font-bold break-words">
-                  {c.title}
-                </span>
-                <span className="mono ml-auto shrink-0 text-[11px] text-faint">
-                  {ago(c.updated_at, t)}
-                </span>
-                <form action={deleteContextAction}>
-                  <input type="hidden" name="context_id" value={c.id} />
-                  <SubmitButton
-                    className="link-more row-action text-meta"
-                    pendingLabel={t("working")}
-                  >
-                    {t("delete")}
-                    <span className="sr-only"> — {c.title}</span>
-                  </SubmitButton>
-                </form>
-              </div>
-              {/* Same treatment as the project rail: these are the same notes,
-                  and one of them running to three thousand characters used to
-                  push everything under it off the first screen. */}
-              <ExpandableText
-                text={c.body}
-                more={t("showMore")}
-                less={t("showLess")}
-                className="mt-1.5 text-[14px] leading-relaxed text-muted"
-              />
-            </div>
-          ))}
+          {globalContext.length === 0 ? (
+            <Empty>{t("globalEmpty")}</Empty>
+          ) : (
+            // The same rows as a project's notes: a note that ran to three
+            // thousand characters used to push everything under it off the
+            // first screen, and now it is a line until it is opened.
+            <NoteGroups notes={globalContext} t={t} deleteAction={deleteContextAction} />
+          )}
 
           <details>
             <summary className="link-more">{t("addGlobalNote")}</summary>

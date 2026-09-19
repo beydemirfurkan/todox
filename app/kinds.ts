@@ -11,6 +11,24 @@ export const KIND_COLOR: Record<EntryKind, string> = {
 };
 
 /**
+ * A note's kind, as a fill.
+ *
+ * Every context note used to wear the decision blue whatever it was, so the
+ * one thing a reader wants from a list of standing notes -- is this a trap
+ * or a rule -- had to be read off the chip's text. The four fills are the
+ * ones the log's kinds already mean: a gotcha is the colour of a dead end,
+ * a decision is a decision, a convention is the colour of a handoff (what
+ * one session tells the next), a preference is the quiet grey of a note.
+ * All four are bright, so `Chip`'s dark-on-fill text rule holds.
+ */
+export const CONTEXT_KIND_COLOR: Record<ContextKind, string> = {
+  gotcha: "var(--k-dead_end)",
+  decision: "var(--k-decision)",
+  convention: "var(--k-handoff)",
+  preference: "var(--k-note)",
+};
+
+/**
  * `undefined` means "no fill", which is how a chip gets light text on the dark
  * card. Passing a dark colour here instead would paint dark-on-dark: `Chip`
  * chooses its text colour from whether a fill was given, not from how light
@@ -51,4 +69,8 @@ export const priorityOptions = (t: T) => [
 ];
 
 export const kindOptions = (t: T) =>
-  CONTEXT_KINDS.map((k) => ({ value: k, label: contextKindLabel(t, k) }));
+  CONTEXT_KINDS.map((k) => ({
+    value: k,
+    label: contextKindLabel(t, k),
+    colour: CONTEXT_KIND_COLOR[k],
+  }));

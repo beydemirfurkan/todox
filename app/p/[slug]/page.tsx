@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Fragment } from "react";
 
-import { CONTEXT_KINDS, type Status } from "@/lib/constants";
-import { ago } from "@/lib/i18n";
+import { CONTEXT_KINDS } from "@/lib/constants";
+import { ago, type T } from "@/lib/i18n";
 import { firstLine } from "@/lib/util/headline";
 import { getT } from "@/lib/lang";
 import { publicUrl } from "@/lib/public-url";
@@ -16,6 +16,7 @@ import * as invitationsRepo from "@/lib/repositories/project-invitations";
 import * as membershipsRepo from "@/lib/repositories/project-memberships";
 import * as observationsRepo from "@/lib/repositories/observations";
 import * as tasksRepo from "@/lib/repositories/tasks";
+import type { Task } from "@/lib/types";
 import { staleRefs } from "@/lib/services/briefing";
 import { repoLabel, repoLink } from "@/lib/util/paths";
 import {
@@ -23,19 +24,13 @@ import {
   createTaskAction,
   deleteContextAction,
   deleteProjectAction,
-  setStatusAction,
   inviteProjectAction,
   removeProjectMemberAction,
   revokeProjectInviteAction,
   updateProjectAction,
 } from "../../actions";
 import { authMessages } from "../../auth-messages";
-import {
-  contextKindLabel,
-  kindOptions,
-  priorityOptions,
-  statusOptions,
-} from "../../kinds";
+import { kindOptions, priorityOptions } from "../../kinds";
 import { AuthForm } from "../../features/auth-form";
 import { SharePanel } from "../../features/share-panel";
 import { Picker } from "../../features/picker";
@@ -44,27 +39,20 @@ import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
 import {
   Blob,
   Chip,
-  Counter,
   Empty,
   ExpandableText,
   Field,
-  Panel,
+  Group,
+  NoteGroups,
   StatusDot,
 } from "../../components";
 import { privatePageMetadata } from "../../metadata-shared";
-import {
-  compareTasks,
-  isClosed,
-  matchesFilter,
-  paginate,
-  resolveFilter,
-  type FilterId,
-} from "./task-list";
+import { groupTasks, isClosed } from "./task-list";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Filtering, ordering and the ceiling live in `./task-list`, where they can be
+ * Grouping, ordering and the ceilings live in `./task-list`, where they can be
  * asserted without standing a page up. What is left here is markup.
  */
 
@@ -83,16 +71,6 @@ const currentUser = cache(requireUser);
  * stays the true one; the point of the banner is that something has drifted, and
  * which files is a question the tasks themselves answer.
  */
-/**
- * Context notes shown in the rail before it folds.
- *
- * Six, because the rail is a reminder of what constrains this project and not
- * a reading list -- past a handful somebody is scrolling a column rather than
- * being reminded of anything. The panel header carries the true count, so
- * nothing here hides how much there is.
- */
-const NOTES_SHOWN = 6;
-
 const STALE_SHOWN = 8;
 
 /**
@@ -123,10 +101,7 @@ export async function generateMetadata({
   );
 }
 
-export default async function ProjectPage({
-  params,
-  searchParams,
-}: PageProps<"/p/[slug]">) {
+export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
   const { slug } = await params;
   const user = await currentUser();
   const { t } = await getT();
@@ -147,7 +122,6 @@ export default async function ProjectPage({
     owner ? invitationsRepo.listByProject(project.id) : Promise.resolve([]),
   ]);
 
-  const by = (s: Status) => all.filter((x) => x.status === s).length;
   const open = all.filter((x) => !isClosed(x.status));
 
   // Both depend on the list above, so they wait for it -- but they wait
@@ -183,23 +157,7 @@ export default async function ProjectPage({
     ? sameName.filter((p) => p.id !== project.id && p.user_id === user.id)
     : [];
 
-  const closed = all.filter((x) => isClosed(x.status));
-
-  const filters: { id: FilterId; label: string; n: number }[] = [
-    { id: "open", label: t("filterOpen"), n: open.length },
-    { id: "doing", label: t("inFlight"), n: by("doing") },
-    { id: "blocked", label: t("stuck"), n: by("blocked") },
-    { id: "todo", label: t("queued"), n: by("todo") },
-    { id: "done", label: t("doneDropped"), n: closed.length },
-  ];
-
-  const filter = resolveFilter(
-    (await searchParams).s,
-    filters.map((f) => f.id),
-  );
-
-  const selected = all.filter((task) => matchesFilter(task, filter)).sort(compareTasks);
-  const { shown } = paginate(selected);
+  const groups = groupTasks(all);
 
   const origin = publicUrl();
   const repo = repoLink(project.repo_url);
@@ -505,17 +463,178 @@ export default async function ProjectPage({
         </section>
       )}
 
+      {/* From here down the page reads in the order the agent's briefing
+          does: what is in flight, what constrains it, what is queued, what is
+          finished, what a process saw, who is here. Each part is a Group --
+          a native details -- so the page is as long as what is open, and a
+          project with sixty tasks and forty notes still fits on a screen when
+          only the work in flight is unfolded. The two-column grid this
+          replaces put the notes in a 19rem rail where every one of them was
+          a paragraph: 1,855px of rail beside 661px of work, measured. */}
+      <Group
+        id="in-flight"
+        title={t("inFlight")}
+        count={groups.counts.doing}
+        countLabel={t("tasks")}
+        right={
+          // Said in words on the header, so a closed group still says it.
+          groups.counts.blocked > 0 ? (
+            <Chip color="var(--k-dead_end)">
+              {groups.counts.blocked} {t("countStuck")}
+            </Chip>
+          ) : undefined
+        }
+        open
+        delay={60}
+      >
+        {groups.inFlight.length === 0 ? (
+          <Empty mood="happy">{t("allClear")}</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {groups.inFlight.map((task) => (
+              <TaskRow key={task.id} task={task} count={counts.get(task.id)} slug={slug} t={t} />
+            ))}
+          </ul>
+        )}
+      </Group>
+
+      {/* The standing notes, above the queue: they are what the work in
+          flight is being done under, and a person who opens this page to
+          orient reads them before the backlog. */}
+      <Group
+        id="context"
+        title={t("projectContext")}
+        count={projectContext.length}
+        countLabel={t("notes")}
+        open
+        delay={100}
+      >
+        {/* Same rule as the task composer: the form sits where the note will
+            appear. */}
+        <details className="text-right">
+          <summary className="link-more">{t("newNote")}</summary>
+          <form action={addContextAction} className="mt-3 space-y-2 text-left">
+            <input type="hidden" name="slug" value={slug} />
+            <Field label={t("projectContext")}>
+              <Picker
+                name="kind"
+                value={CONTEXT_KINDS[0]}
+                options={kindOptions(t)}
+                label={t("projectContext")}
+              />
+            </Field>
+            <Field label={t("title")}>
+              <input name="title" required />
+            </Field>
+            <Field label={t("noteBodyPh")}>
+              <textarea name="body" required />
+            </Field>
+            <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
+              {t("save")}
+            </SubmitButton>
+          </form>
+        </details>
+
+        {projectContext.length === 0 ? (
+          <Empty>{t("projectContextEmpty")}</Empty>
+        ) : (
+          <div className="mt-3">
+            <NoteGroups notes={projectContext} t={t} deleteAction={deleteContextAction} />
+          </div>
+        )}
+      </Group>
+
+      {/* Open when nothing is in flight, because then the queue is the work
+          and a page that opens with two folded groups says nothing. */}
+      <Group
+        id="queued"
+        title={t("queued")}
+        count={groups.queued.total}
+        countLabel={t("tasks")}
+        open={groups.inFlight.length === 0}
+        delay={140}
+      >
+        {/* The composer lives with the group its result lands in: a new task
+            is queued, and from the in-flight group it vanished into a fold
+            the moment it was saved. First in the body and not in the header,
+            because a control inside a summary is nested interactive content,
+            which Safari answers by toggling the group. */}
+        <details className="text-right">
+          <summary className="link-more">{t("newTask")}</summary>
+          <form action={createTaskAction} className="mt-3 space-y-2 text-left">
+            <input type="hidden" name="slug" value={slug} />
+            <Field label={t("taskTitlePh")}>
+              <input name="title" required />
+            </Field>
+            <Field label={t("taskBodyPh")}>
+              <textarea name="body" />
+            </Field>
+            <div className="flex flex-wrap items-end gap-2">
+              <Field label={t("priorityLabel")} className="w-full min-w-0 sm:w-40">
+                <Picker
+                  name="priority"
+                  value="2"
+                  options={priorityOptions(t)}
+                  label={t("priorityLabel")}
+                />
+              </Field>
+              <SubmitButton pendingLabel={t("working")}>{t("add")}</SubmitButton>
+            </div>
+          </form>
+        </details>
+
+        {groups.queued.shown.length === 0 ? (
+          <Empty>{t("queuedEmpty")}</Empty>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {groups.queued.shown.map((task) => (
+              <TaskRow key={task.id} task={task} count={counts.get(task.id)} slug={slug} t={t} />
+            ))}
+          </ul>
+        )}
+        {groups.queued.omitted > 0 && (
+          <p className="mt-3 border-t border-dashed border-rule pt-3 text-[13px] text-muted">
+            {t("andMore", { n: groups.queued.omitted })}
+          </p>
+        )}
+      </Group>
+
+      <Group
+        id="closed"
+        title={t("doneDropped")}
+        count={groups.closed.total}
+        countLabel={t("tasks")}
+        delay={180}
+      >
+        {groups.closed.shown.length === 0 ? (
+          <Empty>{t("closedEmpty")}</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {groups.closed.shown.map((task) => (
+              <TaskRow key={task.id} task={task} count={counts.get(task.id)} slug={slug} t={t} />
+            ))}
+          </ul>
+        )}
+        {groups.closed.omitted > 0 && (
+          <p className="mt-3 border-t border-dashed border-rule pt-3 text-[13px] text-muted">
+            {t("andMore", { n: groups.closed.omitted })}
+          </p>
+        )}
+      </Group>
+
       {observed.rows.length > 0 && (
-        // Deliberately plain, and below the stale banner rather than beside it.
-        // Nobody wrote any of this: it is what a process saw in git while an
-        // earlier session ran, so it gets less weight on the page than anything
-        // somebody chose to record. The body says so in words rather than
-        // leaving the styling to imply it.
-        <section aria-labelledby="observations-heading" className="sticker pop p-4">
-          <h2 id="observations-heading" className="display text-[17px] font-bold">
-            {t("observationsTitle")}
-          </h2>
-          <p className="prose mt-0.5 text-[14px] text-faint">{t("observationsBody")}</p>
+        // Absent rather than empty, like every always-true line this page has
+        // shed. Nobody wrote any of this: it is what a process saw in git while
+        // an earlier session ran, so it sits below everything somebody chose
+        // to record, and the body says so in words.
+        <Group
+          id="observations"
+          title={t("observationsTitle")}
+          count={observed.rows.length + observed.omitted}
+          countLabel={t("observationsLabel")}
+          delay={220}
+        >
+          <p className="prose text-[14px] text-faint">{t("observationsBody")}</p>
 
           <ul className="mt-3 space-y-2.5">
             {observed.rows.map((o) => {
@@ -577,357 +696,168 @@ export default async function ProjectPage({
               {t("observationsAndMore", { n: observed.omitted })}
             </p>
           )}
-        </section>
+        </Group>
       )}
 
-      {/* The rail is fixed-width and sticks, so it cannot stretch the page the
-          way a second flexible column did. Work is the only thing that grows. */}
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <main className="min-w-0 space-y-4">
-          <nav
-            aria-label={t("taskFilterLabel")}
-            className="pop flex flex-wrap gap-1.5"
-            style={{ animationDelay: "60ms" }}
-          >
-            {filters.map((f) => (
-              <Link
-                key={f.id}
-                href={f.id === "open" ? `/p/${slug}` : `/p/${slug}?s=${f.id}`}
-                aria-current={f.id === filter ? "page" : undefined}
-                className="pill seg"
-              >
-                {f.label}
-                <span className="mono ml-1.5 opacity-70">{f.n}</span>
-              </Link>
-            ))}
-          </nav>
+      {/* Who is in this. Last, because it is the fact that changes least;
+          the owner keeps the controls, everybody else gets the roster, which
+          is the part that answers "am I working with somebody here". */}
+      <Group
+        id="team"
+        title={t("team")}
+        count={members.length + 1}
+        countLabel={t("team")}
+        delay={260}
+      >
+        <ul className="space-y-1.5">
+          <li className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5">
+            <span className="display min-w-0 flex-1 text-[14px] font-bold break-words">
+              {project.owner_name ?? "—"}
+            </span>
+            <Chip color="var(--k-decision)">{t("teamOwner")}</Chip>
+            {owner && <Chip>{t("teamYou")}</Chip>}
+          </li>
 
-          <Panel
-            delay={100}
-            title={filters.find((f) => f.id === filter)!.label}
-            right={
-              <Counter n={selected.length} label={t("tasks")} />
-            }
-          >
-            <ul className="space-y-2">
-              {shown.length === 0 && (
-                <Empty mood={filter === "open" ? "happy" : "idle"}>
-                  {filter === "open" ? t("allClear") : t("noTasksHere")}
-                </Empty>
-              )}
-
-              {shown.map((task) => {
-                const c = counts.get(task.id);
-                const done = ["done", "dropped"].includes(task.status);
-                return (
-                  <li
-                    key={task.id}
-                    className="sticker-flat flex flex-wrap items-start gap-x-2.5 gap-y-2 p-3"
-                  >
-                    <span className="pt-1">
-                      <StatusDot status={task.status} t={t} />
-                    </span>
-
-                    {/* The link wraps the text and nothing else. The row used
-                        to be one big anchor, which left no legal place to put
-                        a control on it. */}
-                    <Link
-                      href={`/p/${slug}/t/${task.id}`}
-                      className="min-w-0 flex-1 basis-64 hover:text-ink"
-                    >
-                      <span className="flex flex-wrap items-baseline gap-2">
-                        <span className="mono text-[12px] text-faint">#{task.id}</span>
-                        <span
-                          className={`min-w-0 text-[15px] font-medium break-words ${done ? "text-muted line-through decoration-1" : ""}`}
-                        >
-                          {task.title}
-                        </span>
-                        {task.priority === 1 && !done && (
-                          <Chip color="var(--accent)" tilt={-3}>
-                            p1
-                          </Chip>
-                        )}
-                      </span>
-
-                      <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        {c && c.total > 0 && (
-                          <Chip>
-                            {c.total} {t("inLog")}
-                          </Chip>
-                        )}
-                        {c && c.decisions > 0 && (
-                          <Chip color="var(--k-decision)">
-                            {c.decisions}{" "}
-                            {c.decisions > 1 ? t("decisionCountPlural") : t("decisionCount")}
-                          </Chip>
-                        )}
-                        {c && c.dead_ends > 0 && (
-                          <Chip color="var(--k-dead_end)">
-                            {c.dead_ends}{" "}
-                            {c.dead_ends > 1 ? t("deadEndCountPlural") : t("deadEndCount")}
-                          </Chip>
-                        )}
-                        {c && c.questions > 0 && (
-                          <Chip color="var(--k-question)">
-                            {c.questions} {t("askedCount")}
-                          </Chip>
-                        )}
-                        <span className="mono text-[11px] text-faint">
-                          {ago(task.updated_at, t)}
-                        </span>
-                      </span>
-                    </Link>
-
-                    {/* Moving a task is the commonest thing anybody does here.
-                        It used to live in a second list in the sidebar, which
-                        meant every task appeared on the page twice. */}
-                    <form
-                      action={setStatusAction}
-                      className="ml-auto flex shrink-0 items-center gap-1.5"
-                    >
-                      <input type="hidden" name="task_id" value={task.id} />
-                      {/* Choosing applies it. The apply button next to this was
-                          a second click for the thing people do most, and it
-                          only ever existed because a native select cannot post
-                          a form on its own without script. It still appears
-                          when there is none. */}
-                      <Picker
-                        name="status"
-                        value={task.status}
-                        options={statusOptions(t)}
-                        label={`${t("statusLabel")} — ${task.title}`}
-                        applyLabel={t("apply")}
-                        submitOnPick
-                      />
-                    </form>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {selected.length > shown.length && (
-              <p className="mt-3 border-t border-dashed border-rule pt-3 text-[13px] text-muted">
-                {t("andMore", { n: selected.length - shown.length })}
-              </p>
-            )}
-
-            <details className="mt-3 border-t border-dashed border-rule pt-3">
-              <summary className="link-more">{t("newTask")}</summary>
-              <form action={createTaskAction} className="mt-3 space-y-2">
-                <input type="hidden" name="slug" value={slug} />
-                <Field label={t("taskTitlePh")}>
-                  <input name="title" required />
-                </Field>
-                <Field label={t("taskBodyPh")}>
-                  <textarea name="body" />
-                </Field>
-                <div className="flex flex-wrap items-end gap-2">
-                  <Field label={t("priorityLabel")} className="w-40">
-                    <Picker
-                      name="priority"
-                      value="2"
-                      options={priorityOptions(t)}
-                      label={t("priorityLabel")}
-                    />
-                  </Field>
-                  <SubmitButton pendingLabel={t("working")}>{t("add")}</SubmitButton>
-                </div>
-              </form>
-            </details>
-          </Panel>
-        </main>
-
-        {/* Not pinned, and not scrolling inside itself.
-            It was both, which meant a second scroll context nested in the
-            page: cards came away sliced through the middle at the top and
-            bottom edges with nothing to say why, and the seam moved as the
-            page moved. The rail is reference material -- notes and a roster --
-            and there is no reason it has to stay on screen while the work
-            scrolls past it. As an ordinary column every card is whole and
-            every one of them is reachable. */}
-        {/* `space-y` because the rail holds two panels now. It held one for as
-            long as it existed, so nothing here had ever needed a gap -- and
-            the two arrived stacked edge to edge, reading as one broken card.
-            Same 1.25rem the grid puts between the rail and the work. */}
-        <aside className="min-w-0 mt-9 space-y-5">
-          {/* Who is in this, above the notes, because it is the fact the rest
-              of the page reads differently in light of. The owner keeps the
-              controls; everybody else gets the roster, which is the part that
-              answers "am I working with somebody here". */}
-          <Panel
-            delay={120}
-            className="border-none shadow-none dropshadow-none"
-            title={t("team")}
-            right={<Counter n={members.length + 1} label={t("team")} />}
-          >
-            <ul className="space-y-1.5">
-              <li className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5">
-                <span className="display min-w-0 flex-1 text-[14px] font-bold break-words">
-                  {project.owner_name ?? "—"}
+          {members.map((member) => (
+            <li
+              key={member.id}
+              className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="display block text-[14px] font-bold break-words">
+                  {member.name}
                 </span>
-                <Chip color="var(--k-decision)">{t("teamOwner")}</Chip>
-                {owner && <Chip>{t("teamYou")}</Chip>}
-              </li>
-
-              {members.map((member) => (
-                <li
-                  key={member.id}
-                  className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="display block text-[14px] font-bold break-words">
-                      {member.name}
-                    </span>
-                    {/* The owner sees addresses because the owner invited
-                        them. Between collaborators a name and a handle answer
-                        "who am I working with"; an inbox is not that. */}
-                    <span className="mono block text-[11.5px] break-all text-faint">
-                      {owner ? member.email : `@${member.username}`}
-                    </span>
-                  </span>
-                  {member.user_id === user.id && <Chip>{t("teamYou")}</Chip>}
-                  {owner && (
-                    <form action={removeProjectMemberAction}>
-                      <input type="hidden" name="membership_id" value={member.id} />
-                      <SubmitButton
-                        className="link-more row-action text-meta"
-                        pendingLabel={t("working")}
-                      >
-                        {t("removeCollaborator")}
-                        <span className="sr-only"> — {member.name}</span>
-                      </SubmitButton>
-                    </form>
-                  )}
-                </li>
-              ))}
-
-              {invitations.map((invitation) => (
-                <li
-                  key={invitation.id}
-                  className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="mono block text-[12.5px] break-all">
-                      {invitation.email}
-                    </span>
-                    <span className="block text-[11.5px] text-faint">
-                      {t("teamPending")}
-                    </span>
-                  </span>
-                  <form action={revokeProjectInviteAction}>
-                    <input type="hidden" name="invitation_id" value={invitation.id} />
-                    <SubmitButton
-                      className="link-more row-action text-meta"
-                      pendingLabel={t("working")}
-                    >
-                      {t("revoke")}
-                      <span className="sr-only"> — {invitation.email}</span>
-                    </SubmitButton>
-                  </form>
-                </li>
-              ))}
-            </ul>
-
-            {owner && (
-              <details className="mt-3 border-t border-dashed border-rule pt-3">
-                <summary className="link-more">{t("invitePeople")}</summary>
-                <form action={inviteProjectAction} className="mt-3 space-y-2">
-                  <input type="hidden" name="project_id" value={project.id} />
-                  <Field label={t("inviteEmail")}>
-                    <input name="email" type="email" autoComplete="email" required />
-                  </Field>
-                  <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
-                    {t("inviteSend")}
+                {/* The owner sees addresses because the owner invited
+                    them. Between collaborators a name and a handle answer
+                    "who am I working with"; an inbox is not that. */}
+                <span className="mono block text-[11.5px] break-all text-faint">
+                  {owner ? member.email : `@${member.username}`}
+                </span>
+              </span>
+              {member.user_id === user.id && <Chip>{t("teamYou")}</Chip>}
+              {owner && (
+                <form action={removeProjectMemberAction}>
+                  <input type="hidden" name="membership_id" value={member.id} />
+                  <SubmitButton
+                    className="link-more row-action text-meta"
+                    pendingLabel={t("working")}
+                  >
+                    {t("removeCollaborator")}
+                    <span className="sr-only"> — {member.name}</span>
                   </SubmitButton>
                 </form>
-              </details>
-            )}
-
-            {members.length === 0 && invitations.length === 0 && owner && (
-              <p className="mt-3 text-[13px] text-muted">{t("teamAlone")}</p>
-            )}
-          </Panel>
-
-          <Panel
-            delay={140}
-            className={"border-none shadow-none dropshadow-none"}
-            title={t("projectContext")}
-            right={<Counter n={projectContext.length} label={t("projectContext")} />}
-          >
-            <div className="space-y-3">
-              {projectContext.length === 0 && <Empty>{t("projectContextEmpty")}</Empty>}
-              {/* Capped, the way the stale banner beside it is.
-                  Each of these is a clamped paragraph, so the rail was bounded
-                  per note and not at all in total: the todox project itself
-                  carries 22 notes and 28,512 characters, and the column simply
-                  ran off the bottom of the page. The count in the panel header
-                  is the honest total either way, and the rest are a click
-                  away. */}
-              {projectContext.slice(0, NOTES_SHOWN).map((c) => (
-                <div key={c.id} className="sticker-flat group p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Chip color="var(--k-decision)" tilt={-2}>
-                      {contextKindLabel(t, c.kind)}
-                    </Chip>
-                    <span className="display min-w-0 text-[14.5px] font-bold break-words">
-                      {c.title}
-                    </span>
-                    <form action={deleteContextAction} className="ml-auto">
-                      <input type="hidden" name="context_id" value={c.id} />
-                      <SubmitButton
-                        className="link-more row-action text-meta"
-                        pendingLabel={t("working")}
-                      >
-                        {t("delete")}
-                        <span className="sr-only"> — {c.title}</span>
-                      </SubmitButton>
-                    </form>
-                  </div>
-                  {/* Clamped, because these are paragraphs and the rail is a
-                      summary — and expandable, because for a long time it was
-                      only the first half. */}
-                  <ExpandableText
-                    text={c.body}
-                    more={t("showMore")}
-                    less={t("showLess")}
-                    className="mt-1.5 text-[13.5px] leading-relaxed text-muted"
-                  />
-                </div>
-              ))}
-              {projectContext.length > NOTES_SHOWN && (
-                // Says how many, rather than trailing off. The same sentence
-                // the stale banner uses when its own list is cut.
-                <p className="text-[13px] text-faint">
-                  {t("notesAndMore", { n: projectContext.length - NOTES_SHOWN })}
-                </p>
               )}
-              <details>
-                <summary className="link-more">{t("add")}</summary>
-                <form action={addContextAction} className="mt-3 space-y-2">
-                  <input type="hidden" name="slug" value={slug} />
-                  <Field label={t("projectContext")}>
-                    <Picker
-                      name="kind"
-                      value={CONTEXT_KINDS[0]}
-                      options={kindOptions(t)}
-                      label={t("projectContext")}
-                    />
-                  </Field>
-                  <Field label={t("title")}>
-                    <input name="title" required />
-                  </Field>
-                  <Field label={t("noteBodyPh")}>
-                    <textarea name="body" required />
-                  </Field>
-                  <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
-                    {t("save")}
-                  </SubmitButton>
-                </form>
-              </details>
-            </div>
-          </Panel>
-        </aside>
-      </div>
+            </li>
+          ))}
+
+          {invitations.map((invitation) => (
+            <li
+              key={invitation.id}
+              className="sticker-flat flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="mono block text-[12.5px] break-all">
+                  {invitation.email}
+                </span>
+                <span className="block text-[11.5px] text-faint">
+                  {t("teamPending")}
+                </span>
+              </span>
+              <form action={revokeProjectInviteAction}>
+                <input type="hidden" name="invitation_id" value={invitation.id} />
+                <SubmitButton
+                  className="link-more row-action text-meta"
+                  pendingLabel={t("working")}
+                >
+                  {t("revoke")}
+                  <span className="sr-only"> — {invitation.email}</span>
+                </SubmitButton>
+              </form>
+            </li>
+          ))}
+        </ul>
+
+        {owner && (
+          <details className="mt-3 border-t border-dashed border-rule pt-3">
+            <summary className="link-more">{t("invitePeople")}</summary>
+            <form action={inviteProjectAction} className="mt-3 space-y-2">
+              <input type="hidden" name="project_id" value={project.id} />
+              <Field label={t("inviteEmail")}>
+                <input name="email" type="email" autoComplete="email" required />
+              </Field>
+              <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+                {t("inviteSend")}
+              </SubmitButton>
+            </form>
+          </details>
+        )}
+
+        {members.length === 0 && invitations.length === 0 && owner && (
+          <p className="mt-3 text-[13px] text-muted">{t("teamAlone")}</p>
+        )}
+      </Group>
     </div>
+  );
+}
+
+/**
+ * One task, one row. The card it replaces stacked the title over a row of
+ * chips and put a 44px status picker beside them, so sixty of them ran to
+ * six thousand pixels. The row is the link; the status is the dot and the
+ * group the row sits in; changing it is what the task page is for.
+ */
+function TaskRow({
+  task,
+  count,
+  slug,
+  t,
+}: {
+  task: Task;
+  count: entriesRepo.EntryCounts | undefined;
+  slug: string;
+  t: T;
+}) {
+  const closed = isClosed(task.status);
+  return (
+    <li className="sticker-flat">
+      <Link
+        href={`/p/${slug}/t/${task.id}`}
+        className="flex flex-wrap items-start gap-x-2.5 gap-y-1 p-3 hover:text-ink"
+      >
+        <span className="pt-1">
+          <StatusDot status={task.status} t={t} />
+        </span>
+        <span className="mono pt-0.5 text-[12px] text-faint">#{task.id}</span>
+        <span
+          className={`line-clamp-2 min-w-0 flex-1 basis-56 text-[15px] font-medium break-words ${closed ? "text-muted line-through decoration-1" : ""}`}
+        >
+          {task.title}
+        </span>
+        {/* What is worth a glance and nothing else: urgency, the dead ends
+            the next session must not repeat, the decisions behind the work.
+            The log total and the question count said nothing a reader acts
+            on from a list. */}
+        <span className="ml-auto flex shrink-0 flex-wrap items-center gap-1.5">
+          {task.priority === 1 && !closed && (
+            <Chip color="var(--accent)" tilt={-3}>
+              p1
+            </Chip>
+          )}
+          {count && count.dead_ends > 0 && (
+            <Chip color="var(--k-dead_end)">
+              {count.dead_ends}{" "}
+              {count.dead_ends > 1 ? t("deadEndCountPlural") : t("deadEndCount")}
+            </Chip>
+          )}
+          {count && count.decisions > 0 && (
+            <Chip color="var(--k-decision)">
+              {count.decisions}{" "}
+              {count.decisions > 1 ? t("decisionCountPlural") : t("decisionCount")}
+            </Chip>
+          )}
+          <span className="mono text-[11px] text-faint">{ago(task.updated_at, t)}</span>
+        </span>
+      </Link>
+    </li>
   );
 }

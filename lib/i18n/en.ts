@@ -316,7 +316,6 @@ export const en = {
 
   /* project page */
   inFlight: "In flight",
-  stuck: "Stuck",
   queued: "Queued",
   doneDropped: "Done & dropped",
   projectContext: "Project context",
@@ -336,10 +335,9 @@ export const en = {
   noRemote: "no remote — a second computer registers it again",
   allClear: "All clear.",
   tasks: "tasks",
-  taskFilterLabel: "Filter by status",
-  filterOpen: "open",
-  noTasksHere: "Nothing with this status.",
-  andMore: "{n} more, not shown. Narrow it with the filters above.",
+  queuedEmpty: "Nothing queued.",
+  closedEmpty: "Nothing finished or dropped yet.",
+  andMore: "{n} more, not shown. Search reaches any of them.",
   projectSettings: "Project settings",
   team: "Team",
   teamOwner: "owner",
@@ -368,7 +366,9 @@ export const en = {
   noSummary:
     "No description yet. A sentence or two on what this repository is makes every session that opens it cheaper — add one in project settings.",
   lastLeftOff: "last left off on",
-  notesAndMore: "and {n} more, kept for the agent that asks for them.",
+  notes: "notes",
+  newNote: "+ new note",
+  notesMore: "{n} more",
   emptyProjectsTitleOne: "1 project holds nothing yet",
   emptyProjectsTitleMany: "{n} projects hold nothing yet",
   emptyProjectsBody:
@@ -390,6 +390,7 @@ export const en = {
   // Followed by the task links, so it reads "started #12, #13".
   observationsStarted: "started",
   observationsAndMore: "and {n} older, kept for the agent for two weeks.",
+  observationsLabel: "observations",
   inLog: "in log",
   decisionCount: "decision",
   decisionCountPlural: "decisions",
