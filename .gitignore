@@ -47,3 +47,4 @@ next-env.d.ts
 .superpowers/plans/*.report.md
 .superpowers/plans/review-*.diff
 dist-npm/
+.playwright-mcp/

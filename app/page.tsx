@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { CONTEXT_KINDS } from "@/lib/constants";
-import { ago } from "@/lib/i18n";
-import { firstLine } from "@/lib/util/headline";
 import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import * as apiTokens from "@/lib/repositories/api-tokens";
@@ -26,7 +24,18 @@ import { Landing } from "./features/landing";
 import { Picker } from "./features/picker";
 import { SubmitButton } from "./features/submit";
 import { kindOptions } from "./kinds";
-import { Blob, Chip, Counter, Empty, Field, NoteGroups, Panel } from "./components";
+import {
+  Blob,
+  Composer,
+  Empty,
+  Field,
+  Group,
+  NoteGroups,
+  ProjectCard,
+  ProjectFields,
+  ProjectRow,
+} from "./components";
+import { groupProjects } from "./project-groups";
 import { pageOpenGraph } from "./metadata-shared";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +50,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const TILTS = [-0.6, 0.5, -0.4, 0.7];
 
 export default async function Home() {
   const { t } = await getT();
@@ -142,8 +150,49 @@ export default async function Home() {
    */
   const beforeFirstProject = allProjects.length === 0;
 
+  /**
+   * What is moving, then what is not.
+   *
+   * Every project used to be a card, at equal weight, newest activity first:
+   * thirty-two of them over 4,200px on the account that measured it, with the
+   * six that had work in flight sitting among twenty-four that had none, and
+   * the notes that hold for every project at the very bottom. The page now
+   * reads in the order the agent's briefing does -- the same fold the project
+   * page moved to -- and a quiet project is a row, because there is nothing
+   * happening in it to fill a card with.
+   */
+  const { live, quiet } = groupProjects(
+    allProjects,
+    counts.map,
+    new Set(emptyProjects.map((p) => p.id)),
+  );
+  const countsOf = (id: number) => counts.map.get(id) ?? counts.empty;
+  const teamOf = (id: number) => teamSizes.get(id) ?? 0;
+
+  const newGlobalNote = (
+    <Composer id="new-global-note" label={t("addGlobalNote")} action={addContextAction}>
+      <Field label={t("title")}>
+        <input name="title" autoFocus required />
+      </Field>
+      <Field label={t("noteBodyPh")}>
+        <textarea name="body" required />
+      </Field>
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label={t("globalContext")} className="w-full min-w-0 sm:w-40">
+          <Picker
+            name="kind"
+            value={CONTEXT_KINDS[0]}
+            options={kindOptions(t)}
+            label={t("globalContext")}
+          />
+        </Field>
+        <SubmitButton pendingLabel={t("saving")}>{t("save")}</SubmitButton>
+      </div>
+    </Composer>
+  );
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {beforeFirstProject ? (
         <>
           <div className="pop prose">
@@ -156,7 +205,13 @@ export default async function Home() {
           <Explainer t={t} />
 
           <h2 className="display pop pt-1 text-[25px] font-bold">{t("projects")}</h2>
-          <FirstRun t={t} />
+          {/* The first project is the line. Before it there is one thing to
+              do, so the form is open rather than behind a "+". */}
+          <FirstRun t={t}>
+            <form action={createProjectAction} className="mt-2 w-full max-w-sm space-y-2 text-left">
+              <ProjectFields t={t} />
+            </form>
+          </FirstRun>
         </>
       ) : (
         // The page is a list of projects, so that is its heading. Promoted from
@@ -167,112 +222,96 @@ export default async function Home() {
         </h1>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {allProjects.map((p, i) => {
-          const c = counts.map.get(p.id) ?? counts.empty;
-          return (
-            <Link
-              key={p.id}
-              href={`/p/${p.slug}`}
-              className="sticker lift pop block p-4"
-              style={{
-                animationDelay: `${60 + i * 55}ms`,
-                rotate: `${TILTS[i % TILTS.length]}deg`,
-              }}
-            >
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <h3 className="display text-[20px] font-bold">{p.name}</h3>
-                <span className="mono text-meta text-faint">{p.slug}</span>
-                {/* Somebody else's project, or one of yours that is not only
-                    yours. Two cards used to look identical either way. */}
-                {p.access_role === "member" && p.owner_name ? (
-                  <Chip color="var(--k-handoff)">
-                    {t("sharedBy", { name: p.owner_name })}
-                  </Chip>
-                ) : (
-                  (teamSizes.get(p.id) ?? 0) > 0 && (
-                    <Chip color="var(--k-handoff)">
-                      {t("memberCount", { n: (teamSizes.get(p.id) ?? 0) + 1 })}
-                    </Chip>
-                  )
-                )}
-              </div>
-              {p.summary && (
-                <p className="mt-1.5 line-clamp-2 text-[14px] text-muted">{p.summary}</p>
-              )}
-              {/* Where it left off, which is what a card is for.
-                  Two thirds of projects carry no summary -- 43 of 64 measured
-                  on production -- so for most cards the line above is simply
-                  absent and the card said nothing but a name and some counts.
-                  This says something true today and different tomorrow, and
-                  there is one to say on 28 of the 37 projects with open work.
+      {!beforeFirstProject && (
+        <Group
+          id="live"
+          title={t("inFlight")}
+          count={live.length}
+          countLabel={t("projectsCount")}
+          open
+          delay={60}
+        >
+          {live.length === 0 ? (
+            <Empty mood="happy">{t("liveProjectsEmpty")}</Empty>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {live.map((p) => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  counts={countsOf(p.id)}
+                  teamSize={teamOf(p.id)}
+                  leftOff={leftOff.get(p.id)?.body ?? null}
+                  t={t}
+                />
+              ))}
+            </div>
+          )}
+        </Group>
+      )}
 
-                  Absent rather than empty when there is no handoff: a card
-                  that always carries a line saying nothing happened is the
-                  always-true sentence this page already removed once. */}
-              {leftOff.get(p.id) && (
-                <p className="mt-1.5 line-clamp-2 text-small text-muted">
-                  <span className="mono">{t("lastLeftOff")} </span>
-                  {firstLine(leftOff.get(p.id)!.body, 110)}
-                </p>
-              )}
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {c.doing > 0 && (
-                  <Chip color="var(--accent)" tilt={-2}>
-                    {c.doing} {t("countInFlight")}
-                  </Chip>
-                )}
-                {c.blocked > 0 && (
-                  <Chip color="var(--k-dead_end)" tilt={2}>
-                    {c.blocked} {t("countStuck")}
-                  </Chip>
-                )}
-                <Chip>
-                  {c.todo} {t("countQueued")}
-                </Chip>
-                {c.done > 0 && (
-                  <Chip color="var(--ok)">
-                    {c.done} {t("countDone")}
-                  </Chip>
-                )}
-              </div>
-              <p className="mono mt-2 text-meta text-faint">
-                {t("updated")} {ago(p.activity_at, t)}
-              </p>
-              {p.root_path && (
-                <p className="mono mt-3 truncate text-meta text-faint">{p.root_path}</p>
-              )}
-            </Link>
-          );
-        })}
+      {/* Above the quiet projects, not below every project: these are the
+          notes that hold everywhere, and they used to sit under thirty cards. */}
+      <Group
+        id="global-context"
+        title={t("globalContext")}
+        count={globalContext.length}
+        countLabel={t("notes")}
+        right={<span className="text-small font-normal text-muted">{t("globalContextSub")}</span>}
+        action={newGlobalNote}
+        open
+        delay={120}
+      >
+        {globalContext.length === 0 ? (
+          <Empty>{t("globalEmpty")}</Empty>
+        ) : (
+          // The same rows as a project's notes: a note that ran to three
+          // thousand characters used to push everything under it off the
+          // first screen, and now it is a line until it is opened.
+          <NoteGroups notes={globalContext} t={t} deleteAction={deleteContextAction} />
+        )}
+      </Group>
 
-        <details className="pop rounded-[14px] border border-dashed border-line p-4 open:border-solid open:border-line open:bg-card">
-          <summary className="link-more">{t("newProject")}</summary>
-          <form action={createProjectAction} className="mt-3 space-y-2">
-            <Field label={t("projectNamePh")}>
-              <input name="name" required />
-            </Field>
-            <Field label={t("projectPathLabel")}>
-              <input
-                name="root_path"
-                placeholder={t("projectPathPh")}
-                className="mono text-small"
-              />
-            </Field>
-            <Field label={t("projectSummaryPh")}>
-              <textarea name="summary" />
-            </Field>
-            <SubmitButton pendingLabel={t("working")}>{t("create")}</SubmitButton>
-          </form>
-        </details>
-      </div>
+      {!beforeFirstProject && (
+        <Group
+          id="quiet"
+          title={t("quietProjects")}
+          count={quiet.length}
+          countLabel={t("projectsCount")}
+          // A new project has no work in flight, so this is the group it
+          // lands in, and the "+" sits on the group its result lands in.
+          action={
+            <Composer id="new-project" label={t("newProject")} action={createProjectAction}>
+              <ProjectFields t={t} autoFocus />
+            </Composer>
+          }
+          open
+          delay={180}
+        >
+          {quiet.length === 0 ? (
+            <Empty mood="happy">{t("quietEmpty")}</Empty>
+          ) : (
+            <ul className="space-y-1.5">
+              {quiet.map((p) => (
+                <ProjectRow
+                  key={p.id}
+                  project={p}
+                  counts={countsOf(p.id)}
+                  teamSize={teamOf(p.id)}
+                  t={t}
+                />
+              ))}
+            </ul>
+          )}
+        </Group>
+      )}
 
       {emptyProjects.length > 0 && (
         // Quiet on purpose: a fold, not a banner. These are not a problem to be
         // alarmed about -- they are the cost of registration being frictionless
         // enough that an agent never stops to ask -- so the count is visible
         // and the list is one click away.
-        <details className="sticker pop p-4" style={{ animationDelay: "200ms" }}>
+        <details className="disclosure sticker pop p-4" style={{ animationDelay: "240ms" }}>
           <summary className="cursor-pointer text-[14px]">
             {emptyProjects.length === 1
               ? t("emptyProjectsTitleOne")
@@ -303,56 +342,6 @@ export default async function Home() {
           </ul>
         </details>
       )}
-
-      <Panel
-        delay={220}
-        headingId="global-context"
-        title={
-          <span className="flex flex-wrap items-baseline gap-2">
-            {t("globalContext")}
-            <span className="text-[13px] font-normal text-muted">
-              {t("globalContextSub")}
-            </span>
-          </span>
-        }
-        right={<Counter n={globalContext.length} label={t("globalContext")} />}
-      >
-        <div className="space-y-3">
-          {globalContext.length === 0 ? (
-            <Empty>{t("globalEmpty")}</Empty>
-          ) : (
-            // The same rows as a project's notes: a note that ran to three
-            // thousand characters used to push everything under it off the
-            // first screen, and now it is a line until it is opened.
-            <NoteGroups notes={globalContext} t={t} deleteAction={deleteContextAction} />
-          )}
-
-          <details>
-            <summary className="link-more">{t("addGlobalNote")}</summary>
-            <form action={addContextAction} className="mt-3 space-y-2">
-              <div className="flex flex-wrap gap-2">
-                <Field label={t("globalContext")} className="w-40">
-                  <Picker
-                    name="kind"
-                    value={CONTEXT_KINDS[0]}
-                    options={kindOptions(t)}
-                    label={t("globalContext")}
-                  />
-                </Field>
-                <Field label={t("title")} className="min-w-40 flex-1">
-                  <input name="title" required />
-                </Field>
-              </div>
-              <Field label={t("noteBodyPh")}>
-                <textarea name="body" required />
-              </Field>
-              <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
-                {t("save")}
-              </SubmitButton>
-            </form>
-          </details>
-        </div>
-      </Panel>
 
       {/* The same rule as the pitch above, applied to the last block on the
           page: once an agent has actually connected, telling somebody to

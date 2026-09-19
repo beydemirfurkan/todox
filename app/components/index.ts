@@ -8,5 +8,6 @@ export { Group } from "./group";
 export { MarkdownPreview } from "./markdown-preview";
 export { NoteGroups } from "./note-list";
 export { Empty, Panel } from "./panel";
+export { ProjectCard, ProjectFields, ProjectRow, type ProjectCountRow } from "./project-list";
 export { Tabs, currentTab, type Tab } from "./tabs";
 export { RefBadge, StatusDot } from "./status";
