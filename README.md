@@ -50,6 +50,25 @@ Two things fall out of treating the log as the product:
   note attached to it. Paths are folded to their repo-relative form, so a link
   made on one machine is found from another.
 
+## Why not the memory your agent already has?
+
+Claude Code writes its own notes now (auto memory, on by default since
+February 2026), and Cursor and Codex have theirs. Use them: they are good at
+remembering that you prefer pnpm. What their documentation says, in its own
+words, is that they are per repository, per machine ("machine-local … not
+shared across machines") and per tool, and shared with nobody ("just you").
+todox is for what falls outside that line:
+
+- **Two machines, one log.** A repository is identified by its remote, so the
+  note left on the laptop is read on the desktop.
+- **Every agent, one log.** Claude Code, Codex, Cursor and VS Code all speak
+  MCP; the handoff one leaves is what the next one reads, whichever it is.
+- **The people, too.** A project can be shared, and the log carries who wrote
+  what and which model did it.
+- **A shape a note in a file does not have.** Tasks that open and close, dead
+  ends as their own kind, a report read from the log, a stale note that says
+  so — and a briefing that reports what its caps left out.
+
 ## Try it
 
 **[todox.dev](https://www.todox.dev)** — anyone can register. Small personal

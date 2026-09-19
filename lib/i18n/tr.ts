@@ -39,6 +39,8 @@ export const tr: Record<Key, string> = {
   whatItIsNot1: "Bir Kanban panosu değil. Swimlane, sprint, Gantt yok.",
   whatItIsNot2: "Takım sohbeti değil. Yorumlar anlattıkları değişikliğin yanında durur.",
   whatItIsNot3: "Bir wiki değil. Notlar kısa ve tarihlidir.",
+  whatItIsNot4:
+    "Agent'ının yerleşik hafızasının yerine geçmez. Claude Code'un auto memory'si kendi dokümanına göre repo başına, makine başına ve kimseyle paylaşılmıyor; todox o çizgileri — makineleri, agent'ları ve insanları — aşan günlük.",
   builtBy: "Yapan",
   builtByBody:
     "todox, Furkan Beydemir tarafından geliştirilmiş ve sürdürülmektedir. Depo MIT lisansıyla açık kaynaktır; katkılar GitHub'da kabul edilir.",
@@ -268,7 +270,7 @@ export const tr: Record<Key, string> = {
   title: "başlık",
   none: "yok",
 
-  heroTitle: "Sana ve agent'larına ait bir hafıza",
+  heroTitle: "Bir sonraki oturumun kaldığı yerden devam ettiği günlük",
   heroBody:
     "todox bir yapılacaklar listesi değil. Her görev bir kayıt taşır — arkasındaki kararlar, işe yaramamış denemeler, hâlâ açık sorular ve son oturumun bıraktığı not. Yeni açılan bir agent bunu tek bir get_context çağrısıyla okur ve sana hiçbir şey sormadan devam eder.",
   step1Title: "Yazıya geçer",
@@ -542,6 +544,14 @@ export const tr: Record<Key, string> = {
   landingConnectBody:
     "Tek bir adres ve bir token. Kurulacak paket yok, ayakta tutulacak yerel süreç yok — MCP konuşan her şey bağlanır: Claude Code, Codex, Cursor, VS Code.",
   /* ürünün gerçekten ileri sürdüğü üç iddia ve arkasındaki yük */
+  /* yeni gelenin ilk itirazı, ürünün kendi diliyle cevaplanmış */
+  vsNativeTitle: "Agent'ının zaten bir hafızası varken neden?",
+  vsNativeBody:
+    "Claude Code artık kendi notlarını tutuyor; Cursor'ın ve Codex'in de kendi hafızaları var. Kullan onları: pnpm tercih ettiğini hatırlamakta iyiler. Kendi dokümanlarında söyledikleri şu: repo başına, makine başına, araç başına ve kimseyle paylaşılmıyor. todox o çizginin dışında kalan için.",
+  vsNative1: "İki makine, tek günlük. Repo remote'uyla tanınır; dizüstünde bırakılan not masaüstünde okunur.",
+  vsNative2: "Her agent, tek günlük. Claude Code, Codex, Cursor ve VS Code hepsi MCP konuşur; birinin bıraktığı devri hangisi olursa olsun bir sonraki okur.",
+  vsNative3: "İnsanlar da. Bir proje paylaşılabilir; günlük kimin ne yazdığını ve hangi modelin yaptığını taşır.",
+  vsNative4: "Bir dosyadaki notun sahip olmadığı biçim: açılıp kapanan görevler, kendi türü olan çıkmaz sokaklar, günlükten okunan rapor ve bayat olduğunu kendisi söyleyen not.",
   diffTitle: "Kayda neden güvenilir",
   diff1Title: "Çıkmaz sokak bir kayıt türü",
   diff1Body:

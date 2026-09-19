@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { T } from "@/lib/i18n";
 import { Blob } from "../components";
 import { BriefingPreview } from "./briefing-preview";
-import { Differences, Explainer } from "./explainer";
+import { Differences, Explainer, VsNative } from "./explainer";
 
 /**
  * What somebody sees at todox.dev before they have an account.
@@ -66,6 +66,10 @@ export function Landing({ t }: { t: T }) {
           and the payload is unreadable to somebody who has not been told what
           to look for in it. */}
       <Differences t={t} />
+      {/* The objection before the evidence: somebody who has just read three
+          claims about a log is about to ask why the notes their agent already
+          keeps are not that log. */}
+      <VsNative t={t} />
       <BriefingPreview t={t} />
 
       <section className="sticker pop p-5" style={{ animationDelay: "300ms" }}>
