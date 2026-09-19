@@ -60,6 +60,13 @@ describe("what stays reachable without a session", () => {
     expect(redirected(proxy(request(path)))).toBe(false);
   });
 
+  it.each(["/blog", "/blog/six-weeks-on-our-own-log"])(
+    "serves %s, because a post is for whoever finds the link",
+    (path) => {
+      expect(redirected(proxy(request(path)))).toBe(false);
+    },
+  );
+
   it.each(["/login", "/register", "/forgot", "/reset", "/verify", "/invite"])(
     "serves %s, because a signed-out visitor is the only one who wants it",
     (path) => {

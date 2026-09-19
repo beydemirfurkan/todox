@@ -23,6 +23,7 @@ todox is a small, opinionated workspace for a developer and the agents they work
 - https://www.todox.dev/login — sign in.
 - https://www.todox.dev/register — create an account.
 - https://www.todox.dev/forgot — request a password-reset link.
+- https://www.todox.dev/blog — what we measured running todox on our own work; the first post is six weeks of our own log.
 
 Authenticated routes (/p/*, /account, /report, /search) are not listed here. Without a session cookie they redirect to /login, so a link into one will not show you anything.
 
