@@ -126,7 +126,7 @@ async function main() {
           </div>
 
           <div style={{ display: "flex", marginTop: 28, fontSize: 40, lineHeight: 1.25 }}>
-            Working memory for developers and their agents
+            The log your next session resumes from
           </div>
 
           <div
@@ -138,7 +138,7 @@ async function main() {
               fontFamily: "sans-serif",
             }}
           >
-            Not a checklist — a log your next session can resume from
+            Across your machines, every agent and your team
           </div>
 
           <div style={{ display: "flex", gap: 14, marginTop: 34 }}>
