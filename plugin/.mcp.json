@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "todox": {
+      "type": "http",
+      "url": "https://www.todox.dev/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${user_config.token}"
+      }
+    }
+  }
+}
