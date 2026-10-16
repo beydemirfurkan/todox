@@ -492,19 +492,30 @@ async function runSuite(mode: Mode, token: string) {
   await text("delete_context", { context_id: fileNote.id });
   const status = linked.files[0].status;
 
-  // Locally the process reads the file on the way through, so the answer is
-  // already there. Remotely the server has been told a hash but nobody has
-  // looked since -- and "not checked" is what it must say until somebody has.
-  const first = mode.local ? "fresh" : "unknown";
-  if (status !== first)
-    throw new Error(`linked file should read ${first} in ${mode.label}, got ${status}`);
+  // Fresh on both transports. A hash sent with a link is what the caller just
+  // read, so it counts as a check: hosted links used to read "unknown" until a
+  // separate report_file_hashes, and in production almost none ever got one --
+  // one of October's 58 hosted links carried a hash and none carried a check.
+  if (status !== "fresh")
+    throw new Error(`a file linked with its hash should read fresh in ${mode.label}, got ${status}`);
   console.log("straight after linking:", status);
 
+  // The id a hosted agent reports against, handed over by the call it makes
+  // before an edit -- not only by get_task.
+  const viaFile = JSON.parse(await text("get_file_context", { path: marker, cwd: SCRATCH }));
+  const viaFileLink = viaFile.tasks.find((t: { id: number }) => t.id === taskId)?.link;
+  if (!viaFile.linked || viaFileLink?.id !== refId || viaFileLink?.status !== "fresh")
+    throw new Error(`get_file_context did not hand back the link: ${JSON.stringify(viaFile)}`);
+  const nothing = JSON.parse(
+    await text("get_file_context", { path: join(SCRATCH, "src", "deep", "untouched.ts"), cwd: SCRATCH }),
+  );
+  if (nothing.linked !== false) throw new Error("a file nothing touches did not say linked:false");
+
   if (!mode.local) {
-    // The remote half of the loop, which had no tool at all: the agent hashes
-    // what it was handed and reports back. Without it every hosted ref stayed
-    // "unknown" for ever and the staleness feature never ran.
-    await text("report_file_hashes", { refs: [{ id: refId, hash: sha256(marker) }] });
+    // The remote half of the loop: the agent re-hashes what it was handed and
+    // reports back, in either hex case -- PowerShell prints upper case, and the
+    // pattern used to refuse the whole call.
+    await text("report_file_hashes", { refs: [{ id: refId, hash: sha256(marker).toUpperCase() }] });
     const seen = JSON.parse(await text("get_task", { task_id: taskId }));
     const seenRef = byRef(seen.files, refId);
     if (seenRef.status !== "fresh")
@@ -535,8 +546,8 @@ async function runSuite(mode: Mode, token: string) {
   const urlRef = withPlan.files.find((f: { path: string }) => f.path === artifact);
   if (!planRef) throw new Error(`the plan outside the repo is not on the task: ${JSON.stringify(withPlan.files)}`);
   if (!urlRef) throw new Error(`the artifact URL is not on the task: ${JSON.stringify(withPlan.files)}`);
-  if (planRef.status !== (mode.local ? "fresh" : "unknown"))
-    throw new Error(`a plan outside the repo should read ${mode.local ? "fresh" : "unknown"} here, got ${planRef.status}`);
+  if (planRef.status !== "fresh")
+    throw new Error(`a plan outside the repo linked with its hash should read fresh, got ${planRef.status}`);
   if (urlRef.status !== "unknown")
     throw new Error(`a URL can never be checked and must read unknown, got ${urlRef.status}`);
   // Windows spelling on the way in, folded spelling stored: the same file

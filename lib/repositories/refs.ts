@@ -79,7 +79,7 @@ export async function link(input: {
   const byPath = new Map(
     input.paths.map((p) => {
       const path = storedPath(p.path);
-      return [path, { ...p, path }];
+      return [path, { ...p, path, hash: p.hash?.toLowerCase() ?? null }];
     }),
   );
   const paths = [...byPath.values()];
@@ -107,6 +107,13 @@ export async function link(input: {
   // description tells it to. The first link keeps its `hash`, because that is
   // the baseline the existing note was written against; a note or a hash
   // supplied later fills in one that was missing.
+  //
+  // A hash sent with a link is also a report: the caller just read the file
+  // and that is what it found. Recording it as `hash_seen`/`checked_at` is what
+  // lets a hosted link read "fresh" at once. Before this, only
+  // `report_file_hashes` set them, so a hosted agent that hashed every file it
+  // linked still got "not checked" back -- in October 2026 one of 58 hosted
+  // links carried a hash at all, and none of them carried a check.
   const same = `r.task_id IS NOT DISTINCT FROM v.task_id
                 AND r.context_id IS NOT DISTINCT FROM v.context_id
                 AND r.path = v.path`;
@@ -116,14 +123,17 @@ export async function link(input: {
        VALUES ${tuples.join(", ")}
      ), updated AS (
        UPDATE refs r
-       SET note      = COALESCE(v.note, r.note),
-           hash      = COALESCE(r.hash, v.hash),
-           linked_at = v.linked_at
+       SET note       = COALESCE(v.note, r.note),
+           hash       = COALESCE(r.hash, v.hash),
+           hash_seen  = CASE WHEN v.hash IS NULL THEN r.hash_seen ELSE v.hash END,
+           checked_at = CASE WHEN v.hash IS NULL THEN r.checked_at ELSE v.linked_at END,
+           linked_at  = v.linked_at
        FROM v WHERE ${same}
        RETURNING r.*
      ), inserted AS (
-       INSERT INTO refs (task_id, context_id, path, note, hash, linked_at)
-       SELECT v.task_id, v.context_id, v.path, v.note, v.hash, v.linked_at
+       INSERT INTO refs (task_id, context_id, path, note, hash, linked_at, hash_seen, checked_at)
+       SELECT v.task_id, v.context_id, v.path, v.note, v.hash, v.linked_at, v.hash,
+              CASE WHEN v.hash IS NULL THEN NULL ELSE v.linked_at END
        FROM v
        WHERE NOT EXISTS (SELECT 1 FROM refs r WHERE ${same})
        ON CONFLICT DO NOTHING
@@ -170,7 +180,7 @@ export async function recordCheck(
   // without telling anyone.
   const values: unknown[] = [ts];
   const tuples = seen.map((s) => {
-    values.push(s.id, s.hash);
+    values.push(s.id, s.hash?.toLowerCase() ?? null);
     // The casts are not decoration: a column of all-NULL hashes gives Postgres
     // nothing to infer a type from, and the statement fails to plan.
     return "(?::int, ?::text)";

@@ -20,7 +20,12 @@ const mocks = vi.hoisted(() => ({
   perKind: vi.fn(),
 }));
 
-vi.mock("../repositories/refs", () => ({ listByPaths: mocks.listPaths }));
+// `freshness` is the real one: it is pure, and the answer is only worth
+// asserting if it is the comparison the briefing makes too.
+vi.mock("../repositories/refs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../repositories/refs")>()),
+  listByPaths: mocks.listPaths,
+}));
 vi.mock("../repositories/project-paths", () => ({ listFor: mocks.listFor }));
 vi.mock("../repositories/tasks", () => ({ byIds: mocks.taskByIds }));
 vi.mock("../repositories/contexts", () => ({ byIds: mocks.contextByIds }));
@@ -180,5 +185,39 @@ describe("what it refuses to hand back", () => {
       { id: 9, project_id: null, user_id: 8, kind: "preference", title: "t", body: "b" },
     ]);
     expect((await ask("lib/auth.ts")).notes).toEqual([]);
+  });
+});
+
+/**
+ * A hosted agent can only report on a link whose id it holds, and before an
+ * edit this is the call it makes. It used to hand back no id, no hash and no
+ * status -- so a note's link could not be reported on from anywhere -- and an
+ * answer about a file nothing touches was two empty arrays to be interpreted.
+ */
+describe("the link, for an agent that can hash", () => {
+  const H = "a".repeat(64);
+  const B = "b".repeat(64);
+
+  it("says outright when nothing is linked", async () => {
+    expect((await ask("lib/auth.ts")).linked).toBe(false);
+  });
+
+  it("hands back the ref id, the baseline and its status for a task", async () => {
+    mocks.listPaths.mockResolvedValue([
+      ref({ id: 31, task_id: 4, hash: H, hash_seen: B, checked_at: "2026-10-16T08:00:00Z" }),
+    ]);
+    mocks.taskByIds.mockResolvedValue([{ id: 4, project_id: 1, title: "t", status: "todo", priority: 2 }]);
+    const out = await ask("lib/auth.ts");
+    expect(out.linked).toBe(true);
+    expect(out.tasks[0].link).toEqual({ id: 31, hash: H, status: "changed", checked_at: "2026-10-16T08:00:00Z" });
+  });
+
+  it("does the same for a note's link, which nothing else exposes", async () => {
+    mocks.listPaths.mockResolvedValue([ref({ id: 32, context_id: 9, hash: H })]);
+    mocks.contextByIds.mockResolvedValue([
+      { id: 9, project_id: 1, user_id: 7, kind: "gotcha", title: "g", body: "b" },
+    ]);
+    const out = await ask("lib/auth.ts");
+    expect(out.notes[0].link).toMatchObject({ id: 32, status: "unknown" });
   });
 });

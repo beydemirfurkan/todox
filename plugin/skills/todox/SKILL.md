@@ -23,7 +23,7 @@ LOOK UP: search covers every project. Ask it in words -- the query is
 parsed and ranked -- and quote a phrase to require it. kinds:['dead_end'] answers
 'has this been tried?', kinds:['decision'] 'why is it like this?'.
 BEFORE YOU EDIT A FILE: get_file_context(path) gives the tasks, dead ends and
-notes attached to it -- the cheapest call here and the one most worth making.
+notes attached to it; `linked:false` means none. Cheap, and worth making.
 DO NOT READ list_tasks status:'all' or activity_report period:'all': they
 return everything ever, bodies included.
 
