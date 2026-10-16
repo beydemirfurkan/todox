@@ -30,6 +30,7 @@ import { silentAccountNudge } from "./nudge";
 import { search } from "./search";
 import { sessionStatus } from "./session-status";
 import * as taskService from "./task-service";
+import { logError } from "../server/log";
 import { isAbsolutePath, normalisePath, scrubRemote } from "../util/paths";
 import { resolvePeriod, type PeriodName } from "../util/time";
 import { hashToken } from "../util/tokens";
@@ -224,13 +225,16 @@ export const methods = {
 
     if (create) {
       const { project, created, warning } = await resolveOrCreate(userId, which, hints);
+      pruneEmptyProjects(userId, project.id);
       return {
         project_created: created,
         ...(warning ? { warning } : {}),
         ...(await briefing(userId, project, p.focus)),
       };
     }
-    return briefing(userId, await mustResolve(userId, which, hints), p.focus);
+    const project = await mustResolve(userId, which, hints);
+    pruneEmptyProjects(userId, project.id);
+    return briefing(userId, project, p.focus);
   },
 
   listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {
@@ -646,6 +650,29 @@ export const methods = {
   MethodName,
   Handler
 >;
+
+/**
+ * How long a project may hold nothing before a session start removes it.
+ *
+ * Long enough that a repository opened on Monday and first written to on
+ * Friday survives; short enough that the 30 production projects that had held
+ * nothing for over a week (2026-10-16) do not.
+ */
+const EMPTY_PROJECT_DAYS = 7;
+
+/**
+ * Take out the caller's long-empty projects, at the one moment every session
+ * has: there is no scheduler in this deployment, and the observation write the
+ * other retention sweep rides on almost never happens over the hosted endpoint.
+ * Not awaited -- the briefing must not wait on housekeeping -- and the project
+ * being opened is never a candidate, however empty.
+ */
+function pruneEmptyProjects(userId: number, keep: number) {
+  const cutoff = new Date(Date.now() - EMPTY_PROJECT_DAYS * 86_400_000).toISOString();
+  void projectsRepo
+    .removeEmptyOlderThan(userId, cutoff, keep)
+    .catch((e) => logError("projects.pruneFailed", e));
+}
 
 export type { MethodName };
 
