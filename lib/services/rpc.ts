@@ -23,13 +23,14 @@ import {
 } from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
 import * as projectActivity from "./project-activity";
-import { mustResolve, noMatch, resolve, resolveOrCreate } from "./project-resolver";
+import { existingFor, mustResolve, noMatch, resolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { silentAccountNudge } from "./nudge";
 import { search } from "./search";
 import { sessionStatus } from "./session-status";
 import * as taskService from "./task-service";
+import { logError } from "../server/log";
 import { isAbsolutePath, normalisePath, scrubRemote } from "../util/paths";
 import { resolvePeriod, type PeriodName } from "../util/time";
 import { hashToken } from "../util/tokens";
@@ -130,15 +131,33 @@ export const methods = {
       repo_url?: string;
       summary?: string;
     },
-  ) =>
-    projectsRepo.create(userId, {
+  ) => {
+    // Normalised the way auto-registration normalises it. These two used to
+    // disagree, and the stored form is now something resolution matches on.
+    const rootPath = p.root_path ? normalisePath(p.root_path) : undefined;
+    const repoUrl = p.repo_url ? scrubRemote(p.repo_url) : undefined;
+
+    // Naming a project is deliberate, registering one repository twice is not:
+    // the twin got the next free slug and the history split from then on.
+    const existing = await existingFor(userId, { rootPath, repoUrl });
+    if (existing) {
+      return {
+        ...existing,
+        created: false,
+        warning:
+          `"${existing.slug}" is already this repository, so nothing was created. ` +
+          "Pass it as `project` from now on.",
+      };
+    }
+
+    const project = await projectsRepo.create(userId, {
       ...p,
-      // Normalised the way auto-registration normalises it. These two used to
-      // disagree, and the stored form is now something resolution matches on.
-      root_path: p.root_path ? normalisePath(p.root_path) : undefined,
-      repo_url: p.repo_url ? scrubRemote(p.repo_url) : undefined,
+      root_path: rootPath,
+      repo_url: repoUrl,
       slug: await projectsRepo.nextFreeSlug(userId, p.slug ?? p.name),
-    }),
+    });
+    return { ...project, created: true };
+  },
 
   updateProject: async (
     { userId },
@@ -206,13 +225,16 @@ export const methods = {
 
     if (create) {
       const { project, created, warning } = await resolveOrCreate(userId, which, hints);
+      pruneEmptyProjects(userId, project.id);
       return {
         project_created: created,
         ...(warning ? { warning } : {}),
         ...(await briefing(userId, project, p.focus)),
       };
     }
-    return briefing(userId, await mustResolve(userId, which, hints), p.focus);
+    const project = await mustResolve(userId, which, hints);
+    pruneEmptyProjects(userId, project.id);
+    return briefing(userId, project, p.focus);
   },
 
   listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {
@@ -628,6 +650,29 @@ export const methods = {
   MethodName,
   Handler
 >;
+
+/**
+ * How long a project may hold nothing before a session start removes it.
+ *
+ * Long enough that a repository opened on Monday and first written to on
+ * Friday survives; short enough that the 30 production projects that had held
+ * nothing for over a week (2026-10-16) do not.
+ */
+const EMPTY_PROJECT_DAYS = 7;
+
+/**
+ * Take out the caller's long-empty projects, at the one moment every session
+ * has: there is no scheduler in this deployment, and the observation write the
+ * other retention sweep rides on almost never happens over the hosted endpoint.
+ * Not awaited -- the briefing must not wait on housekeeping -- and the project
+ * being opened is never a candidate, however empty.
+ */
+function pruneEmptyProjects(userId: number, keep: number) {
+  const cutoff = new Date(Date.now() - EMPTY_PROJECT_DAYS * 86_400_000).toISOString();
+  void projectsRepo
+    .removeEmptyOlderThan(userId, cutoff, keep)
+    .catch((e) => logError("projects.pruneFailed", e));
+}
 
 export type { MethodName };
 

@@ -20,11 +20,16 @@ import { LANG_COOKIE, SESSION_COOKIE } from "./lib/cookies";
  */
 
 /** Enough of a NextRequest for the function under test: a URL and cookies. */
-const request = (path: string, cookies: Record<string, string> = {}) => {
+const request = (
+  path: string,
+  cookies: Record<string, string> = {},
+  headers: Record<string, string> = {},
+) => {
   const url = new URL(`https://todox.dev${path}`);
   return {
     nextUrl: Object.assign(url, { clone: () => new URL(url.toString()) }),
     cookies: { get: (name: string) => (name in cookies ? { value: cookies[name] } : undefined) },
+    headers: new Headers(headers),
   } as unknown as Parameters<typeof proxy>[0];
 };
 
@@ -166,5 +171,32 @@ describe("?lang=", () => {
     // value in the cookie every later request reads.
     const res = proxy(request("/?lang=klingon"));
     expect(res.cookies.get(LANG_COOKIE)).toBeUndefined();
+  });
+});
+
+/**
+ * Scanners post `Next-Action: x` about twenty times an hour, and Next answers
+ * each with a stack trace outside the JSON log. The real ids are 42 hex
+ * characters; anything else is refused here, and a real one must still pass.
+ */
+describe("a Next-Action header", () => {
+  it("refuses one no build could have issued", () => {
+    const res = proxy(request("/", {}, { "next-action": "x" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("refuses one of the right length that is not hex", () => {
+    const res = proxy(request("/", signedIn, { "next-action": "z".repeat(42) }));
+    expect(res.status).toBe(400);
+  });
+
+  it("lets a real action id through to the gate", () => {
+    const id = "403d394e5f7e8ae6c9db5361438c5a30797304fe6c";
+    const res = proxy(request("/account", signedIn, { "next-action": id }));
+    expect(res.status).toBe(200);
+  });
+
+  it("leaves a request without one alone", () => {
+    expect(proxy(request("/account", signedIn)).status).toBe(200);
   });
 });

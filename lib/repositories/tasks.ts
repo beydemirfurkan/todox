@@ -103,6 +103,34 @@ export async function pageByProject(
   return { rows, total };
 }
 
+/**
+ * The 'doing' tasks nobody has touched since `before`, oldest first, with how
+ * many there are in all.
+ *
+ * Its own query because the lists the stale check used to read were cut by
+ * priority and newest first -- fifty rows -- so the oldest 'doing' tasks, the
+ * ones the check exists for, were the first thing the cut removed. One account
+ * had 54 of them on 2026-10-16.
+ */
+export async function staleDoing(
+  projectId: number,
+  before: string,
+  limit: number,
+): Promise<{ rows: Task[]; total: number }> {
+  const [rows, count] = await Promise.all([
+    all<Task>(
+      `SELECT * FROM tasks WHERE project_id = ? AND status = 'doing' AND updated_at < ?
+       ORDER BY updated_at LIMIT ?`,
+      [projectId, before, limit],
+    ),
+    one<{ n: string }>(
+      "SELECT count(*) AS n FROM tasks WHERE project_id = ? AND status = 'doing' AND updated_at < ?",
+      [projectId, before],
+    ),
+  ]);
+  return { rows, total: Number(count?.n ?? 0) };
+}
+
 function limitedByProject(projectId: number, status: StatusFilter, limit: number) {
   if (status === "all")
     return all<Task>(

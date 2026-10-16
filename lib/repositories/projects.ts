@@ -189,6 +189,26 @@ export const removeStmt = (userId: number, id: number): Statement => ({
   params: [id, userId],
 });
 
+/** True of a project row that holds nothing: see `removeIfEmpty`. */
+const HOLDS_NOTHING = `NOT EXISTS (SELECT 1 FROM tasks WHERE project_id = projects.id)
+        AND NOT EXISTS (SELECT 1 FROM contexts WHERE project_id = projects.id)
+        -- A project with people in it is not empty, whatever it holds.
+        --
+        -- Tasks and notes were the whole test, and the state right after
+        -- inviting somebody into a fresh repo is exactly no tasks and no
+        -- notes: the project appeared in the home page's "holds nothing yet"
+        -- fold with a one-click remove, and the click cascaded the membership
+        -- and the pending invitation away. No confirmation, no mention of the
+        -- team, and nothing anywhere said a person had lost access.
+        --
+        -- Checked against a real database: one member and one open invitation,
+        -- and the delete removed all three rows.
+        AND NOT EXISTS (SELECT 1 FROM project_memberships WHERE project_id = projects.id)
+        AND NOT EXISTS (
+          SELECT 1 FROM project_invitations
+           WHERE project_id = projects.id AND accepted_at IS NULL AND revoked_at IS NULL
+        )`;
+
 /**
  * Remove a project only while it still holds nothing. Returns 0 when it does.
  *
@@ -211,25 +231,26 @@ export const removeIfEmpty = (userId: number, id: number) =>
   run(
     `DELETE FROM projects
       WHERE id = ? AND user_id = ?
-        AND NOT EXISTS (SELECT 1 FROM tasks WHERE project_id = projects.id)
-        AND NOT EXISTS (SELECT 1 FROM contexts WHERE project_id = projects.id)
-        -- A project with people in it is not empty, whatever it holds.
-        --
-        -- Tasks and notes were the whole test, and the state right after
-        -- inviting somebody into a fresh repo is exactly no tasks and no
-        -- notes: the project appeared in the home page's "holds nothing yet"
-        -- fold with a one-click remove, and the click cascaded the membership
-        -- and the pending invitation away. No confirmation, no mention of the
-        -- team, and nothing anywhere said a person had lost access.
-        --
-        -- Checked against a real database: one member and one open invitation,
-        -- and the delete removed all three rows.
-        AND NOT EXISTS (SELECT 1 FROM project_memberships WHERE project_id = projects.id)
-        AND NOT EXISTS (
-          SELECT 1 FROM project_invitations
-           WHERE project_id = projects.id AND accepted_at IS NULL AND revoked_at IS NULL
-        )`,
+        AND ${HOLDS_NOTHING}`,
     [id, userId],
+  );
+
+/**
+ * Remove the account's projects that have held nothing since before `cutoff`,
+ * except `keep` -- the one the caller is standing in right now.
+ *
+ * `get_context` registers a project for any repository an agent opens, which is
+ * what lets the first capture work on the first try. The cost was measured on
+ * 2026-10-16: 37 of 112 production projects held nothing, 30 of them for more
+ * than a week. Same WHERE as `removeIfEmpty`, so the race it closes stays
+ * closed: a project that gains a task between the read and the delete stays.
+ */
+export const removeEmptyOlderThan = (userId: number, cutoff: string, keep: number) =>
+  run(
+    `DELETE FROM projects
+      WHERE user_id = ? AND created_at < ? AND id <> ?
+        AND ${HOLDS_NOTHING}`,
+    [userId, cutoff, keep],
   );
 
 /**

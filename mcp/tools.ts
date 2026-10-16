@@ -692,7 +692,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("create_project", "createProject", {
     title: "Create project",
     description:
-      "Register a project by name. Usually unnecessary: get_context and create_task register one from `cwd`.",
+      "Register a project by name. Usually unnecessary: get_context and create_task register one from `cwd`. A `root_path` or `repo_url` already registered returns that project (`created: false`) instead of a twin.",
   });
 
   tool("update_project", "updateProject", {
