@@ -30,6 +30,7 @@ import { silentAccountNudge } from "./nudge";
 import { search } from "./search";
 import { sessionStatus } from "./session-status";
 import * as taskService from "./task-service";
+import { headlineHint, quickCloseHint } from "./write-hints";
 import { logError } from "../server/log";
 import { isAbsolutePath, normalisePath, scrubRemote } from "../util/paths";
 import { resolvePeriod, type PeriodName } from "../util/time";
@@ -332,7 +333,11 @@ export const methods = {
   ) => {
     await assertTask(userId, p.task_id);
     const { task_id, model, ...patch } = p;
-    return taskService.update(task_id, patch, { model, user_id: userId });
+    const task = await taskService.update(task_id, patch, { model, user_id: userId });
+    // Only on the call that closed it: a later title edit on a task that was
+    // closed quickly long ago is not news.
+    const hint = p.status === "done" && task ? quickCloseHint(task) : undefined;
+    return hint ? { ...task, hint } : task;
   },
 
   logEntry: async (
@@ -353,7 +358,9 @@ export const methods = {
     // observation, and marking somebody else's handled would quietly remove it
     // from a briefing that was not this caller's.
     if (p.from_observation_id != null) await assertObservation(userId, p.from_observation_id);
-    return taskService.addEntry({ ...p, user_id: userId });
+    const entry = await taskService.addEntry({ ...p, user_id: userId });
+    const hint = headlineHint(p.body);
+    return hint ? { ...entry, hint } : entry;
   },
 
   linkFiles: async (

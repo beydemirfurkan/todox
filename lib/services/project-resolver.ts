@@ -397,7 +397,8 @@ const noEvidence = (ref: string) =>
   `no repository at ${ref}. todox registers repositories, not directories, ` +
   `and nothing here says this path is one. Send \`repo_root\` -- the directory ` +
   `holding .git -- or \`repo_url\` from \`git remote get-url origin\`, and the ` +
-  `same call will register it. If this is a scratch directory rather than a ` +
+  `same call will register it: get_context(cwd:"${ref}", repo_root:"<the directory ` +
+  `holding .git>"). If this is a scratch directory rather than a ` +
   `checkout, pass \`project\` to work in an existing project, or ` +
   `\`create_project\` to name one deliberately.`;
 
