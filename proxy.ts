@@ -144,8 +144,31 @@ function cached(pathname: string, res: NextResponse): NextResponse {
   return res;
 }
 
+/**
+ * What a server action id looks like: 42 hex characters, every one of the 37
+ * in the build's server-reference manifest (checked 2026-10-16).
+ */
+const SERVER_ACTION_ID = /^[0-9a-f]{42}$/i;
+
+/**
+ * Refuse a `Next-Action` header no build could have issued, before Next does.
+ *
+ * Scanners send `Next-Action: x` around the clock -- about twenty an hour since
+ * 2026-09-27, 6,649 by 2026-10-16. Next answers each with a three-line stack
+ * trace on stderr, outside the JSON log, so a real error would arrive buried in
+ * them. The answer is the same refusal; it just stops costing a stack trace.
+ */
+function malformedAction(req: NextRequest): NextResponse | undefined {
+  const action = req.headers.get("next-action");
+  if (action === null || SERVER_ACTION_ID.test(action)) return undefined;
+  return new NextResponse("Bad Request", { status: 400 });
+}
+
 export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  const malformed = malformedAction(req);
+  if (malformed) return malformed;
 
   // Before everything: it applies to any page, and the redirect it returns is
   // what the rules below should be deciding about.
