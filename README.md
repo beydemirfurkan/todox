@@ -84,6 +84,24 @@ todox is for what falls outside that line:
   ends as their own kind, a report read from the log, a stale note that says
   so — and a briefing that reports what its caps left out.
 
+### Beside other memory servers
+
+Compared with what each project's own README says (read 2026-10-16). Where a
+README does not describe something, the cell says so rather than guessing.
+
+| | todox | [MCP memory server](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | [Basic Memory](https://github.com/basicmachines-co/basic-memory) | [Mem0](https://github.com/mem0ai/mem0) |
+| --- | --- | --- | --- | --- |
+| What it stores | tasks, each with a log of decisions, dead ends, questions and handoffs; standing notes | a knowledge graph: entities, relations, observations | Markdown notes, with a SQLite index locally | facts an LLM extracts from conversations |
+| Where | Postgres, hosted or your own | a local JSONL file | files on your disk; a paid cloud option syncs them | self-hosted server or a managed platform |
+| Two machines | one log, a repository identified by its git remote | not described; the file is not safe on a network filesystem | manual (Git, Syncthing) or the cloud option | through the server or platform |
+| Work with a shape | yes: a task opens and closes, and a dead end is its own kind | not described | free-form observations with categories; no task or dead-end type described | not described |
+| Knows when code moved on | yes: the agent hashes linked files and a changed one is flagged | not described | not described | not described |
+| Needs an LLM API key | no | not described | not described | yes; OpenAI is the default |
+
+They solve different problems. A knowledge graph or a notes vault is a good
+place for what is true about a person or a domain; todox is for the state of
+work in a repository, and for not repeating what already failed there.
+
 ## Try it
 
 **[todox.dev](https://www.todox.dev)** — anyone can register. Small personal
