@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, promises as fs, rmSync } from "node:fs";
 import * as path from "node:path";
 import { tmpdir } from "node:os";
@@ -52,6 +52,15 @@ beforeEach(async () => {
   state.reports = [];
   state.ok = true;
   await fs.mkdir(state.home, { recursive: true });
+  // VS Code's config on Windows lives under %APPDATA%, which the homedir mock
+  // does not reach. Left alone, the "nothing on it" machine was the developer's
+  // own: a real VS Code mcp.json made the suite red on every Windows box that
+  // had one, and green on CI, which has none.
+  vi.stubEnv("APPDATA", path.join(state.home, "AppData", "Roaming"));
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 const TOKEN = "todox_0123456789abcdefghij";
