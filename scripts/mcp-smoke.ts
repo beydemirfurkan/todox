@@ -695,6 +695,25 @@ async function runSuite(mode: Mode, token: string) {
     throw new Error(`the question and its answer should both survive; found ${kinds.length}`);
   console.log("answered: out of the briefing, still in the log");
 
+  // Advice rides on the write rather than refusing it, and has to survive both
+  // transports to be any use: half of production handoffs opened with a line
+  // the briefing cuts off.
+  console.log("\n--- a write with a headline the briefing would cut says so ---");
+  const longHead = JSON.parse(
+    await text("log_entry", {
+      task_id: openA,
+      kind: "note",
+      body: `SMOKE-LONG ${"x".repeat(300)}\nbody`,
+      model: MODEL,
+    }),
+  );
+  if (!longHead.hint) throw new Error("a 300-character headline came back without a hint");
+  const shortHead = JSON.parse(
+    await text("log_entry", { task_id: openA, kind: "note", body: "SMOKE-SHORT\nbody", model: MODEL }),
+  );
+  if (shortHead.hint) throw new Error(`a short headline got advice it did not need: ${shortHead.hint}`);
+  console.log("hinted the long one, left the short one alone");
+
   await text("add_context", {
     kind: "preference",
     title: "SMOKE-EVERYWHERE",
