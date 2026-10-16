@@ -31,9 +31,9 @@
     "bench:memory": "tsx scripts/memory-bench/index.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "next": "16.3.3",
-    "nodemailer": "^9.1.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "next": "16.3.8",
+    "nodemailer": "^10.1.1",
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -49,7 +49,7 @@
     "@types/react-dom": "^19.2.5",
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9",
-    "eslint-config-next": "16.3.3",
+    "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
     "typescript": "^5",
@@ -57,9 +57,13 @@
   },
   "pnpm": {
     "overrides": {
-      "fast-uri": "^3.1.6",
+      "fast-uri": "^3.1.8",
       "hono": "^4.13.5",
-      "qs": "^6.16.0"
+      "qs": "^6.16.0",
+      "proxy-addr": "^2.0.8",
+      "ip-address": "^10.7.1",
+      "source-map-js": "^1.2.2",
+      "sharp": "^0.35.5"
     }
   },
   "packageManager": "pnpm@10.33.0",
