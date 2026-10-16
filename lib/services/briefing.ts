@@ -236,6 +236,9 @@ const BRIEFING_TASK_BYTES = 6_144;
  */
 export const STALE_DOING_DAYS = 7;
 
+/** How many stale tasks a hint names before it says "+N more". */
+const STALE_NAMED = 5;
+
 /**
  * How long an open task may go untouched before the briefing carries it as
  * a head alone -- title, status, how long, the last handoff's first line --
@@ -295,7 +298,11 @@ export async function briefing(userId: number, project: Project, focus?: string)
 
   // Cut in SQL rather than after the fact. This read every open task and then
   // took fifty, on the first query of every session.
-  const { rows: open, total } = await tasks.pageByProject(project.id, "open", BRIEFING_TASKS);
+  const staleBefore = new Date(Date.now() - STALE_DOING_DAYS * 86_400_000).toISOString();
+  const [{ rows: open, total }, staleDoing] = await Promise.all([
+    tasks.pageByProject(project.id, "open", BRIEFING_TASKS),
+    tasks.staleDoing(project.id, staleBefore, STALE_NAMED),
+  ]);
   // Two tiers of the same fifty rows. The live ones get the log and the body
   // budget; the idle ones get a head and their last handoff's first line, and
   // cost nothing -- see `IDLE_DAYS`.
@@ -515,7 +522,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * relevant ones or merely the newest.
      */
     log_ranked_by: focus ? "focus" : "recency",
-    hint: closingHint(allOpen, project),
+    hint: closingHint(allOpen, staleDoing, project),
   };
 }
 
@@ -580,20 +587,20 @@ function duplicateOf(
  * budget, which on a long log is most of them.
  */
 function closingHint(
-  openTasks: { id: number; status: string; updated_at: string; last_handoff: object | null }[],
+  openTasks: { id: number; last_handoff: object | null }[],
+  stale: { rows: { id: number }[]; total: number },
   project: { slug: string; summary: string | null },
 ): string {
   const naked = openTasks.filter((t) => t.last_handoff === null);
-  const stale = openTasks.filter((t) => t.status === "doing" && ageDays(t.updated_at) >= STALE_DOING_DAYS);
   const always =
     "Record dead ends as you hit them, so the next session does not repeat them.";
 
   // The ids, so the ask is actionable rather than a count to go and match up.
   // Capped: past a handful this is a statement about the backlog, not a list
   // of things to do before finishing.
-  const named = (list: { id: number }[]) => {
-    const shown = list.slice(0, 5).map((t) => `#${t.id}`).join(", ");
-    const rest = list.length - 5;
+  const named = (list: { id: number }[], total = list.length) => {
+    const shown = list.slice(0, STALE_NAMED).map((t) => `#${t.id}`).join(", ");
+    const rest = total - Math.min(list.length, STALE_NAMED);
     return `${shown}${rest > 0 ? `, +${rest} more` : ""}`;
   };
 
@@ -614,10 +621,10 @@ function closingHint(
     );
   // Said only when true, for the reason the handoff line is: a sentence that
   // applies to every briefing is one an agent learns to skip.
-  if (stale.length)
+  if (stale.total)
     lines.push(
-      `${stale.length} task${stale.length === 1 ? " has" : "s have"} been 'doing' for ` +
-        `${STALE_DOING_DAYS}+ days with nothing logged since (${named(stale)}). Either ` +
+      `${stale.total} task${stale.total === 1 ? " has" : "s have"} been 'doing' for ` +
+        `${STALE_DOING_DAYS}+ days with nothing logged since (${named(stale.rows, stale.total)}). Either ` +
         `continue one, or set its status back to 'todo' or 'blocked' so the list stays true.`,
     );
   lines.push(always);

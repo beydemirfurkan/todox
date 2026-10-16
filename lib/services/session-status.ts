@@ -65,11 +65,14 @@ export async function sessionStatus(
   const hours = opts.hours ?? DEFAULT_WINDOW_HOURS;
   const since = new Date(Date.now() - hours * 3_600_000).toISOString();
 
+  const staleBefore = new Date(Date.now() - STALE_DOING_DAYS * 86_400_000).toISOString();
   const [touched, doing] = await Promise.all([
     tasksRepo.touchedByUserSince(project.id, userId, since, TOUCHED_LIMIT),
-    tasksRepo.pageByProject(project.id, "doing", TOUCHED_LIMIT),
+    // Its own query, oldest first. Reading the fifty highest-priority, newest
+    // 'doing' tasks and filtering for old ones dropped the oldest first.
+    tasksRepo.staleDoing(project.id, staleBefore, TOUCHED_LIMIT),
   ]);
-  const staleCandidates = doing.rows.filter((t) => ageDays(t.updated_at) >= STALE_DOING_DAYS);
+  const staleCandidates = doing.rows;
 
   const ids = [...new Set([...touched, ...staleCandidates].map((t) => t.id))];
   const [events, entries] = await Promise.all([

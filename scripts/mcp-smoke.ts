@@ -28,6 +28,7 @@ import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { one, run } from "../lib/db/client";
 import * as contextsRepo from "../lib/repositories/contexts";
 import * as entriesRepo from "../lib/repositories/entries";
 import * as observationsRepo from "../lib/repositories/observations";
@@ -257,6 +258,25 @@ async function runSuite(mode: Mode, token: string) {
   console.log("project_created:", again.project_created, "| slug:", again.project.slug);
   if (again.project.slug !== fresh.project.slug)
     throw new Error("a nested path should resolve to the project it sits in");
+
+  // Ten production twins had a root_path identical to the project they
+  // duplicated: a hosted agent outside the checkout (a Codex scratch folder, a
+  // worktree beside the repo) sends its cwd and, separately, the repo_root it
+  // means. Only hosted lets the model name repo_root, so only hosted can do it.
+  if (!mode.local) {
+    console.log("\n--- a cwd outside the checkout, with its repo_root, is the same project ---");
+    const outside = JSON.parse(
+      await text("create_task", {
+        cwd: join(TMP, "todox-smoke-elsewhere"),
+        title: "SMOKE: captured from outside the checkout",
+        model: MODEL,
+        repo_root: SCRATCH,
+      }),
+    );
+    if (outside.project_created || outside.project.slug !== fresh.project.slug)
+      throw new Error(`repo_root of a known project registered a twin: ${outside.project.slug}`);
+    console.log("resolved to", outside.project.slug, "and created nothing");
+  }
 
   /**
    * The bug this whole change exists for: one repository, two machines, one
@@ -1168,6 +1188,7 @@ async function main() {
   for (const mode of MODES) await runSuite(mode, token);
 
   await observerActuallyWrote(user.id);
+  await emptyProjectsArePruned(user.id, token);
 
 
   const rpc = (bearer: string | null, body: unknown) =>
@@ -1343,6 +1364,50 @@ async function main() {
  * the row behind, and the next one then matches it by remote and fails
  * somewhere far less obvious.
  */
+/**
+ * A session start removes the caller's projects that have held nothing for a
+ * week, and nothing else. 37 of 112 production projects were empty when this
+ * was written, because opening a repository is enough to register one.
+ *
+ * Against the database, because the whole safety property is the WHERE: a
+ * repository mock would agree with any statement at all.
+ */
+async function emptyProjectsArePruned(userId: number, token: string) {
+  console.log("\n--- a session start clears week-old empty projects, and only those ---");
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+  const make = async (slug: string, age: number) => {
+    const p = await projectsRepo.create(userId, { name: slug, slug });
+    await run("UPDATE projects SET created_at = ? WHERE id = ?", [daysAgo(age), p.id]);
+    return p;
+  };
+  const stale = await make("smoke-empty-stale", 8);
+  const young = await make("smoke-empty-young", 6);
+  const used = await make("smoke-used-stale", 8);
+  const here = await make("smoke-empty-here", 30);
+  await run(
+    "INSERT INTO tasks (project_id, title, status, priority, created_at, updated_at) VALUES (?, ?, 'todo', 2, ?, ?)",
+    [used.id, "SMOKE: keeps its project", daysAgo(8), daysAgo(8)],
+  );
+
+  const res = await fetch(new URL("/api/rpc", URL_BASE), {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ method: "getContext", params: { project: here.slug } }),
+  });
+  if (!res.ok) throw new Error(`get_context failed: ${res.status}`);
+
+  // The sweep is not awaited by the request, so give it a moment to land.
+  const alive = async (id: number) => Boolean(await one("SELECT 1 FROM projects WHERE id = ?", [id]));
+  for (let i = 0; i < 20 && (await alive(stale.id)); i++) await new Promise((r) => setTimeout(r, 100));
+
+  if (await alive(stale.id)) throw new Error("a project empty for 8 days survived a session start");
+  if (!(await alive(young.id))) throw new Error("a project empty for 6 days was removed");
+  if (!(await alive(used.id))) throw new Error("an old project with a task was removed");
+  if (!(await alive(here.id))) throw new Error("the project being opened was removed");
+  for (const p of [young, used, here]) await projectsRepo.remove(userId, p.id);
+  console.log("removed the week-old empty one; kept the young one, the used one and the open one");
+}
+
 async function removeRows(userId: number) {
   const ours = new Set([
     normalisePath(SCRATCH),
