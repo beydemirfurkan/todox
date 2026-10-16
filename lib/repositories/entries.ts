@@ -480,6 +480,7 @@ export type EntryCounts = {
   total: number;
   decisions: number;
   dead_ends: number;
+  /** Open questions: nothing answers them yet. */
   questions: number;
 };
 
@@ -503,7 +504,13 @@ export async function countsByTasks(taskIds: number[]): Promise<Map<number, Entr
        COUNT(*)                                    AS total,
        COUNT(*) FILTER (WHERE kind = 'decision')   AS decisions,
        COUNT(*) FILTER (WHERE kind = 'dead_end')   AS dead_ends,
-       COUNT(*) FILTER (WHERE kind = 'question')   AS questions
+       -- Open ones only: the briefing subtracts the open questions it shows
+       -- from this, and counting answered ones too reported every answered
+       -- question as omitted, for ever.
+       COUNT(*) FILTER (
+         WHERE kind = 'question'
+           AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = entries.id)
+       )                                           AS questions
      FROM entries WHERE task_id IN (${taskIds.map(() => "?").join(",")})
      GROUP BY task_id`,
     taskIds,
