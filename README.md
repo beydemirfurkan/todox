@@ -21,6 +21,21 @@ caps left out instead of trimming in silence. Nothing is ever cut mid-sentence:
 every record comes back named and dated with its first line, and a `body` of
 null means the budget was spent, not that the record is empty.
 
+<p align="center">
+  <img src="public/screenshots/task-log.jpg" width="720" alt="A task in todox: its status, and a log of a decision, a dead end and a handoff, newest last">
+</p>
+
+## How it works
+
+<img src="docs/how-it-works.svg" width="880" alt="The agent on your machine talks MCP to todox: it reads a briefing with get_context, writes tasks and log entries while it works, and sends the sha256 of the files it links, because the server has no copy of your code. You read the same log in the browser.">
+
+Your agent does the writing; you read over its shoulder. One log per
+repository, whichever machine or agent touched it last:
+
+| Projects | One project |
+| --- | --- |
+| <img src="public/screenshots/dashboard.jpg" width="420" alt="The projects page: what is in flight in each, where the last session left off, and the notes that hold in every project"> | <img src="public/screenshots/project.jpg" width="420" alt="A project page: the task in flight with its dead ends and decisions counted, the standing notes, then queued and done work"> |
+
 ## What goes in a log
 
 | kind | what it means |

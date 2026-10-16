@@ -571,6 +571,11 @@ export const tr: Record<Key, string> = {
   briefingBody:
     "Bu, `get_context`'in şekli — her oturumun yaptığı ilk çağrı. Ürünün özeti değil: yükün kendisi.",
   briefingCaption: "Ekrana sığsın diye kısaltıldı. Gerçeği açık olan her görevi taşır.",
+  landingShotTitle: "Agentın omzunun üstünden okuduğun şey",
+  landingShotAlt:
+    "todox'ta bir görev: durumu ve bir karar, bir çıkmaz ile bir devir notu taşıyan günlüğü",
+  landingShotCaption:
+    "Demo hesabından bir görev: alınan karar, bariz yolu eleyen çıkmaz ve bir sonraki oturumun kaldığı yerden devam edeceği devir notu.",
 
   landingOpenSource: "Açık kaynak, MIT. Kodu oku, ya da kendi kurulumunu çalıştır.",
   landingHonest:

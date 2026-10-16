@@ -101,6 +101,10 @@ describe("what stays reachable without a session", () => {
     },
   );
 
+  it("serves the screenshots the landing page shows a signed-out visitor", () => {
+    expect(redirected(proxy(request("/screenshots/task-log.jpg")))).toBe(false);
+  });
+
   it("serves a share link and its children", () => {
     expect(redirected(proxy(request("/s/abc123")))).toBe(false);
   });

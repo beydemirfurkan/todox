@@ -44,6 +44,9 @@ const PUBLIC = [
   "/robots.txt",
   "/sitemap.xml",
   "/llms.txt",
+  // The product screenshots the landing page shows somebody without an
+  // account -- the one visitor they are for.
+  "/screenshots/",
 ];
 
 /**
