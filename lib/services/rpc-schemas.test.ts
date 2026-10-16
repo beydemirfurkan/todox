@@ -344,6 +344,32 @@ describe("linkFiles takes a plan wherever it lives", () => {
   });
 });
 
+/**
+ * PowerShell's `Get-FileHash` prints sha256 upper-case. The pattern was
+ * lower-case only, so a Windows agent that did exactly what the instructions
+ * ask had its whole call refused.
+ */
+describe("a sha256 in either case", () => {
+  const upper = "ABCDEF0123456789".repeat(4);
+
+  it("is accepted wherever a hash is", () => {
+    expect(() =>
+      parseParams("linkFiles", { task_id: 1, paths: [{ path: "/repo/a.ts", hash: upper }] }),
+    ).not.toThrow();
+    expect(() => parseParams("reportRefs", { refs: [{ id: 1, hash: upper }] })).not.toThrow();
+    expect(() =>
+      parseParams("createTask", { project: "p", title: "t", files: [{ path: "/repo/a.ts", hash: upper }] }),
+    ).not.toThrow();
+  });
+
+  it("still refuses something that is not a sha256", () => {
+    expect(() =>
+      parseParams("reportRefs", { refs: [{ id: 1, hash: "G".repeat(64) }] }),
+    ).toThrow();
+    expect(() => parseParams("reportRefs", { refs: [{ id: 1, hash: "a".repeat(63) }] })).toThrow();
+  });
+});
+
 describe("getFileContext", () => {
   it("needs a project or a cwd to fold the path against", () => {
     // Without one there is no set of roots, so an absolute path could not be

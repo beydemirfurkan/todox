@@ -3,7 +3,7 @@ import * as entriesRepo from "../repositories/entries";
 import * as projectPathsRepo from "../repositories/project-paths";
 import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
-import type { Project, Ref } from "../types";
+import type { Project, Ref, RefStatus } from "../types";
 import { isAbsolutePath, normalisePath, relativeTo } from "../util/paths";
 
 /**
@@ -24,10 +24,22 @@ import { isAbsolutePath, normalisePath, relativeTo } from "../util/paths";
 const KINDS = ["dead_end", "decision"] as const;
 const PER_KIND = 3;
 
+/**
+ * The link itself, so a hosted agent can report on it from here: the id is
+ * what `report_file_hashes` takes, and nothing else it reads before an edit
+ * hands one over for a note's link.
+ */
+type LinkState = { id: number; hash: string | null; status: RefStatus; checked_at: string | null };
+
 export type FileContext = {
   /** What was actually matched on, repo-relative. */
   path: string;
   project: { slug: string; name: string };
+  /**
+   * False when nothing is linked to this file, said outright rather than left
+   * to be inferred from two empty arrays -- most answers are this one.
+   */
+  linked: boolean;
   tasks: {
     id: number;
     title: string;
@@ -35,10 +47,18 @@ export type FileContext = {
     priority: number;
     /** Why this file was attached to this task, if whoever linked it said. */
     note: string | null;
+    link: LinkState;
     dead_ends: string[];
     decisions: string[];
   }[];
-  notes: { id: number; kind: string; title: string; body: string; note: string | null }[];
+  notes: {
+    id: number;
+    kind: string;
+    title: string;
+    body: string;
+    note: string | null;
+    link: LinkState;
+  }[];
 };
 
 /**
@@ -143,7 +163,19 @@ export async function fileContext(
   // twice. `refs` orders newest first, and the first ref is the one whose
   // `note` is worth showing.
   const seen = new Set<string>();
-  const out: FileContext = { path: relative, project: { slug: project.slug, name: project.name }, tasks: [], notes: [] };
+  const out: FileContext = {
+    path: relative,
+    project: { slug: project.slug, name: project.name },
+    linked: false,
+    tasks: [],
+    notes: [],
+  };
+  const link = (ref: Ref): LinkState => ({
+    id: ref.id,
+    hash: ref.hash,
+    status: refsRepo.freshness(ref),
+    checked_at: ref.checked_at,
+  });
 
   for (const ref of refs) {
     const task = ref.task_id === null ? undefined : tasks.get(ref.task_id);
@@ -157,6 +189,7 @@ export async function fileContext(
         status: task.status,
         priority: task.priority,
         note: ref.note,
+        link: link(ref),
         dead_ends: bodies("dead_end"),
         decisions: bodies("decision"),
       });
@@ -173,9 +206,11 @@ export async function fileContext(
         // few, and the agent asked about this file specifically.
         body: note.body,
         note: ref.note,
+        link: link(ref),
       });
     }
   }
 
+  out.linked = out.tasks.length > 0 || out.notes.length > 0;
   return out;
 }

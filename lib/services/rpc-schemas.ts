@@ -10,6 +10,15 @@ import {
 import { BadRequest } from "./errors";
 
 /**
+ * sha256 as hex, in either case. PowerShell's `Get-FileHash` prints it
+ * upper-case, so a lower-case-only pattern refused every Windows agent's whole
+ * call. Folded to lower case where it is stored (`refs.ts`), not here: a
+ * transform in a schema that is also the MCP tool's input schema is a
+ * transform the JSON-schema export has to understand.
+ */
+const SHA256 = /^[a-fA-F0-9]{64}$/;
+
+/**
  * The shape of every RPC method's parameters, in one place.
  *
  * This is the runtime half of `lib/services/rpc.ts`. The handler signatures
@@ -288,7 +297,7 @@ export const SHAPES = {
             .describe("Absolute path, or a URL. The plan this task follows belongs here."),
           hash: z
             .string()
-            .regex(/^[a-f0-9]{64}$/)
+            .regex(SHA256)
             .nullish(),
         }),
       )
@@ -372,7 +381,7 @@ export const SHAPES = {
           note: z.string().max(MAX.line).optional(),
           hash: z
             .string()
-            .regex(/^[a-f0-9]{64}$/)
+            .regex(SHA256)
             .nullish()
             .describe("sha256 of the file, computed by you. The server has no copy."),
         }),
@@ -411,7 +420,7 @@ export const SHAPES = {
           id: z.number().int(),
           hash: z
             .string()
-            .regex(/^[a-f0-9]{64}$/)
+            .regex(SHA256)
             .nullable()
             .describe("null when the file is gone"),
         }),

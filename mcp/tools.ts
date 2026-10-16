@@ -72,7 +72,7 @@ const BASE = [
   "parsed and ranked -- and quote a phrase to require it. kinds:['dead_end'] answers",
   "'has this been tried?', kinds:['decision'] 'why is it like this?'.",
   "BEFORE YOU EDIT A FILE: get_file_context(path) gives the tasks, dead ends and",
-  "notes attached to it -- the cheapest call here and the one most worth making.",
+  "notes attached to it; `linked:false` means none. Cheap, and worth making.",
   "DO NOT READ list_tasks status:'all' or activity_report period:'all': they",
   "return everything ever, bodies included.",
   "",
@@ -149,10 +149,10 @@ const REMOTE_NOTE = [
   "- `tz` (IANA, e.g. 'Europe/Istanbul') on reports, or say the window is UTC.",
   "- on first registration, update_project with a one-paragraph summary and",
   "  repo_url.",
-  "- when you link a file, send its sha256 `hash`; after get_context or",
-  "  get_task hands you linked files, re-hash the ones you can read and send",
-  "  them to report_file_hashes with their ids. That is what turns a stale note",
-  "  into a warning.",
+  "- link a file with its sha256 `hash` (`sha256sum f`; PowerShell",
+  "  `(Get-FileHash f).Hash`). When a read hands back linked files with ids,",
+  "  re-hash them and send report_file_hashes: that turns a stale note into a",
+  "  warning.",
   "",
   "`observations` is always empty on this transport: only a process on the",
   "developer's machine can watch git. Nothing is wrong when it is empty and no",
@@ -745,7 +745,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "What is known about one file",
       description:
-        "Everything todox has recorded against a file: the tasks that touched it with their dead ends and decisions, and the context notes attached to it in full. Ask before editing a file you have not seen this session — a dead end costs nothing to read and an afternoon to rediscover. The path may be absolute or relative to the repository root; both fold to the same answer, so a note linked on one machine is found from another. Pass `cwd` or `project` to say which repository is being asked about.",
+        "Everything todox has recorded against a file: the tasks that touched it with their dead ends and decisions, and the context notes attached to it in full. Ask before editing a file you have not seen this session — a dead end costs nothing to read and an afternoon to rediscover. The path may be absolute or relative to the repository root; both fold to the same answer, so a note linked on one machine is found from another. Pass `cwd` or `project` to say which repository is being asked about. `linked:false` means nothing is recorded against it; otherwise each task and note carries its `link` (id, hash, status) for report_file_hashes.",
       annotations: READ_ONLY,
     },
     // Same as get_context: locally the process reads the remote off the
@@ -900,7 +900,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     tool("report_file_hashes", "reportRefs", {
       title: "Report what linked files look like now",
       description:
-        "After get_context or get_task: sha256 each linked file you can read (null if gone) and send them back with their ids. The server has no copy of the code; this is how it learns a note went stale.",
+        "After get_context, get_task or get_file_context: sha256 each linked file you can read (null if gone; either hex case) and send them back with their ids. The server has no copy of the code; this is how it learns a note went stale.",
     });
 
   /* -------------------------------------------------- durable knowledge */
