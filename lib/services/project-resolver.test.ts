@@ -416,3 +416,64 @@ describe("the reason a refusal carries", () => {
     expect(err).toMatchObject({ reason: "no_project" });
   });
 });
+
+/**
+ * Ten twins in production, each with a `root_path` identical to the project it
+ * duplicated (2026-10-16). A hosted agent standing outside the checkout -- a
+ * Codex per-prompt scratch directory, a worktree beside the repo -- sends its
+ * cwd and, separately, `repo_root` pointing at the registered repository. Only
+ * the cwd was matched against known paths, so the lookup missed, the namesake
+ * was on the same OS and not adoptable, and the evidence was enough to create.
+ */
+describe("a repo_root the account already knows", () => {
+  it("resolves to that project when cwd is outside it", async () => {
+    const known = project(7, "/Users/me/todox", { name: "todox" });
+    repo.withRootPath.mockResolvedValue([known]);
+    repo.listByName.mockResolvedValue([known]);
+
+    const result = await resolveOrCreate(1, "/Users/me/Documents/Codex/2026-10-15/fix", at("/Users/me/todox"));
+
+    expect(result).toMatchObject({ created: false, project: { id: 7 } });
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it("folds Windows case and separators the way a cwd match does", async () => {
+    const known = project(7, "C:/Users/Me/todox", { name: "todox" });
+    repo.withRootPath.mockResolvedValue([known]);
+    repo.listByName.mockResolvedValue([known]);
+
+    const result = await resolveOrCreate(1, String.raw`C:\Users\Me\scratch`, at(String.raw`c:\users\me\todox`));
+
+    expect(result).toMatchObject({ created: false, project: { id: 7 } });
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it("finds it through an extra machine path as well as root_path", async () => {
+    const known = project(7, "/home/me/todox", { name: "todox" });
+    repo.withRootPath.mockResolvedValue([known]);
+    paths.listAll.mockResolvedValue([{ project_id: 7, path: "/Users/me/todox" }]);
+
+    const result = await resolveOrCreate(1, "/tmp/scratch", at("/Users/me/todox"));
+
+    expect(result).toMatchObject({ created: false, project: { id: 7 } });
+  });
+
+  it("still lets the cwd win when both match, so a nested repo keeps its own project", async () => {
+    repo.withRootPath.mockResolvedValue([
+      project(1, "/Users/me/mono"),
+      project(2, "/Users/me/mono/packages/app"),
+    ]);
+
+    const result = await resolveOrCreate(1, "/Users/me/mono/packages/app/src", at("/Users/me/mono"));
+
+    expect(result).toMatchObject({ created: false, project: { id: 2 } });
+  });
+
+  it("still registers a repo_root nobody knows", async () => {
+    repo.withRootPath.mockResolvedValue([project(7, "/Users/me/todox")]);
+
+    const result = await resolveOrCreate(1, "/tmp/scratch", at("/Users/me/other"));
+
+    expect(result.created).toBe(true);
+  });
+});
