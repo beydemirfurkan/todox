@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 const mocks = vi.hoisted(() => ({
   pageByProject: vi.fn(),
+  staleDoing: vi.fn(),
   pageNotes: vi.fn(),
   pageByTasksPerKind: vi.fn(),
   countsByTasks: vi.fn(),
@@ -21,7 +22,10 @@ const mocks = vi.hoisted(() => ({
   listByName: vi.fn(),
 }));
 
-vi.mock("../repositories/tasks", () => ({ pageByProject: mocks.pageByProject }));
+vi.mock("../repositories/tasks", () => ({
+  pageByProject: mocks.pageByProject,
+  staleDoing: mocks.staleDoing,
+}));
 vi.mock("../repositories/contexts", () => ({ pageByProject: mocks.pageNotes }));
 vi.mock("../repositories/entries", () => ({
   pageByTasksPerKind: mocks.pageByTasksPerKind,
@@ -108,6 +112,17 @@ const counts = (over: Partial<Record<string, number>> = {}) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 1 });
+  // The same rows the open-task page was given, filtered the way the query
+  // filters them -- so a test that sets up stale tasks through the page still
+  // means what it says. Read through the implementation, not by calling the
+  // mock, so a test that counts page reads is not thrown off.
+  mocks.staleDoing.mockImplementation(async (_projectId: number, before: string, limit: number) => {
+    const page = await mocks.pageByProject.getMockImplementation()?.();
+    const rows = ((page?.rows ?? []) as { status: string; updated_at: string }[])
+      .filter((t) => t.status === "doing" && t.updated_at < before)
+      .sort((a, b) => a.updated_at.localeCompare(b.updated_at));
+    return { rows: rows.slice(0, limit), total: rows.length };
+  });
   mocks.pageNotes.mockResolvedValue({ rows: [], omitted: 0 });
   mocks.pageByTasksPerKind.mockResolvedValue(logPage(new Map()));
   mocks.countsByTasks.mockResolvedValue(counts());
@@ -702,7 +717,8 @@ describe("the closing hint", () => {
     });
     const out = await brief();
     expect(out.hint).toContain("2 tasks have been 'doing' for 7+ days");
-    expect(out.hint).toContain("#1, #2");
+    // Oldest first: the longest-abandoned task is the one most worth naming.
+    expect(out.hint).toContain("#2, #1");
     expect(out.hint).toContain("'todo' or 'blocked'");
   });
 
@@ -722,6 +738,20 @@ describe("the closing hint", () => {
   it("says one task in the singular", async () => {
     mocks.pageByProject.mockResolvedValue({ rows: [task(1, { updated_at: daysAgo(9) })], total: 1 });
     expect((await brief()).hint).toContain("1 task has been 'doing'");
+  });
+
+  /**
+   * The cut that hid them. The open-task page is fifty rows, highest priority
+   * and newest first, so the oldest 'doing' tasks -- the ones this line is for --
+   * were the first ones it dropped. One production account had 54.
+   */
+  it("counts stale tasks the fifty-row page never reached", async () => {
+    mocks.pageByProject.mockResolvedValue({ rows: [task(1)], total: 80 });
+    const old = Array.from({ length: 5 }, (_, i) => task(100 + i, { updated_at: daysAgo(40) }));
+    mocks.staleDoing.mockResolvedValue({ rows: old, total: 54 });
+    const out = await brief();
+    expect(out.hint).toContain("54 tasks have been 'doing' for 7+ days");
+    expect(out.hint).toContain("#100, #101, #102, #103, #104, +49 more");
   });
 
   it("caps the stale ids it lists, like the handoff ids", async () => {

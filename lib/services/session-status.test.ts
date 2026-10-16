@@ -12,14 +12,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 const mocks = vi.hoisted(() => ({
   touchedByUserSince: vi.fn(),
-  pageByProject: vi.fn(),
+  staleDoing: vi.fn(),
   eventActivity: vi.fn(),
   entryActivity: vi.fn(),
 }));
 
 vi.mock("../repositories/tasks", () => ({
   touchedByUserSince: mocks.touchedByUserSince,
-  pageByProject: mocks.pageByProject,
+  staleDoing: mocks.staleDoing,
 }));
 vi.mock("../repositories/events", () => ({ activityByTasks: mocks.eventActivity }));
 vi.mock("../repositories/entries", () => ({ activityByTasks: mocks.entryActivity }));
@@ -60,11 +60,25 @@ const entries = (
   ][],
 ) => new Map(rows.map(([id, r]) => [id, { task_id: id, ...r }]));
 
+/**
+ * The project's 'doing' tasks, as the database holds them. `staleDoing` filters
+ * and orders in SQL, so the fake does the same with the cutoff it is handed --
+ * which keeps "touched yesterday is not stale" a test of the cutoff, not of a
+ * fixture somebody filtered by hand.
+ */
+const doing = ({ rows }: { rows: ReturnType<typeof task>[]; total?: number }) =>
+  mocks.staleDoing.mockImplementation(async (_projectId: number, before: string, limit: number) => {
+    const old = rows
+      .filter((t) => t.status === "doing" && t.updated_at < before)
+      .sort((a, b) => a.updated_at.localeCompare(b.updated_at));
+    return { rows: old.slice(0, limit), total: old.length };
+  });
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   mocks.touchedByUserSince.mockResolvedValue([]);
-  mocks.pageByProject.mockResolvedValue({ rows: [], total: 0 });
+  doing({ rows: [] });
   mocks.eventActivity.mockResolvedValue(new Map());
   mocks.entryActivity.mockResolvedValue(new Map());
 });
@@ -183,19 +197,19 @@ describe("what is yours", () => {
 
 describe("what is stale", () => {
   it("names a task 'doing' with nothing logged for a week, by anyone", async () => {
-    mocks.pageByProject.mockResolvedValue({ rows: [task(5, "doing", 23 * 24)], total: 1 });
+    doing({ rows: [task(5, "doing", 23 * 24)], total: 1 });
     mocks.eventActivity.mockResolvedValue(
       events([[5, { latest_at: ago(23 * 24), latest_to_status: "doing", last_by_user_at: null }]]),
     );
     const { stale } = await sessionStatus(ME, PROJECT);
     expect(stale).toEqual([{ id: 5, title: "task 5", doing_since: ago(23 * 24), idle_days: 23 }]);
-    expect(mocks.pageByProject).toHaveBeenCalledWith(7, "doing", expect.any(Number));
+    expect(mocks.staleDoing).toHaveBeenCalledWith(7, ago(7 * 24), expect.any(Number));
   });
 
   it("does not call a task stale that somebody wrote on yesterday", async () => {
     // `updated_at` moves with every entry and status change, so an eight-day
     // 'doing' with an entry yesterday is live, not abandoned.
-    mocks.pageByProject.mockResolvedValue({ rows: [task(5, "doing", 24)], total: 1 });
+    doing({ rows: [task(5, "doing", 24)], total: 1 });
     const { stale } = await sessionStatus(ME, PROJECT);
     expect(stale).toEqual([]);
   });
@@ -204,7 +218,7 @@ describe("what is stale", () => {
 describe("the hint", () => {
   it("names the ids, one sentence per thing owed", async () => {
     mocks.touchedByUserSince.mockResolvedValue([task(1, "doing", 1), task(2, "done", 2)]);
-    mocks.pageByProject.mockResolvedValue({
+    doing({
       rows: [task(1, "doing", 1), task(9, "doing", 10 * 24)],
       total: 2,
     });
