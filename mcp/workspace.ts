@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { isInside, isUrl, isWindowsPath, scrubRemote } from "../lib/util/paths";
@@ -58,8 +59,16 @@ function asDirectory(p: string) {
  * and registering a project is what asks it.
  */
 export function projectRootOf(start: string, stopAt?: string): string | undefined {
+  const home = homedir();
   let dir = asDirectory(start);
   for (let i = 0; i < 40; i++) {
+    // The home directory is never a project, and nothing above it is either.
+    // A stray `~/package.json` -- a two-byte `{}` from some tool that once ran
+    // `npm init` in the wrong place -- otherwise made home the root of every
+    // directory under it that has no marker of its own, so a scratch folder
+    // registered as one project named after the user, and every later scratch
+    // folder resolved into it. Found on the maintainer's own machine.
+    if (isHome(dir, home)) break;
     if (ROOT_MARKERS.some((m) => existsSync(join(dir, m)))) return dir;
     const up = dirname(dir);
     if (up === dir || (stopAt && !isInside(up, stopAt))) break;
@@ -67,6 +76,9 @@ export function projectRootOf(start: string, stopAt?: string): string | undefine
   }
   return undefined;
 }
+
+/** Equal paths, compared the way `isInside` compares them (case-folded on Windows). */
+const isHome = (dir: string, home: string) => isInside(dir, home) && isInside(home, dir);
 
 export function findProjectRoot(start: string, stopAt?: string): string {
   return projectRootOf(start, stopAt) ?? asDirectory(start);
