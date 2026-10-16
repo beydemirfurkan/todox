@@ -98,11 +98,44 @@ async function locate(
   const [byUrl, known] = await Promise.all([byRemote(userId, hints.repoUrl), knownPaths(userId)]);
   if (byUrl) return { project: byUrl, known };
 
+  // `repo_root` is tried as well as the reference. A hosted agent standing
+  // outside the checkout -- a Codex per-prompt scratch directory, a worktree
+  // beside the repo -- sends its cwd and, separately, the repository it means.
+  // Matching only the cwd missed, and the miss registered the same repository a
+  // second time: ten production projects had a root_path identical to the one
+  // they duplicated (2026-10-16).
+  const probes = [ref, hints.repoRoot].filter(
+    (probe): probe is string => typeof probe === "string" && isAbsolutePath(probe),
+  );
+
   // Deepest root wins, so a nested repo beats the parent that contains it.
   const candidates = [...known.values()].flatMap(({ project, paths }) =>
-    paths.filter((path) => isInside(ref, path)).map((path) => ({ project, path })),
+    paths
+      .filter((path) => probes.some((probe) => isInside(probe, path)))
+      .map((path) => ({ project, path })),
   );
   return { project: candidates.sort((a, b) => b.path.length - a.path.length)[0]?.project, known };
+}
+
+/**
+ * The project already registered for this root or remote, or undefined.
+ *
+ * For `create_project`, which names a project deliberately and so skips the
+ * reading order above -- but a deliberate name is not a reason to register the
+ * same repository twice. Equality, not containment: a package inside a monorepo
+ * is a legitimate project of its own.
+ */
+export async function existingFor(
+  userId: number,
+  where: { rootPath?: string; repoUrl?: string },
+): Promise<Project | undefined> {
+  const [byUrl, known] = await Promise.all([byRemote(userId, where.repoUrl), knownPaths(userId)]);
+  if (byUrl) return byUrl;
+
+  const root = where.rootPath;
+  if (!root || !isAbsolutePath(root)) return undefined;
+  const same = (path: string) => isInside(root, path) && isInside(path, root);
+  return [...known.values()].find(({ paths }) => paths.some(same))?.project;
 }
 
 /**

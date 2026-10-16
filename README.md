@@ -373,7 +373,7 @@ you are changing the tools themselves.
 | `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier.  Words that only one of the two languages treats as noise are dropped, so a question does not match every record containing the word "a". `kinds` narrows to dead ends or decisions; `project` stops it looking elsewhere. Ask in the language the log is written in — it stems, it does not translate — and if a sentence finds nothing, retry with the distinctive identifiers alone (3+ characters; shorter ones match as whole words only). |
 | `get_task` | One task with its log and linked files. |
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. Projects are newest-activity-first and carry `activity_at`. |
-| `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A summary is worth adding. |
+| `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A path or remote that is already registered returns that project rather than a twin. A summary is worth adding. |
 | `delete_project` | The way back from a mistyped `cwd`. Takes the project and everything under it; `confirm` must be the slug. |
 | `merge_projects` | The way back from one repo registered twice. Moves tasks, notes and paths into the surviving project; `confirm` must be the slug of the one being merged away. |
 

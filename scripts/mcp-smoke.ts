@@ -258,6 +258,25 @@ async function runSuite(mode: Mode, token: string) {
   if (again.project.slug !== fresh.project.slug)
     throw new Error("a nested path should resolve to the project it sits in");
 
+  // Ten production twins had a root_path identical to the project they
+  // duplicated: a hosted agent outside the checkout (a Codex scratch folder, a
+  // worktree beside the repo) sends its cwd and, separately, the repo_root it
+  // means. Only hosted lets the model name repo_root, so only hosted can do it.
+  if (!mode.local) {
+    console.log("\n--- a cwd outside the checkout, with its repo_root, is the same project ---");
+    const outside = JSON.parse(
+      await text("create_task", {
+        cwd: join(TMP, "todox-smoke-elsewhere"),
+        title: "SMOKE: captured from outside the checkout",
+        model: MODEL,
+        repo_root: SCRATCH,
+      }),
+    );
+    if (outside.project_created || outside.project.slug !== fresh.project.slug)
+      throw new Error(`repo_root of a known project registered a twin: ${outside.project.slug}`);
+    console.log("resolved to", outside.project.slug, "and created nothing");
+  }
+
   /**
    * The bug this whole change exists for: one repository, two machines, one
    * project. The path is a different string on the other computer and the

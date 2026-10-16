@@ -23,7 +23,7 @@ import {
 } from "./ownership";
 import { merge as mergeProjects } from "./project-merge";
 import * as projectActivity from "./project-activity";
-import { mustResolve, noMatch, resolve, resolveOrCreate } from "./project-resolver";
+import { existingFor, mustResolve, noMatch, resolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { silentAccountNudge } from "./nudge";
@@ -130,15 +130,33 @@ export const methods = {
       repo_url?: string;
       summary?: string;
     },
-  ) =>
-    projectsRepo.create(userId, {
+  ) => {
+    // Normalised the way auto-registration normalises it. These two used to
+    // disagree, and the stored form is now something resolution matches on.
+    const rootPath = p.root_path ? normalisePath(p.root_path) : undefined;
+    const repoUrl = p.repo_url ? scrubRemote(p.repo_url) : undefined;
+
+    // Naming a project is deliberate, registering one repository twice is not:
+    // the twin got the next free slug and the history split from then on.
+    const existing = await existingFor(userId, { rootPath, repoUrl });
+    if (existing) {
+      return {
+        ...existing,
+        created: false,
+        warning:
+          `"${existing.slug}" is already this repository, so nothing was created. ` +
+          "Pass it as `project` from now on.",
+      };
+    }
+
+    const project = await projectsRepo.create(userId, {
       ...p,
-      // Normalised the way auto-registration normalises it. These two used to
-      // disagree, and the stored form is now something resolution matches on.
-      root_path: p.root_path ? normalisePath(p.root_path) : undefined,
-      repo_url: p.repo_url ? scrubRemote(p.repo_url) : undefined,
+      root_path: rootPath,
+      repo_url: repoUrl,
       slug: await projectsRepo.nextFreeSlug(userId, p.slug ?? p.name),
-    }),
+    });
+    return { ...project, created: true };
+  },
 
   updateProject: async (
     { userId },
