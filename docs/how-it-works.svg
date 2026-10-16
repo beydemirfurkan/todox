@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="330" viewBox="0 0 880 330" role="img" aria-labelledby="t d">
+  <title id="t">How todox works</title>
+  <desc id="d">An agent on your machine talks MCP to the todox server. It reads a briefing at the start of a session and writes tasks, decisions, dead ends and handoffs while it works. It also hashes the files it links, because only it can see them; the server stores and compares those hashes. You read the same log in the browser.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .box { fill: #f6f7f9; stroke: #c9ced6; stroke-width: 1.5; }
+    .accent { fill: #fff6cc; stroke: #e0b400; stroke-width: 1.5; }
+    .h { font: 600 17px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #14171c; }
+    .t { font: 13.5px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #3d4450; }
+    .m { font: 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #3d4450; }
+    .line { stroke: #6b7380; stroke-width: 1.6; fill: none; }
+    .head { fill: #6b7380; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .box { fill: #161b22; stroke: #30363d; }
+      .accent { fill: #2a2410; stroke: #a88600; }
+      .h { fill: #e6edf3; }
+      .t, .m { fill: #9da7b3; }
+      .line { stroke: #8b949e; }
+      .head { fill: #8b949e; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="head" d="M0 0 L10 5 L0 10 z"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="880" height="330" rx="14"/>
+
+  <!-- your machine -->
+  <rect class="box" x="24" y="28" width="300" height="200" rx="12"/>
+  <text class="h" x="44" y="60">Your machine</text>
+  <text class="t" x="44" y="88">An agent: Claude Code, Codex,</text>
+  <text class="t" x="44" y="107">Cursor, VS Code, OpenCode</text>
+  <rect class="accent" x="44" y="128" width="260" height="78" rx="9"/>
+  <text class="t" x="58" y="152">Reads the files it links and</text>
+  <text class="t" x="58" y="171">sends their sha256 — the server</text>
+  <text class="t" x="58" y="190">has no copy of your code</text>
+
+  <!-- server -->
+  <rect class="box" x="556" y="28" width="300" height="200" rx="12"/>
+  <text class="h" x="576" y="60">todox</text>
+  <text class="t" x="576" y="88">Tasks, and the log behind each:</text>
+  <text class="t" x="576" y="107">decisions, dead ends, questions,</text>
+  <text class="t" x="576" y="126">handoffs. Standing notes.</text>
+  <text class="t" x="576" y="158">Stores the hashes and compares</text>
+  <text class="t" x="576" y="177">them: a note whose file moved on</text>
+  <text class="t" x="576" y="196">is flagged, never trusted blindly</text>
+
+  <!-- arrows -->
+  <path class="line" d="M556 92 L328 92" marker-end="url(#a)"/>
+  <text class="m" x="352" y="80">get_context → briefing</text>
+  <path class="line" d="M324 150 L552 150" marker-end="url(#a)"/>
+  <text class="m" x="352" y="138">log_entry · create_task</text>
+  <text class="m" x="352" y="172">+ file hashes · handoff</text>
+  <text class="t" x="390" y="214">MCP over HTTPS</text>
+
+  <!-- you -->
+  <rect class="box" x="556" y="252" width="300" height="56" rx="12"/>
+  <text class="h" x="576" y="286">You, in the browser</text>
+  <path class="line" d="M706 232 L706 248" marker-end="url(#a)"/>
+  <text class="t" x="24" y="286">Next session — any machine, any agent — starts where the last one stopped.</text>
+</svg>

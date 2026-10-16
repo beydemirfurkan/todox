@@ -587,6 +587,11 @@ export const en = {
   briefingBody:
     "This is the shape of `get_context` — the first call every session makes. Not a summary of the product: the payload.",
   briefingCaption: "Trimmed for width. The real one carries every open task.",
+  landingShotTitle: "What you read over its shoulder",
+  landingShotAlt:
+    "A task in todox: its status, and a log holding a decision, a dead end and a handoff",
+  landingShotCaption:
+    "One task from the demo account: the decision, the dead end that ruled out the obvious approach, and the handoff the next session starts from.",
 
   landingOpenSource: "Open source, MIT. Read the code, or run your own.",
   landingHonest:

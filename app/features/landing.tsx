@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import type { T } from "@/lib/i18n";
@@ -71,6 +72,21 @@ export function Landing({ t }: { t: T }) {
           keeps are not that log. */}
       <VsNative t={t} />
       <BriefingPreview t={t} />
+
+      {/* The payload above is what the agent reads; this is the same log as a
+          person sees it. Until this, nothing on the site showed the product. */}
+      <section className="sticker pop p-4 sm:p-5" style={{ animationDelay: "260ms" }}>
+        <h2 className="display text-[18px] font-bold">{t("landingShotTitle")}</h2>
+        <Image
+          src="/screenshots/task-log.jpg"
+          alt={t("landingShotAlt")}
+          width={1054}
+          height={910}
+          sizes="(max-width: 720px) 100vw, 680px"
+          className="sticker-flat mt-3 h-auto w-full"
+        />
+        <p className="mt-2 text-small text-muted">{t("landingShotCaption")}</p>
+      </section>
 
       <section className="sticker pop p-5" style={{ animationDelay: "300ms" }}>
         <div className="flex items-start gap-4">
