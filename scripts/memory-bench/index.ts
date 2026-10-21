@@ -160,7 +160,7 @@ async function reportBriefing(userId: number, project: Awaited<ReturnType<typeof
   const sum = (pick: (t: (typeof tasks)[number]) => unknown) => tasks.reduce((n, t) => n + bytes(pick(t)), 0);
 
   console.log(
-    `\nBRIEFING  —  ${brief.open_tasks.length} open tasks, ${brief.idle_tasks.length} idle, ${brief.project_context.length} notes\n`,
+    `\nBRIEFING  —  ${brief.open_tasks.length} open tasks, ${brief.idle_tasks.length} idle, ${brief.condensed_tasks.length} condensed, ${brief.project_context.length} notes\n`,
   );
   console.log(row("global_context", kb(bytes(brief.global_context))));
   console.log(row("project_context", kb(bytes(brief.project_context))));
@@ -184,6 +184,8 @@ async function reportBriefing(userId: number, project: Awaited<ReturnType<typeof
   // Heads only, outside every budget: what fourteen idle days cost instead
   // of a body each.
   console.log(row("idle_tasks", kb(bytes(brief.idle_tasks))));
+  // Live tasks the whole-briefing ceiling turned into lines; empty unless it cut.
+  console.log(row("condensed_tasks", kb(bytes(brief.condensed_tasks))));
   console.log(row("observations", kb(bytes(brief.observations))));
   console.log(row("stale_refs", kb(bytes(brief.stale_refs))));
   console.log(row("─".repeat(20), ""));

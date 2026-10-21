@@ -40,6 +40,7 @@ vi.mock("../repositories/observations", () => ({ pageByProject: mocks.pageObserv
 vi.mock("../repositories/projects", () => ({ listByName: mocks.listByName }));
 
 const { briefing, handoffMissing, lacksHandoffSince } = await import("./briefing");
+const { BRIEFING_MAX_CHARS } = await import("./briefing-ceiling");
 
 /** Cast where it is used, not here: the tests read `PROJECT.id`. */
 const PROJECT = {
@@ -1147,5 +1148,48 @@ describe("a project with no summary", () => {
     const b = await bare("A memory for developers and their agents.");
     expect(b).not.toHaveProperty("summary_missing");
     expect(b.hint).not.toMatch(/no summary/);
+  });
+});
+
+/**
+ * The bound on the whole payload, through the briefing rather than beside it.
+ *
+ * The production shape that outgrew the client: thirty live tasks, every
+ * budget holding, and the records the budgets do not cover -- ids, dates and
+ * heads with no body -- making the briefing 84 KB. Claude Code refused it and
+ * the agent never read it. `briefing-ceiling.test.ts` holds the cutting rules;
+ * this holds that the briefing actually goes through them.
+ */
+describe("the whole-briefing ceiling", () => {
+  const head = "h".repeat(240);
+  const logFor = (id: number) => [
+    entry("handoff", null, { id: id * 10, head }),
+    ...[1, 2, 3].map((n) => entry("decision", null, { id: id * 10 + n, head })),
+    ...[4, 5, 6].map((n) => entry("dead_end", null, { id: id * 10 + n, head })),
+  ];
+
+  it("brings thirty live tasks under the ceiling and carries the rest as lines", async () => {
+    const rows = Array.from({ length: 30 }, (_, i) => task(i + 1, { body: null }));
+    mocks.pageByProject.mockResolvedValue({ rows, total: 30 });
+    mocks.pageByTasksPerKind
+      .mockResolvedValueOnce(logPage(new Map(rows.map((t) => [t.id, logFor(t.id)]))))
+      .mockResolvedValueOnce(logPage(new Map()));
+
+    const b = await brief();
+    expect(JSON.stringify(b).length).toBeLessThanOrEqual(BRIEFING_MAX_CHARS);
+    expect(b.open_tasks.length).toBeGreaterThan(0);
+    expect(b.open_tasks.length + b.condensed_tasks.length).toBe(30);
+    expect(b.condensed_tasks[0]!.last_handoff).toEqual({
+      id: b.condensed_tasks[0]!.id * 10,
+      created_at: "2026-08-16T00:00:00Z",
+      head,
+    });
+    expect(b.log_bodies_omitted).toBe(b.open_tasks.length * 7);
+  });
+
+  it("leaves a small briefing untouched, with nothing condensed", async () => {
+    const b = await brief();
+    expect(b.open_tasks.map((t) => t.id)).toEqual([1]);
+    expect(b.condensed_tasks).toEqual([]);
   });
 });

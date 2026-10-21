@@ -7,6 +7,7 @@ import * as refs from "../repositories/refs";
 import * as tasks from "../repositories/tasks";
 import type { Project, Task } from "../types";
 import { firstLine } from "../util/headline";
+import { fitToCeiling, type TaskLine } from "./briefing-ceiling";
 
 /**
  * Everything a cold agent needs to resume work on a project, in one payload.
@@ -114,7 +115,9 @@ const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
  * budget here touches that. It is bounded only by BRIEFING_TASKS times
  * PER_KIND times HEAD_CHARS. Task bodies were the other unbounded axis until
  * `BRIEFING_TASK_BYTES` below; the heads remain, real and smaller than what
- * the budgets fixed.
+ * the budgets fixed. Since 2026-10-21 they are bounded by `BRIEFING_MAX_CHARS`
+ * in `briefing-ceiling.ts`, on the whole payload rather than per axis, after
+ * they alone took a briefing past what the client would accept.
  */
 /**
  * HALVED, all three budgets at once, 2026-09-12, on the developer's word
@@ -435,7 +438,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
       .map((f) => `task #${t.id} "${t.title}" -> ${f.path} (${f.status})`),
   );
 
-  return {
+  const brief = {
     project: {
       slug: project.slug,
       name: project.name,
@@ -470,6 +473,13 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * array's length, so there is no separate counter to keep in step.
      */
     idle_tasks: idleTasks,
+    /**
+     * Live tasks carried as a line each because the whole briefing would not
+     * otherwise fit under `BRIEFING_MAX_CHARS` -- the same line an idle task
+     * gets, without the days idle. Empty unless the ceiling cut; `get_task`
+     * has the rest.
+     */
+    condensed_tasks: [] as TaskLine[],
     open_tasks_omitted: total - open.length,
     /**
      * What a process saw, as opposed to what anybody wrote down.
@@ -524,6 +534,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
     log_ranked_by: focus ? "focus" : "recency",
     hint: closingHint(allOpen, staleDoing, project),
   };
+  return fitToCeiling(brief);
 }
 
 /**
