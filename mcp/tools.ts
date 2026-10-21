@@ -227,8 +227,14 @@ export function skillDocument(): string {
  */
 export const SERVER_INFO = { name: "todox", version: "0.1.4" } as const;
 
+/**
+ * Compact, not indented. The reader is a model, which needs no indentation to
+ * follow JSON, and every result here counts against the client's per-result
+ * limit. Measured on a production briefing, 2026-10-21: 84,221 characters
+ * indented, 72,119 compact -- one in seven characters was whitespace.
+ */
 const ok = (data: unknown) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+  content: [{ type: "text" as const, text: JSON.stringify(data) }],
 });
 const plain = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const fail = (msg: string) => ({
