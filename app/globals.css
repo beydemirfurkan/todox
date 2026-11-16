@@ -290,6 +290,21 @@ summary:focus-visible,
   border-radius: 12px;
 }
 
+/* A row that is wider than the page's column: the project board, which holds
+   three columns and a panel and does not fit in the 64rem everything else
+   reads at. Centred on the column it sits in, so the header above it and the
+   groups below stay on the measure. Only from 1100px, where there is width to
+   take, and 4rem short of the viewport rather than flush: `100vw` counts the
+   scrollbar, and a row exactly that wide overflows by the scrollbar's width --
+   which `overflow-x: clip` above would hide rather than fix. */
+@media (min-width: 1100px) {
+  .bleed {
+    --bleed-width: min(100vw - 4rem, 88rem);
+    width: var(--bleed-width);
+    margin-inline: calc((100% - var(--bleed-width)) / 2);
+  }
+}
+
 .lift {
   transition:
     transform 0.13s cubic-bezier(0.34, 1.4, 0.64, 1),

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { HEAD_CHARS, pageByTasksPerKindSql } from "./entries";
+import {
+  HANDOFF_HEAD_CHARS,
+  HEAD_CHARS,
+  latestHandoffByTasksSql,
+  pageByTasksPerKindSql,
+} from "./entries";
 
 /**
  * The briefing's log query, asserted as text.
@@ -192,5 +197,29 @@ describe("a focus, when one was sent", () => {
   it("takes two more parameters than the unfocused form, for the two configs", () => {
     const count = (sql: string) => (sql.match(/\?/g) ?? []).length;
     expect(count(FOCUSED)).toBe(count(SQL) + 2);
+  });
+});
+
+/**
+ * The board's per-task handoff query, asserted the same way and for the same
+ * reason: nothing else in CI reads it.
+ */
+describe("latestHandoffByTasksSql", () => {
+  const BOARD = latestHandoffByTasksSql(3);
+
+  it("binds one parameter per task and nothing else", () => {
+    expect((BOARD.match(/\?/g) ?? []).length).toBe(3);
+    for (const literal of BOARD.match(/'[^']*'/g) ?? []) expect(literal).not.toContain("?");
+  });
+
+  it("keeps the newest handoff of each task", () => {
+    expect(BOARD).toContain("DISTINCT ON (e.task_id)");
+    expect(BOARD).toContain("ORDER BY e.task_id, e.id DESC");
+    expect(BOARD).toContain("e.kind = 'handoff'");
+  });
+
+  it("cuts the body in the database, not after the read", () => {
+    expect(BOARD).toContain(`LEFT(e.body, ${HANDOFF_HEAD_CHARS})`);
+    expect(BOARD).not.toContain("e.*");
   });
 });
