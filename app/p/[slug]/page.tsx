@@ -251,7 +251,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const repo = repoLink(project.repo_url);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-wide-page>
       {/* One header, one line of identity. The local path used to sit up here
           at full width; it is where the repo happens to be on this laptop,
           which is plumbing, not a name. */}
@@ -562,13 +562,13 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           the standing notes, the closed work. This was five folded groups
           read top to bottom, and reading any task meant leaving the page.
 
-          The row is wider than the column the rest of the page reads at
-          (`.bleed`), because three columns and a panel do not fit in it. The
+          The page asks for the wide column (`data-wide-page` on its root),
+          because three columns and a panel do not fit in the reading one. The
           panel is pinned beside the board and scrolls on its own, so a card
           far down a long queue still changes something that is on screen;
           below `lg` it stacks under the board, and there a card opens the
           task's own page instead (`PanelLink`). */}
-      <div className="bleed flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         <Board
           columns={columns}
           slug={slug}
@@ -576,9 +576,13 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           t={t}
         />
 
+        {/* `id` because the dashboard links to a task as `…?task=7#panel`:
+            on a phone the panel is under the board, and the fragment is what
+            lands the reader on the thing they asked for. */}
         <aside
+          id="panel"
           aria-label={t("panelLabel")}
-          className="sticker min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[22rem] lg:shrink-0 lg:overflow-y-auto xl:w-[26rem]"
+          className="sticker min-w-0 scroll-mt-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[22rem] lg:shrink-0 lg:overflow-y-auto xl:w-[26rem]"
         >
           {/* Links, like `Tabs`, and for its reasons. Not `Tabs` itself: these
               must not scroll the page back to the top, and they sit inside the
