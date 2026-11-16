@@ -50,6 +50,17 @@ describe("waitingItems", () => {
     expect(items[2].quietDays).toBe(30);
   });
 
+  it("lists a task with two open questions once, and counts the other", () => {
+    const { items, omitted } = waitingItems({
+      questions: page([question(5), question(5), question(7)]),
+      stalled: page([]),
+      limit: 6,
+      now,
+    });
+    expect(items.map((item) => item.taskId)).toEqual([5, 7]);
+    expect(omitted).toBe(1);
+  });
+
   it("does not list a task twice when its question is already shown", () => {
     const { items, omitted } = waitingItems({
       questions: page([question(2)]),

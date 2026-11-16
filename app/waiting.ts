@@ -54,7 +54,8 @@ export interface WaitingInput {
 /**
  * Questions first: a question is addressed to the reader by name, a stalled
  * task is only inferred to be theirs. A task that is stalled *because* of a
- * question shown above it is not listed twice.
+ * question shown above it is not listed twice, and neither is a task with two
+ * open questions: the oldest stands for it, and the rest are counted.
  *
  * `omitted` counts what the list does not show, from the totals the queries
  * report rather than from the rows they returned, so a list cut at six of
@@ -64,7 +65,10 @@ export function waitingItems(input: WaitingInput): { items: WaitingItem[]; omitt
   const asked = new Set(input.questions.rows.map((question) => question.task_id));
   const repeated = input.stalled.rows.filter((task) => asked.has(task.id)).length;
 
-  const questions: WaitingItem[] = input.questions.rows.map((question) => ({
+  const firstPerTask = input.questions.rows.filter(
+    (question, index, rows) => rows.findIndex((row) => row.task_id === question.task_id) === index,
+  );
+  const questions: WaitingItem[] = firstPerTask.map((question) => ({
     kind: "question",
     taskId: question.task_id,
     projectId: question.project_id,

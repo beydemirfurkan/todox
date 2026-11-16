@@ -61,7 +61,15 @@ export async function TaskPanel({ task, slug, t }: { task: Task; slug: string; t
         </Link>
       </div>
 
-      <h2 className="display text-[20px] leading-snug font-bold break-words">{task.title}</h2>
+      {/* Clamped: a title can be a paragraph, and at panel width that pushed
+          the status buttons and the log off the first screen. The whole of it
+          is on the task's page, and in the tooltip. */}
+      <h2
+        className="display line-clamp-3 text-[17px] leading-snug font-bold break-words"
+        title={task.title}
+      >
+        {task.title}
+      </h2>
 
       {/* One form, one button per status: the button that was pressed is the
           value, so it needs no script, and the current status stays focusable

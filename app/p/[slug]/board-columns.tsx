@@ -23,6 +23,15 @@ import { boardHref } from "./board";
 
 export type OpenStatus = "todo" | "doing" | "blocked";
 
+/**
+ * Cards a stacked column opens with. Below `md` the three columns are one
+ * page, so a queue of thirty put the work in flight thirty cards down; the
+ * rest are one tap away. From `md` up a column scrolls and shows them all.
+ * The selector in `Column` is written out, because Tailwind reads class names
+ * as text and cannot see a number interpolated into one.
+ */
+const STACKED_CARDS = 5;
+
 export interface BoardCard {
   task: Task;
   counts: EntryCounts | undefined;
@@ -56,10 +65,26 @@ export function Board({
   t: T;
 }) {
   return (
-    <section aria-label={t("boardLabel")} className="grid min-w-0 gap-3 md:grid-cols-3 lg:flex-1">
-      {columns.map((column) => (
-        <Column key={column.status} column={column} slug={slug} selectedId={selectedId} t={t} />
-      ))}
+    <section aria-label={t("boardLabel")} className="min-w-0 space-y-3 lg:flex-1">
+      {/* Stacked, the columns are one long page: the queue alone can be thirty
+          cards, and what is in flight sits under all of them. These are the
+          way past it. Gone from `md` up, where the columns are side by side. */}
+      <nav aria-label={t("jumpToColumn")} className="flex flex-wrap gap-1.5 md:hidden">
+        {columns.map((column) => (
+          <a key={column.status} href={`#column-${column.status}`} className="pill">
+            {column.title}
+            <span className="mono ml-1.5 opacity-70">{column.total}</span>
+          </a>
+        ))}
+        <a href="#panel" className="pill">
+          {t("panelLabel")}
+        </a>
+      </nav>
+      <div className="grid min-w-0 gap-3 md:grid-cols-3 md:items-start">
+        {columns.map((column) => (
+          <Column key={column.status} column={column} slug={slug} selectedId={selectedId} t={t} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -76,10 +101,15 @@ function Column({
   t: T;
 }) {
   const headingId = `column-${column.status}`;
+  const showAllId = `show-all-${column.status}`;
+  const isCutWhenStacked = column.cards.length > STACKED_CARDS;
   return (
     <section
       aria-labelledby={headingId}
-      className="relative min-w-0 rounded-[12px] border-[1.5px] border-rule bg-inset p-2.5"
+      // From `md` a column is as tall as the screen and scrolls inside
+      // itself, like the panel beside it: a queue of thirty used to make the
+      // page thirty cards long, with two empty columns running down beside it.
+      className="relative flex min-w-0 scroll-mt-4 flex-col rounded-[12px] border-[1.5px] border-rule bg-inset p-2.5 md:sticky md:top-4 md:max-h-[calc(100vh-2rem)]"
     >
       {/* Tall enough for the "+", which is absolutely placed over its right
           edge and would otherwise hang into the first card. */}
@@ -99,7 +129,13 @@ function Column({
           {column.emptyText}
         </p>
       ) : (
-        <ul className="space-y-2">
+        <>
+        {/* A checkbox and its label, so "show all" works without a script. */}
+        {isCutWhenStacked && <input type="checkbox" id={showAllId} className="peer sr-only md:hidden" />}
+        {/* `relative`, so the visually hidden labels inside the cards are placed
+            against this list and scroll with it. Against the column they sat at
+            their unscrolled offsets and made the page as long as the queue. */}
+        <ul className="board-scroll relative space-y-2 max-md:[&>li:nth-child(n+6)]:hidden max-md:peer-checked:[&>li:nth-child(n+6)]:block md:-mr-1.5 md:min-h-0 md:overflow-y-auto md:pr-1.5">
           {column.cards.map((card) => (
             <Card
               key={card.task.id}
@@ -110,6 +146,16 @@ function Column({
             />
           ))}
         </ul>
+        {isCutWhenStacked && (
+          // Hidden on the wrapper: `.link-more` sets its own `display` outside
+          // Tailwind's layers, so `hidden` on the label itself loses to it.
+          <p className="mt-2.5 px-1 peer-checked:hidden peer-focus-visible:outline-2 peer-focus-visible:outline-accent md:hidden">
+            <label htmlFor={showAllId} className="link-more text-small">
+              {t("showAllCards", { n: column.cards.length })}
+            </label>
+          </p>
+        )}
+        </>
       )}
       {column.omitted > 0 && (
         <p className="mt-2.5 px-1 text-small text-muted">{t("andMore", { n: column.omitted })}</p>
@@ -136,20 +182,20 @@ function Card({
         href={`/p/${slug}/t/${task.id}`}
         panelHref={boardHref(slug, { task: task.id, view: "task" })}
         isCurrent={isSelected}
-        className="flex flex-col gap-1.5 rounded-[10px] border-[1.5px] border-line bg-card p-3 hover:border-lineStrong aria-[current]:border-accent"
+        className="flex flex-col gap-1.5 rounded-[10px] border-[1.5px] border-line bg-card px-3 py-2.5 hover:border-lineStrong aria-[current]:border-accent"
       >
         <span className="mono flex items-baseline gap-2 text-meta text-faint">
           <span>#{task.id}</span>
           <span className="ml-auto">{ago(task.updated_at, t)}</span>
         </span>
-        <span className="line-clamp-3 text-[14.5px] leading-snug font-medium break-words">
+        <span className="line-clamp-2 text-[14.5px] leading-snug font-medium break-words">
           {task.title}
         </span>
         {handoffHead && (
           // The rule down the side is the handoff colour; the label is for
           // anyone who cannot see it, because colour never says it alone.
           <span
-            className="line-clamp-2 border-l-2 pl-2 text-small break-words text-muted"
+            className="line-clamp-1 border-l-2 pl-2 text-small break-all text-muted"
             style={{ borderColor: "var(--k-handoff)" }}
           >
             <span className="sr-only">{kindLabel(t, "handoff")}: </span>
@@ -196,20 +242,28 @@ function CardChips({
       </Chip>,
     );
   }
+  // What needs somebody is a chip; what is only history is a line of text.
+  // Five colours on every card was a board where nothing stood out, and the
+  // counts of decisions and dead ends are a reason to open a task, not a
+  // reason to look at it first.
+  const history: string[] = [];
   if (counts && counts.dead_ends > 0) {
-    chips.push(
-      <Chip key="dead-ends" color="var(--k-dead_end)">
-        {counts.dead_ends} {counts.dead_ends > 1 ? t("deadEndCountPlural") : t("deadEndCount")}
-      </Chip>,
+    history.push(
+      `${counts.dead_ends} ${counts.dead_ends > 1 ? t("deadEndCountPlural") : t("deadEndCount")}`,
     );
   }
   if (counts && counts.decisions > 0) {
-    chips.push(
-      <Chip key="decisions" color="var(--k-decision)">
-        {counts.decisions} {counts.decisions > 1 ? t("decisionCountPlural") : t("decisionCount")}
-      </Chip>,
+    history.push(
+      `${counts.decisions} ${counts.decisions > 1 ? t("decisionCountPlural") : t("decisionCount")}`,
     );
   }
-  if (chips.length === 0) return null;
-  return <span className="flex flex-wrap items-center gap-1.5">{chips}</span>;
+  if (chips.length === 0 && history.length === 0) return null;
+  return (
+    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      {chips}
+      {history.length > 0 && (
+        <span className="mono text-meta text-faint">{history.join(" · ")}</span>
+      )}
+    </span>
+  );
 }

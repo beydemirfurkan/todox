@@ -244,7 +244,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const panelTabs: { view: PanelView; label: string; count?: number }[] = [
     { view: "task", label: t("tabTask") },
     { view: "notes", label: t("tabNotes"), count: projectContext.length },
-    { view: "closed", label: t("doneDropped"), count: groups.closed.total },
+    { view: "closed", label: t("tabClosed"), count: groups.closed.total },
   ];
 
   const origin = publicUrl();
@@ -541,12 +541,19 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           has left one" on every project that has never had one is the
           always-true sentence this codebase keeps having to remove. */}
       {lastHandoff && lastHandoffTask && (
-        <p className="sticker-flat flex flex-wrap items-baseline gap-x-2.5 gap-y-1 px-3.5 py-2.5 text-small">
+        // Where the panel sits beside the board and is already open on this
+        // task, the strip said the same thing a third time: once here, once on
+        // the card, once in the panel. It stays where the panel is below.
+        <p
+          className={`sticker-flat flex flex-wrap items-baseline gap-x-2.5 gap-y-1 px-3.5 py-2.5 text-small ${
+            view === "task" && selectedId === lastHandoffTask.id ? "lg:hidden" : ""
+          }`}
+        >
           <Chip color="var(--k-handoff)">{t("lastLeftOff")}</Chip>
           <PanelLink
             href={`/p/${slug}/t/${lastHandoffTask.id}`}
             panelHref={boardHref(slug, { task: lastHandoffTask.id, view: "task" })}
-            className="link-more"
+            className="link-more block max-w-full truncate"
           >
             #{lastHandoffTask.id} {lastHandoffTask.title}
           </PanelLink>
@@ -582,7 +589,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
         <aside
           id="panel"
           aria-label={t("panelLabel")}
-          className="sticker min-w-0 scroll-mt-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[22rem] lg:shrink-0 lg:overflow-y-auto xl:w-[26rem]"
+          className="sticker board-scroll min-w-0 scroll-mt-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[22rem] lg:shrink-0 lg:overflow-y-auto xl:w-[26rem]"
         >
           {/* Links, like `Tabs`, and for its reasons. Not `Tabs` itself: these
               must not scroll the page back to the top, and they sit inside the
