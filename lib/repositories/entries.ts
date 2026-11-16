@@ -142,15 +142,6 @@ export async function listByTasksPerKind(
 }
 
 /**
- * The single newest handoff across a set of tasks, with the task it belongs to.
- *
- * For the project page, which had no answer at all to the question a person
- * opens a project to ask: where did this leave off. The briefing has carried
- * `last_handoff` per task since it was written, so the AGENT has always been
- * told; the human looking at the same project got a wall of summary and a list
- * of titles. One row, not one per task -- the page shows one line.
- */
-/**
  * The newest handoff on an open task, per project, in one query.
  *
  * The sibling above answers for one project; the home page needs the same
@@ -190,19 +181,34 @@ export async function latestHandoffByProjects(
   return new Map(rows.map((r) => [r.project_id, r]));
 }
 
-export const latestHandoff = async (taskIds: number[]) =>
-  taskIds.length
-    ? one<Entry & { task_title: string }>(
-        `SELECT e.*, t.title AS task_title
-           FROM entries e
-           JOIN tasks t ON t.id = e.task_id
-          WHERE e.task_id IN (${taskIds.map(() => "?").join(",")})
-            AND e.kind = 'handoff'
-          ORDER BY e.id DESC
-          LIMIT 1`,
-        taskIds,
-      )
-    : undefined;
+export type HandoffHead = { id: number; task_id: number; body: string; created_at: string };
+
+/** Enough of a body to hold its first line; `firstLine` cuts the rest. */
+export const HANDOFF_HEAD_CHARS = 400;
+
+export const latestHandoffByTasksSql = (taskCount: number): string =>
+  `SELECT DISTINCT ON (e.task_id)
+          e.id, e.task_id, LEFT(e.body, ${HANDOFF_HEAD_CHARS}) AS body, e.created_at
+     FROM entries e
+    WHERE e.task_id IN (${Array.from({ length: taskCount }, () => "?").join(",")})
+      AND e.kind = 'handoff'
+    ORDER BY e.task_id, e.id DESC`;
+
+/**
+ * The newest handoff of each task, in one query, cut to its head.
+ *
+ * The project board prints where every open task left off on its card, so the
+ * single newest handoff this replaces (one row for the whole project) is now
+ * the newest of these rather than a query of its own. Cut in SQL because a
+ * body may be 100 KB and a card shows one line of it: fifty whole handoffs
+ * across the network to print fifty first lines is the mistake `countsByTasks`
+ * below was written to stop.
+ */
+export async function latestHandoffByTasks(taskIds: number[]): Promise<Map<number, HandoffHead>> {
+  if (!taskIds.length) return new Map();
+  const rows = await all<HandoffHead>(latestHandoffByTasksSql(taskIds.length), taskIds);
+  return new Map(rows.map((row) => [row.task_id, row]));
+}
 
 /**
  * An entry as the briefing carries it.
@@ -596,4 +602,54 @@ export async function activityByTasks(
     [userId, userId, ...taskIds],
   );
   return new Map(rows.map((r) => [r.task_id, r]));
+}
+
+export type OpenQuestion = {
+  id: number;
+  task_id: number;
+  project_id: number;
+  task_title: string;
+  /** Cut to `HANDOFF_HEAD_CHARS`: a list prints its first line. */
+  body: string;
+  created_at: string;
+};
+
+export const openQuestionsByProjectsSql = (projectCount: number, statusCount: number): string =>
+  `SELECT e.id, e.task_id, t.project_id, t.title AS task_title,
+          LEFT(e.body, ${HANDOFF_HEAD_CHARS}) AS body, e.created_at,
+          COUNT(*) OVER () AS total
+     FROM entries e
+     JOIN tasks t ON t.id = e.task_id
+    WHERE t.project_id IN (${Array.from({ length: projectCount }, () => "?").join(",")})
+      AND t.status IN (${Array.from({ length: statusCount }, () => "?").join(",")})
+      AND e.kind = 'question'
+      AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)
+    ORDER BY e.id
+    LIMIT ?`;
+
+/**
+ * Questions nothing has answered yet, on open tasks, across a set of projects.
+ * Oldest first, with how many there are in all.
+ *
+ * A `question` is the one entry kind written for the developer rather than the
+ * next agent -- "something only the developer can settle" -- and until now the
+ * only place a person met one was inside the log of the task it was asked on.
+ * The agent that asked has stopped; nothing surfaces the question to the one
+ * reader who can close it. Oldest first because that is the one that has been
+ * blocking something longest.
+ */
+export async function openQuestionsByProjects(
+  projectIds: number[],
+  openStatuses: readonly string[],
+  limit: number,
+): Promise<{ rows: OpenQuestion[]; total: number }> {
+  if (!projectIds.length || !openStatuses.length) return { rows: [], total: 0 };
+  const rows = await all<OpenQuestion & { total: string }>(
+    openQuestionsByProjectsSql(projectIds.length, openStatuses.length),
+    [...projectIds, ...openStatuses, limit],
+  );
+  return {
+    rows: rows.map(({ total: _total, ...question }) => question),
+    total: Number(rows[0]?.total ?? 0),
+  };
 }

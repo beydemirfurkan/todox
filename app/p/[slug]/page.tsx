@@ -35,6 +35,7 @@ import { AuthForm } from "../../features/auth-form";
 import { SharePanel } from "../../features/share-panel";
 import { Picker } from "../../features/picker";
 import { SubmitButton } from "../../features/submit";
+import { PanelLink } from "../../features/panel-link";
 import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
 import {
   Blob,
@@ -48,7 +49,10 @@ import {
   StatusDot,
 } from "../../components";
 import { privatePageMetadata } from "../../metadata-shared";
+import { boardHref, newest, panelView, quietDays, selectTaskId, type PanelView } from "./board";
+import { Board, type BoardCard, type BoardColumn } from "./board-columns";
 import { groupTasks, isClosed } from "./task-list";
+import { TaskPanel } from "./task-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -102,8 +106,9 @@ export async function generateMetadata({
   );
 }
 
-export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
+export default async function ProjectPage({ params, searchParams }: PageProps<"/p/[slug]">) {
   const { slug } = await params;
+  const asked = await searchParams;
   const user = await currentUser();
   const { t } = await getT();
   const project = await projectBySlug(user.id, slug);
@@ -128,7 +133,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
   // Both depend on the list above, so they wait for it -- but they wait
   // together. `staleRefs` used to fetch the project's open tasks for itself,
   // which queried the same table this render had already read in full.
-  const [counts, stale, observed, lastHandoff, sameName] = await Promise.all([
+  const [counts, stale, observed, handoffs, sameName] = await Promise.all([
     // Counted in the database. This used to load every entry of every task to
     // render three badges a row.
     entriesRepo.countsByTasks(all.map((x) => x.id)),
@@ -139,8 +144,9 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
     observationsRepo.pageByProject(project.id, OBSERVATIONS_SHOWN),
     // The one question a person opens a project to ask. The briefing has
     // carried `last_handoff` per task since it was written, so the agent has
-    // always been told; the human got a summary and a list of titles.
-    entriesRepo.latestHandoff(open.map((x) => x.id)),
+    // always been told; the human got a summary and a list of titles. One per
+    // open task now, because every card on the board prints its own.
+    entriesRepo.latestHandoffByTasks(open.map((x) => x.id)),
     // A namesake in this account. `merge_projects` has existed since the
     // cross-machine identity work and nothing has ever pointed at a duplicate
     // that already exists -- the agent surface says it once, at registration.
@@ -160,11 +166,92 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
 
   const groups = groupTasks(all);
 
+  const lastHandoff = newest(handoffs.values());
+  const lastHandoffTask = lastHandoff && all.find((x) => x.id === lastHandoff.task_id);
+
+  // What the panel shows comes from the address; see `./board`. With nothing
+  // asked for it opens on where the project left off, then on the first task
+  // in flight, then the head of the queue.
+  const view = panelView(asked.view);
+  const selectedId = selectTaskId(asked.task, new Set(all.map((x) => x.id)), [
+    lastHandoff?.task_id,
+    groups.inFlight[0]?.id,
+    groups.queued.shown[0]?.id,
+    groups.closed.shown[0]?.id,
+  ]);
+  const selected = all.find((x) => x.id === selectedId);
+
+  const today = new Date();
+  const toCard = (task: Task): BoardCard => {
+    const handoff = handoffs.get(task.id);
+    return {
+      task,
+      counts: counts.get(task.id),
+      handoffHead: handoff ? firstLine(handoff.body) : null,
+      quietDays: quietDays(task, today),
+    };
+  };
+  const columns: BoardColumn[] = [
+    {
+      status: "todo",
+      title: t("queued"),
+      cards: groups.queued.shown.map(toCard),
+      omitted: groups.queued.omitted,
+      total: groups.queued.total,
+      emptyText: t("queuedEmpty"),
+      // On the queue, not on the column in flight: a new task is queued, and
+      // it should appear in the column whose "+" made it.
+      action: (
+        <Composer id="new-task" label={t("newTask")} action={createTaskAction}>
+          <input type="hidden" name="slug" value={slug} />
+          <Field label={t("taskTitlePh")}>
+            <input name="title" autoFocus required />
+          </Field>
+          <Field label={t("taskBodyPh")}>
+            <textarea name="body" />
+          </Field>
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label={t("priorityLabel")} className="w-full min-w-0 sm:w-40">
+              <Picker
+                name="priority"
+                value="2"
+                options={priorityOptions(t)}
+                label={t("priorityLabel")}
+              />
+            </Field>
+            <SubmitButton pendingLabel={t("working")}>{t("add")}</SubmitButton>
+          </div>
+        </Composer>
+      ),
+    },
+    {
+      status: "doing",
+      title: t("colDoing"),
+      cards: groups.inFlight.filter((x) => x.status === "doing").map(toCard),
+      omitted: 0,
+      total: groups.counts.doing,
+      emptyText: t("columnEmpty"),
+    },
+    {
+      status: "blocked",
+      title: t("colBlocked"),
+      cards: groups.inFlight.filter((x) => x.status === "blocked").map(toCard),
+      omitted: 0,
+      total: groups.counts.blocked,
+      emptyText: t("columnEmpty"),
+    },
+  ];
+  const panelTabs: { view: PanelView; label: string; count?: number }[] = [
+    { view: "task", label: t("tabTask") },
+    { view: "notes", label: t("tabNotes"), count: projectContext.length },
+    { view: "closed", label: t("doneDropped"), count: groups.closed.total },
+  ];
+
   const origin = publicUrl();
   const repo = repoLink(project.repo_url);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-wide-page>
       {/* One header, one line of identity. The local path used to sit up here
           at full width; it is where the repo happens to be on this laptop,
           which is plumbing, not a name. */}
@@ -331,22 +418,6 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
           )
         )}
 
-        {/* Where it left off, which is what somebody came here to find out.
-            Absent rather than empty when there is no handoff: a line saying
-            "nobody has left one" on every project that has never had one is
-            the always-true sentence this codebase keeps having to remove. */}
-        {lastHandoff && (
-          <p className="prose text-[13.5px] leading-relaxed text-muted">
-            <span className="text-faint">{t("lastLeftOff")} </span>
-            <Link href={`/p/${slug}/t/${lastHandoff.task_id}`} className="link-more">
-              #{lastHandoff.task_id} {lastHandoff.task_title}
-            </Link>{" "}
-            <span className="text-faint">· {ago(lastHandoff.created_at, t)}</span>
-            <br />
-            <span className="break-words">{firstLine(lastHandoff.body)}</span>
-          </p>
-        )}
-
         {/* Where the project lives, in one line: the name it has everywhere,
             and the path it has here.
 
@@ -464,154 +535,142 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
         </section>
       )}
 
-      {/* From here down the page reads in the order the agent's briefing
-          does: what is in flight, what constrains it, what is queued, what is
-          finished, what a process saw, who is here. Each part is a Group --
-          a native details -- so the page is as long as what is open, and a
-          project with sixty tasks and forty notes still fits on a screen when
-          only the work in flight is unfolded. The two-column grid this
-          replaces put the notes in a 19rem rail where every one of them was
-          a paragraph: 1,855px of rail beside 661px of work, measured. */}
-      <Group
-        id="in-flight"
-        title={t("inFlight")}
-        count={groups.counts.doing}
-        countLabel={t("tasks")}
-        right={
-          // Said in words on the header, so a closed group still says it.
-          groups.counts.blocked > 0 ? (
-            <Chip color="var(--k-dead_end)">
-              {groups.counts.blocked} {t("countStuck")}
-            </Chip>
-          ) : undefined
-        }
-        open
-        delay={60}
-      >
-        {groups.inFlight.length === 0 ? (
-          <Empty mood="happy">{t("allClear")}</Empty>
-        ) : (
-          <ul className="space-y-2">
-            {groups.inFlight.map((task) => (
-              <TaskRow key={task.id} task={task} count={counts.get(task.id)} slug={slug} t={t} />
-            ))}
-          </ul>
-        )}
-      </Group>
+      {/* Where it left off, which is what somebody came here to find out --
+          and now a way in: the title opens that task in the panel. Absent
+          rather than empty when there is no handoff: a line saying "nobody
+          has left one" on every project that has never had one is the
+          always-true sentence this codebase keeps having to remove. */}
+      {lastHandoff && lastHandoffTask && (
+        <p className="sticker-flat flex flex-wrap items-baseline gap-x-2.5 gap-y-1 px-3.5 py-2.5 text-small">
+          <Chip color="var(--k-handoff)">{t("lastLeftOff")}</Chip>
+          <PanelLink
+            href={`/p/${slug}/t/${lastHandoffTask.id}`}
+            panelHref={boardHref(slug, { task: lastHandoffTask.id, view: "task" })}
+            className="link-more"
+          >
+            #{lastHandoffTask.id} {lastHandoffTask.title}
+          </PanelLink>
+          <span className="min-w-[12rem] flex-1 break-words text-muted">
+            {firstLine(lastHandoff.body)}
+          </span>
+          <span className="mono text-meta text-faint">{ago(lastHandoff.created_at, t)}</span>
+        </p>
+      )}
 
-      {/* The standing notes, above the queue: they are what the work in
-          flight is being done under, and a person who opens this page to
-          orient reads them before the backlog. */}
-      <Group
-        id="context"
-        title={t("projectContext")}
-        count={projectContext.length}
-        countLabel={t("notes")}
-        action={
-          <Composer id="new-note" label={t("newNote")} action={addContextAction}>
-            <input type="hidden" name="slug" value={slug} />
-            <Field label={t("title")}>
-              <input name="title" autoFocus required />
-            </Field>
-            <Field label={t("noteBodyPh")}>
-              <textarea name="body" required />
-            </Field>
-            <div className="flex flex-wrap items-end gap-2">
-              <Field label={t("projectContext")} className="w-full min-w-0 sm:w-40">
-                <Picker
-                  name="kind"
-                  value={CONTEXT_KINDS[0]}
-                  options={kindOptions(t)}
-                  label={t("projectContext")}
-                />
-              </Field>
-              <SubmitButton pendingLabel={t("saving")}>{t("save")}</SubmitButton>
-            </div>
-          </Composer>
-        }
-        open
-        delay={100}
-      >
-        {projectContext.length === 0 ? (
-          <Empty>{t("projectContextEmpty")}</Empty>
-        ) : (
-          <NoteGroups notes={projectContext} t={t} deleteAction={deleteContextAction} />
-        )}
-      </Group>
+      {/* The work, on one screen: the open tasks as a board, and beside it a
+          panel that shows one of three things -- the task that is selected,
+          the standing notes, the closed work. This was five folded groups
+          read top to bottom, and reading any task meant leaving the page.
 
-      {/* Open when nothing is in flight, because then the queue is the work
-          and a page that opens with two folded groups says nothing. */}
-      {/* The composer is on this group, not the in-flight one: a new task is
-          queued, and from the in-flight group it vanished into a fold the
-          moment it was saved. */}
-      <Group
-        id="queued"
-        title={t("queued")}
-        count={groups.queued.total}
-        countLabel={t("tasks")}
-        action={
-          <Composer id="new-task" label={t("newTask")} action={createTaskAction}>
-            <input type="hidden" name="slug" value={slug} />
-            <Field label={t("taskTitlePh")}>
-              <input name="title" autoFocus required />
-            </Field>
-            <Field label={t("taskBodyPh")}>
-              <textarea name="body" />
-            </Field>
-            <div className="flex flex-wrap items-end gap-2">
-              <Field label={t("priorityLabel")} className="w-full min-w-0 sm:w-40">
-                <Picker
-                  name="priority"
-                  value="2"
-                  options={priorityOptions(t)}
-                  label={t("priorityLabel")}
-                />
-              </Field>
-              <SubmitButton pendingLabel={t("working")}>{t("add")}</SubmitButton>
-            </div>
-          </Composer>
-        }
-        open={groups.inFlight.length === 0}
-        delay={140}
-      >
-        {groups.queued.shown.length === 0 ? (
-          <Empty>{t("queuedEmpty")}</Empty>
-        ) : (
-          <ul className="space-y-2">
-            {groups.queued.shown.map((task) => (
-              <TaskRow key={task.id} task={task} count={counts.get(task.id)} slug={slug} t={t} />
-            ))}
-          </ul>
-        )}
-        {groups.queued.omitted > 0 && (
-          <p className="mt-3 border-t border-dashed border-rule pt-3 text-[13px] text-muted">
-            {t("andMore", { n: groups.queued.omitted })}
-          </p>
-        )}
-      </Group>
+          The page asks for the wide column (`data-wide-page` on its root),
+          because three columns and a panel do not fit in the reading one. The
+          panel is pinned beside the board and scrolls on its own, so a card
+          far down a long queue still changes something that is on screen;
+          below `lg` it stacks under the board, and there a card opens the
+          task's own page instead (`PanelLink`). */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <Board
+          columns={columns}
+          slug={slug}
+          selectedId={view === "task" ? selectedId : null}
+          t={t}
+        />
 
-      <Group
-        id="closed"
-        title={t("doneDropped")}
-        count={groups.closed.total}
-        countLabel={t("tasks")}
-        delay={180}
-      >
-        {groups.closed.shown.length === 0 ? (
-          <Empty>{t("closedEmpty")}</Empty>
-        ) : (
-          <ul className="space-y-2">
-            {groups.closed.shown.map((task) => (
-              <TaskRow key={task.id} task={task} count={counts.get(task.id)} slug={slug} t={t} />
+        {/* `id` because the dashboard links to a task as `…?task=7#panel`:
+            on a phone the panel is under the board, and the fragment is what
+            lands the reader on the thing they asked for. */}
+        <aside
+          id="panel"
+          aria-label={t("panelLabel")}
+          className="sticker min-w-0 scroll-mt-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[22rem] lg:shrink-0 lg:overflow-y-auto xl:w-[26rem]"
+        >
+          {/* Links, like `Tabs`, and for its reasons. Not `Tabs` itself: these
+              must not scroll the page back to the top, and they sit inside the
+              panel rather than above a page. */}
+          <nav
+            aria-label={t("panelSections")}
+            className="flex flex-wrap gap-1.5 border-b border-dashed border-rule p-3"
+          >
+            {panelTabs.map((tab) => (
+              <Link
+                key={tab.view}
+                href={boardHref(slug, { task: selectedId, view: tab.view })}
+                scroll={false}
+                aria-current={tab.view === view ? "page" : undefined}
+                className="pill seg"
+              >
+                {tab.label}
+                {tab.count !== undefined && (
+                  <span className="mono ml-1.5 opacity-70">{tab.count}</span>
+                )}
+              </Link>
             ))}
-          </ul>
-        )}
-        {groups.closed.omitted > 0 && (
-          <p className="mt-3 border-t border-dashed border-rule pt-3 text-[13px] text-muted">
-            {t("andMore", { n: groups.closed.omitted })}
-          </p>
-        )}
-      </Group>
+          </nav>
+
+          <div className="p-4">
+            {view === "task" &&
+              (selected ? (
+                <TaskPanel task={selected} slug={slug} t={t} />
+              ) : (
+                <Empty>{t("noTaskSelected")}</Empty>
+              ))}
+
+            {view === "notes" && (
+              <div className="relative">
+                <h2 className="display min-h-[40px] pr-11 text-[16px] leading-[40px] font-bold">
+                  {t("projectContext")}
+                </h2>
+                <Composer id="new-note" label={t("newNote")} action={addContextAction}>
+                  <input type="hidden" name="slug" value={slug} />
+                  <Field label={t("title")}>
+                    <input name="title" autoFocus required />
+                  </Field>
+                  <Field label={t("noteBodyPh")}>
+                    <textarea name="body" required />
+                  </Field>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <Field label={t("projectContext")} className="w-full min-w-0 sm:w-40">
+                      <Picker
+                        name="kind"
+                        value={CONTEXT_KINDS[0]}
+                        options={kindOptions(t)}
+                        label={t("projectContext")}
+                      />
+                    </Field>
+                    <SubmitButton pendingLabel={t("saving")}>{t("save")}</SubmitButton>
+                  </div>
+                </Composer>
+                <div className="mt-2">
+                  {projectContext.length === 0 ? (
+                    <Empty>{t("projectContextEmpty")}</Empty>
+                  ) : (
+                    <NoteGroups notes={projectContext} t={t} deleteAction={deleteContextAction} />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {view === "closed" && (
+              <>
+                {groups.closed.shown.length === 0 ? (
+                  <Empty>{t("closedEmpty")}</Empty>
+                ) : (
+                  <ul className="space-y-2">
+                    {groups.closed.shown.map((task) => (
+                      <ClosedRow key={task.id} task={task} slug={slug} t={t} />
+                    ))}
+                  </ul>
+                )}
+                {groups.closed.omitted > 0 && (
+                  <p className="mt-3 border-t border-dashed border-rule pt-3 text-[13px] text-muted">
+                    {t("andMore", { n: groups.closed.omitted })}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </aside>
+      </div>
 
       {observed.rows.length > 0 && (
         // Absent rather than empty, like every always-true line this page has
@@ -792,63 +851,32 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
 }
 
 /**
- * One task, one row. The card it replaces stacked the title over a row of
- * chips and put a 44px status picker beside them, so sixty of them ran to
- * six thousand pixels. The row is the link; the status is the dot and the
- * group the row sits in; changing it is what the task page is for.
+ * One closed task, one line: what it was, how it ended, when.
+ *
+ * The status is the dot and its hidden label -- done and dropped share this
+ * list, and a struck-through title alone would not say which. The line is a
+ * link to the panel like a card is, so closed work can be read, and reopened
+ * from the status buttons there, without leaving the board.
  */
-function TaskRow({
-  task,
-  count,
-  slug,
-  t,
-}: {
-  task: Task;
-  count: entriesRepo.EntryCounts | undefined;
-  slug: string;
-  t: T;
-}) {
-  const closed = isClosed(task.status);
+function ClosedRow({ task, slug, t }: { task: Task; slug: string; t: T }) {
   return (
     <li className="sticker-flat">
-      <Link
+      <PanelLink
         href={`/p/${slug}/t/${task.id}`}
+        panelHref={boardHref(slug, { task: task.id, view: "task" })}
         className="flex flex-wrap items-start gap-x-2.5 gap-y-1 p-3 hover:text-ink"
       >
         <span className="pt-1">
           <StatusDot status={task.status} t={t} />
         </span>
         <span className="mono pt-0.5 text-meta text-faint">#{task.id}</span>
-        <span
-          className={`line-clamp-2 min-w-0 flex-1 basis-56 text-[15px] font-medium break-words ${closed ? "text-muted line-through decoration-1" : ""}`}
-        >
+        <span className="line-clamp-2 min-w-[10rem] flex-1 text-small font-medium break-words text-muted line-through decoration-1">
           {task.title}
         </span>
-        {/* What is worth a glance and nothing else: urgency, the dead ends
-            the next session must not repeat, the decisions behind the work.
-            The log total and the question count said nothing a reader acts
-            on from a list. */}
-        <span className="ml-auto flex shrink-0 flex-wrap items-center gap-1.5">
-          {task.priority === 1 && !closed && (
-            <Chip color="var(--accent)" tilt={-3}>
-              p1
-            </Chip>
-          )}
-          {count && count.dead_ends > 0 && (
-            <Chip color="var(--k-dead_end)">
-              {count.dead_ends}{" "}
-              {count.dead_ends > 1 ? t("deadEndCountPlural") : t("deadEndCount")}
-            </Chip>
-          )}
-          {count && count.decisions > 0 && (
-            <Chip color="var(--k-decision)">
-              {count.decisions}{" "}
-              {count.decisions > 1 ? t("decisionCountPlural") : t("decisionCount")}
-            </Chip>
-          )}
-          <span className="mono text-meta text-faint">{ago(task.updated_at, t)}</span>
+        <span className="mono ml-auto shrink-0 pt-0.5 text-meta text-faint">
+          {ago(task.closed_at ?? task.updated_at, t)}
         </span>
-      </Link>
+      </PanelLink>
     </li>
   );
 }

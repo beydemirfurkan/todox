@@ -80,7 +80,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {t("skipToContent")}
         </a>
 
-        <header className="relative z-20 mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
+        <header className="relative z-20 mx-auto flex w-full page-column flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
           {/* "/" for everyone now: signed out it is the page that explains what
               this is, which used to be nowhere. */}
           <Link href="/" className="brand flex items-center gap-2.5">
@@ -147,12 +147,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
         <main
           id="main"
-          className="relative z-10 mx-auto w-full max-w-5xl flex-1 px-5 pt-2 pb-16"
+          className="relative z-10 mx-auto w-full page-column flex-1 px-5 pt-2 pb-16"
         >
           {children}
         </main>
 
-        <footer className="mx-auto w-full max-w-5xl px-5 pb-8 text-[13px] text-faint">
+        <footer className="mx-auto w-full page-column px-5 pb-8 text-[13px] text-faint">
           <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <Link href="/about" className="link-more">
               {t("footerAbout")}

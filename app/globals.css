@@ -290,6 +290,22 @@ summary:focus-visible,
   border-radius: 12px;
 }
 
+/* The column every page reads in, and the wider one a board needs.
+   Pages are 64rem: that is a measure for reading, and most of this app is
+   reading. The dashboard and a project are boards -- lanes, three columns and
+   a panel -- and do not fit in it, so their root carries `data-wide-page` and
+   the header, the main and the footer all widen together. Together is the
+   point: the first cut widened only the board's own row, which left the site
+   header and the page heading on a narrower column than the thing under them.
+   `:has()` because a layout cannot know which page it is wrapping; the page
+   says so in markup and the stylesheet does the rest. */
+.page-column {
+  max-width: 64rem;
+}
+body:has([data-wide-page]) .page-column {
+  max-width: 88rem;
+}
+
 .lift {
   transition:
     transform 0.13s cubic-bezier(0.34, 1.4, 0.64, 1),
