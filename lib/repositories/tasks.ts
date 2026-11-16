@@ -5,7 +5,7 @@ import {
   isClosedStatus,
   type Status,
 } from "../constants";
-import { all, one, run, runStmt, setClause, type Statement } from "../db/client";
+import { all, groupBy, one, run, runStmt, setClause, type Statement } from "../db/client";
 import type { Task } from "../types";
 import { now } from "../util/time";
 
@@ -426,4 +426,90 @@ export async function countsByProject(userId: number) {
       dropped: Number(r.dropped),
     });
   return { map, empty };
+}
+
+/** What a lane on the dashboard prints of a task: enough for a line and a link. */
+export type LaneTask = Pick<
+  Task,
+  "id" | "project_id" | "title" | "status" | "priority" | "updated_at"
+>;
+
+export const openByProjectsSql = (projectCount: number): string =>
+  `SELECT id, project_id, title, status, priority, updated_at
+     FROM (
+       SELECT t.id, t.project_id, t.title, t.status, t.priority, t.updated_at,
+              ROW_NUMBER() OVER (
+                PARTITION BY t.project_id, t.status
+                ORDER BY t.priority, t.updated_at DESC
+              ) AS rank
+         FROM tasks t
+        WHERE t.project_id IN (${Array.from({ length: projectCount }, () => "?").join(",")})
+          AND t.status IN (${OPEN_STATUSES.map(() => "?").join(",")})
+     ) ranked
+    WHERE rank <= ?
+    ORDER BY project_id, priority, updated_at DESC`;
+
+/**
+ * The top `perStatus` open tasks of each status, for a set of projects, in one
+ * query.
+ *
+ * The dashboard draws a lane per project and a cell per status, and a lane has
+ * room for a few lines -- the counts beside it already come from
+ * `countsByProject`, which is what lets a cell say how many it is not showing.
+ * Cut per project AND per status, because a flat "newest fifty" would hand one
+ * busy project every row and leave the lanes under it empty; and cut for
+ * 'doing' as well as 'todo', because the account that measured `staleDoing`
+ * had fifty-four of those in one project.
+ *
+ * No body: a body may be 100 KB and a lane prints a title.
+ */
+export async function openByProjects(
+  projectIds: number[],
+  perStatus: number,
+): Promise<Map<number, LaneTask[]>> {
+  if (!projectIds.length) return new Map();
+  const rows = await all<LaneTask>(openByProjectsSql(projectIds.length), [
+    ...projectIds,
+    ...OPEN_STATUSES,
+    perStatus,
+  ]);
+  return groupBy(rows, (row) => row.project_id);
+}
+
+export type StalledTask = Pick<Task, "id" | "project_id" | "title" | "status" | "updated_at">;
+
+export const stalledByProjectsSql = (projectCount: number): string =>
+  `SELECT id, project_id, title, status, updated_at, COUNT(*) OVER () AS total
+     FROM tasks
+    WHERE project_id IN (${Array.from({ length: projectCount }, () => "?").join(",")})
+      AND (status = 'blocked' OR (status = 'doing' AND updated_at < ?))
+    ORDER BY updated_at
+    LIMIT ?`;
+
+/**
+ * Tasks that will not move by themselves, across a set of projects: the
+ * blocked ones, and the ones left in 'doing' with nothing written since
+ * `quietBefore`. Longest waiting first, with how many there are in all.
+ *
+ * `staleDoing` answers the second half for one project and the briefing; the
+ * dashboard asks for every project at once and wants the blocked ones in the
+ * same list, because to the person reading it they are the same thing -- work
+ * that is waiting on them. `COUNT(*) OVER ()` is affordable here where
+ * `pageByProject` refused it: the set it walks is the stalled tasks, not every
+ * open one.
+ */
+export async function stalledByProjects(
+  projectIds: number[],
+  quietBefore: string,
+  limit: number,
+): Promise<{ rows: StalledTask[]; total: number }> {
+  if (!projectIds.length) return { rows: [], total: 0 };
+  const rows = await all<StalledTask & { total: string }>(
+    stalledByProjectsSql(projectIds.length),
+    [...projectIds, quietBefore, limit],
+  );
+  return {
+    rows: rows.map(({ total: _total, ...task }) => task),
+    total: Number(rows[0]?.total ?? 0),
+  };
 }

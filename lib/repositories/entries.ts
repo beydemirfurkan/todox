@@ -603,3 +603,53 @@ export async function activityByTasks(
   );
   return new Map(rows.map((r) => [r.task_id, r]));
 }
+
+export type OpenQuestion = {
+  id: number;
+  task_id: number;
+  project_id: number;
+  task_title: string;
+  /** Cut to `HANDOFF_HEAD_CHARS`: a list prints its first line. */
+  body: string;
+  created_at: string;
+};
+
+export const openQuestionsByProjectsSql = (projectCount: number, statusCount: number): string =>
+  `SELECT e.id, e.task_id, t.project_id, t.title AS task_title,
+          LEFT(e.body, ${HANDOFF_HEAD_CHARS}) AS body, e.created_at,
+          COUNT(*) OVER () AS total
+     FROM entries e
+     JOIN tasks t ON t.id = e.task_id
+    WHERE t.project_id IN (${Array.from({ length: projectCount }, () => "?").join(",")})
+      AND t.status IN (${Array.from({ length: statusCount }, () => "?").join(",")})
+      AND e.kind = 'question'
+      AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)
+    ORDER BY e.id
+    LIMIT ?`;
+
+/**
+ * Questions nothing has answered yet, on open tasks, across a set of projects.
+ * Oldest first, with how many there are in all.
+ *
+ * A `question` is the one entry kind written for the developer rather than the
+ * next agent -- "something only the developer can settle" -- and until now the
+ * only place a person met one was inside the log of the task it was asked on.
+ * The agent that asked has stopped; nothing surfaces the question to the one
+ * reader who can close it. Oldest first because that is the one that has been
+ * blocking something longest.
+ */
+export async function openQuestionsByProjects(
+  projectIds: number[],
+  openStatuses: readonly string[],
+  limit: number,
+): Promise<{ rows: OpenQuestion[]; total: number }> {
+  if (!projectIds.length || !openStatuses.length) return { rows: [], total: 0 };
+  const rows = await all<OpenQuestion & { total: string }>(
+    openQuestionsByProjectsSql(projectIds.length, openStatuses.length),
+    [...projectIds, ...openStatuses, limit],
+  );
+  return {
+    rows: rows.map(({ total: _total, ...question }) => question),
+    total: Number(rows[0]?.total ?? 0),
+  };
+}

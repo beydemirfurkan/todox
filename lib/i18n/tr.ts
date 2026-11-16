@@ -289,6 +289,12 @@ export const tr: Record<Key, string> = {
   quietProjects: "Sessiz",
   liveProjectsEmpty: "Hiçbir projede uçuşta iş yok.",
   quietEmpty: "Her projede uçuşta bir iş var.",
+  colProject: "Proje",
+  laneMore: "+{n} tane daha",
+  waitingTitle: "Seni bekleyenler",
+  waitingBody:
+    "Ajanın tek başına ilerletemedikleri: yanıtlanmamış bir soru, takılmış bir görev, yapılıyor durumunda bırakılıp üstüne bir şey yazılmamış iş.",
+  waitingMore: "ve {n} tane daha, kendi projelerinde.",
   projectNamePh: "ad",
   projectPathPh: "/repo/için/mutlak/yol (isteğe bağlı)",
   projectSummaryPh: "bu proje ne? hiçbir şey bilmeyen bir agent için yaz",
@@ -305,8 +311,6 @@ export const tr: Record<Key, string> = {
   firstRunTitle: "Burası henüz boş",
   firstRunBody:
     "İlk projeni buradan ekle — bir ad ver ve bir repo yolu göster. Sonra todox'u agent'ına bağla, yazma işini ona bırak.",
-  countInFlight: "uçuşta",
-  countStuck: "takıldı",
   countQueued: "sırada",
   countDone: "bitti",
 

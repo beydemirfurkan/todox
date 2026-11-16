@@ -4,6 +4,7 @@ import {
   HANDOFF_HEAD_CHARS,
   HEAD_CHARS,
   latestHandoffByTasksSql,
+  openQuestionsByProjectsSql,
   pageByTasksPerKindSql,
 } from "./entries";
 
@@ -221,5 +222,23 @@ describe("latestHandoffByTasksSql", () => {
   it("cuts the body in the database, not after the read", () => {
     expect(BOARD).toContain(`LEFT(e.body, ${HANDOFF_HEAD_CHARS})`);
     expect(BOARD).not.toContain("e.*");
+  });
+});
+
+describe("openQuestionsByProjectsSql", () => {
+  const QUESTIONS = openQuestionsByProjectsSql(3, 2);
+
+  it("binds the projects, the statuses and the limit", () => {
+    expect((QUESTIONS.match(/\?/g) ?? []).length).toBe(3 + 2 + 1);
+    for (const literal of QUESTIONS.match(/'[^']*'/g) ?? []) expect(literal).not.toContain("?");
+  });
+
+  it("leaves out a question that something answers", () => {
+    expect(QUESTIONS).toContain("NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = e.id)");
+  });
+
+  it("returns the oldest first and a cut body", () => {
+    expect(QUESTIONS).toMatch(/ORDER BY e\.id\s+LIMIT \?/);
+    expect(QUESTIONS).toContain(`LEFT(e.body, ${HANDOFF_HEAD_CHARS})`);
   });
 });

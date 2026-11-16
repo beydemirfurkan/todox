@@ -31,12 +31,26 @@ import {
   Field,
   Group,
   NoteGroups,
-  ProjectCard,
   ProjectFields,
+  ProjectLanes,
   ProjectRow,
+  WaitingList,
 } from "./components";
-import { groupProjects } from "./project-groups";
+import { QUIET_AFTER_DAYS } from "./p/[slug]/board";
+import { groupProjects, isLive } from "./project-groups";
 import { pageOpenGraph } from "./metadata-shared";
+import { waitingItems } from "./waiting";
+
+/**
+ * Titles a lane prints per status. The counts beside them are the true ones;
+ * a lane is a glance, and past a few lines per cell it stops being one.
+ */
+const LANE_TASKS_PER_STATUS = 3;
+
+/** Cards in "Waiting on you". The rest are counted, and found on their projects. */
+const WAITING_SHOWN = 6;
+
+const DAY_MS = 86_400_000;
 
 export const dynamic = "force-dynamic";
 
@@ -87,9 +101,17 @@ export default async function Home() {
    * note by anyone, which is the definition this list now matches.
    */
   const owned = allProjects.filter((p) => p.user_id === user.id);
-  // Both of these need the project list first, so they wait -- but they wait
+  const allIds = allProjects.map((p) => p.id);
+  // A lane is drawn for a project with work in flight, and which those are is
+  // known from the counts already in hand -- so their tasks ride in the second
+  // round below rather than costing a third.
+  const liveIds = allIds.filter((id) => isLive(counts.map.get(id)));
+  const renderedAt = new Date();
+  const quietBefore = new Date(renderedAt.getTime() - QUIET_AFTER_DAYS * DAY_MS).toISOString();
+  // All of these need the project list first, so they wait -- but they wait
   // together, the way the project page pairs its own second round.
-  const [teamSizes, notesByProject, pending, leftOff] = await Promise.all([
+  const [teamSizes, notesByProject, pending, leftOff, laneTasks, questions, stalled] =
+    await Promise.all([
     // One grouped query for every card, not one per card.
     memberships.countsByProjects(allProjects.map((p) => p.id)),
     contexts.projectIdsHoldingNotes(owned.map((p) => p.id)),
@@ -97,8 +119,16 @@ export default async function Home() {
     // disagree, and a disagreement here is a button that does nothing.
     invitationsRepo.projectIdsWithPending(owned.map((p) => p.id), new Date().toISOString()),
     // What a card can say that its name and its counts cannot.
-    entriesRepo.latestHandoffByProjects(allProjects.map((p) => p.id), OPEN_STATUSES),
+    entriesRepo.latestHandoffByProjects(allIds, OPEN_STATUSES),
+    // The top of each status, per project, in one query for every lane.
+    tasks.openByProjects(liveIds, LANE_TASKS_PER_STATUS),
+    // What only a person can move: asked across every project this account
+    // can see, because a question in a quiet project waits just as long.
+    entriesRepo.openQuestionsByProjects(allIds, OPEN_STATUSES, WAITING_SHOWN),
+    tasks.stalledByProjects(allIds, quietBefore, WAITING_SHOWN),
   ]);
+  const waiting = waitingItems({ questions, stalled, limit: WAITING_SHOWN, now: renderedAt });
+  const slugOf = new Map(allProjects.map((p) => [p.id, p.slug]));
 
   /**
    * Projects that hold nothing at all.
@@ -192,7 +222,10 @@ export default async function Home() {
   );
 
   return (
-    <div className="space-y-5">
+    // Wide, like a project: this is a board of lanes, not a page to read --
+    // once there are projects. Before the first one it is a pitch and a form,
+    // and those read at the ordinary measure.
+    <div className="space-y-5" data-wide-page={beforeFirstProject ? undefined : true}>
       {beforeFirstProject ? (
         <>
           <div className="pop prose">
@@ -222,6 +255,24 @@ export default async function Home() {
         </h1>
       )}
 
+      {/* First, and absent when nothing waits: the one list on this page that
+          is about the reader rather than about the projects. A heading over
+          "nothing is waiting on you" on every visit is the always-true
+          sentence this page has removed twice already. */}
+      {waiting.items.length > 0 && (
+        <section
+          aria-labelledby="waiting"
+          className="pop sticker p-4"
+          style={{ animationDelay: "40ms" }}
+        >
+          <h2 id="waiting" className="display text-[17px] font-bold">
+            {t("waitingTitle")}
+          </h2>
+          <p className="prose mt-0.5 mb-3 text-small text-muted">{t("waitingBody")}</p>
+          <WaitingList items={waiting.items} omitted={waiting.omitted} slugOf={slugOf} t={t} />
+        </section>
+      )}
+
       {!beforeFirstProject && (
         <Group
           id="live"
@@ -234,18 +285,17 @@ export default async function Home() {
           {live.length === 0 ? (
             <Empty mood="happy">{t("liveProjectsEmpty")}</Empty>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {live.map((p) => (
-                <ProjectCard
-                  key={p.id}
-                  project={p}
-                  counts={countsOf(p.id)}
-                  teamSize={teamOf(p.id)}
-                  leftOff={leftOff.get(p.id)?.body ?? null}
-                  t={t}
-                />
-              ))}
-            </div>
+            <ProjectLanes
+              lanes={live.map((p) => ({
+                project: p,
+                counts: countsOf(p.id),
+                teamSize: teamOf(p.id),
+                tasks: laneTasks.get(p.id) ?? [],
+                leftOff: leftOff.get(p.id)?.body ?? null,
+              }))}
+              titles={{ todo: t("queued"), doing: t("colDoing"), blocked: t("colBlocked") }}
+              t={t}
+            />
           )}
         </Group>
       )}

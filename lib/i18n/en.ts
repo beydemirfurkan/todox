@@ -297,6 +297,12 @@ export const en = {
   quietProjects: "Quiet",
   liveProjectsEmpty: "Nothing in flight in any project.",
   quietEmpty: "Every project has something in flight.",
+  colProject: "Project",
+  laneMore: "+{n} more",
+  waitingTitle: "Waiting on you",
+  waitingBody:
+    "What an agent cannot move by itself: a question nobody has answered, a blocked task, work left in doing with nothing written since.",
+  waitingMore: "and {n} more, on their projects.",
   projectNamePh: "name",
   projectPathPh: "/absolute/path/to/repo (optional)",
   projectSummaryPh: "what is this project? written for a cold agent",
@@ -313,8 +319,6 @@ export const en = {
   firstRunTitle: "Nothing here yet",
   firstRunBody:
     "Add your first project here — name it and point it at a repo path. After that, hook todox up to your agent and let it do the writing.",
-  countInFlight: "in flight",
-  countStuck: "stuck",
   countQueued: "queued",
   countDone: "done",
 
