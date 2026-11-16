@@ -306,6 +306,14 @@ body:has([data-wide-page]) .page-column {
   max-width: 88rem;
 }
 
+/* The scrollers inside a board: a column of cards, and the panel beside
+   them. A full-width system scrollbar in each was four grey bars across one
+   screen; thin and the colour of a rule, they read as an edge. */
+.board-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
 .lift {
   transition:
     transform 0.13s cubic-bezier(0.34, 1.4, 0.64, 1),

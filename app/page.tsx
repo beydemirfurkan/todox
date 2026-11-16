@@ -45,7 +45,7 @@ import { waitingItems } from "./waiting";
  * Titles a lane prints per status. The counts beside them are the true ones;
  * a lane is a glance, and past a few lines per cell it stops being one.
  */
-const LANE_TASKS_PER_STATUS = 3;
+const LANE_TASKS_PER_STATUS = 2;
 
 /** Cards in "Waiting on you". The rest are counted, and found on their projects. */
 const WAITING_SHOWN = 6;

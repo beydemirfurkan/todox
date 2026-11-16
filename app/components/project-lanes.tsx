@@ -32,7 +32,17 @@ import { StatusDot } from "./status";
 const taskHref = (slug: string, taskId: number) =>
   `${boardHref(slug, { task: taskId, view: "task" })}#panel`;
 
-const LANE_GRID = "md:grid md:grid-cols-[11rem_repeat(3,minmax(0,1fr))_4.5rem] md:gap-x-3";
+/**
+ * Three shapes. Stacked on a phone. From `md` the three statuses sit side by
+ * side under the project's own line, because at tablet width a fourth and
+ * fifth column left each status a hundred and twenty pixels and every title
+ * became three words a line. From `xl` everything is one row, under headings
+ * drawn once.
+ */
+const LANE_ROW = "xl:grid-cols-[11rem_repeat(3,minmax(0,1fr))_4.5rem] xl:gap-x-3";
+const LANE_GRID = `md:grid md:grid-cols-3 md:gap-x-3 md:gap-y-3 ${LANE_ROW}`;
+/** The project's line and the done count: full width until the single row. */
+const LANE_WIDE_CELL = "md:col-span-3 xl:col-span-1";
 
 const LANE_STATUSES = ["todo", "doing", "blocked"] as const satisfies readonly Status[];
 type LaneStatus = (typeof LANE_STATUSES)[number];
@@ -61,9 +71,9 @@ export function ProjectLanes({
   return (
     <div className="space-y-2">
       {/* Headings for the columns, drawn once. Hidden from assistive tech and
-          below `md`: every cell names its own status, which is what is read
-          out and what a phone shows when the lane is stacked. */}
-      <div aria-hidden="true" className={`hidden px-3 ${LANE_GRID}`}>
+          below `xl`: every cell names its own status, which is what is read
+          out and what a narrower screen shows above each cell. */}
+      <div aria-hidden="true" className={`hidden px-3 xl:grid ${LANE_ROW}`}>
         <span className="text-meta font-semibold tracking-wide text-muted uppercase">
           {t("colProject")}
         </span>
@@ -75,7 +85,7 @@ export function ProjectLanes({
         ))}
         <span className="display flex items-center gap-2 text-[15px] font-bold">
           <StatusDot status="done" t={t} />
-          {t("countDone")}
+          {t("colDone")}
         </span>
       </div>
 
@@ -101,9 +111,9 @@ function Lane({
   const projectHref = `/p/${project.slug}`;
   return (
     <li className={`sticker-flat space-y-3 p-3 md:space-y-0 ${LANE_GRID}`}>
-      <div className="min-w-0 space-y-1.5">
+      <div className={`min-w-0 space-y-1.5 ${LANE_WIDE_CELL}`}>
         <h3 className="display text-[18px] leading-tight font-bold break-words">
-          <Link href={projectHref} className="hover:text-accent">
+          <Link href={projectHref} className="inline-flex items-center hover:text-accent max-sm:min-h-[44px]">
             {project.name}
           </Link>
         </h3>
@@ -113,7 +123,7 @@ function Lane({
         <ShareChip project={project} teamSize={teamSize} t={t} />
         {leftOff && (
           <p
-            className="line-clamp-3 border-l-2 pl-2 text-small break-words text-muted"
+            className="line-clamp-2 border-l-2 pl-2 text-small break-words text-muted"
             style={{ borderColor: "var(--k-handoff)" }}
           >
             <span className="sr-only">{kindLabel(t, "handoff")}: </span>
@@ -136,8 +146,11 @@ function Lane({
         />
       ))}
 
-      <p className="min-w-0 md:pt-0.5">
-        <Link href={boardHref(project.slug, { task: null, view: "closed" })} className="hover:text-accent">
+      <p className={`min-w-0 xl:pt-0.5 ${LANE_WIDE_CELL}`}>
+        <Link
+          href={boardHref(project.slug, { task: null, view: "closed" })}
+          className="inline-flex items-baseline gap-1 hover:text-accent max-sm:min-h-[44px] max-sm:items-center"
+        >
           <span className="mono text-[17px]">{counts.done}</span>{" "}
           <span className="text-meta text-muted">{t("countDone")}</span>
         </Link>
@@ -162,9 +175,12 @@ function LaneCell({
 }) {
   const omitted = total - tasks.length;
   return (
-    <div className="min-w-0 space-y-1.5">
+    // An empty cell holds its place in the grid, and is nothing at all where
+    // the lane is stacked: "Blocked · 0" and a dash, per project, was a third
+    // of a phone's screen spent saying nothing is wrong.
+    <div className={`min-w-0 space-y-1.5 ${total === 0 ? "max-md:hidden" : ""}`}>
       {/* The cell's own name: visible where lanes stack, read out everywhere. */}
-      <p className="text-meta font-semibold text-muted md:sr-only">
+      <p className="text-meta font-semibold text-muted xl:sr-only">
         {title} · {total}
       </p>
       {tasks.length === 0 ? (
@@ -178,11 +194,15 @@ function LaneCell({
             <li key={task.id}>
               <Link
                 href={taskHref(slug, task.id)}
-                className="flex items-baseline gap-2 rounded-[9px] border-[1.5px] border-line bg-card px-2.5 py-2 text-small hover:border-lineStrong"
+                className="flex items-baseline gap-2 rounded-[9px] border-[1.5px] border-line bg-card px-2.5 py-2 text-small hover:border-lineStrong max-sm:min-h-[44px] max-sm:items-center"
               >
                 <span className="mono shrink-0 text-meta text-faint">#{task.id}</span>
                 <span className="line-clamp-2 min-w-0 flex-1 break-words">{task.title}</span>
-                {task.priority === 1 && <Chip color="var(--accent)">p1</Chip>}
+                {/* Text, not a filled chip: most open work is p1, and a
+                    yellow block on every row of every lane marked nothing. */}
+                {task.priority === 1 && (
+                  <span className="mono shrink-0 text-meta font-medium text-accent">p1</span>
+                )}
               </Link>
             </li>
           ))}
@@ -230,7 +250,7 @@ export function WaitingList({
           const slug = slugOf.get(item.projectId);
           if (!slug) return null;
           return (
-            <li key={`${item.kind}-${item.taskId}`}>
+            <li key={`${item.kind}-${item.taskId}`} className="min-w-0">
               <Link
                 href={taskHref(slug, item.taskId)}
                 className="sticker-flat flex h-full flex-col gap-1.5 p-3 hover:border-lineStrong"
