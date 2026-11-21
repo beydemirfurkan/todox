@@ -832,7 +832,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Create task",
       description:
-        "Capture work that will not finish this session. Pass `cwd` and todox picks the project; registering a new one needs `repo_root` or `repo_url` too. Put the goal and the definition of done in `body`.",
+        "Capture work that will not finish this session. Pass `cwd` and todox picks the project; registering a new one needs `repo_root` or `repo_url` too. Put the goal and the definition of done in `body`. If dead ends in this project share its title's terms, they come back as `related_dead_ends` -- read them before starting.",
     },
     // Local only. A process sitting next to the code can hash it, so the model
     // is asked for paths and nothing else -- asking it for a sha256 would be

@@ -28,7 +28,7 @@ import { existingFor, mustResolve, noMatch, resolve, resolveOrCreate } from "./p
 import { activityReport } from "./reports";
 import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
 import { silentAccountNudge } from "./nudge";
-import { search } from "./search";
+import { highlightedTerms, search } from "./search";
 import { sessionStatus } from "./session-status";
 import * as taskService from "./task-service";
 import { headlineHint, quickCloseHint } from "./write-hints";
@@ -324,6 +324,7 @@ export const methods = {
       project: { slug: project.slug, name: project.name, root_path: project.root_path },
       project_created: created,
       ...(warning ? { warning } : {}),
+      ...(await relatedDeadEnds(userId, project.id, p.title)),
       ...(created
         ? {
             next: `Registered a new project "${project.slug}". Call update_project with a one-paragraph summary and repo_url set to \`git remote get-url origin\` — the summary is what a cold session reads, and the remote is the only name this project has on any machine but this one.`,
@@ -703,6 +704,56 @@ function shapeBriefing(
   if (p.shape !== "digest") return brief;
   const { text, chars, dropped } = renderDigest(brief, p.max_chars);
   return { digest: text, chars, dropped };
+}
+
+/**
+ * How many distinct terms of a new task's title a dead end must share before
+ * it is offered with the task.
+ *
+ * Counted from the snippet's highlights rather than from the score. The
+ * full-text query is rewritten to a disjunction, so a title matches every dead
+ * end sharing one word with it, and `ts_rank` cannot draw the line: measured in
+ * `smoke:search`, three shared terms scored 0.046 and one scored 0.030, and
+ * both numbers move with the length of the title. `ts_headline` marks each term
+ * it matched, so two different marked words is "about the same thing" in a
+ * form that does not drift.
+ */
+const RELATED_DEAD_END_TERMS = 2;
+const RELATED_DEAD_ENDS = 3;
+
+/**
+ * "Has this been tried?", answered at the one moment the answer is cheapest:
+ * when the work is being written down, before anybody has spent an afternoon
+ * rediscovering why it failed. Same project only, headlines only, and absent
+ * when nothing clears the bar -- an empty list on every create_task would be
+ * a key the agent learns to skip.
+ *
+ * Never fails the create. The task is already written; a search that errors
+ * here costs the hint, not the work.
+ */
+async function relatedDeadEnds(
+  userId: number,
+  projectId: number,
+  title: string,
+): Promise<{ related_dead_ends?: { entry_id: number; task_id: number | undefined; on_task: string; snippet: string }[] }> {
+  try {
+    const hits = await search(userId, title, 10, { projectId, kinds: ["dead_end"] });
+    const related = hits
+      .filter((h) => highlightedTerms(h.snippet) >= RELATED_DEAD_END_TERMS)
+      .slice(0, RELATED_DEAD_ENDS);
+    if (related.length === 0) return {};
+    return {
+      related_dead_ends: related.map((h) => ({
+        entry_id: h.id,
+        task_id: h.task_id,
+        on_task: h.title.replace(/^dead_end @ /, ""),
+        snippet: h.snippet,
+      })),
+    };
+  } catch (e) {
+    logError("createTask.relatedDeadEnds", e);
+    return {};
+  }
 }
 
 /**

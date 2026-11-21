@@ -41,6 +41,16 @@ type ContextRow = Scored & {
 };
 
 /**
+ * Distinct words `ts_headline` marked in a snippet: how many terms of the
+ * query a hit actually shares, which the score cannot say once the query is a
+ * disjunction (see `relatedDeadEnds` in rpc.ts).
+ */
+export function highlightedTerms(snippet: string): number {
+  const marked = [...snippet.matchAll(/<b>([^<]+)<\/b>/g)].map((m) => m[1].toLowerCase());
+  return new Set(marked).size;
+}
+
+/**
  * `%` and `_` are wildcards to ILIKE, so a search for either matched
  * everything and a search for a literal one found nothing.
  */
