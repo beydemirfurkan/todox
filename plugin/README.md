@@ -1,7 +1,8 @@
 # todox for Claude Code
 
-The todox MCP server, the session protocol as a skill, and one reminder at
-session start — packaged so that installing it is one command and nothing has
+The todox MCP server, the session protocol as a skill, and command hooks that
+brief a session at start and ask for its handoff at the end — packaged so that
+installing it is one command and nothing has
 to be pasted into a config file by hand.
 
 ```bash
@@ -39,12 +40,24 @@ directory, never in the session. `TODOX_HOOKS=off` turns them all off;
 `TODOX_URL` points them at another server when `.mcp.json`'s `url` was
 overwritten by an update.
 
-What it deliberately does not add: a `Stop` hook. A prompt hook at stop cannot
-read the transcript — it sees the last message and nothing else — so it either
-blocks every chat that ends without a handoff or blocks none. The shape that
-would work is an agent hook that reads the transcript, and that is a model call
-on every stop. `session_status` at the end of the instructions, named again at
-session start, is the reminder; the enforcement is a measured question, not a
-default.
+- **Stop hook** — asks for the handoff, **once per session**, and only for
+  tasks this session itself created or wrote on that are still `doing` or have
+  changed since their last handoff — asked of the server with `session_status`,
+  not guessed. The turn is stopped with the exact calls to make and "if the
+  developer asked to stop now, say so and stop." A session that only read is
+  never stopped. One that edited files without touching any todox task gets a
+  single message to you, not a stop: a typo fix owes no task, and a hook that
+  blocks every quick fix makes capture more expensive, which is the trade-off
+  this project weighs hardest. `TODOX_STOP=strict` makes that a stop too;
+  `TODOX_STOP=off` turns the Stop hook off; "no-handoff" or "todox off" in a
+  prompt turns it off for that session.
+
+An earlier version of this README argued against a Stop hook: a prompt hook at
+stop sees only the last message, so it blocks every chat or none, and an agent
+hook that reads the transcript is a model call on every stop. Both are true and
+neither is what this is. A command hook is a plain process: a `PostToolUse`
+hook appends one line per edit or todox call to a file under the plugin's data
+directory, and at stop the question "did this session leave its own tasks
+unwritten?" is one RPC, with no transcript and no model.
 
 From a clone, without installing: `claude --plugin-dir ./plugin`.

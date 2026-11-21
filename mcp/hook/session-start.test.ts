@@ -1,23 +1,11 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { DIGEST_CHARS, PREAMBLE, REMINDER, sessionStart } from "./session-start";
 import { readEvents } from "./state";
-import type { Logger } from "./log";
+import { hookContext } from "./test-context";
 import type { HookContext } from "./types";
 
-function context(rpc: HookContext["rpc"], cwd: string | undefined = "/repo") {
-  const dataDir = mkdtempSync(join(tmpdir(), "todox-hook-start-"));
-  return {
-    config: { token: rpc ? "todox_t" : undefined, url: "http://x", dataDir, disabled: false },
-    log: vi.fn<Logger>(),
-    input: { session_id: "s1", cwd },
-    rpc,
-    now: () => new Date("2026-11-22T10:00:00Z"),
-  } satisfies HookContext;
-}
+const context = (rpc: HookContext["rpc"]) => hookContext({ rpc });
 
 const contextOf = (out: unknown) =>
   (out as { hookSpecificOutput: { hookEventName: string; additionalContext: string } }).hookSpecificOutput;

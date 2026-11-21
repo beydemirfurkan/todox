@@ -46,7 +46,8 @@ function hookConfig(env, pluginRoot, warn) {
     token: env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || void 0,
     url: env.TODOX_URL || pluginRoot && urlFromMcpJson(pluginRoot, warn) || HOSTED_URL,
     dataDir: dataDirFrom(env),
-    disabled: env.TODOX_HOOKS === "off"
+    disabled: env.TODOX_HOOKS === "off",
+    stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default"
   };
 }
 function dataDirFrom(env) {
@@ -88,6 +89,20 @@ function rotateIfFull(path) {
 }
 var oneLine = (message) => message.replace(/\s+/g, " ").slice(0, 500);
 
+// lib/util/paths.ts
+var isWindowsPath = (p) => /^[a-zA-Z]:[\\/]/.test(p);
+var normalisePath = (p) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+function isInside(child, root) {
+  const fold = isWindowsPath(root);
+  const norm = (p) => {
+    const s = normalisePath(p);
+    return fold ? s.toLowerCase() : s;
+  };
+  const c = norm(child);
+  const r = norm(root);
+  return c === r || c.startsWith(`${r}/`);
+}
+
 // mcp/hook/state.ts
 import {
   appendFileSync as appendFileSync2,
@@ -110,6 +125,11 @@ function appendEvent(dataDir, sessionId, event) {
   appendFileSync2(path, `${JSON.stringify(event)}
 `);
 }
+function readEvents(dataDir, sessionId) {
+  const path = sessionPath(dataDir, sessionId);
+  if (!existsSync3(path)) return [];
+  return readFileSync2(path, "utf8").split("\n").filter((line) => line.startsWith("{") && line.endsWith("}")).map((line) => JSON.parse(line));
+}
 function pruneSessions(dataDir, nowMs = Date.now()) {
   const dir = join3(dataDir, "sessions");
   if (!existsSync3(dir)) return 0;
@@ -122,6 +142,38 @@ function pruneSessions(dataDir, nowMs = Date.now()) {
     removed++;
   }
   return removed;
+}
+
+// mcp/hook/post-tool-use.ts
+var EDIT_TOOLS = /* @__PURE__ */ new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+var TODOX_TASK_TOOL = /^mcp__.*todox.*__(create_task|update_task|log_entry)$/;
+async function postToolUse(ctx) {
+  const { session_id: sessionId, tool_name: tool } = ctx.input;
+  if (!sessionId || !tool) return null;
+  const at = ctx.now().toISOString();
+  if (EDIT_TOOLS.has(tool)) {
+    if (editsWorkingTree(ctx.input)) appendEvent(ctx.config.dataDir, sessionId, { t: "edit", at });
+    return null;
+  }
+  if (TODOX_TASK_TOOL.test(tool)) {
+    const id = taskIdOf(ctx.input);
+    if (id) appendEvent(ctx.config.dataDir, sessionId, { t: "task", at, id });
+    else ctx.log("post-tool-use", `${tool}: no task id in the call or its answer`);
+  }
+  return null;
+}
+function editsWorkingTree(input) {
+  const path = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+  if (typeof path !== "string" || !input.cwd) return false;
+  return isInside(path, input.cwd);
+}
+function taskIdOf(input) {
+  const fromArgs = input.tool_input?.task_id;
+  if (typeof fromArgs === "number" && Number.isInteger(fromArgs) && fromArgs > 0) return fromArgs;
+  if (typeof fromArgs === "string" && /^\d+$/.test(fromArgs)) return Number(fromArgs);
+  const answer = JSON.stringify(input.tool_response ?? "");
+  const match = /\/p\/[^/"\\]+\/t\/(\d+)/.exec(answer);
+  return match ? Number(match[1]) : null;
 }
 
 // mcp/hook/session-start.ts
@@ -164,12 +216,84 @@ function inject(text) {
   return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } };
 }
 
+// mcp/hook/stop.ts
+var MAX_WINDOW_HOURS = 168;
+async function stop(ctx) {
+  const { session_id: sessionId, cwd } = ctx.input;
+  if (!sessionId || !cwd || ctx.input.stop_hook_active || ctx.config.stopMode === "off") return null;
+  const events = readEvents(ctx.config.dataDir, sessionId);
+  if (events.some((e) => e.t === "blocked" || e.t === "optout")) return null;
+  const taskIds = new Set(events.flatMap((e) => e.t === "task" ? [e.id] : []));
+  const edited = events.some((e) => e.t === "edit");
+  if (taskIds.size === 0) return edited ? editsWithoutTask(ctx, sessionId, events) : null;
+  const owed = await owedTasks(ctx, cwd, taskIds, windowHours(events, ctx.now()));
+  if (owed.length === 0) return null;
+  appendEvent(ctx.config.dataDir, sessionId, { t: "blocked", at: ctx.now().toISOString() });
+  return { decision: "block", reason: handoffReason(owed) };
+}
+async function owedTasks(ctx, cwd, taskIds, hours) {
+  if (!ctx.rpc) {
+    ctx.log("stop", "no token: cannot ask what this session still owes");
+    return [];
+  }
+  try {
+    const status = await ctx.rpc("sessionStatus", { cwd, hours });
+    return (status.yours ?? []).filter(
+      (t) => taskIds.has(t.id) && (t.status === "doing" || t.handoff_missing)
+    );
+  } catch (e) {
+    ctx.log("stop", `session_status failed, not stopping: ${e.message}`);
+    return [];
+  }
+}
+function windowHours(events, now) {
+  const first = events[0] ? Date.parse(events[0].at) : now.getTime();
+  const hours = Math.ceil((now.getTime() - first) / 36e5) + 1;
+  return Math.min(Math.max(hours, 1), MAX_WINDOW_HOURS);
+}
+function handoffReason(owed) {
+  const lines = owed.map((t) => {
+    const why = [t.status === "doing" ? "still 'doing'" : null, t.handoff_missing ? "no handoff since your last change" : null].filter(Boolean).join("; ");
+    return `- #${t.id} "${t.title}": ${why}`;
+  });
+  return [
+    "todox: this session touched tasks it has not written up.",
+    ...lines,
+    "For each: update_task to its true status ('done', or back to 'todo'/'blocked' if unfinished); log_entry(kind:'dead_end') for any approach that failed; log_entry(kind:'handoff') with the state, the next step and what to watch. Pass your model id.",
+    "Asked once per session. If the developer asked to stop now, say so and stop."
+  ].join("\n");
+}
+var NO_TASK_MESSAGE = 'todox: this session edited files without touching a todox task. If any of it will not finish today, ask for a create_task or a handoff before you go. (TODOX_STOP=strict makes this a stop; "no-handoff" silences it.)';
+var NO_TASK_REASON = "todox: this session edited files but wrote nothing to the log. If the work is unfinished, create_task with cwd and log_entry(kind:'handoff'); record any failed approach as a dead_end. Pass your model id. If none of it is worth keeping, or the developer asked to stop now, say so and stop.";
+function editsWithoutTask(ctx, sessionId, events) {
+  if (events.some((e) => e.t === "nudged")) return null;
+  const at = ctx.now().toISOString();
+  if (ctx.config.stopMode === "strict") {
+    appendEvent(ctx.config.dataDir, sessionId, { t: "blocked", at });
+    return { decision: "block", reason: NO_TASK_REASON };
+  }
+  appendEvent(ctx.config.dataDir, sessionId, { t: "nudged", at });
+  return { systemMessage: NO_TASK_MESSAGE };
+}
+
+// mcp/hook/user-prompt-submit.ts
+var OPT_OUT = /\b(no-handoff|todox off)\b/i;
+async function userPromptSubmit(ctx) {
+  const { session_id: sessionId, prompt } = ctx.input;
+  if (!sessionId || typeof prompt !== "string" || !OPT_OUT.test(prompt)) return null;
+  appendEvent(ctx.config.dataDir, sessionId, { t: "optout", at: ctx.now().toISOString() });
+  return null;
+}
+
 // mcp/hook/index.ts
 var RPC_TIMEOUT_MS = 4e3;
 var CARRIER = { "x-todox-carrier": "claude-code-hook" };
 var MAX_INPUT_BYTES = 1024 * 1024;
 var HANDLERS = {
-  "session-start": sessionStart
+  "session-start": sessionStart,
+  "post-tool-use": postToolUse,
+  "user-prompt-submit": userPromptSubmit,
+  stop
 };
 async function runHook(event, rawInput, env) {
   const log = fileLogger(dataDirFrom(env));

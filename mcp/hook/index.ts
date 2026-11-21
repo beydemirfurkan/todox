@@ -1,8 +1,11 @@
 import { createClient } from "../rpc-client";
 import { dataDirFrom, hookConfig, type HookConfig } from "./config";
 import { fileLogger, type Logger } from "./log";
+import { postToolUse } from "./post-tool-use";
 import { sessionStart } from "./session-start";
+import { stop } from "./stop";
 import type { HookContext, HookInput, HookOutput } from "./types";
+import { userPromptSubmit } from "./user-prompt-submit";
 
 /**
  * The Claude Code plugin's command hooks, one entry point for every event.
@@ -28,6 +31,9 @@ type Handler = (ctx: HookContext) => Promise<HookOutput>;
 
 const HANDLERS: Record<string, Handler> = {
   "session-start": sessionStart,
+  "post-tool-use": postToolUse,
+  "user-prompt-submit": userPromptSubmit,
+  stop,
 };
 
 export async function runHook(
