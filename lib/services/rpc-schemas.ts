@@ -249,6 +249,25 @@ export const SHAPES = {
       ),
     repo_root: repoRoot,
     repo_url: repoIdentity,
+    /**
+     * `digest` answers with plain text under `max_chars` instead of the JSON:
+     * the shape a Claude Code SessionStart hook can inject (10,000 characters,
+     * spilled to an unread file above that) and an agent on a large project
+     * can actually read. See `briefing-digest.ts`.
+     */
+    shape: z
+      .enum(["full", "digest"])
+      .optional()
+      .describe(
+        "'digest' returns the briefing as an indexed text under max_chars (default 9500): rules, live tasks with their last handoff, open questions, dead ends and decisions by headline only. Default 'full'.",
+      ),
+    max_chars: z
+      .number()
+      .int()
+      .min(2000)
+      .max(40000)
+      .optional()
+      .describe("Ceiling for shape:'digest', in characters. Ignored for 'full'."),
     model,
   },
 

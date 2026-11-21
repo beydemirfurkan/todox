@@ -651,3 +651,28 @@ describe("every entry kind says when it applies", () => {
       expect(described).toContain(kind);
     });
 });
+
+/**
+ * The digest's ceiling is the whole point of the shape: a SessionStart hook
+ * injects at most 10,000 characters. A ceiling too small to hold the header
+ * and the footer would hand back a digest that is nothing but its own
+ * apology, so the floor is refused rather than honoured.
+ */
+describe("getContext's digest shape", () => {
+  it("accepts a digest with or without a ceiling", () => {
+    expect(() => parseParams("getContext", { cwd: "/tmp", shape: "digest" })).not.toThrow();
+    expect(() =>
+      parseParams("getContext", { cwd: "/tmp", shape: "digest", max_chars: 9500 }),
+    ).not.toThrow();
+  });
+
+  it("refuses a ceiling too small to say anything, or too large to be one", () => {
+    expect(() => parseParams("getContext", { cwd: "/tmp", shape: "digest", max_chars: 100 })).toThrow();
+    expect(() => parseParams("getContext", { cwd: "/tmp", shape: "digest", max_chars: 1e6 })).toThrow();
+    expect(() => parseParams("getContext", { cwd: "/tmp", max_chars: 9500.5 })).toThrow();
+  });
+
+  it("refuses a shape it does not know", () => {
+    expect(() => parseParams("getContext", { cwd: "/tmp", shape: "summary" })).toThrow();
+  });
+});

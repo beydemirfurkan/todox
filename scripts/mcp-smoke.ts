@@ -1042,6 +1042,21 @@ async function runSuite(mode: Mode, token: string) {
     throw new Error("a deleted note is still in the briefing");
   console.log("entry and note both removed, and gone from what the next session reads");
 
+  // The digest is what a SessionStart hook injects, under a hard ceiling, so
+  // the ceiling is the assertion: a digest one character over it is spilled
+  // to a file nobody reads, which is the problem the shape exists to solve.
+  console.log("\n--- the digest stays under its ceiling, as text ---");
+  const digest = await text("get_context", { cwd: SCRATCH, shape: "digest", max_chars: 2000 });
+  if (digest.startsWith("{")) throw new Error(`the digest came back as JSON: ${digest.slice(0, 120)}`);
+  if (digest.length > 2000) throw new Error(`the digest is ${digest.length} characters, over 2000`);
+  if (!digest.startsWith("todox briefing for "))
+    throw new Error(`the digest does not open with its header: ${digest.slice(0, 120)}`);
+  if (!digest.includes("get_context with cwd and a focus"))
+    throw new Error("the digest does not say where the rest of the briefing is");
+  if (!/#\d+ \[(todo|doing|blocked)\]/.test(digest))
+    throw new Error(`the digest names no live task: ${digest}`);
+  console.log(`digest: ${digest.length} characters`);
+
   // A project is a repository, not a path. This is the assertion that keeps
   // that true on the transport where it can actually go wrong: the hosted
   // server has no disk, so a bare `cwd` is the only thing some clients send,

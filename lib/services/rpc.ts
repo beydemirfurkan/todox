@@ -8,6 +8,7 @@ import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import * as toolUsage from "../repositories/tool-usage";
 import { briefing } from "./briefing";
+import { renderDigest, type Briefing } from "./briefing-digest";
 import { fileContext } from "./file-context";
 import { BadRequest } from "./errors";
 import { addContext } from "./context-service";
@@ -212,6 +213,8 @@ export const methods = {
       focus?: string;
       repo_root?: string;
       repo_url?: string;
+      shape?: "full" | "digest";
+      max_chars?: number;
     },
   ) => {
     const which = pickRef(p);
@@ -227,15 +230,16 @@ export const methods = {
     if (create) {
       const { project, created, warning } = await resolveOrCreate(userId, which, hints);
       pruneEmptyProjects(userId, project.id);
+      const brief = await briefing(userId, project, p.focus);
       return {
         project_created: created,
         ...(warning ? { warning } : {}),
-        ...(await briefing(userId, project, p.focus)),
+        ...shapeBriefing(brief, p),
       };
     }
     const project = await mustResolve(userId, which, hints);
     pruneEmptyProjects(userId, project.id);
-    return briefing(userId, project, p.focus);
+    return shapeBriefing(await briefing(userId, project, p.focus), p);
   },
 
   listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {
@@ -674,6 +678,20 @@ const EMPTY_PROJECT_DAYS = 7;
  * Not awaited -- the briefing must not wait on housekeeping -- and the project
  * being opened is never a candidate, however empty.
  */
+/**
+ * The full briefing, or its digest when the caller asked for one. The digest
+ * replaces the payload rather than riding beside it: a caller that asked for
+ * text under a ceiling is a caller the JSON is too big for.
+ */
+function shapeBriefing(
+  brief: Briefing,
+  p: { shape?: "full" | "digest"; max_chars?: number },
+): Briefing | { digest: string; chars: number; dropped: Record<string, number> } {
+  if (p.shape !== "digest") return brief;
+  const { text, chars, dropped } = renderDigest(brief, p.max_chars);
+  return { digest: text, chars, dropped };
+}
+
 function pruneEmptyProjects(userId: number, keep: number) {
   const cutoff = new Date(Date.now() - EMPTY_PROJECT_DAYS * 86_400_000).toISOString();
   void projectsRepo
