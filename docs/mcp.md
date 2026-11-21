@@ -183,3 +183,10 @@ no event log accumulating beside the log you actually keep, and nothing to
 expire. On a self-hosted instance these rows are in your own database like
 everything else, and `TODOX_OBSERVE=off` does not touch them — it is a
 different mechanism, on the client rather than the server.
+
+A call that a client-side hook placed on the agent's behalf — the Claude Code
+plugin's session-start briefing, its check before a session stops — carries an
+`x-todox-carrier: claude-code-hook` header and is counted as `hook:<method>`:
+still a method name and nothing else, but not an agent's. `pnpm usage` marks
+those rows as the client's own, and the nudge for an account that has gone
+quiet does not count them.

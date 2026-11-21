@@ -53,6 +53,20 @@ describe("counting what an agent called", () => {
    * schema rejects looks, from every other angle, exactly like an agent that
    * never called it at all.
    */
+  /**
+   * A client-side hook asks on the agent's behalf. Counted as the agent, the
+   * SessionStart hook's getContext would read as every session starting by
+   * the book -- the number this table exists to keep honest.
+   */
+  it("counts a hook's call under its own name", async () => {
+    db.all.mockResolvedValue([]);
+    db.one.mockResolvedValue(undefined);
+
+    await invoke({ ...CTX, carrier: "claude-code-hook" }, "listProjects", {});
+
+    expect(usage.record).toHaveBeenCalledWith(7, "hook:listProjects", true);
+  });
+
   it("counts a call the schema refused, and still refuses it", async () => {
     await expect(invoke(CTX, "createTask", { title: "" })).rejects.toThrow();
 

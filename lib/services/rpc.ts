@@ -50,7 +50,15 @@ import { hashToken } from "../util/tokens";
  * one (the MCP route) and is consumed by `recordClientInfo` to identify the
  * caller without re-reading the row.
  */
-export type RpcContext = { userId: number; token?: string };
+/**
+ * Who placed the call when it was not an agent: a client-side hook that asks
+ * on the agent's behalf (the Claude Code plugin's SessionStart and Stop).
+ * Counted under its own name so `tool_usage` keeps describing agents -- see
+ * `usageName`.
+ */
+export type Carrier = "claude-code-hook";
+
+export type RpcContext = { userId: number; token?: string; carrier?: Carrier };
 
 type Handler = (ctx: RpcContext, params: Record<string, never>) => Promise<unknown>;
 
@@ -702,6 +710,18 @@ function pruneEmptyProjects(userId: number, keep: number) {
 export type { MethodName };
 
 /**
+ * The name a call is counted under. A hook's call is `hook:<method>`, still a
+ * method name and nothing more, so the measurement rule holds -- but it is no
+ * longer an agent's. Folded in, the SessionStart hook's getContext would read
+ * as every session starting by the book, and the silent-account nudge (which
+ * asks "has this account called anything?") would go quiet for an account
+ * whose agents never call anything at all.
+ */
+export function usageName(ctx: RpcContext, method: MethodName): string {
+  return ctx.carrier ? `hook:${method}` : method;
+}
+
+/**
  * Params are validated here, not trusted here.
  *
  * The cast below is the only thing standing between the handler signatures and
@@ -733,7 +753,8 @@ export async function invoke(ctx: RpcContext, method: string, params: unknown) {
   // reads until `pnpm usage` runs. The process is a long-lived container,
   // not a function frozen at the response, so the write completes behind the
   // reply. What a crash between the two would lose is one count.
-  const count = (ok: boolean) => void toolUsage.record(ctx.userId, method, ok).catch(() => {});
+  const count = (ok: boolean) =>
+    void toolUsage.record(ctx.userId, usageName(ctx, method), ok).catch((e) => logError("toolUsage.record", e));
 
   try {
     const clean = parseParams(method, params);

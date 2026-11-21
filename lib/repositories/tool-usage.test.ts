@@ -70,3 +70,9 @@ describe("the report's read", () => {
       expect(QUERIES.since).not.toContain(forbidden);
   });
 });
+
+describe("what counts as an account being active", () => {
+  it("leaves a hook's calls out, so a hook cannot make a silent account look busy", () => {
+    expect(QUERIES.callsBy).toContain("method NOT LIKE 'hook:%'");
+  });
+});
