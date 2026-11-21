@@ -170,6 +170,35 @@ function alternativeRequirements(schema: ToolSchema | undefined): string[] {
 }
 
 /** The same run through whichever way in it was handed. */
+const BRIEFING_LISTS = [
+  "global_context",
+  "project_context",
+  "open_tasks",
+  "idle_tasks",
+  "observations",
+  "stale_refs",
+  "notes",
+] as const;
+const TASK_LISTS = ["decisions", "dead_ends", "open_questions", "files"] as const;
+
+/**
+ * get_context's text, held to the compact contract and read back with its
+ * empty lists restored. The tool leaves an empty list out (task #524), and an
+ * absent list means an empty one -- which is what every reader below assumes,
+ * so it is restored once here rather than defaulted at forty call sites. A
+ * refusal ("error: ...") is not a briefing and passes through untouched.
+ */
+function readBriefing(raw: string): string {
+  if (!raw.startsWith("{")) return raw;
+  if (raw.includes("\n")) throw new Error("get_context answered with indented JSON");
+  if (raw.includes(":[]")) throw new Error(`get_context sent an empty list: ${raw.slice(0, 200)}`);
+  const brief = JSON.parse(raw) as Record<string, unknown>;
+  for (const key of BRIEFING_LISTS) brief[key] ??= [];
+  for (const task of brief.open_tasks as Record<string, unknown>[])
+    for (const key of TASK_LISTS) task[key] ??= [];
+  return JSON.stringify(brief);
+}
+
 async function runSuite(mode: Mode, token: string) {
   console.log(`\n=========== ${mode.label} ===========`);
 
@@ -223,7 +252,8 @@ async function runSuite(mode: Mode, token: string) {
 
   const text = async (name: string, args: Record<string, unknown> = {}) => {
     const r = await client.callTool({ name, arguments: args });
-    return (r.content as { text: string }[])[0].text;
+    const raw = (r.content as { text: string }[])[0].text;
+    return name === "get_context" ? readBriefing(raw) : raw;
   };
 
   console.log("\n--- the agent starts with only a working directory ---");
