@@ -645,19 +645,24 @@ describe("instructions", () => {
    * The assertion is that the two notes DISAGREE, because the failure this
    * guards against is somebody unifying them back into one honest-sounding
    * sentence that is wrong on one side.
+   *
+   * Since the Claude Code plugin's hooks became a second carrier, "always
+   * empty" stopped being true on the hosted side too -- so the hosted note
+   * names the two things that can fill the section, and that the server
+   * itself never does.
    */
-  it("tells a hosted agent that its observations section will stay empty", () => {
+  it("tells a hosted agent the server never fills observations, and what does", () => {
     const hosted = instructions({ local: false });
-    expect(hosted).toMatch(/`observations` is always empty on this/);
-    // And says which transport does capture, so the sentence is actionable
-    // rather than an apology.
+    expect(hosted).toMatch(/never from\s+this server/);
+    expect(hosted).toContain("Claude Code plugin's hooks");
     expect(hosted).toContain("todox-mcp");
+    expect(hosted).not.toMatch(/always empty/);
   });
 
   it("tells a local agent that it is the one doing the capturing", () => {
     const local = instructions({ local: true });
     expect(local).toMatch(/this process is the one that writes them/i);
-    expect(local).not.toMatch(/always empty on this/);
+    expect(local).not.toMatch(/never from\s+this server/);
   });
 
   it("never promises observations unconditionally, on either side", () => {

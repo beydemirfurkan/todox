@@ -676,3 +676,19 @@ describe("getContext's digest shape", () => {
     expect(() => parseParams("getContext", { cwd: "/tmp", shape: "summary" })).toThrow();
   });
 });
+
+describe("recordObservation's carrier", () => {
+  const base = { cwd: "/tmp", session_id: "s", commits: 0, files_changed: 0 };
+
+  it("accepts the two carriers that exist, and none", () => {
+    expect(() => parseParams("recordObservation", base)).not.toThrow();
+    expect(() => parseParams("recordObservation", { ...base, source: "stdio" })).not.toThrow();
+    expect(() =>
+      parseParams("recordObservation", { ...base, source: "claude-code-hook" }),
+    ).not.toThrow();
+  });
+
+  it("refuses a carrier it does not know", () => {
+    expect(() => parseParams("recordObservation", { ...base, source: "cursor" })).toThrow();
+  });
+});

@@ -224,6 +224,57 @@ async function main() {
   );
   expect("the row records what it became", marked?.promoted_as === "decision");
 
+  // ------------------------------------------------------ 4b. a second carrier
+  line("the plugin's hooks are a second carrier, and stand down for stdio");
+
+  // A project of its own, so the rows above cannot satisfy or spoil the check.
+  const hookSlug = `observe-hook-${rnd()}`;
+  const hookProject = await projectsRepo.create(owner.id, {
+    name: hookSlug,
+    slug: hookSlug,
+    summary: "throwaway",
+  });
+  const hookStart = now();
+  const alone = await invoke({ userId: owner.id }, "recordObservation", {
+    project: hookSlug,
+    ...observation({ session_id: `cc:${rnd()}`, source: "claude-code-hook", started_at: hookStart }),
+  });
+  expect("a hook's write is taken when nothing else watches", !("skipped" in (alone as object)));
+  const hookBrief = await briefing(owner.id, hookProject);
+  expect(
+    "and the briefing says which carrier saw it",
+    hookBrief.observations[0]?.source === "claude-code-hook",
+  );
+
+  await invoke({ userId: owner.id }, "recordObservation", {
+    project: hookSlug,
+    ...observation({ session_id: `stdio-${rnd()}` }),
+  });
+  const shadowed = await invoke({ userId: owner.id }, "recordObservation", {
+    project: hookSlug,
+    ...observation({ session_id: `cc:${rnd()}`, source: "claude-code-hook", started_at: hookStart }),
+  });
+  expect(
+    "a hook's write is skipped once stdio has observed the same project since the session began",
+    (shadowed as { skipped?: string }).skipped === "stdio_active",
+  );
+  expect(
+    "and nothing was written for it",
+    (await all("SELECT 1 FROM observations WHERE project_id = ?", [hookProject.id])).length === 2,
+  );
+  const later = await invoke({ userId: owner.id }, "recordObservation", {
+    project: hookSlug,
+    ...observation({
+      session_id: `cc:${rnd()}`,
+      source: "claude-code-hook",
+      started_at: new Date(Date.now() + 60_000).toISOString(),
+    }),
+  });
+  expect(
+    "but a stdio session that ended before this one began silences nothing",
+    !("skipped" in (later as object)),
+  );
+
   // ------------------------------------------------------- 5. somebody else's
   line("an observation belonging to somebody else");
 

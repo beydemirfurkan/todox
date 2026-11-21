@@ -672,6 +672,12 @@ export const SHAPES = {
         "Tasks this session set to 'doing', so the next briefing can name the ones that got no handoff",
       ),
     started_at: z.string().max(MAX.line).optional(),
+    source: z
+      .enum(["stdio", "claude-code-hook"])
+      .optional()
+      .describe(
+        "Which carrier saw this: the stdio process (default) or the Claude Code plugin's hooks. A hook's write is skipped while the stdio process is already observing the same project for this account.",
+      ),
     model,
   },
 } satisfies Record<string, z.ZodRawShape>;

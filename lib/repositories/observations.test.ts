@@ -128,3 +128,21 @@ describe("OMITTED_FROM", () => {
     expect(OMITTED_FROM([])).toBe(0);
   });
 });
+
+describe("two carriers", () => {
+  it("tells the briefing which carrier saw each row", () => {
+    expect(QUERIES.page).toMatch(/SELECT id, source,/);
+  });
+
+  /**
+   * How a hook's write learns the stdio process is already watching the same
+   * checkout. Scoped to the account, or one person's stdio process would
+   * silence another person's hooks on a shared project.
+   */
+  it("asks one account's own rows, for one carrier, since a moment", () => {
+    expect(QUERIES.observedBySince).toContain("user_id = ?");
+    expect(QUERIES.observedBySince).toContain("project_id = ?");
+    expect(QUERIES.observedBySince).toContain("source = ?");
+    expect(QUERIES.observedBySince).toContain("observed_at >= ?");
+  });
+});

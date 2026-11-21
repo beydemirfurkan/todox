@@ -132,8 +132,8 @@ const LOCAL_NOTE = [
   "FILES: link_files and create_task's `files` take plain paths; this process",
   "hashes them, so todox can later warn that a note describes changed code.",
   "OBSERVATIONS: this process is the one that writes them -- it watches the",
-  "checkout it was started in while you work. Over the hosted endpoint that",
-  "section is always empty, which is why the two notes differ.",
+  "checkout it was started in while you work. Over the hosted endpoint only",
+  "the Claude Code plugin's hooks can, which is why the two notes differ.",
 ];
 
 const REMOTE_NOTE = [
@@ -154,9 +154,9 @@ const REMOTE_NOTE = [
   "  re-hash them and send report_file_hashes: that turns a stale note into a",
   "  warning.",
   "",
-  "`observations` is always empty on this transport: only a process on the",
-  "developer's machine can watch git. Nothing is wrong when it is empty and no",
-  "call fills it; the stdio server (todox-mcp) is the one that captures.",
+  "`observations` comes from a process on the developer's machine, never from",
+  "this server: the Claude Code plugin's hooks, or the stdio server",
+  "(todox-mcp). Nothing is wrong when it is empty and no call fills it.",
 ];
 
 /**

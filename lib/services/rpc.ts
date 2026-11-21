@@ -34,7 +34,7 @@ import * as taskService from "./task-service";
 import { headlineHint, quickCloseHint } from "./write-hints";
 import { logError } from "../server/log";
 import { isAbsolutePath, normalisePath, scrubRemote } from "../util/paths";
-import { resolvePeriod, type PeriodName } from "../util/time";
+import { now, resolvePeriod, type PeriodName } from "../util/time";
 import { hashToken } from "../util/tokens";
 
 /**
@@ -626,6 +626,7 @@ export const methods = {
       commit_subjects?: string;
       task_ids?: number[];
       started_at?: string;
+      source?: "stdio" | "claude-code-hook";
     },
   ) => {
     const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }));
@@ -635,6 +636,9 @@ export const methods = {
     // just wrote, which is this session's own HEAD and tells the next session
     // nothing.
     const previous = await observationsRepo.lastHeadFor(userId, project.id);
+
+    if (await stdioAlreadyObserving(userId, project.id, p))
+      return { ok: true, project: project.slug, last_head_sha: previous, skipped: "stdio_active" };
 
     await observationsRepo.record({
       user_id: userId,
@@ -652,6 +656,7 @@ export const methods = {
       // stored and never seen. Ownership stays in ownership.ts.
       task_ids: p.task_ids ?? [],
       started_at: p.started_at,
+      source: p.source ?? "stdio",
     });
 
     // Retention, swept on a write path because this deployment has no
@@ -698,6 +703,27 @@ function shapeBriefing(
   if (p.shape !== "digest") return brief;
   const { text, chars, dropped } = renderDigest(brief, p.max_chars);
   return { digest: text, chars, dropped };
+}
+
+/**
+ * Whether a hook's observation would describe a session the stdio process is
+ * already describing.
+ *
+ * A developer running the plugin's hooks with the stdio server as well has two
+ * carriers watching one checkout, under two session ids, so without this every
+ * session would arrive twice and the briefing's six observation slots would
+ * hold three sessions. The stdio row wins because it is the richer one: it sees
+ * every tool call, the hook sees only the session's edges. "Since the hook's
+ * session began" rather than "ever", so yesterday's stdio session does not
+ * silence today's hook-only one.
+ */
+async function stdioAlreadyObserving(
+  userId: number,
+  projectId: number,
+  p: { source?: string; started_at?: string },
+): Promise<boolean> {
+  if (p.source !== "claude-code-hook") return false;
+  return observationsRepo.observedBySince(userId, projectId, "stdio", p.started_at ?? now());
 }
 
 function pruneEmptyProjects(userId: number, keep: number) {
