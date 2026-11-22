@@ -1596,8 +1596,7 @@ pre {
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
-  background: var(--inset);
-  border: 1px solid var(--line);
+  background: var(--card);
   border-radius: 16px;
 }
 .account-tabs::-webkit-scrollbar {
@@ -1626,12 +1625,11 @@ pre {
   color: var(--ink);
   background: var(--wash);
 }
-/* The charcoal pill, as every selected control is. */
+/* The raised control, as every selected control is. */
 .account-tab[aria-current="page"] {
-  color: var(--paper);
-  background: var(--line-strong);
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  background: var(--control);
+  border-color: var(--control);
 }
 .account-tab-icon {
   flex-shrink: 0;
@@ -1639,7 +1637,7 @@ pre {
   transition: color 0.14s ease;
 }
 .account-tab[aria-current="page"] .account-tab-icon {
-  color: var(--paper);
+  color: var(--accent-ink);
 }
 .account-tab-count {
   display: inline-flex;
