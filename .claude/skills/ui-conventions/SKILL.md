@@ -30,6 +30,18 @@ in `app/globals.css` under `@theme inline`.
 | `.board-col` + `data-drop-status` | a board column (a neutral well, its status as a rule along the top) and a drop target |
 | `.stat-badge` | one number as a pill; `StatBadges` lays a row of them out |
 | `.prose` | 68ch measure for body copy |
+| `.task-row` + `StatusRing` / `TaskRow` | a task as a calm list row (Today, the project list) |
+| `.today-heading` / `TaskSection` | a titled group of task rows |
+| `.seg-group` | the well a row of `.seg` pills or link tabs sits in |
+| `.status-choice` | a task's status as radio-looking buttons, `aria-pressed` |
+| `.settings-row` | label on the left, control on the right, wrapping on a phone |
+| `.icon-button` | a 40px control with only an icon; label it with `aria-label` |
+| `.quick-add` / `QuickAdd` | the one-line "add a task" form |
+| `.oauth-button` | "Continue with Google / GitHub" |
+
+The signed-in shell is `AppSidebar` from `md` up and the `TabBar` below it;
+the project page is `?tab=tasks|notes` and `?view=list|board`, built from
+`projectHref` in `app/p/[slug]/board.ts`.
 
 The page backdrop is `public/backdrop.svg`: faint line icons of the trade on
 a 480px tile, faded out down the page in `body`. It is an XML file, so its
