@@ -524,6 +524,8 @@ export const en = {
   updated: "updated",
   linkedAt: "linked",
   by: "by",
+  byAgentOf: "by {who}'s agent",
+  byAgent: "by an agent",
 
   /* search */
   searchTitle: "Search",

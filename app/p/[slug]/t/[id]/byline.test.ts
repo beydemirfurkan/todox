@@ -16,9 +16,14 @@ import { authorWorthNaming, byline } from "./byline";
  * cases that make a shared project readable.
  */
 
-const t = ((key: string) => (key === "by" ? "by" : key)) as unknown as Parameters<
-  typeof byline
->[0];
+const t = ((key: string, vars?: Record<string, string>) =>
+  key === "by"
+    ? "by"
+    : key === "byAgentOf"
+      ? `by ${vars?.who}'s agent`
+      : key === "byAgent"
+        ? "by an agent"
+        : key) as unknown as Parameters<typeof byline>[0];
 
 describe("an author worth naming", () => {
   it("names a person", () => {
@@ -51,7 +56,22 @@ describe("an author that adds nothing", () => {
 
 describe("the rendered prefix", () => {
   it("carries its own separator, so the caller composes nothing", () => {
-    expect(byline(t, { author: "agent", author_name: "furkan" })).toBe("by furkan · ");
+    expect(byline(t, { author: "human", author_name: "furkan" })).toBe("by furkan · ");
+  });
+
+  /**
+   * An agent writing for a person is not the person. Under the bare name, a
+   * teammate could not tell a decision from somebody's agent's guess.
+   */
+  it("says an agent wrote it, for whom, and which model", () => {
+    expect(
+      byline(t, { author: "agent", author_name: "Mert", model: "claude-sonnet-5-5" }),
+    ).toBe("by Mert's agent · claude-sonnet-5-5 · ");
+    expect(byline(t, { author: "agent", author_name: "Mert" })).toBe("by Mert's agent · ");
+  });
+
+  it("names the model even when nobody is named", () => {
+    expect(byline(t, { author: "agent", model: "gpt-5.5" })).toBe("by an agent · gpt-5.5 · ");
   });
 
   it("is empty rather than a stray separator when there is nobody to name", () => {

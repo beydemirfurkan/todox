@@ -513,6 +513,8 @@ export const tr: Record<Key, string> = {
   updated: "güncellendi",
   linkedAt: "bağlandı",
   by: "yazan",
+  byAgentOf: "yazan ajan ({who})",
+  byAgent: "yazan bir ajan",
 
   searchTitle: "Arama",
   searchIntro:

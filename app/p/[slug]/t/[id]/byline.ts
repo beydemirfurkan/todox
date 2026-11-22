@@ -18,7 +18,7 @@ import type { T } from "@/lib/i18n";
  * Here rather than in the page for the same reason `./task-list` is: it is a
  * rule, and a rule can be asserted without standing a page up.
  */
-export type Authored = { author: string; author_name?: string | null };
+export type Authored = { author: string; author_name?: string | null; model?: string | null };
 
 /** The name to print, or null when naming it would add nothing. */
 export function authorWorthNaming(entry: Authored): string | null {
@@ -33,5 +33,13 @@ export function authorWorthNaming(entry: Authored): string | null {
  */
 export function byline(t: T, entry: Authored): string {
   const who = authorWorthNaming(entry);
-  return who ? `${t("by")} ${who} · ` : "";
+  const isAgent = entry.author === "agent";
+  const parts: string[] = [];
+  // An agent's line under the person's bare name read as if they had typed it,
+  // and a team could not tell a decision from its own agent's guess (dogfood
+  // 2026-11-22). The account still answers "whose", the label says "what".
+  if (who) parts.push(isAgent && entry.author_name ? t("byAgentOf", { who }) : `${t("by")} ${who}`);
+  else if (isAgent && entry.model) parts.push(t("byAgent"));
+  if (isAgent && entry.model) parts.push(entry.model);
+  return parts.length > 0 ? `${parts.join(" · ")} · ` : "";
 }
