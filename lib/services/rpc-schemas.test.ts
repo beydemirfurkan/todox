@@ -680,11 +680,15 @@ describe("getContext's digest shape", () => {
 describe("recordObservation's carrier", () => {
   const base = { cwd: "/tmp", session_id: "s", commits: 0, files_changed: 0 };
 
-  it("accepts the two carriers that exist, and none", () => {
+  it("accepts the three carriers that exist, and none", () => {
     expect(() => parseParams("recordObservation", base)).not.toThrow();
-    expect(() => parseParams("recordObservation", { ...base, source: "stdio" })).not.toThrow();
+    for (const source of ["stdio", "claude-code-hook", "git-hook"])
+      expect(() => parseParams("recordObservation", { ...base, source })).not.toThrow();
+  });
+
+  it("takes the remote, so a carrier at a new path still finds the project", () => {
     expect(() =>
-      parseParams("recordObservation", { ...base, source: "claude-code-hook" }),
+      parseParams("recordObservation", { ...base, source: "git-hook", repo_url: "https://github.com/a/b" }),
     ).not.toThrow();
   });
 

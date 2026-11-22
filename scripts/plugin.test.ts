@@ -13,6 +13,7 @@ import {
   PLUGIN_ROOT,
   SKILL_PATH,
 } from "./plugin-sync";
+import { importedSpecifiers } from "./bundle-node";
 
 /**
  * The plugin is the agent surface again, for a client that installs plugins.
@@ -63,13 +64,31 @@ describe("the plugin's hand-written files", () => {
     const hooks = JSON.parse(readFileSync(join(PLUGIN_ROOT, "hooks", "hooks.json"), "utf8")) as {
       hooks: Record<string, { matcher?: string; hooks: { type: string; command?: string; timeout?: number }[] }[]>;
     };
-    expect(Object.keys(hooks.hooks)).toEqual(["SessionStart"]);
-    const [group] = hooks.hooks.SessionStart;
-    expect(group.matcher?.split("|").sort()).toEqual(["clear", "compact", "resume", "startup"]);
-    const [start] = group.hooks;
-    expect(start.type).toBe("command");
-    expect(start.command).toBe('sh "${CLAUDE_PLUGIN_ROOT}/hooks/run.sh" session-start');
-    expect(start.timeout).toBeLessThanOrEqual(10);
+    const events: Record<string, string> = {
+      SessionStart: "session-start",
+      PostToolUse: "post-tool-use",
+      UserPromptSubmit: "user-prompt-submit",
+      Stop: "stop",
+      SessionEnd: "session-end",
+    };
+    expect(Object.keys(hooks.hooks).sort()).toEqual(Object.keys(events).sort());
+    for (const [event, arg] of Object.entries(events)) {
+      const [hook] = hooks.hooks[event][0].hooks;
+      expect(hook.type).toBe("command");
+      expect(hook.command).toBe(`sh "\${CLAUDE_PLUGIN_ROOT}/hooks/run.sh" ${arg}`);
+      expect(hook.timeout).toBeLessThanOrEqual(10);
+    }
+    expect(hooks.hooks.SessionStart[0].matcher?.split("|").sort()).toEqual(["clear", "compact", "resume", "startup"]);
+  });
+
+  it("only records the tools the Stop hook reads, through either transport's name", () => {
+    const hooks = JSON.parse(readFileSync(join(PLUGIN_ROOT, "hooks", "hooks.json"), "utf8")) as {
+      hooks: { PostToolUse: { matcher: string }[] };
+    };
+    const matcher = new RegExp(`^(?:${hooks.hooks.PostToolUse[0].matcher})$`);
+    for (const tool of ["Edit", "Write", "mcp__todox__create_task", "mcp__plugin_todox_todox__log_entry"])
+      expect(matcher.test(tool)).toBe(true);
+    for (const tool of ["Bash", "Read", "mcp__todox__search", "mcp__todox__get_context"]) expect(matcher.test(tool)).toBe(false);
   });
 
   it("still gives the reminder at start on a machine with no node, word for word", () => {
@@ -94,7 +113,7 @@ describe("the hook bundle", () => {
   });
 
   it("imports nothing but node's built-ins, because a plugin has no node_modules", () => {
-    const specifiers = [...bundle().matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1]);
+    const specifiers = importedSpecifiers(bundle());
     expect(specifiers.length).toBeGreaterThan(0);
     expect(specifiers.filter((s) => !s.startsWith("node:"))).toEqual([]);
     expect(bundle()).not.toMatch(/\brequire\(/);

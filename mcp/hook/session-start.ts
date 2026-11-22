@@ -37,6 +37,7 @@ export async function sessionStart(ctx: HookContext): Promise<HookOutput> {
   try {
     const result = (await ctx.rpc("getContext", {
       cwd: ctx.input.cwd,
+      ...remoteOf(ctx, ctx.input.cwd),
       shape: "digest",
       max_chars: DIGEST_CHARS,
       create_if_missing: false,
@@ -53,10 +54,34 @@ function recordStart(ctx: HookContext): void {
   const sessionId = ctx.input.session_id;
   try {
     pruneSessions(ctx.config.dataDir);
-    if (sessionId) appendEvent(ctx.config.dataDir, sessionId, { t: "start", at: ctx.now().toISOString() });
+    if (sessionId) appendEvent(ctx.config.dataDir, sessionId, { t: "start", at: ctx.now().toISOString(), ...baseline(ctx) });
   } catch (e) {
     ctx.log("session-start", `state not written: ${(e as Error).message}`);
   }
+}
+
+/**
+ * Where HEAD was when the session opened, so a commit made before the first
+ * Stop counts as this session's rather than vanishing into its baseline. Only
+ * on a fresh start: a resume or a compaction is the same session continuing,
+ * and its first `start` already holds the baseline.
+ */
+function baseline(ctx: HookContext): { head?: string } {
+  if (ctx.input.source && ctx.input.source !== "startup" && ctx.input.source !== "clear") return {};
+  const dir = ctx.input.cwd ? ctx.git.root(ctx.input.cwd) : undefined;
+  const head = dir ? ctx.git.head(dir) : undefined;
+  return head ? { head } : {};
+}
+
+/**
+ * The remote as a resolution hint: a second checkout of a known repository,
+ * at a path todox has not seen, gets its briefing instead of the reminder.
+ * It still cannot register anything -- `create_if_missing` stays false.
+ */
+function remoteOf(ctx: HookContext, cwd: string): { repo_url?: string } {
+  const dir = ctx.git.root(cwd);
+  const remote = dir ? ctx.git.remote(dir) : undefined;
+  return remote ? { repo_url: remote } : {};
 }
 
 function inject(text: string): HookOutput {

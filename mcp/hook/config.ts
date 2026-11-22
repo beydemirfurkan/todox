@@ -19,7 +19,17 @@ export interface HookConfig {
   dataDir: string;
   /** `TODOX_HOOKS=off`: every hook does nothing and says nothing. */
   disabled: boolean;
+  /**
+   * `TODOX_STOP`: `off` never stops a turn; `strict` also stops one that
+   * edited files without any todox task; anything else is the default --
+   * stop once for a task this session left unwritten.
+   */
+  stopMode: StopMode;
+  /** `TODOX_OBSERVE=off`, the stdio observer's switch, turns this carrier off too. */
+  observe: boolean;
 }
+
+export type StopMode = "default" | "off" | "strict";
 
 export const HOSTED_URL = "https://www.todox.dev";
 
@@ -35,6 +45,8 @@ export function hookConfig(
     url: env.TODOX_URL || (pluginRoot && urlFromMcpJson(pluginRoot, warn)) || HOSTED_URL,
     dataDir: dataDirFrom(env),
     disabled: env.TODOX_HOOKS === "off",
+    stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default",
+    observe: env.TODOX_OBSERVE !== "off",
   };
 }
 
