@@ -4,6 +4,7 @@ import {
   matches,
   MIN_SUBSTRING_CHARS,
   rank,
+  type SearchedTable,
   substring,
   TSQUERY,
   TSQUERY_FROM,
@@ -117,6 +118,9 @@ const HEADLINE = (doc: string) =>
  * the same query.
  */
 type Searchable = {
+  /** The table and the alias every fragment below calls it by. */
+  table: SearchedTable;
+  alias: string;
   /** `FROM … WHERE <ownership>`, and the reason it is one string: see below. */
   scoped: string;
   /** The text this row is matched and ranked by, from `db/fts.ts`. */
@@ -165,8 +169,10 @@ function buildQuery(t: Searchable): string {
   const arm = (score: string, predicate: string) =>
     `SELECT ${t.carried}, ${score} AS rank ${t.scoped} AND ${predicate}`;
 
-  return `${BINDINGS}, hit AS (
-      ${arm(rank(t.doc), matches(t.doc))}
+  return `${BINDINGS}, matched AS MATERIALIZED (
+      SELECT ${t.alias}.id FROM q CROSS JOIN ${t.table} ${t.alias} WHERE ${matches(t.doc)}
+    ), hit AS (
+      ${arm(rank(t.doc), `${t.alias}.id IN (SELECT id FROM matched)`)}
       UNION ALL
       ${arm("0::real", `(${t.substring})`)}
     ), top AS (
@@ -189,6 +195,8 @@ function buildQuery(t: Searchable): string {
 const SLUG = `CASE WHEN p.user_id = q.uid THEN p.slug ELSE pm.access_slug END`;
 
 const TASKS: Searchable = {
+  table: "tasks",
+  alias: "t",
   scoped: `FROM q
              CROSS JOIN tasks t
              JOIN projects p ON p.id = t.project_id
@@ -204,6 +212,8 @@ const TASKS: Searchable = {
 };
 
 const ENTRIES: Searchable = {
+  table: "entries",
+  alias: "e",
   scoped: `FROM q
              CROSS JOIN entries e
              JOIN tasks t ON t.id = e.task_id
@@ -225,6 +235,8 @@ const ENTRIES: Searchable = {
  * is two tests, and why `p` is joined LEFT.
  */
 const CONTEXTS: Searchable = {
+  table: "contexts",
+  alias: "c",
   scoped: `FROM q
              CROSS JOIN contexts c
              LEFT JOIN projects p ON p.id = c.project_id
