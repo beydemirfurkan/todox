@@ -125,11 +125,11 @@ export function passwordReset(input: {
         "Bu isteği sen yapmadıysan hiçbir şey yapmana gerek yok.",
       ].join("\n"),
       html: layout(
-        "Şifreni sıfırla",
+        "şifreni sıfırla",
         [
           { kind: "text", body: `Merhaba ${esc(name)},` },
           { kind: "text", body: "Yeni bir şifre belirlemek için:" },
-          { kind: "button", label: "Şifremi sıfırla", href: link },
+          { kind: "button", label: "şifremi sıfırla", href: link },
           { kind: "link", href: link },
           {
             kind: "note",
@@ -141,7 +141,7 @@ export function passwordReset(input: {
     };
   }
   return {
-    subject: "Reset your todox password",
+    subject: "reset your todox password",
     text: [
       `Hi ${name},`,
       "",
@@ -152,11 +152,11 @@ export function passwordReset(input: {
       "If you did not ask for this, you can ignore it.",
     ].join("\n"),
     html: layout(
-      "Reset your password",
+      "reset your password",
       [
         { kind: "text", body: `Hi ${esc(name)},` },
         { kind: "text", body: "Set a new password here:" },
-        { kind: "button", label: "Reset password", href: link },
+        { kind: "button", label: "reset password", href: link },
         { kind: "link", href: link },
         {
           kind: "note",
@@ -187,11 +187,11 @@ export function verifyEmail(input: {
         `Bağlantı ${days} gün geçerli.`,
       ].join("\n"),
       html: layout(
-        "E-posta adresini doğrula",
+        "e-posta adresini doğrula",
         [
           { kind: "text", body: `Merhaba ${esc(name)},` },
           { kind: "text", body: "Adresin sana ait olduğunu doğrulamak için:" },
-          { kind: "button", label: "Adresimi doğrula", href: link },
+          { kind: "button", label: "adresimi doğrula", href: link },
           { kind: "link", href: link },
           { kind: "note", body: `Bağlantı ${days} gün geçerli.` },
         ],
@@ -200,7 +200,7 @@ export function verifyEmail(input: {
     };
   }
   return {
-    subject: "Confirm your todox email",
+    subject: "confirm your todox email",
     text: [
       `Hi ${name},`,
       "",
@@ -210,11 +210,11 @@ export function verifyEmail(input: {
       `The link is valid for ${days} days.`,
     ].join("\n"),
     html: layout(
-      "Confirm your email",
+      "confirm your email",
       [
         { kind: "text", body: `Hi ${esc(name)},` },
         { kind: "text", body: "Confirm this address belongs to you:" },
-        { kind: "button", label: "Confirm email", href: link },
+        { kind: "button", label: "confirm email", href: link },
         { kind: "link", href: link },
         { kind: "note", body: `The link is valid for ${days} days.` },
       ],
@@ -253,7 +253,7 @@ export function emailChanged(input: {
         `sıfırla (${forgotUrl}) ve agent tokenlarını iptal et.`,
       ].join("\n"),
       html: layout(
-        "Hesabının e-posta adresi değişti",
+        "hesabının e-posta adresi değişti",
         [
           { kind: "text", body: `Merhaba ${esc(name)},` },
           {
@@ -271,7 +271,7 @@ export function emailChanged(input: {
     };
   }
   return {
-    subject: "Your todox email was changed",
+    subject: "your todox email was changed",
     text: [
       `Hi ${name},`,
       "",
@@ -283,7 +283,7 @@ export function emailChanged(input: {
       `(${forgotUrl}) and revoke your agent tokens.`,
     ].join("\n"),
     html: layout(
-      "Your account email was changed",
+      "your account email was changed",
       [
         { kind: "text", body: `Hi ${esc(name)},` },
         {
@@ -313,13 +313,13 @@ export function projectInvitation(input: {
       subject: `${projectName} projesine davet edildiniz`,
       text: `${projectName} projesinde birlikte çalışmak için davet edildiniz.\n\nDaveti görüntüleyin ve kabul edin:\n${link}\n\nBu bağlantı ${days} gün geçerlidir.`,
       html: layout(
-        "Bir projeye davet edildin",
+        "bir projeye davet edildin",
         [
           {
             kind: "text",
             body: `<strong>${esc(projectName)}</strong> projesinde birlikte çalışmak için davet edildin.`,
           },
-          { kind: "button", label: "Daveti görüntüle", href: link },
+          { kind: "button", label: "daveti görüntüle", href: link },
           { kind: "link", href: link },
           { kind: "note", body: `Bu bağlantı ${days} gün geçerlidir.` },
         ],
@@ -328,16 +328,16 @@ export function projectInvitation(input: {
     };
   }
   return {
-    subject: `You were invited to ${projectName}`,
+    subject: `you were invited to ${projectName}`,
     text: `You were invited to collaborate on ${projectName}.\n\nReview and accept the invitation:\n${link}\n\nThis link expires in ${days} days.`,
     html: layout(
-      "You were invited to a project",
+      "you were invited to a project",
       [
         {
           kind: "text",
           body: `You were invited to collaborate on <strong>${esc(projectName)}</strong>.`,
         },
-        { kind: "button", label: "Review the invitation", href: link },
+        { kind: "button", label: "review the invitation", href: link },
         { kind: "link", href: link },
         { kind: "note", body: `This link expires in ${days} days.` },
       ],
@@ -358,31 +358,31 @@ export function invitationAccepted(input: {
       subject: `${projectName} davetin kabul edildi`,
       text: `${who} ${projectName} projesine katıldı.\n\nArtık görevleri ve kaydı birlikte görüyorsunuz:\n${url}`,
       html: layout(
-        "Davetin kabul edildi",
+        "davetin kabul edildi",
         [
           {
             kind: "text",
             body: `<strong>${esc(who)}</strong>, <strong>${esc(projectName)}</strong> projesine katıldı.`,
           },
           { kind: "text", body: "Artık görevleri ve kaydı birlikte görüyorsunuz." },
-          { kind: "button", label: "Projeyi aç", href: url },
+          { kind: "button", label: "projeyi aç", href: url },
         ],
         FOOTER.tr,
       ),
     };
   }
   return {
-    subject: `Your invitation to ${projectName} was accepted`,
+    subject: `your invitation to ${projectName} was accepted`,
     text: `${who} joined ${projectName}.\n\nYou now share its tasks and its log:\n${url}`,
     html: layout(
-      "Your invitation was accepted",
+      "your invitation was accepted",
       [
         {
           kind: "text",
           body: `<strong>${esc(who)}</strong> joined <strong>${esc(projectName)}</strong>.`,
         },
         { kind: "text", body: "You now share its tasks and its log." },
-        { kind: "button", label: "Open the project", href: url },
+        { kind: "button", label: "open the project", href: url },
       ],
       FOOTER.en,
     ),
