@@ -1,26 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ObserverGit } from "../observer";
 import { HOOK_CLIENT, observeSession } from "./observe";
 import { appendEvent, readEvents } from "./state";
 import { hookContext } from "./test-context";
+import type { HookGit } from "./types";
 
 const BASE = "a".repeat(40);
 const HEAD = "b".repeat(40);
 const OLDER = "c".repeat(40);
 
-function checkout(overrides: Partial<ObserverGit> = {}): Partial<ObserverGit> {
+function checkout(overrides: Partial<HookGit> = {}): Partial<HookGit> {
   return {
     root: () => "/repo",
     head: () => HEAD,
     branch: () => "feat/x",
     dirty: () => 2,
     since: (_dir, base) => (base === OLDER ? { count: 5, subjects: ["older", "fix"] } : { count: 1, subjects: ["fix"] }),
+    remote: () => "https://github.com/acme/repo.git",
     ...overrides,
   };
 }
 
-function session(options: { git?: Partial<ObserverGit>; reply?: unknown; observe?: boolean } = {}) {
+function session(options: { git?: Partial<HookGit>; reply?: unknown; observe?: boolean } = {}) {
   const rpc = vi.fn().mockResolvedValue(options.reply ?? { ok: true, last_head_sha: BASE });
   const ctx = hookContext({
     rpc,
@@ -52,8 +53,15 @@ describe("the hook as an observation carrier", () => {
       commit_subjects: "fix",
       task_ids: [7],
       started_at: "2026-11-22T08:00:00.000Z",
+      repo_url: "https://github.com/acme/repo.git",
       source: "claude-code-hook",
     });
+  });
+
+  it("leaves repo_url out for a checkout with no remote", async () => {
+    const { ctx, rpc } = session({ git: checkout({ remote: () => undefined }) });
+    await observeSession(ctx);
+    expect(rpc.mock.calls[0][1]).not.toHaveProperty("repo_url");
   });
 
   it("sends nothing for a session that changed nothing", async () => {

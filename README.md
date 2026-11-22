@@ -387,6 +387,27 @@ server-side ever finds its way into the tool surface again.
 From a clone, `pnpm -C /path/to/todox mcp` still works and is what to use when
 you are changing the tools themselves.
 
+### Optional: a git hook, for any client
+
+The briefing's `observations` section — what git did while an earlier session
+ran — needs something on your machine to watch. The stdio server and the
+Claude Code plugin do it for their own sessions; for every other client, or for
+commits made with no agent at all, a git hook does it per repository:
+
+```bash
+cd your-repo
+npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz hook install --token todox_…
+```
+
+It adds a marked block to `.git/hooks/post-commit` and `post-rewrite` (an
+existing hook is kept), copies one dependency-free script to `~/.todox`, and
+saves the token there readable by you only. After each commit it sends counts,
+a branch and up to three commit subjects in the background — the commit never
+waits for it — and stands down while the stdio server or the plugin has written
+for that project in the last half hour. `hook status` says what is installed,
+`hook uninstall` takes out only its own block. Repositories that commit their
+hooks (husky, lefthook) are not edited; it prints the line to add instead.
+
 ### Tools
 
 | tool | what it does |
@@ -548,11 +569,12 @@ Details, and an honest list of what is **not** covered, in
   alone — but it is not bounded in bytes, and `pnpm bench:memory` prints it
   so the next reader does not have to discover it.
 - **Observations need a process on your machine.** Watching git means running
-  where the checkout is, and the hosted endpoint does not. Two things do: the
-  Claude Code plugin's hooks (at Stop and SessionEnd — counts and three commit
-  subjects, never a diff) and `npx todox-mcp`. Connected to `/api/mcp` from any
-  other client, the `observations` section stays empty. Everything else works
-  identically either way.
+  where the checkout is, and the hosted endpoint does not. Three things do: the
+  Claude Code plugin's hooks (at Stop and SessionEnd), `npx todox-mcp`, and the
+  git hook (`todox-mcp hook install`, per repository, at each commit) — all
+  counts and three commit subjects, never a diff. Connected to `/api/mcp` from
+  any other client with none of them installed, the `observations` section
+  stays empty, and the git hook sees commits, not uncommitted work in progress.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.
@@ -560,7 +582,7 @@ Details, and an honest list of what is **not** covered, in
 ## Cutting a release
 
 ```bash
-git tag v0.1.4 && git push origin v0.1.4
+git tag v0.1.6 && git push origin v0.1.6
 ```
 
 That is the procedure. The workflow checks the tag against `package.json`,

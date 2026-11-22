@@ -3,18 +3,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
 
-import type { ObserverGit } from "../observer";
+
 import type { HookConfig } from "./config";
 import type { Logger } from "./log";
-import type { HookContext, HookInput } from "./types";
+import type { HookContext, HookGit, HookInput } from "./types";
 
 /** A directory that is not a checkout: every read answers "I do not know". */
-const NO_GIT: ObserverGit = {
+const NO_GIT: HookGit = {
   root: () => undefined,
   head: () => undefined,
   branch: () => undefined,
   dirty: () => undefined,
   since: () => undefined,
+  remote: () => undefined,
 };
 
 /** A hook context over a fresh data directory, for the handler tests. */
@@ -24,7 +25,7 @@ export function hookContext(
     input?: HookInput;
     config?: Partial<HookConfig>;
     now?: Date;
-    git?: Partial<ObserverGit>;
+    git?: Partial<HookGit>;
   } = {},
 ) {
   const rpc = overrides.rpc ?? null;

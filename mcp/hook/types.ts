@@ -16,6 +16,13 @@ export interface HookInput {
   prompt?: string;
 }
 
+/**
+ * The observer's git reads plus the remote: the one identity that is the same
+ * string on every machine, so a checkout at a path todox has not seen yet
+ * still finds its project.
+ */
+export type HookGit = ObserverGit & { remote(dir: string): string | undefined };
+
 export interface HookContext {
   config: HookConfig;
   log: Logger;
@@ -24,7 +31,7 @@ export interface HookContext {
   rpc: RpcClient | null;
   now: () => Date;
   /** Git on this machine; a fake in tests. */
-  git: ObserverGit;
+  git: HookGit;
 }
 
 /** Printed to stdout as JSON; null prints nothing. */
