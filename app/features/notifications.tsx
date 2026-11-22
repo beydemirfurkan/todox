@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { ago } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { feed, notificationHref, notificationText } from "@/lib/services/notifications";
@@ -15,9 +17,12 @@ import { NotificationBell } from "./notification-bell";
  * The strings are resolved here because the translator is a server function
  * and cannot cross into the client component that renders them.
  */
+/** The sidebar and the phone's app bar both render the bell; one fetch. */
+const feedOnce = cache(feed);
+
 export async function Notifications({ userId }: { userId: number }) {
   const { t } = await getT();
-  const { items, unread } = await feed(userId);
+  const { items, unread } = await feedOnce(userId);
 
   return (
     <NotificationBell

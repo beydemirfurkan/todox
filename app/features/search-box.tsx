@@ -26,7 +26,8 @@ export function SearchBox({
         el instanceof HTMLTextAreaElement ||
         (el as HTMLElement | null)?.isContentEditable;
 
-      if (e.key === "/" && !typing) {
+      const isCommandK = e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey);
+      if (isCommandK || (e.key === "/" && !typing)) {
         e.preventDefault();
         ref.current?.focus();
         ref.current?.select();
@@ -78,7 +79,7 @@ export function SearchBox({
         // A keyboard hint is worth nothing on a touch device, and the 28px it
         // takes is 28px the field does not have there.
         <kbd aria-hidden="true" className="hidden sm:block">
-          /
+          ⌘K
         </kbd>
       )}
     </form>

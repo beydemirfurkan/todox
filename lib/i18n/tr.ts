@@ -93,6 +93,12 @@ export const tr: Record<Key, string> = {
   breadcrumb: "Sayfa yolu",
   navReport: "Rapor",
   navBrain: "Beyin",
+  navToday: "Bugün",
+  sidebarLabel: "Ana menü",
+  sidebarProjects: "Projeler",
+  sidebarSearch: "Ara",
+  sidebarNoProjects: "Agent'ın bir repoyu ilk açtığında proje burada kendiliğinden belirir.",
+  sidebarOpenCount: "{n} açık görev",
   metaTitleBrain: "Beynin — todox",
   brainTitle: "Beynin",
   brainLede:
