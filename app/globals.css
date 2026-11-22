@@ -2238,6 +2238,77 @@ pre {
   }
 }
 
+/* ------------------------------------------------------------- loading */
+
+/* A page on its way: bars where its rows will be. They breathe rather than
+   shimmer, because a sweep across twenty bars is the busiest thing on a calm
+   page, and they stop breathing for anyone who asked for less motion. */
+.skeleton-page {
+  animation: fade-in 0.2s ease-out 0.08s both;
+}
+.skeleton-bar {
+  display: block;
+  border-radius: 6px;
+  background: var(--line);
+  animation: skeleton-breathe 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The link that was clicked, while its page is on the way: a short accent
+   bar at the row's edge. Absolute, so the row does not move when it shows. */
+.sidebar-link,
+.tab-bar-item {
+  position: relative;
+}
+.link-pending {
+  position: absolute;
+  left: 0;
+  top: 25%;
+  width: 3px;
+  height: 50%;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.tab-bar-item .link-pending {
+  left: 30%;
+  top: 0;
+  width: 40%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+}
+.link-pending[data-state="pending"] {
+  opacity: 1;
+  animation: skeleton-breathe 0.9s ease-in-out infinite;
+}
+
+/* A list that shows its first few and keeps the rest one click away. */
+.more-list > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.more-list > summary::-webkit-details-marker {
+  display: none;
+}
+.more-list[open] > summary .when-closed,
+.more-list:not([open]) > summary .when-open {
+  display: none;
+}
+.more-list[open] > ul {
+  animation: fade-in 0.2s ease-out both;
+}
+
 /* --------------------------------------------------------------- motion */
 
 @keyframes pop-in {
@@ -2255,7 +2326,11 @@ pre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pop {
+  .pop,
+  .skeleton-page,
+  .skeleton-bar,
+  .link-pending[data-state="pending"],
+  .more-list[open] > ul {
     animation: none;
   }
   .lift:hover {

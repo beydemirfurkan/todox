@@ -216,7 +216,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
             </Panel>
           )}
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="flex flex-col gap-5">
             <EntryList
               delay={200}
               title={t("decisionsMade")}
@@ -360,39 +360,61 @@ function EntryList({
   if (items.length === 0) return null;
   return (
     <Panel delay={delay} title={title} right={<Counter n={items.length} label={title} />}>
-      <ul className="space-y-2.5">
-        {items.map((item, i) => (
-          <li key={`${item.task_id}-${i}`} className="flex items-start gap-2.5">
-            <span
-              aria-hidden="true"
-              className="mt-1.5 size-3 shrink-0 rounded-full border-[1.5px] border-line"
-              style={{ background: color, borderColor: "var(--edge-dark)" }}
-            />
-            <span className="min-w-0">
-              <span className="text-[14px] font-medium break-words text-ink">{item.task}</span>
-              {/* Both classes, and for the reasons the sibling render on the
-                  share page has always had them: a body is paragraphs, which
-                  is what `pre-wrap` keeps, and it carries paths, urls and
-                  commit hashes, which `pre-wrap` alone refuses to break. This
-                  copy had neither, so every body arrived here as one slab and
-                  a long link pushed it out of the card. */}
-              <p className="text-[14px] leading-relaxed break-words whitespace-pre-wrap text-muted">
-                {item.truncated ? `${item.body}…` : item.body}
-              </p>
-              {item.truncated && item.project_slug && (
-                <Link
-                  href={`/p/${item.project_slug}/t/${item.task_id}`}
-                  className="link-more mt-1.5 inline-block"
-                >
-                  {t("readEntryInFull")}
-                  {/* Every one of these links says the same three words. */}
-                  <span className="sr-only"> — {item.task}</span>
-                </Link>
-              )}
-            </span>
-          </li>
+      <ul className="flex flex-col gap-3">
+        {items.slice(0, VISIBLE_ENTRIES).map((item, i) => (
+          <EntryItem key={`${item.task_id}-${i}`} item={item} color={color} />
         ))}
       </ul>
+      {items.length > VISIBLE_ENTRIES && (
+        <details className="more-list mt-3">
+          <summary className="link-more inline-block text-small">
+            <span className="when-closed">{t("showMoreCount", { n: items.length - VISIBLE_ENTRIES })}</span>
+            <span className="when-open">{t("showFewer")}</span>
+          </summary>
+          <ul className="mt-3 flex flex-col gap-3">
+            {items.slice(VISIBLE_ENTRIES).map((item, i) => (
+              <EntryItem key={`${item.task_id}-more-${i}`} item={item} color={color} />
+            ))}
+          </ul>
+        </details>
+      )}
     </Panel>
+  );
+}
+
+/** Enough to see what kind of period it was; the rest is one click away. */
+const VISIBLE_ENTRIES = 5;
+
+/**
+ * One entry: the task it belongs to, then three lines of what it said. A
+ * body used to be printed whole, so one decision with a pasted id list was a
+ * screen tall and the panel beside it stretched to match, empty.
+ */
+function EntryItem({ item, color }: { item: ReportEntry; color: string }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span
+        aria-hidden="true"
+        className="mt-1.5 size-3 shrink-0 rounded-full border-[1.5px]"
+        style={{ background: color, borderColor: "var(--edge-dark)" }}
+      />
+      <span className="min-w-0 flex-1">
+        {item.project_slug ? (
+          <Link
+            href={`/p/${item.project_slug}/t/${item.task_id}`}
+            className="text-[14px] font-medium break-words text-ink hover:underline"
+          >
+            {item.task}
+          </Link>
+        ) : (
+          <span className="text-[14px] font-medium break-words text-ink">{item.task}</span>
+        )}
+        {/* Paragraphs are kept and long paths still break, as on the share
+            page; the clamp is what keeps one entry from becoming a screen. */}
+        <p className="line-clamp-3 text-[14px] leading-relaxed break-words whitespace-pre-wrap text-muted">
+          {item.truncated ? `${item.body}…` : item.body}
+        </p>
+      </span>
+    </li>
   );
 }
