@@ -81,6 +81,9 @@ const NOT_A_REPO = join(TMP, "todox-smoke-scratch", "2026-09-04", "some-prompt")
 const ELSEWHERE = join(TMP, "todox-smoke-repo-elsewhere");
 /** Both checkouts answer with this, which is what ties them together. */
 const REMOTE = "git@github.com:todox-smoke/repo.git";
+/** A clean checkout for one short session, and its own remote. */
+const SHORT = join(TMP, "todox-smoke-short");
+const SHORT_REMOTE = "git@github.com:todox-smoke/short.git";
 const URL_BASE = process.env.TODOX_URL ?? "http://localhost:3000";
 const MODEL = "claude-opus-5";
 
@@ -100,6 +103,32 @@ async function ensureUser(username: string, name: string) {
   );
 }
 
+const stdioTransport = (token: string, cwd: string): StdioClientTransport =>
+  new StdioClientTransport({
+    // The binary directly rather than `pnpm exec`, because the process is
+    // started outside this workspace and `pnpm exec` resolves from its own
+    // cwd.
+    command: join(__dirname, "..", "node_modules", ".bin", "tsx"),
+    args: [join(__dirname, "..", "mcp", "server.ts")],
+    // Started *inside* the fixture repository, the way a real agent
+    // launcher starts it inside the developer's checkout. It used to
+    // inherit todox's own root, where this account has no project, so
+    // every observation the carrier tried to write was refused and the
+    // whole feature went unexercised.
+    cwd,
+    // The client name reaches this process through its environment, the
+    // way a real agent launcher passes it. Over HTTP the same fact arrives
+    // in the `initialize` handshake instead — one fact, two channels, which
+    // is the difference the assertion below exists to catch.
+    env: {
+      ...process.env,
+      TODOX_TOKEN: token,
+      TODOX_URL: URL_BASE,
+      TODOX_CLIENT_NAME: CLIENT_NAME,
+      TODOX_CLIENT_VERSION: "smoke",
+    } as Record<string, string>,
+  });
+
 type Mode = { label: string; local: boolean; transport(token: string): Transport };
 
 const MODES: Mode[] = [
@@ -114,31 +143,7 @@ const MODES: Mode[] = [
   {
     label: "local (stdio)",
     local: true,
-    transport: (token) =>
-      new StdioClientTransport({
-        // The binary directly rather than `pnpm exec`, because the process is
-        // started outside this workspace and `pnpm exec` resolves from its own
-        // cwd.
-        command: join(__dirname, "..", "node_modules", ".bin", "tsx"),
-        args: [join(__dirname, "..", "mcp", "server.ts")],
-        // Started *inside* the fixture repository, the way a real agent
-        // launcher starts it inside the developer's checkout. It used to
-        // inherit todox's own root, where this account has no project, so
-        // every observation the carrier tried to write was refused and the
-        // whole feature went unexercised.
-        cwd: SCRATCH,
-        // The client name reaches this process through its environment, the
-        // way a real agent launcher passes it. Over HTTP the same fact arrives
-        // in the `initialize` handshake instead — one fact, two channels, which
-        // is the difference the assertion below exists to catch.
-        env: {
-          ...process.env,
-          TODOX_TOKEN: token,
-          TODOX_URL: URL_BASE,
-          TODOX_CLIENT_NAME: CLIENT_NAME,
-          TODOX_CLIENT_VERSION: "smoke",
-        } as Record<string, string>,
-      }),
+    transport: (token) => stdioTransport(token, SCRATCH),
   },
 ];
 
@@ -1219,6 +1224,55 @@ async function observerActuallyWrote(userId: number) {
   );
 }
 
+/**
+ * A session shorter than the observer's one-minute interval is still seen.
+ *
+ * The carrier looked once at a clean tree, every later call fell inside the
+ * interval, and the process exited having written nothing -- so a quick fix
+ * left no trace at all (dogfood 2026-11-22, B10). The fix is a last look when
+ * stdin closes, and only a real process with a real stdin can prove it.
+ */
+async function shortSessionIsObserved(userId: number, token: string) {
+  console.log("\n--- a session shorter than a minute is observed ---");
+  rmSync(SHORT, { recursive: true, force: true });
+  mkdirSync(SHORT, { recursive: true });
+  writeFileSync(join(SHORT, "package.json"), '{"name":"smoke-short"}\n');
+  const git = (...args: string[]) =>
+    spawnSync(
+      "git",
+      ["-C", SHORT, "-c", "user.email=smoke@todox.local", "-c", "user.name=smoke", ...args],
+      { stdio: "ignore" },
+    );
+  git("init", "-q");
+  git("remote", "add", "origin", SHORT_REMOTE);
+  git("add", "-A");
+  git("commit", "-q", "-m", "clean start");
+
+  const client = new Client({ name: CLIENT_NAME, version: "0" });
+  await client.connect(stdioTransport(token, SHORT));
+  await client.callTool({ name: "get_context", arguments: { cwd: SHORT } });
+  writeFileSync(join(SHORT, "fix.ts"), "export const fixed = true;\n");
+  await client.callTool({ name: "list_projects", arguments: {} });
+  await client.close();
+
+  const project = (await projectsRepo.list(userId, true)).find((p) => p.repo_url === SHORT_REMOTE);
+  if (!project) throw new Error("the short session's get_context did not register its checkout");
+  for (let waited = 0; waited < 5_000; waited += 250) {
+    const rows = (await observationsRepo.byUser(userId)).filter(
+      (r) => r.project_id === project.id && r.files_changed > 0,
+    );
+    if (rows.length) {
+      console.log(`last look wrote: ${rows[0]!.files_changed} file(s) dirty`);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(
+    "a session that dirtied a file and closed inside the observer's interval " +
+      "wrote no observation -- the last look on stdin close is not running.",
+  );
+}
+
 async function main() {
   if (!(await fetch(URL_BASE).catch(() => null))) {
     console.error(
@@ -1268,6 +1322,7 @@ async function main() {
   for (const mode of MODES) await runSuite(mode, token);
 
   await observerActuallyWrote(user.id);
+  await shortSessionIsObserved(user.id, token);
   await emptyProjectsArePruned(user.id, token);
 
 
@@ -1493,6 +1548,7 @@ async function removeRows(userId: number) {
     normalisePath(SCRATCH),
     normalisePath(OTHER),
     normalisePath(ELSEWHERE),
+    normalisePath(SHORT),
   ]);
   for (const p of await projectsRepo.list(userId, true)) {
     for (const t of await tasksRepo.listByProject(p.id, "all"))
@@ -1503,7 +1559,11 @@ async function removeRows(userId: number) {
     // does not stay out of the way: it carries the same origin, so the
     // resolver matches it by remote, hands it back with last run's root_path,
     // and the failure lands somewhere else entirely.
-    if ((p.root_path && ours.has(normalisePath(p.root_path))) || p.repo_url === REMOTE)
+    if (
+      (p.root_path && ours.has(normalisePath(p.root_path))) ||
+      p.repo_url === REMOTE ||
+      p.repo_url === SHORT_REMOTE
+    )
       await projectsRepo.remove(userId, p.id);
   }
 }
@@ -1514,7 +1574,7 @@ async function removeRows(userId: number) {
  * are the ones `main` has just built and git-initialised.
  */
 function removeDirs() {
-  for (const dir of [SCRATCH, OTHER, ELSEWHERE])
+  for (const dir of [SCRATCH, OTHER, ELSEWHERE, SHORT])
     rmSync(dir, { recursive: true, force: true });
 }
 

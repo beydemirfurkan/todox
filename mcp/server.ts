@@ -173,7 +173,34 @@ async function main() {
     localWorkspace,
   );
 
+  closeWithLastLook(() => observer.flush());
   return server.connect(new StdioServerTransport());
+}
+
+/**
+ * How long the last look may hold up an exit. A client closing this process
+ * is not going to wait for a slow network, and an observation is worth less
+ * than a process that leaves when it is told to.
+ */
+const LAST_LOOK_MS = 3_000;
+
+/**
+ * Exit when the client hangs up -- stdin ends, or a signal arrives -- after
+ * one last look at the checkout. Without it, a session shorter than the
+ * observer's interval never wrote anything (dogfood 2026-11-22, B10).
+ */
+function closeWithLastLook(lastLook: () => Promise<void>): void {
+  let isClosing = false;
+  const close = () => {
+    if (isClosing) return;
+    isClosing = true;
+    const deadline = new Promise<void>((resolve) => setTimeout(resolve, LAST_LOOK_MS).unref());
+    void Promise.race([lastLook(), deadline]).finally(() => process.exit(0));
+  };
+  process.stdin.on("end", close);
+  process.stdin.on("close", close);
+  process.on("SIGTERM", close);
+  process.on("SIGINT", close);
 }
 
 /**

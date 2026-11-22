@@ -238,7 +238,14 @@ export function createObserver(options: ObserverOptions) {
     );
   }
 
-  async function observe(params: Record<string, unknown>): Promise<void> {
+  /**
+   * `final` is the last look before the process goes away. The interval
+   * exists to keep a busy session cheap, and on the way out there is no next
+   * look to defer to: a session shorter than a minute used to look once at a
+   * clean tree, sit inside the interval for every later call, and exit having
+   * recorded nothing (dogfood 2026-11-22, B10).
+   */
+  async function observe(params: Record<string, unknown>, final = false): Promise<void> {
     const dir = locate(params);
     if (!dir) return;
 
@@ -254,6 +261,7 @@ export function createObserver(options: ObserverOptions) {
     // dying session would otherwise lose, and it is rare enough to be free.
     const now = clock();
     if (
+      !final &&
       !startedSinceWrite &&
       head === lastSeenHead &&
       lastLookAt !== undefined &&
@@ -276,7 +284,8 @@ export function createObserver(options: ObserverOptions) {
       const headMoved = head !== lastHead;
       const stateChanged = headMoved || dirty !== lastDirty || startedSinceWrite;
       const throttled = clock() - lastWriteAt < THROTTLE_MS;
-      if (!headMoved && !startedSinceWrite && (throttled || !stateChanged)) return;
+      if (!stateChanged) return;
+      if (!final && !headMoved && !startedSinceWrite && throttled) return;
     }
 
     // Cleared before the write rather than after it. A server that refuses
@@ -320,9 +329,9 @@ export function createObserver(options: ObserverOptions) {
   }
 
   /** `observe`, with the contract that makes `void notice(...)` safe. */
-  async function observeQuietly(params: Record<string, unknown>): Promise<void> {
+  async function observeQuietly(params: Record<string, unknown>, final = false): Promise<void> {
     try {
-      await observe(params);
+      await observe(params, final);
     } catch {
       // Deliberately silent. This runs inside the agent's own tool call, and a
       // message here would attach a failure to work that did not cause it.
@@ -365,6 +374,18 @@ export function createObserver(options: ObserverOptions) {
       inFlight = run;
       await run;
       if (inFlight === run) inFlight = undefined;
+    },
+
+    /**
+     * One last look, past the interval, for when the process is about to go:
+     * stdin closed or a signal arrived. Waits for any write already in flight
+     * first, so the final state is the one that lands. Resolves whatever
+     * happens, like `notice`.
+     */
+    async flush(): Promise<void> {
+      if (!enabled) return;
+      if (inFlight) await inFlight;
+      await observeQuietly({}, true);
     },
   };
 }
