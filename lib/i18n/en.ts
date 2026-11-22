@@ -111,7 +111,6 @@ export const en = {
 
   /* auth */
   loginTitle: "Welcome back",
-  mascotShy: "not looking",
   loginIntro: "Sign in to reach your projects and the log behind them.",
   registerTitle: "Create your account",
   registerIntro: "Your projects, your log, your agents. Nobody else can see any of it.",
@@ -614,9 +613,9 @@ export const en = {
   landingSecondary: "I already have one",
   /* the hero: one sentence with one word under the marker, written in lower
      case on purpose -- the type is the voice, not the capitals */
-  landingScrawl: "for developers, and the agents they work with —",
-  landingHeadline: "the notebook your agent {mark}",
-  landingHeadlineMark: "actually keeps",
+  landingScrawl: "MCP server · open source · for developers and their agents",
+  landingHeadline: "working memory {mark}",
+  landingHeadlineMark: "for your agents",
   landingCtaNote: "Open source. Export all of it, whenever you like.",
   landingConnectTitle: "Works with the agent you already use",
   landingConnectBody:

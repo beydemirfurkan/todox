@@ -34,8 +34,6 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
 
   return (
     <AuthShell
-      shyLabel={t("mascotShy")}
-      mood="idle"
       fill="var(--k-handoff)"
       title={t("registerTitle")}
       intro={t("registerIntro")}

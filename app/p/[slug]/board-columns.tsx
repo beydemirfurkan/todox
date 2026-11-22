@@ -115,7 +115,7 @@ function DoneZone({ slug, closedCount, t }: { slug: string; closedCount: number;
       className="board-col mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3"
     >
       <StatusDot status="done" t={t} />
-      <span className="display text-[16px]">{t("boardDoneZone")}</span>
+      <span className="text-[14px] font-semibold">{t("boardDoneZone")}</span>
       <Counter n={closedCount} label={t("tasks")} />
       <span className="hidden text-small text-muted md:inline">{t("boardDoneHint")}</span>
       <a href={boardHref(slug, { task: null, view: "closed" })} className="link-more ml-auto text-small">
@@ -146,15 +146,15 @@ function Column({
       // itself, like the panel beside it: a queue of thirty used to make the
       // page thirty cards long, with two empty columns running down beside it.
       data-drop-status={column.status}
-      className="board-col relative flex min-w-0 scroll-mt-4 flex-col p-2.5 md:sticky md:top-4 md:max-h-[calc(100vh-2rem)]"
+      className="board-col relative flex min-w-0 scroll-mt-4 flex-col p-2 md:sticky md:top-4 md:max-h-[calc(100vh-2rem)]"
     >
       {/* Tall enough for the "+", which is absolutely placed over its right
           edge and would otherwise hang into the first card. */}
       <header
-        className={`flex min-h-[42px] flex-wrap items-center gap-2 px-1 pb-2.5 ${column.action ? "pr-11" : ""}`}
+        className={`flex min-h-[36px] flex-wrap items-center gap-2 px-1 pb-2 ${column.action ? "pr-11" : ""}`}
       >
         <StatusDot status={column.status} t={t} />
-        <h2 id={headingId} className="display min-w-0 text-[17px]">
+        <h2 id={headingId} className="min-w-0 text-[14px] font-semibold">
           {column.title}
         </h2>
         <Counter n={column.total} label={t("tasks")} />
@@ -219,10 +219,10 @@ function Card({
         href={`/p/${slug}/t/${task.id}`}
         panelHref={boardHref(slug, { task: task.id, view: "task" })}
         isCurrent={isSelected}
-        className="board-card paper flex flex-col gap-2 p-3.5 aria-[current]:border-accent aria-[current]:shadow-[0_0_0_1.5px_var(--accent)]"
+        className="board-card paper flex flex-col gap-1.5 p-3 aria-[current]:border-accent aria-[current]:shadow-[0_0_0_1px_var(--accent)]"
       >
         <span className="mono pr-8 text-meta text-faint">#{task.id}</span>
-        <span className="line-clamp-2 text-[15px] leading-snug font-medium break-words">
+        <span className="line-clamp-2 text-[14px] leading-snug font-medium break-words">
           {task.title}
         </span>
         {handoffHead && (

@@ -259,10 +259,10 @@ export default async function Home() {
           <h1 className="display pop text-[32px] leading-[1.1] sm:text-[44px]">{t("projects")}</h1>
           <StatTiles
             tiles={[
-              { tone: "tone-sky", n: live.length, label: t("statLive"), href: "#live" },
-              { tone: "tone-apricot", n: totals.doing, label: t("statDoing"), href: "#live" },
-              { tone: "tone-lilac", n: totals.blocked, label: t("statBlocked"), href: "#live" },
-              { tone: "tone-butter", n: waiting.items.length + waiting.omitted, label: t("statWaiting"), href: waiting.items.length > 0 ? "#waiting" : undefined },
+              { mark: "var(--k-decision)", n: live.length, label: t("statLive"), href: "#live" },
+              { mark: "var(--accent)", n: totals.doing, label: t("statDoing"), href: "#live" },
+              { mark: "var(--k-dead_end)", n: totals.blocked, label: t("statBlocked"), href: "#live" },
+              { mark: "var(--k-question)", n: waiting.items.length + waiting.omitted, label: t("statWaiting"), href: waiting.items.length > 0 ? "#waiting" : undefined },
             ]}
             label={t("statSummary")}
           />
@@ -448,26 +448,36 @@ function StatTiles({
   tiles,
   label,
 }: {
-  tiles: { tone: string; n: number; label: string; href?: string }[];
+  tiles: { mark: string; n: number; label: string; href?: string }[];
   label: string;
 }) {
   return (
-    <ul aria-label={label} className="pop grid grid-cols-2 gap-3 lg:grid-cols-4" style={{ animationDelay: "30ms" }}>
+    <ul
+      aria-label={label}
+      className="sticker pop grid grid-cols-2 overflow-hidden lg:grid-cols-4"
+      style={{ animationDelay: "30ms" }}
+    >
       {tiles.map((tile) => {
         const body = (
           <>
-            <span className="display block text-[40px] leading-none">{tile.n}</span>
-            <span className="mt-2 block text-small text-muted">{tile.label}</span>
+            <span className="flex items-center gap-2 text-small text-muted">
+              <span aria-hidden="true" className="size-2 rounded-full" style={{ background: tile.mark }} />
+              {tile.label}
+            </span>
+            <span className="display mt-2 block text-[32px] leading-none tabular-nums">{tile.n}</span>
           </>
         );
         return (
-          <li key={tile.label} className={`tone-panel ${tile.tone} min-w-0 !p-0`}>
+          <li
+            key={tile.label}
+            className="min-w-0 border-line even:border-l [&:nth-child(n+3)]:border-t lg:[&:nth-child(n+2)]:border-l lg:[&:nth-child(n+3)]:border-t-0"
+          >
             {tile.href ? (
-              <a href={tile.href} className="lift block rounded-[inherit] p-5">
+              <a href={tile.href} className="block p-4 hover:bg-[var(--wash)]">
                 {body}
               </a>
             ) : (
-              <div className="p-5">{body}</div>
+              <div className="p-4">{body}</div>
             )}
           </li>
         );

@@ -24,7 +24,7 @@ export default async function InvitePage({
   const invitation = token ? await invitations.byToken(token, new Date().toISOString()) : null;
   if (!invitation)
     return (
-      <AuthShell mood="worried" fill="var(--k-dead_end)" title={t("inviteInvalidTitle")}>
+      <AuthShell fill="var(--k-dead_end)" title={t("inviteInvalidTitle")}>
         <p className="text-[15px] text-muted">{t("inviteInvalidBody")}</p>
         <Link href="/account?tab=invites" className="btn mt-4 block text-center">
           {t("viewInvites")}
@@ -37,7 +37,6 @@ export default async function InvitePage({
   if (!user)
     return (
       <AuthShell
-        mood="idle"
         title={t("inviteTitle")}
         intro={t("inviteDescription", { project: invitation.project_name })}
       >
@@ -58,7 +57,6 @@ export default async function InvitePage({
   const matches = user.email.toLowerCase() === invitation.email.toLowerCase();
   return (
     <AuthShell
-      mood={matches ? "happy" : "worried"}
       title={t("inviteTitle")}
       intro={t("inviteDescription", { project: invitation.project_name })}
     >

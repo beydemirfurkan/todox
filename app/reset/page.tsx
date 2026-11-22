@@ -15,8 +15,6 @@ export default async function ResetPage({ searchParams }: PageProps<"/reset">) {
 
   return (
     <AuthShell
-      shyLabel={t("mascotShy")}
-      mood="idle"
       fill="var(--k-handoff)"
       title={t("resetTitle")}
       intro={token ? t("resetIntro") : undefined}
