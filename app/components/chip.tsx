@@ -6,12 +6,11 @@ export function Chip({
 }: {
   children: React.ReactNode;
   /**
-   * One of the bright marker fills, or nothing.
+   * One of the marker or kind colours, or nothing.
    *
-   * Text colour is chosen from whether a fill was given, not from how light it
-   * is — a `var(--…)` string cannot be measured here. So a dark value paints
-   * dark on dark and the label disappears. If you want a neutral chip, pass
-   * nothing: ink on the card is 13:1.
+   * The colour is a dot and a pale wash behind the label, never the label's
+   * own colour: the text stays --ink, so it reads the same on every tint and
+   * in both themes, and the words carry the meaning the colour only repeats.
    */
   color?: string;
   title?: string;
@@ -20,16 +19,16 @@ export function Chip({
   return (
     <span
       title={title}
-      className="display inline-flex shrink-0 items-center rounded-full border-[1.5px] px-2 pt-[1px] pb-[2px] text-[12px] leading-none font-bold"
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-[3px] text-meta leading-none font-medium text-ink"
       style={{
-        background: color ?? "transparent",
-        // filled chips carry the dark text colour; unfilled ones sit on a
-        // dark surface and keep the light one
-        color: color ? "var(--on-fill)" : "var(--ink)",
-        borderColor: color ? "var(--edge-dark)" : "var(--line)",
+        background: color ? `color-mix(in srgb, ${color} 30%, var(--card))` : "var(--card)",
+        borderColor: color ? `color-mix(in srgb, ${color} 55%, var(--card))` : "var(--line)",
         transform: tilt ? `rotate(${tilt}deg)` : undefined,
       }}
     >
+      {color && (
+        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full" style={{ background: color }} />
+      )}
       {children}
     </span>
   );
@@ -38,7 +37,7 @@ export function Chip({
 export function Counter({ n, label }: { n: number; label?: string }) {
   return (
     <span
-      className="mono flex size-6 items-center justify-center rounded-full border-[1.5px] border-line bg-paper text-meta"
+      className="mono flex h-6 min-w-6 items-center justify-center rounded-full bg-inset px-1.5 text-meta text-muted"
       aria-label={label ? `${n} ${label}` : undefined}
     >
       {n}

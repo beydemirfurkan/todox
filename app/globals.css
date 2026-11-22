@@ -1,46 +1,51 @@
 @import "tailwindcss";
 
 /*
-  todox — a notebook on the desk, in afternoon light.
-  Cream paper, charcoal ink, one marker: orange. Headlines are lowercase and
-  heavy, buttons are an outline on the paper rather than a fill, shadows are
-  a whisper. Light by default; the same notebook after dark follows the
-  system setting (decision on task #809 -- dark-only was the old rule).
+  todox — a calm reading room with a scrapbook on the desk.
+  A warm canvas, white cards that float on a soft shadow, graphite ink, and
+  colour only where it means "look here": pastel panels that frame a picture
+  of the product, and one marker, orange, for the phrase that matters.
+  Light by default; a warm dark version follows the system setting
+  (decision on task #809; the blend itself is task #811).
 
-  Two text colours exist for a reason: --ink sits on the paper and the cards,
-  --on-fill sits on the bright marker colours. Never mix them up.
+  Two text colours exist for a reason: --ink sits on the canvas, the cards
+  and the pastel panels; --on-fill sits on the bright marker colours.
 
   Two greys exist for a reason too: --muted is for sentences, --faint is for
   metadata -- timestamps, ids, paths, slugs -- and nothing under 12px. A
   sentence in --faint is the bug.
 
-  Orange is two tokens, not one. --accent is the marker itself (#ff6f1e): a
-  fill under dark text, a highlight, a stroke. On the cream it reads at under
-  3:1, so orange *text* uses --accent-ink, which is the same marker pressed
-  harder and clears 4.5:1 on the card.
+  Orange is two tokens, not one. --accent is the marker itself: a fill under
+  dark text, a highlight, a stroke. Orange *text* uses --accent-ink, which is
+  the same marker pressed harder and clears 4.5:1 on the card.
+
+  The pastels (--tone-*) are surfaces, never text and never a status on
+  their own: a panel behind a framed screenshot, a column's wash, the dot on
+  a chip. Ink on any of them reads at well over 10:1 in both themes.
 */
 
 :root {
-  --paper: #fdfbf9;
-  --card: #fffdfa;
-  --inset: #f7efe9;
+  --paper: #f8f4ee;
+  --card: #ffffff;
+  --inset: #f3eee7;
 
-  --ink: #171717;
-  --ink-head: #2b1a07;
+  --ink: #1b1a19;
+  --ink-head: #1b1a19;
   --on-fill: #171717;
-  /* A card is cut out by a warm hairline and a soft shadow; controls carry
-     the full charcoal stroke, which is what makes them read as buttons. */
-  --line: #c9bcae;
-  --line-strong: #171717;
+  /* A card is cut out by a hairline and a soft, layered shadow; controls
+     carry the full graphite stroke, which is what makes them read as
+     buttons. */
+  --line: #e4ddd3;
+  --line-strong: #1b1a19;
   --edge-dark: rgba(23, 23, 23, 0.85);
-  --muted: #574b42;
-  --faint: #73665b;
-  --rule: #ebe1d7;
-  --shadow-col: rgba(43, 26, 7, 0.16);
+  --muted: #4d4740;
+  --faint: #6b645c;
+  --rule: #ece6dd;
+  --shadow-col: rgba(40, 30, 20, 0.16);
   /* tints for hover and selected rows, and the veil behind a drawer */
-  --wash: rgba(43, 26, 7, 0.05);
-  --wash-strong: rgba(43, 26, 7, 0.09);
-  --scrim: rgba(43, 26, 7, 0.32);
+  --wash: rgba(40, 30, 20, 0.045);
+  --wash-strong: rgba(40, 30, 20, 0.085);
+  --scrim: rgba(27, 26, 25, 0.36);
 
   --accent: #ff6f1e;
   --accent-ink: #b84508;
@@ -53,45 +58,81 @@
   --k-note: #dcd2c6;
   --ok: #6fcf8a;
 
-  --shadow: 0 2px 20px rgba(43, 26, 7, 0.06), 0 1px 2px rgba(43, 26, 7, 0.05);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 10px 30px rgba(43, 26, 7, 0.1), 0 2px 4px rgba(43, 26, 7, 0.06);
-  --shadow-pop: 0 18px 40px rgba(43, 26, 7, 0.14), 0 2px 6px rgba(43, 26, 7, 0.06);
+  /* Pastel surfaces. Each one is a panel colour, picked so the ink above
+     clears 12:1 on it. */
+  --tone-mint: #cdebd3;
+  --tone-butter: #fbecaa;
+  --tone-sky: #d3e0fa;
+  --tone-apricot: #ffdcc4;
+  --tone-lilac: #e3dafd;
+  --tone-sand: #ece3d6;
 
-  --radius-card: 12px;
-  --radius-pill: 20px;
+  /* The graphite band the page ends on, and any section that inverts. */
+  --band: #1b1a19;
+  --band-ink: #f5f1ea;
+  --band-muted: #cfc9c0;
+  --band-rule: #34312e;
+
+  /* Layered, the way paper lifts off a desk: a contact shadow, a near one
+     and a long soft one. Never one hard offset. */
+  --shadow: 0 1px 2px rgba(40, 30, 20, 0.05), 0 4px 12px rgba(40, 30, 20, 0.05),
+    0 18px 40px rgba(40, 30, 20, 0.05);
+  --shadow-sm: 0 1px 2px rgba(40, 30, 20, 0.12);
+  --shadow-lg: 0 2px 4px rgba(40, 30, 20, 0.06), 0 12px 24px rgba(40, 30, 20, 0.08),
+    0 32px 60px rgba(40, 30, 20, 0.08);
+  --shadow-pop: 0 2px 6px rgba(40, 30, 20, 0.08), 0 18px 44px rgba(40, 30, 20, 0.14);
+  /* a screenshot set into a pastel panel */
+  --shadow-frame: 0 0 0 1px rgba(40, 30, 20, 0.06), 0 10px 30px rgba(40, 30, 20, 0.16);
+
+  --radius-card: 20px;
+  --radius-inner: 12px;
+  --radius-pill: 999px;
 }
 
-/* The same notebook after dark: warm brown stock, cream ink, the marker
-   unchanged. Fills keep dark text in both themes, so the kind colours and
-   --on-fill do not move. */
+/* After dark: warm graphite stock, cream ink, the marker unchanged. The
+   pastels go deep rather than bright, so the ink above them -- which is now
+   cream -- still clears the same ratio. Fills keep dark text in both themes,
+   so the kind colours and --on-fill do not move. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #17120e;
-    --card: #221a14;
-    --inset: #130f0b;
+    --paper: #161412;
+    --card: #211e1b;
+    --inset: #1a1816;
 
-    --ink: #f6efe7;
-    --ink-head: #fff3e6;
-    --line: #4d4036;
-    --line-strong: #efe5da;
+    --ink: #f5f1ea;
+    --ink-head: #fbf8f3;
+    --line: #3a3530;
+    --line-strong: #efe9e0;
     --edge-dark: rgba(0, 0, 0, 0.5);
-    --muted: #cdbfb1;
-    --faint: #ab9c8e;
-    --rule: #2d241d;
+    --muted: #cfc8be;
+    --faint: #a9a197;
+    --rule: #2c2824;
     --shadow-col: rgba(0, 0, 0, 0.5);
-    --wash: rgba(246, 239, 231, 0.05);
-    --wash-strong: rgba(246, 239, 231, 0.09);
-    --scrim: rgba(8, 5, 3, 0.6);
+    --wash: rgba(245, 241, 234, 0.05);
+    --wash-strong: rgba(245, 241, 234, 0.09);
+    --scrim: rgba(6, 5, 4, 0.62);
 
     --accent: #ff7a2e;
     --accent-ink: #ff9a5c;
     --danger-ink: #ff9d8a;
 
-    --shadow: 0 2px 20px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --tone-mint: #1f3a29;
+    --tone-butter: #3b3417;
+    --tone-sky: #1e2b45;
+    --tone-apricot: #422a1b;
+    --tone-lilac: #2d2547;
+    --tone-sand: #2e2924;
+
+    --band: #0e0d0c;
+    --band-ink: #f5f1ea;
+    --band-muted: #bdb6ac;
+    --band-rule: #2a2724;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.3);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.3);
-    --shadow-pop: 0 18px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 16px 36px rgba(0, 0, 0, 0.45);
+    --shadow-pop: 0 18px 44px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --shadow-frame: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -111,6 +152,12 @@
   --color-rule: var(--rule);
   --color-accent: var(--accent);
   --color-ok: var(--ok);
+  --color-mint: var(--tone-mint);
+  --color-butter: var(--tone-butter);
+  --color-sky: var(--tone-sky);
+  --color-apricot: var(--tone-apricot);
+  --color-lilac: var(--tone-lilac);
+  --color-sand: var(--tone-sand);
   --font-display: var(--font-fraunces);
   --font-sans: var(--font-geist);
   --font-mono: var(--font-dm-mono);
@@ -247,15 +294,16 @@ body {
   max-width: 68ch;
 }
 
-/* Fraunces with its SOFT axis all the way up and WONK on: the rounded,
-   slightly hand-cut display face. Never tracked, never capitalised by CSS --
-   the lowercase is written into the copy, not forced here, so a name or an
-   acronym keeps its own case. */
+/* Fraunces, soft and set a little tight: the literary voice for headlines.
+   Controls, labels and body copy are Geist -- the serif is for what a page
+   says, never for what a person clicks. Never capitalised by CSS: the
+   lowercase is written into the copy, so a name or an acronym keeps its own
+   case. */
 .display {
   font-family: var(--font-fraunces), ui-serif, Georgia, serif;
-  font-weight: 600;
-  font-variation-settings: "SOFT" 100, "WONK" 1;
-  letter-spacing: normal;
+  font-weight: 560;
+  font-variation-settings: "SOFT" 100, "WONK" 0;
+  letter-spacing: -0.015em;
 }
 h1.display,
 h2.display,
@@ -372,28 +420,78 @@ summary:focus-visible,
   box-shadow: var(--shadow-lg);
 }
 
-/* The orange band the page ends on. */
-.brand-band {
+/* The graphite band the page ends on: the calm after the colour above it.
+   The orange stays for one phrase inside it, not for the band. */
+.site-band {
+  background: var(--band);
+  color: var(--band-ink);
+  border-radius: 40px 40px 0 0;
+}
+.site-band .band-link {
+  color: var(--band-muted);
+  text-decoration: none;
+}
+.site-band .band-link:hover {
+  color: var(--band-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 4px;
+}
+.site-band .band-label {
+  color: var(--band-muted);
+}
+.site-band ::selection {
   background: var(--accent);
   color: var(--on-fill);
-  border-radius: 56px 56px 0 0;
-}
-.brand-band .link-more {
-  color: var(--on-fill);
-  text-decoration-color: var(--on-fill);
-}
-.brand-band ::selection {
-  background: var(--on-fill);
-  color: var(--accent);
 }
 @media (max-width: 640px) {
-  .brand-band {
-    border-radius: 32px 32px 0 0;
+  .site-band {
+    border-radius: 28px 28px 0 0;
   }
+}
+
+/* --------------------------------------------------------- pastel panels */
+
+/* A pastel panel: the coloured surface a picture of the product sits on.
+   The tone is a class (`tone-mint` ...), so a panel's colour is decided
+   where it is drawn and the palette stays in one place. */
+.tone-panel {
+  border-radius: var(--radius-card);
+  padding: 20px;
+  color: var(--ink);
+}
+.tone-mint { background: var(--tone-mint); }
+.tone-butter { background: var(--tone-butter); }
+.tone-sky { background: var(--tone-sky); }
+.tone-apricot { background: var(--tone-apricot); }
+.tone-lilac { background: var(--tone-lilac); }
+.tone-sand { background: var(--tone-sand); }
+
+/* A screenshot, or a drawing of a screen, set into a panel: white, rounded
+   a step tighter than the panel, lifted on its own shadow. */
+.frame {
+  background: var(--card);
+  border-radius: var(--radius-inner);
+  box-shadow: var(--shadow-frame);
+  overflow: hidden;
+}
+
+/* Graph paper, for the back of a collage. */
+.dot-grid {
+  background-image: radial-gradient(var(--line) 1.2px, transparent 1.3px);
+  background-size: 18px 18px;
+}
+
+/* A scrap of paper torn off a pad: the jagged edge is a clip-path, so it
+   wraps whatever colour the tone class gives it. Decoration only. */
+.scrap {
+  clip-path: polygon(0% 6%, 6% 0%, 14% 4%, 22% 0%, 31% 5%, 40% 1%, 49% 4%, 58% 0%, 67% 5%, 76% 1%, 85% 4%, 93% 0%, 100% 5%, 98% 100%, 0% 97%);
 }
 
 /* ------------------------------------------------------------- stickers */
 
+/* The card: white, floated on the layered shadow, a hairline to hold its
+   edge where the shadow is too soft to. */
 .sticker {
   background: var(--card);
   border: 1px solid var(--line);
@@ -401,10 +499,11 @@ summary:focus-visible,
   box-shadow: var(--shadow);
 }
 
+/* The quieter card inside a card: a well, no shadow. */
 .sticker-flat {
   background: var(--inset);
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-inner);
 }
 
 /* The column every page reads in, and the wider one a board needs.
@@ -447,36 +546,46 @@ body:has([data-wide-page]) .page-column {
 
 /* ------------------------------------------------------------- controls */
 
-/* An outline on the paper, never a fill: the action is the dark stroke.
-   `.btn-quiet` is the same control with a lighter stroke, for the second
-   action beside a first. */
+/* The action is a graphite capsule: filled, compact, decisive -- a
+   punctuation mark under the sentence it acts on. `.btn-quiet` is the
+   second action beside a first: the same capsule as an outline. */
 .btn {
-  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
-  font-variation-settings: "SOFT" 100;
-  font-weight: 600;
-  font-size: 14.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 550;
+  font-size: 14px;
+  line-height: 1.4;
   border: 1.5px solid var(--line-strong);
   border-radius: var(--radius-pill);
-  padding: 6px 20px 7px;
-  background: var(--card);
-  color: var(--ink);
+  padding: 7px 20px;
+  background: var(--line-strong);
+  color: var(--paper);
   box-shadow: var(--shadow-sm);
   transition:
-    transform 0.1s ease,
-    box-shadow 0.1s ease,
-    background-color 0.1s ease;
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    background-color 0.12s ease;
 }
 .btn:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-lg);
 }
 .btn:active {
-  transform: translateY(1px);
+  transform: translateY(0);
   box-shadow: none;
 }
 .btn-quiet {
+  background: var(--card);
+  color: var(--ink);
   border-color: var(--line);
   box-shadow: none;
+}
+.btn-quiet:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Irreversible. It should not look like the buttons that merely save
@@ -485,7 +594,7 @@ body:has([data-wide-page]) .page-column {
 .btn-danger {
   background: var(--k-dead_end);
   color: var(--on-fill);
-  border-color: var(--line-strong);
+  border-color: var(--k-dead_end);
 }
 
 /* Something is in flight. Applied by aria-busy rather than :disabled so the
@@ -516,12 +625,11 @@ body:has([data-wide-page]) .page-column {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
-  font-variation-settings: "SOFT" 100;
-  font-weight: 600;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
   font-size: 13.5px;
   line-height: 1;
-  padding: 4px 13px 5px;
+  padding: 6px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--card);
@@ -549,9 +657,8 @@ body:has([data-wide-page]) .page-column {
 }
 
 .link-more {
-  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
-  font-variation-settings: "SOFT" 100;
-  font-weight: 600;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
   font-size: 14px;
   color: var(--muted);
   cursor: pointer;
