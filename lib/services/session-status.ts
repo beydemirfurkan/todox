@@ -141,6 +141,15 @@ function hint(yours: SessionStatus["yours"], stale: SessionStatus["stale"]): str
       `No handoff since you last touched: ${ids(owed)}. log_entry(kind:'handoff') on ` +
         `each -- state, next step, what to watch.`,
     );
+  // Nothing touched is exactly when the why goes missing: a session that
+  // fixed something without a task left no line at all (dogfood 2026-11-22,
+  // Jonas s1, whose hint was empty). Said only in that case, so it is not a
+  // sentence on every call.
+  if (!yours.length)
+    lines.push(
+      `No task touched this session. If you changed code whose reason the diff ` +
+        `does not show, add_context it (kind 'decision' or 'gotcha') before you stop.`,
+    );
   if (stale.length)
     lines.push(
       `'doing' for ${STALE_DOING_DAYS}+ days with nothing logged: ${ids(stale)}. ` +

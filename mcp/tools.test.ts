@@ -628,7 +628,9 @@ describe("instructions", () => {
   it("tells an agent when to stop retrying a refused write", () => {
     for (const local of [true, false]) {
       const text = instructions({ local });
-      expect(text).toMatch(/A REFUSED WRITE names what is missing/);
+      // A call, not only a write: a new checkout's first get_context was
+      // refused for want of a repo_url and never retried (dogfood 2026-11-22).
+      expect(text).toMatch(/A REFUSED CALL names what is missing -- get_context's too/);
       expect(text).toMatch(/Refused twice\s+with the same message, stop/);
     }
   });
