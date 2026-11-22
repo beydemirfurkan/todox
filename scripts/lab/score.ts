@@ -149,12 +149,15 @@ function codeModeCalls(state: Record<string, unknown>): ToolCall[] {
   const code = isRecord(state.input) && typeof state.input.code === "string" ? state.input.code : "";
   const output = text(state.output ?? state.error);
   const isError = state.status === "error" || /^Invalid arguments|"error"\s*:/.test(output);
-  return [...code.matchAll(/tools\.todox\.(\w+)\(\s*(\{[^)]*\})?/g)].map((match) => {
-    const args = match[2] ?? "";
+  const starts = [...code.matchAll(/tools\.todox\.(\w+)\(/g)];
+  // Each call's arguments run to the next call (or the end): a body may hold
+  // any character, a closing parenthesis included, so no pattern can end it.
+  return starts.map((match, i) => {
+    const args = code.slice(match.index + match[0].length, starts[i + 1]?.index ?? code.length);
     const input: Record<string, unknown> = {};
     for (const key of ["cwd", "focus", "kind", "project", "status", "answers_entry_id"]) {
-      const value = new RegExp(`\\b${key}\\s*:\\s*("([^"]*)"|[\\w.]+)`).exec(args);
-      if (value) input[key] = value[2] ?? value[1];
+      const value = new RegExp(`\\b${key}\\s*:\\s*("([^"]*)"|'([^']*)'|[\\w.]+)`).exec(args);
+      if (value) input[key] = value[2] ?? value[3] ?? value[1];
     }
     return { name: match[1], isTodox: true, input, output, isError };
   });
@@ -285,6 +288,8 @@ function contamination(): string[] {
     .filter((name) => name.includes("todox-lab"))
     .filter((name) => existsSync(join(projectsDir, name, "memory")))
     .map((name) => `Claude Code auto-memory exists for ${name}`);
+  // Not detected here: rows a rolled-back session left behind (a task body,
+  // an observation). Roll back with care, or rerun from `lab:setup --reset`.
 }
 
 const yes = (value: boolean | undefined) => (value === undefined ? "–" : value ? "✓" : "✗");

@@ -48,3 +48,6 @@ next-env.d.ts
 .superpowers/plans/review-*.diff
 dist-npm/
 .playwright-mcp/
+
+# Dogfood screenshots show local paths; they stay on this machine.
+docs/dogfood/*/shots/
