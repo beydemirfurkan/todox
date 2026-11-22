@@ -580,6 +580,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           columns={columns}
           slug={slug}
           selectedId={view === "task" ? selectedId : null}
+          closedCount={groups.closed.total}
           t={t}
         />
 

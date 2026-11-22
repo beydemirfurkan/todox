@@ -16,9 +16,14 @@ const STATUS_COLOR: Record<Status, string> = {
 export function StatusDot({ status, t }: { status: Status; t: T }) {
   return (
     <>
+      {/* A ring for work not started, a solid dot for everything else. */}
       <span
-        className="inline-block size-3.5 shrink-0 rounded-full border-[1.5px] border-line"
-        style={{ background: STATUS_COLOR[status], borderColor: "var(--edge-dark)" }}
+        className="inline-block size-3 shrink-0 rounded-full"
+        style={
+          status === "todo"
+            ? { boxShadow: "inset 0 0 0 2px var(--faint)" }
+            : { background: STATUS_COLOR[status] }
+        }
         aria-hidden="true"
       />
       <span className="sr-only">{statusLabel(t, status)}</span>

@@ -339,6 +339,13 @@ export const en = {
   jumpToColumn: "Jump to",
   showAllCards: "show all {n}",
   columnEmpty: "Nothing here.",
+  boardMoveMenu: "Change the status of #{id}",
+  boardMoveTo: "Move to",
+  boardDoneZone: "Done",
+  boardDoneHint: "Drop a card here to close it",
+  boardDropped: "Drop it",
+  boardMoving: "Moving #{id} to {status}…",
+  boardDragHint: "Drag a card to another column, or use its ⋯ menu.",
   boardLabel: "Board",
   panelLabel: "Details",
   panelSections: "Panel sections",
@@ -629,9 +636,9 @@ export const en = {
     "This is the shape of `get_context` — the first call every session makes. Not a summary of the product: the payload.",
   briefingCaption: "Trimmed for width. The real one carries every open task.",
   landingShotAlt:
-    "A task in todox: its status, and a log holding a decision, a dead end and a handoff",
+    "A todox project board: queued, doing and blocked columns of task cards, and beside them one task open with its log of a decision and a dead end",
   landingShotCaption:
-    "One task from the demo account: the decision, the dead end that ruled out the obvious approach, and the handoff the next session starts from.",
+    "The demo project: cards move between columns, and the open task shows the decision behind it and the dead end that ruled out the obvious approach.",
 
   landingOpenSource: "Open source, MIT. Read the code, or run your own.",
   landingHonest:
