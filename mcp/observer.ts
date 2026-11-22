@@ -71,6 +71,48 @@ export type ObserverOptions = {
   clock?: () => number;
 };
 
+/** What one observation says, before it becomes `recordObservation`'s params. */
+export interface ObservationFacts {
+  dir: string;
+  sessionId: string;
+  client?: string;
+  branch?: string;
+  base: string;
+  head: string;
+  commits: number;
+  subjects: string[];
+  dirty: number;
+  taskIds: number[];
+  startedAt: string;
+}
+
+/**
+ * The params of `recordObservation`, shared by both carriers -- the stdio
+ * process below and the Claude Code plugin's hooks -- so the two cannot
+ * describe the same session in two shapes.
+ */
+export function observationPayload(f: ObservationFacts): Record<string, unknown> {
+  return {
+    cwd: f.dir,
+    session_id: f.sessionId,
+    client: f.client,
+    branch: f.branch,
+    base_sha: f.base,
+    head_sha: f.head,
+    commits: f.commits,
+    files_changed: f.dirty,
+    commit_subjects: f.subjects.length ? f.subjects.join("\n") : undefined,
+    // Absent rather than empty when there is nothing to say. The schemas
+    // are strict, so a self-hosted server that predates this field refuses
+    // the whole call -- and the observer swallows the refusal, which would
+    // lose every observation of every session against that server. Sending
+    // the key only when it carries something keeps the old server working
+    // for the sessions that never take a task on, which is most of them.
+    ...(f.taskIds.length ? { task_ids: [...f.taskIds] } : {}),
+    started_at: f.startedAt,
+  };
+}
+
 /** Tools that carry a path carry it under one of these. */
 const PATH_KEYS = ["cwd", "path", "root_path"] as const;
 
@@ -178,25 +220,22 @@ export function createObserver(options: ObserverOptions) {
     subjects: string[],
     dirty: number,
   ): Promise<unknown> {
-    return options.call("recordObservation", {
-      cwd: dir,
-      session_id: options.sessionId,
-      client: options.client,
-      branch: options.git.branch(dir),
-      base_sha: from,
-      head_sha: head,
-      commits,
-      files_changed: dirty,
-      commit_subjects: subjects.length ? subjects.join("\n") : undefined,
-      // Absent rather than empty when there is nothing to say. The schemas
-      // are strict, so a self-hosted server that predates this field refuses
-      // the whole call -- and the observer swallows the refusal, which would
-      // lose every observation of every session against that server. Sending
-      // the key only when it carries something keeps the old server working
-      // for the sessions that never take a task on, which is most of them.
-      ...(started.length ? { task_ids: [...started] } : {}),
-      started_at: startedAt,
-    });
+    return options.call(
+      "recordObservation",
+      observationPayload({
+        dir,
+        sessionId: options.sessionId,
+        client: options.client,
+        branch: options.git.branch(dir),
+        base: from,
+        head,
+        commits,
+        subjects,
+        dirty,
+        taskIds: started,
+        startedAt,
+      }),
+    );
   }
 
   async function observe(params: Record<string, unknown>): Promise<void> {

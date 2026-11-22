@@ -20,6 +20,7 @@ import { normalise, type ClientInfo } from "../lib/client-identity";
 import type { MethodName } from "../lib/services/rpc-schemas";
 import { isAbsolutePath } from "../lib/util/paths";
 import { runInstallDoctor } from "./doctor";
+import { runHookCommand } from "./git-hook/cli";
 import { createObserver } from "./observer";
 import { createClient, readConfig } from "./rpc-client";
 import { instructions, registerTools, SERVER_INFO, type Workspace } from "./tools";
@@ -183,7 +184,16 @@ async function main() {
  * here: `pack-mcp` walks `require(...)` to decide what ships, and a dynamic
  * import would be pruned from the package and throw on the first run.
  */
-if (process.argv[2] === "doctor") {
+if (process.argv[2] === "hook") {
+  // The git hook's installer, like the doctor, needs no token to start: it
+  // is how one gets saved.
+  try {
+    process.exit(runHookCommand(process.argv.slice(3), process.env, process.cwd()));
+  } catch (e) {
+    console.error("[todox] hook:", e instanceof Error ? e.message : e);
+    process.exit(1);
+  }
+} else if (process.argv[2] === "doctor") {
   runInstallDoctor(process.argv[3] ?? process.cwd()).then(
     (code) => process.exit(code),
     (e) => {

@@ -29,16 +29,14 @@ export const expiryFrom = (at: string) =>
  * observation and wants to act on it -- promote it, quote it in a handoff --
  * has to be able to name the row.
  *
- * `source` is deliberately NOT in it, and the column is still in the schema.
- * It exists to tell a reader which carrier saw a row, and there is exactly one
- * carrier: `recordObservation` has no `source` parameter, so every row ever
- * written says "stdio". A field with one possible value tells a reader nothing
- * and costs bytes in the payload every session opens with -- the same argument
- * the log's byte budget is built on. Put it back in the moment a second
- * carrier can write, and not before: a column carried without a reader is what
- * `repo_url` and `refs.context_id` both were.
+ * `source` is in it since there are two carriers: the stdio process, which
+ * sees every tool call, and the Claude Code plugin's hooks, which see only a
+ * session's edges. Which one saw a row is how a reader weighs it. It was kept
+ * out while only one could write, and it went back in with the parameter that
+ * lets the second one -- the reader and the writer together, as the schema
+ * comment asked.
  */
-const COLUMNS = `id, client, branch, base_sha, head_sha, commits,
+const COLUMNS = `id, source, client, branch, base_sha, head_sha, commits,
                  files_changed, commit_subjects, task_ids, started_at, observed_at`;
 
 /**
@@ -108,6 +106,16 @@ export const QUERIES = {
           ORDER BY observed_at DESC, id DESC
           LIMIT ?`,
 
+  /**
+   * Whether any of some carriers has written for this account and project
+   * since a moment -- how a poorer carrier learns a richer one is already
+   * watching the same checkout. Account-scoped for the reason `lastHead` is:
+   * another person's process is watching another checkout.
+   */
+  observedBySourcesSince: `SELECT 1 FROM observations
+                            WHERE user_id = ? AND project_id = ? AND source = ANY(?) AND observed_at >= ?
+                            LIMIT 1`,
+
   purge: `DELETE FROM observations WHERE expires_at <= ?`,
 } as const;
 
@@ -142,6 +150,14 @@ export async function record(input: NewObservation): Promise<Observation> {
 export const lastHeadFor = async (userId: number, projectId: number) =>
   (await one<{ head_sha: string | null }>(QUERIES.lastHead, [userId, projectId]))?.head_sha ??
   null;
+
+export const observedBySourcesSince = async (
+  userId: number,
+  projectId: number,
+  sources: readonly string[],
+  since: string,
+): Promise<boolean> =>
+  Boolean(await one(QUERIES.observedBySourcesSince, [userId, projectId, [...sources], since]));
 
 type Paged = BriefingObservation & { total: number };
 

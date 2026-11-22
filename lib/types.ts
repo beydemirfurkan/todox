@@ -253,17 +253,15 @@ export type NewObservation = {
 /**
  * The briefing's view: the row without the bookkeeping nobody reading it needs.
  *
- * `source` is in this list rather than in the payload because there is only
- * one carrier that can write an observation, so the field would answer "stdio"
- * for every row that has ever existed. It goes back in when a second carrier
- * does.
+ * `source` is not in this list: two carriers can write an observation (the
+ * stdio process and the Claude Code plugin's hooks), and which one saw a row
+ * is part of how a reader weighs it.
  */
 export type BriefingObservation = Omit<
   Observation,
   | "user_id"
   | "project_id"
   | "session_id"
-  | "source"
   | "expires_at"
   | "promoted_at"
   | "promoted_as"

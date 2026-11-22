@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, promises as fs, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, promises as fs, rmSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
 import { tmpdir } from "node:os";
 
@@ -31,6 +32,7 @@ vi.mock("../scripts/install-mcp/reachability", () => ({
 }));
 
 const { inspectInstalls, runInstallDoctor } = await import("./doctor");
+const { install } = await import("./git-hook/install");
 const {
   claudeCodeContract,
   codexConfigFile,
@@ -290,5 +292,47 @@ describe("the exit code", () => {
     await writeJson(claudeCodeContract().current.file, { mcpServers: { todox: httpEntry("http") } });
     await writeJson(vsCodeContract().current.file, { servers: { todox: httpEntry("remote") } });
     expect(await runInstallDoctor(state.home, write)).toBe(1);
+  });
+});
+
+describe("the git hook in the repository it was run from", () => {
+  async function gitRepo(): Promise<string> {
+    const dir = path.join(state.home, "repo");
+    await fs.mkdir(dir, { recursive: true });
+    execFileSync("git", ["init", "-q", dir]);
+    return dir;
+  }
+  const bundle = async () => {
+    const file = path.join(state.home, "bundle", "git-hook.mjs");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    writeFileSync(file, "// bundle");
+    return file;
+  };
+  const env = () => ({ TODOX_HOME: path.join(state.home, ".todox") });
+
+  it("says nothing outside a repository", async () => {
+    expect(about((await inspectInstalls(state.home, env())).findings, "git-hook")).toEqual([]);
+  });
+
+  it("names its absence as a fact, not a fault", async () => {
+    const [f] = about((await inspectInstalls(await gitRepo(), env())).findings, "git-hook");
+    expect(f.level).toBe("info");
+    expect(f.detail).toMatch(/not installed/);
+  });
+
+  it("is ok when both hooks, the script and a token are there", async () => {
+    const dir = await gitRepo();
+    install({ cwd: dir, env: env(), bundle: await bundle(), token: "todox_t" });
+    const [f] = about((await inspectInstalls(dir, env())).findings, "git-hook");
+    expect(f.level).toBe("ok");
+    expect(f.detail).not.toContain("todox_t");
+  });
+
+  it("warns when it would fail silently on every commit: no token", async () => {
+    const dir = await gitRepo();
+    install({ cwd: dir, env: env(), bundle: await bundle() });
+    const [f] = about((await inspectInstalls(dir, env())).findings, "git-hook");
+    expect(f.level).toBe("warn");
+    expect(f.detail).toMatch(/a token/);
   });
 });

@@ -37,6 +37,7 @@ import * as observationsRepo from "../../lib/repositories/observations";
 import * as projectsRepo from "../../lib/repositories/projects";
 import * as usersRepo from "../../lib/repositories/users";
 import { briefing } from "../../lib/services/briefing";
+import { renderDigest } from "../../lib/services/briefing-digest";
 import { search } from "../../lib/services/search";
 import * as taskService from "../../lib/services/task-service";
 import { hashPassword } from "../../lib/util/password";
@@ -189,6 +190,12 @@ async function reportBriefing(userId: number, project: Awaited<ReturnType<typeof
   console.log(row("─".repeat(20), ""));
   console.log(row("total", kb(bytes(brief))));
   console.log(row("≈ tokens (see CHARS_PER_TOKEN)", `${approxTokens(brief)}`));
+  // What a SessionStart hook injects instead: text under a character ceiling,
+  // and what the ceiling cost. Characters, not bytes, because the ceiling it
+  // answers to (Claude Code's 10,000) counts characters.
+  const digest = renderDigest(brief);
+  const left = Object.entries(digest.dropped).map(([name, n]) => `${n} ${name}`).join(", ");
+  console.log(row("digest (shape:'digest')", `${digest.chars} chars${left ? `, left out: ${left}` : ""}`));
   console.log(
     row("left out", `${brief.context_omitted} notes, ${brief.open_tasks_omitted} tasks`),
   );

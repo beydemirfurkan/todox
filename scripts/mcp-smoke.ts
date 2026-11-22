@@ -170,6 +170,35 @@ function alternativeRequirements(schema: ToolSchema | undefined): string[] {
 }
 
 /** The same run through whichever way in it was handed. */
+const BRIEFING_LISTS = [
+  "global_context",
+  "project_context",
+  "open_tasks",
+  "idle_tasks",
+  "observations",
+  "stale_refs",
+  "notes",
+] as const;
+const TASK_LISTS = ["decisions", "dead_ends", "open_questions", "files"] as const;
+
+/**
+ * get_context's text, held to the compact contract and read back with its
+ * empty lists restored. The tool leaves an empty list out (task #524), and an
+ * absent list means an empty one -- which is what every reader below assumes,
+ * so it is restored once here rather than defaulted at forty call sites. A
+ * refusal ("error: ...") is not a briefing and passes through untouched.
+ */
+function readBriefing(raw: string): string {
+  if (!raw.startsWith("{")) return raw;
+  if (raw.includes("\n")) throw new Error("get_context answered with indented JSON");
+  if (raw.includes(":[]")) throw new Error(`get_context sent an empty list: ${raw.slice(0, 200)}`);
+  const brief = JSON.parse(raw) as Record<string, unknown>;
+  for (const key of BRIEFING_LISTS) brief[key] ??= [];
+  for (const task of brief.open_tasks as Record<string, unknown>[])
+    for (const key of TASK_LISTS) task[key] ??= [];
+  return JSON.stringify(brief);
+}
+
 async function runSuite(mode: Mode, token: string) {
   console.log(`\n=========== ${mode.label} ===========`);
 
@@ -223,7 +252,8 @@ async function runSuite(mode: Mode, token: string) {
 
   const text = async (name: string, args: Record<string, unknown> = {}) => {
     const r = await client.callTool({ name, arguments: args });
-    return (r.content as { text: string }[])[0].text;
+    const raw = (r.content as { text: string }[])[0].text;
+    return name === "get_context" ? readBriefing(raw) : raw;
   };
 
   console.log("\n--- the agent starts with only a working directory ---");
@@ -1011,6 +1041,21 @@ async function runSuite(mode: Mode, token: string) {
   if (noteIn(afterRemoval))
     throw new Error("a deleted note is still in the briefing");
   console.log("entry and note both removed, and gone from what the next session reads");
+
+  // The digest is what a SessionStart hook injects, under a hard ceiling, so
+  // the ceiling is the assertion: a digest one character over it is spilled
+  // to a file nobody reads, which is the problem the shape exists to solve.
+  console.log("\n--- the digest stays under its ceiling, as text ---");
+  const digest = await text("get_context", { cwd: SCRATCH, shape: "digest", max_chars: 2000 });
+  if (digest.startsWith("{")) throw new Error(`the digest came back as JSON: ${digest.slice(0, 120)}`);
+  if (digest.length > 2000) throw new Error(`the digest is ${digest.length} characters, over 2000`);
+  if (!digest.startsWith("todox briefing for "))
+    throw new Error(`the digest does not open with its header: ${digest.slice(0, 120)}`);
+  if (!digest.includes("get_context with cwd and a focus"))
+    throw new Error("the digest does not say where the rest of the briefing is");
+  if (!/#\d+ \[(todo|doing|blocked)\]/.test(digest))
+    throw new Error(`the digest names no live task: ${digest}`);
+  console.log(`digest: ${digest.length} characters`);
 
   // A project is a repository, not a path. This is the assertion that keeps
   // that true on the transport where it can actually go wrong: the hosted

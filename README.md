@@ -387,12 +387,33 @@ server-side ever finds its way into the tool surface again.
 From a clone, `pnpm -C /path/to/todox mcp` still works and is what to use when
 you are changing the tools themselves.
 
+### Optional: a git hook, for any client
+
+The briefing's `observations` section — what git did while an earlier session
+ran — needs something on your machine to watch. The stdio server and the
+Claude Code plugin do it for their own sessions; for every other client, or for
+commits made with no agent at all, a git hook does it per repository:
+
+```bash
+cd your-repo
+npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz hook install --token todox_…
+```
+
+It adds a marked block to `.git/hooks/post-commit` and `post-rewrite` (an
+existing hook is kept), copies one dependency-free script to `~/.todox`, and
+saves the token there readable by you only. After each commit it sends counts,
+a branch and up to three commit subjects in the background — the commit never
+waits for it — and stands down while the stdio server or the plugin has written
+for that project in the last half hour. `hook status` says what is installed,
+`hook uninstall` takes out only its own block. Repositories that commit their
+hooks (husky, lefthook) are not edited; it prints the line to add instead.
+
 ### Tools
 
 | tool | what it does |
 | --- | --- |
-| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped in rows and in bytes, never truncated: every record keeps its id, kind, date and first line, and a `body` of null means the budget was spent — `get_task` reads it. Open tasks untouched for 14+ days come back as a line each in `idle_tasks` — title, status, days idle, last handoff head — outside every budget. Pass `focus` — a sentence about what the session is for — and both budgets are spent on the records that answer it rather than the newest ones, which is what lets them be smaller. |
-| `create_task` | Capture work. Pass `cwd` or an explicit `project`; the tool schema requires one before the call runs. Registering a **new** one also needs `repo_root` or `repo_url`. The receipt returns the task path and body length without echoing the body. |
+| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped in rows and in bytes, never truncated: every record keeps its id, kind, date and first line, and a `body` of null means the budget was spent — `get_task` reads it. Open tasks untouched for 14+ days come back as a line each in `idle_tasks` — title, status, days idle, last handoff head — outside every budget. Pass `focus` — a sentence about what the session is for — and both budgets are spent on the records that answer it rather than the newest ones, which is what lets them be smaller. Answers with one line of JSON, empty lists left out. `shape: "digest"` returns the same briefing as a plain-text index under `max_chars` (default 9,500) — rules, live tasks with their last handoff, then questions, dead ends and decisions by headline — and says what the ceiling left out; it is what a session-start hook can inject whole. |
+| `create_task` | Capture work. Pass `cwd` or an explicit `project`; the tool schema requires one before the call runs. Registering a **new** one also needs `repo_root` or `repo_url`. The receipt returns the task path and body length without echoing the body, and — when dead ends in the same project share at least two terms with the title — up to three of them as `related_dead_ends`, so "has this been tried?" is answered before the work starts. |
 | `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
 | `log_entry` | Append one of the five kinds. `answers_entry_id` closes a `question` — the only thing that does. |
 | `delete_entry` | For an entry that was wrong when it was written. One overtaken by later work is history, not an error — append instead. |
@@ -547,12 +568,13 @@ Details, and an honest list of what is **not** covered, in
   budgets fixed — one project went from 143 KB to about 55 KB on the log
   alone — but it is not bounded in bytes, and `pnpm bench:memory` prints it
   so the next reader does not have to discover it.
-- **Observations are captured by the local process only.** Watching git means
-  running on the machine that holds the checkout, and the hosted endpoint has
-  none — so connected that way, the `observations` section of every briefing
-  stays empty and nothing anywhere fills it. The Try-it path in this README is
-  the hosted one, so that is most people. `npx todox-mcp` is the transport that
-  captures. Everything else works identically either way.
+- **Observations need a process on your machine.** Watching git means running
+  where the checkout is, and the hosted endpoint does not. Three things do: the
+  Claude Code plugin's hooks (at Stop and SessionEnd), `npx todox-mcp`, and the
+  git hook (`todox-mcp hook install`, per repository, at each commit) — all
+  counts and three commit subjects, never a diff. Connected to `/api/mcp` from
+  any other client with none of them installed, the `observations` section
+  stays empty, and the git hook sees commits, not uncommitted work in progress.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.
@@ -560,7 +582,7 @@ Details, and an honest list of what is **not** covered, in
 ## Cutting a release
 
 ```bash
-git tag v0.1.4 && git push origin v0.1.4
+git tag v0.1.6 && git push origin v0.1.6
 ```
 
 That is the procedure. The workflow checks the tag against `package.json`,

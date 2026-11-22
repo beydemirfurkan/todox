@@ -8,7 +8,7 @@ import { userForApiToken } from "@/lib/services/auth";
 import { BadRequest, refusalReason, TooSlow } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
-import { invoke } from "@/lib/services/rpc";
+import { CARRIERS, invoke, type Carrier } from "@/lib/services/rpc";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -74,7 +74,11 @@ export async function POST(req: NextRequest) {
     if (typeof payload.method !== "string") return fail(400, "method must be a string", requestId);
     method = payload.method;
 
-    const result = await invoke({ userId: user.id, token }, payload.method, payload.params);
+    const result = await invoke(
+      { userId: user.id, token, ...carrierOf(req.headers) },
+      payload.method,
+      payload.params,
+    );
     return NextResponse.json({ ok: true, result }, { headers: idHeader(requestId) });
   } catch (e) {
     // Ownership failures are the caller's problem, not a server fault, and
@@ -116,3 +120,15 @@ const idHeader = (requestId: string) => ({ "x-request-id": requestId });
 
 const fail = (status: number, error: string, requestId: string) =>
   NextResponse.json({ ok: false, error }, { status, headers: idHeader(requestId) });
+
+/**
+ * A client-side hook says so in a header, and only the known values are taken:
+ * anything else is an ordinary agent call. It changes nothing but the name the
+ * call is counted under (`usageName`), so a caller that lies about it can only
+ * hide its own calls from its own account's numbers.
+ */
+function carrierOf(headers: Headers): { carrier?: Carrier } {
+  const claimed = headers.get("x-todox-carrier");
+  const carrier = CARRIERS.find((c) => c === claimed);
+  return carrier ? { carrier } : {};
+}
