@@ -46,6 +46,23 @@ export async function latestUpdatedByProjects(
 /** The only columns `update` will write. See `setClause` for why this exists. */
 const COLUMNS = ["title", "body", "status", "priority", "closed_at"] as const;
 
+/**
+ * Every task of a project for the board, without bodies.
+ *
+ * The board prints titles, statuses and ids; it never shows a body. Reading
+ * `*` shipped every brief ever written -- closed tasks included -- from the
+ * database to throw it away. `body` comes back null, so nothing can mistake
+ * this for a full row and print it.
+ */
+export const listForBoard = (projectId: number) =>
+  all<Task>(
+    `SELECT id, project_id, title, NULL::text AS body, status, priority,
+            created_at, updated_at, closed_at
+       FROM tasks WHERE project_id = ?
+      ORDER BY (status IN ('done','dropped')), priority, updated_at DESC`,
+    [projectId],
+  );
+
 export function listByProject(projectId: number, status: StatusFilter = "open") {
   if (status === "all")
     return all<Task>(
@@ -183,6 +200,10 @@ async function countByProject(projectId: number, status: StatusFilter): Promise<
 
 export const byId = (id: number) => one<Task>("SELECT * FROM tasks WHERE id = ?", [id]);
 
+/** One task's brief, for a view that already holds the rest of the row. */
+export const bodyOf = async (id: number): Promise<string | null> =>
+  (await one<{ body: string | null }>("SELECT body FROM tasks WHERE id = ?", [id]))?.body ?? null;
+
 /** The same read for a handful of ids, so a list does not become a round trip
  *  each. Order follows the ids given, because the caller has already decided
  *  what order means here. */
@@ -218,26 +239,29 @@ export const activeBetween = (
   projectId?: number,
 ) =>
   all<Task>(
-    `SELECT DISTINCT t.* FROM tasks t
+    // EXISTS rather than two LEFT JOINs under a DISTINCT: the joins produced a
+    // row per entry times per event, and DISTINCT then compared every one of
+    // them whole, bodies included. Each EXISTS stops at its first match.
+    `SELECT t.* FROM tasks t
      JOIN projects p ON p.id = t.project_id
      LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
-     LEFT JOIN entries e     ON e.task_id = t.id AND e.created_at >= ? AND e.created_at < ?
-     LEFT JOIN task_events v ON v.task_id = t.id AND v.at         >= ? AND v.at         < ?
       WHERE (p.user_id = ? OR pm.user_id IS NOT NULL)
         ${projectId === undefined ? "" : "AND t.project_id = ?"}
         AND ((t.created_at >= ? AND t.created_at < ?)
          OR (t.closed_at   >= ? AND t.closed_at  < ?)
-         OR e.id IS NOT NULL
-         OR v.id IS NOT NULL)
+         OR EXISTS (SELECT 1 FROM entries e
+                     WHERE e.task_id = t.id AND e.created_at >= ? AND e.created_at < ?)
+         OR EXISTS (SELECT 1 FROM task_events v
+                     WHERE v.task_id = t.id AND v.at >= ? AND v.at < ?))
      ORDER BY t.updated_at DESC`,
     [
       userId,
-      from,
-      to,
-      from,
-      to,
       userId,
       ...(projectId === undefined ? [] : [projectId]),
+      from,
+      to,
+      from,
+      to,
       from,
       to,
       from,

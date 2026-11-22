@@ -30,7 +30,7 @@ import { localDatabaseOnly } from "../local-only";
 
 localDatabaseOnly("bench:memory");
 
-import { run } from "../../lib/db/client";
+import { metered, run } from "../../lib/db/client";
 import * as contextsRepo from "../../lib/repositories/contexts";
 import * as entriesRepo from "../../lib/repositories/entries";
 import * as observationsRepo from "../../lib/repositories/observations";
@@ -38,6 +38,7 @@ import * as projectsRepo from "../../lib/repositories/projects";
 import * as usersRepo from "../../lib/repositories/users";
 import { briefing } from "../../lib/services/briefing";
 import { renderDigest } from "../../lib/services/briefing-digest";
+import { invoke } from "../../lib/services/rpc";
 import { search } from "../../lib/services/search";
 import * as taskService from "../../lib/services/task-service";
 import { hashPassword } from "../../lib/util/password";
@@ -568,8 +569,56 @@ async function tasksRepoOpen(projectId: number): Promise<number[]> {
   return rows.map((t) => t.id);
 }
 
+/**
+ * What the calls a session makes cost in time, through the same `invoke` both
+ * transports use. Wall time here is the database's time plus the work around
+ * it on this machine, with no network in front; the query count is the number
+ * that travels, because every statement is a round trip wherever the database
+ * sits. Warmed first, so a cold pool does not decide the first row.
+ */
+const LATENCY_RUNS = 50;
+
+async function reportLatency(userId: number, project: { slug: string }) {
+  const calls: { label: string; method: string; params: Record<string, unknown> }[] = [
+    { label: "get_context", method: "getContext", params: { project: project.slug } },
+    {
+      label: "get_context (digest)",
+      method: "getContext",
+      params: { project: project.slug, shape: "digest" },
+    },
+    { label: "search", method: "search", params: { query: "migration rollback" } },
+    { label: "list_projects", method: "listProjects", params: {} },
+    { label: "activity_report (week)", method: "activityReport", params: { period: "week" } },
+  ];
+  console.log(`\nLATENCY (${LATENCY_RUNS} runs each, p50 / p95, queries per call)`);
+  for (const call of calls) {
+    await invoke({ userId }, call.method, call.params);
+    const times: number[] = [];
+    let queries = 0;
+    for (let i = 0; i < LATENCY_RUNS; i++) {
+      const started = performance.now();
+      const { meter } = await metered(() => invoke({ userId }, call.method, call.params));
+      times.push(performance.now() - started);
+      queries = meter.count;
+    }
+    times.sort((a, b) => a - b);
+    const at = (q: number) => times[Math.min(times.length - 1, Math.floor(q * times.length))];
+    console.log(
+      row(call.label, `${at(0.5).toFixed(1)} / ${at(0.95).toFixed(1)} ms  ${String(queries).padStart(3)} q`),
+    );
+  }
+}
+
 async function main() {
   const { user, project } = await seed();
+  if (process.argv.includes("--latency")) {
+    try {
+      await reportLatency(user.id, project);
+    } finally {
+      await projectsRepo.remove(user.id, project.id);
+    }
+    return;
+  }
   try {
     const notes = await contextsRepo.listByProject(user.id, project.id);
     const tasks = (await import("../../lib/repositories/tasks")).listByProject(project.id, "all");

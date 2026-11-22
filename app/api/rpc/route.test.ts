@@ -124,7 +124,11 @@ describe("rate limiting", () => {
     const res = await post();
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).toBe("42");
-    expect(mocks.userForApiToken).not.toHaveBeenCalled();
+    // The token is looked up alongside the gate to save a round trip, but a
+    // shut gate answers the same whatever the lookup found: a valid token
+    // learns nothing, does not count against its pace, and runs nothing.
+    expect(mocks.consume).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalled();
   });
 
   it("answers 429 with retry-after when a valid token is going too fast", async () => {

@@ -4,6 +4,7 @@ import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
 import { bearerToken } from "@/lib/server/bearer";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, logWarn, newRequestId } from "@/lib/server/log";
+import { metered, serverTiming } from "@/lib/db/client";
 import { userForApiToken } from "@/lib/services/auth";
 import { BadRequest, refusalReason, TooSlow } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
@@ -38,14 +39,15 @@ export async function POST(req: NextRequest) {
     if (!token) return fail(401, "missing bearer token", requestId);
 
     // Tokens are long random strings, but nothing should be free to brute force.
-    const gate = await limit.check("badTokenPerIp", ip);
+    // The lookup rides alongside the gate; its answer is ignored until the
+    // gate has allowed the call. One round trip instead of two.
+    const [gate, user] = await Promise.all([limit.check("badTokenPerIp", ip), userForApiToken(token)]);
     if (!gate.allowed)
       return NextResponse.json(
         { ok: false, error: "too many failed authentications" },
         { status: 429, headers: { "retry-after": String(gate.retryAfterSec), ...idHeader(requestId) } },
       );
 
-    const user = await userForApiToken(token);
     if (!user) {
       await limit.penalise("badTokenPerIp", ip);
       return fail(401, "invalid or revoked token", requestId);
@@ -73,13 +75,15 @@ export async function POST(req: NextRequest) {
     }
     if (typeof payload.method !== "string") return fail(400, "method must be a string", requestId);
     method = payload.method;
+    const name = payload.method;
 
-    const result = await invoke(
-      { userId: user.id, token, ...carrierOf(req.headers) },
-      payload.method,
-      payload.params,
+    const { result, meter } = await metered(() =>
+      invoke({ userId: user.id, token, ...carrierOf(req.headers) }, name, payload.params),
     );
-    return NextResponse.json({ ok: true, result }, { headers: idHeader(requestId) });
+    return NextResponse.json(
+      { ok: true, result },
+      { headers: { ...idHeader(requestId), "server-timing": serverTiming(meter) } },
+    );
   } catch (e) {
     // Ownership failures are the caller's problem, not a server fault, and
     // they must not reveal whether the id exists for somebody else.

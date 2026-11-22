@@ -1,6 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool } from "pg";
 
-import { logError } from "../server/log";
+import { logError, logWarn } from "../server/log";
 import { TooSlow } from "../services/errors";
 
 /**
@@ -41,7 +42,9 @@ export function connectionString(): string {
 function db(): Pool {
   pool ??= new Pool({
     connectionString: connectionString(),
-    max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+    // 20 rather than 10: one briefing sends eight statements at once, so ten
+    // let a single agent hold the whole pool and a second one queue behind it.
+    max: Number(process.env.DATABASE_POOL_MAX ?? 20),
     // A statement that has not answered in 25s is not going to; failing the
     // request beats holding a connection that the next one needs.
     //
@@ -56,7 +59,17 @@ function db(): Pool {
     // that fails.
     statement_timeout: 25_000,
     connectionTimeoutMillis: 10_000,
-    idleTimeoutMillis: 30_000,
+    // Idle connections are kept for five minutes, not thirty seconds. An agent
+    // session calls in bursts a minute or two apart, and at thirty seconds
+    // nearly every burst began by opening a connection again -- the one cost a
+    // pool exists to remove. TCP keepalive stops a quiet socket being dropped
+    // by something in between while it waits.
+    idleTimeoutMillis: 300_000,
+    keepAlive: true,
+    // Idle connections do not hold the process open. The server never notices
+    // (it is listening on a port anyway); a script that forgot `disconnect()`
+    // would otherwise sit for the five minutes above before exiting.
+    allowExitOnIdle: true,
   });
   return pool;
 }
@@ -113,9 +126,53 @@ function rethrow(e: unknown): never {
   );
 }
 
+/**
+ * How many statements one request sent, and how long they took together.
+ *
+ * Counts and milliseconds only. A slow statement is logged by its first line
+ * of SQL -- the table and the shape -- never by its parameters, which are
+ * people's titles, bodies and paths: the same promise `tool_usage` makes.
+ */
+export interface QueryMeter {
+  count: number;
+  ms: number;
+}
+
+const meters = new AsyncLocalStorage<QueryMeter>();
+
+/** Runs `work` with a fresh meter, and hands both back. */
+export async function metered<T>(work: () => Promise<T>): Promise<{ result: T; meter: QueryMeter }> {
+  const meter: QueryMeter = { count: 0, ms: 0 };
+  const result = await meters.run(meter, work);
+  return { result, meter };
+}
+
+/** `Server-Timing` for a response, so the browser's network panel shows it. */
+export const serverTiming = (meter: QueryMeter): string =>
+  `db;dur=${meter.ms.toFixed(1)};desc="${meter.count} queries"`;
+
+const SLOW_MS = Number(process.env.TODOX_SLOW_MS ?? 50);
+
+const firstLine = (text: string) => text.trim().split("\n")[0].replace(/\s+/g, " ").slice(0, 120);
+
+async function timed<R>(text: string, send: () => Promise<R>): Promise<R> {
+  const started = performance.now();
+  try {
+    return await send();
+  } finally {
+    const ms = performance.now() - started;
+    const meter = meters.getStore();
+    if (meter) {
+      meter.count += 1;
+      meter.ms += ms;
+    }
+    if (ms >= SLOW_MS) logWarn("db.slow", { ms: Math.round(ms), sql: firstLine(text) });
+  }
+}
+
 export async function all<T>(text: string, params: Params = []): Promise<T[]> {
   try {
-    const result = await db().query(positional(text), params as unknown[]);
+    const result = await timed(text, () => db().query(positional(text), params as unknown[]));
     return result.rows as T[];
   } catch (e) {
     rethrow(e);
@@ -145,7 +202,7 @@ export async function one<T>(text: string, params: Params = []): Promise<T | und
  */
 export async function run(text: string, params: Params = []): Promise<number> {
   try {
-    const result = await db().query(positional(text), params as unknown[]);
+    const result = await timed(text, () => db().query(positional(text), params as unknown[]));
     return result.rowCount ?? 0;
   } catch (e) {
     rethrow(e);
@@ -216,7 +273,9 @@ export async function tx<T = unknown>(
     await client.query("BEGIN");
     const results: T[][] = [];
     for (const q of statements) {
-      const result = await client.query(positional(q.text), (q.params ?? []) as unknown[]);
+      const result = await timed(q.text, () =>
+        client.query(positional(q.text), (q.params ?? []) as unknown[]),
+      );
       results.push(result.rows as T[]);
     }
     await client.query("COMMIT");

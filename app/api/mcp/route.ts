@@ -8,6 +8,7 @@ import { clientIp } from "@/lib/server/client-ip";
 import { logError, logWarn, newRequestId } from "@/lib/server/log";
 import { normalise, type ClientInfo } from "@/lib/client-identity";
 import { clientDuringSetup, record } from "@/lib/server/client-info";
+import { metered, serverTiming } from "@/lib/db/client";
 import { agentForToken, type AgentIdentity } from "@/lib/services/auth";
 import { silentAccountNudge } from "@/lib/services/nudge";
 import { BadRequest, refusalReason } from "@/lib/services/errors";
@@ -139,7 +140,9 @@ const unauthorised = (error: string) =>
 export async function POST(req: Request): Promise<Response> {
   const requestId = newRequestId();
   try {
-    return withId(await answer(req, requestId), requestId);
+    const { result, meter } = await metered(() => answer(req, requestId));
+    result.headers.set("server-timing", serverTiming(meter));
+    return withId(result, requestId);
   } catch (e) {
     logError("mcp.failed", e, { requestId });
     return withId(
@@ -161,8 +164,11 @@ async function answer(req: Request, requestId: string): Promise<Response> {
   const token = bearerToken(req.headers);
   if (!token) return unauthorised("missing bearer token");
 
-  // Same bucket as /api/rpc: one token surface, one brute-force budget.
-  const gate = await limit.check("badTokenPerIp", ip);
+  // Same bucket as /api/rpc: one token surface, one brute-force budget. The
+  // gate and the lookup go out together -- the lookup's answer is only used
+  // once the gate has said yes, so asking in parallel changes nothing a caller
+  // can see and saves a round trip on every call.
+  const [gate, agent] = await Promise.all([limit.check("badTokenPerIp", ip), agentForToken(token)]);
   if (!gate.allowed)
     return json(
       { jsonrpc: "2.0", error: { code: -32001, message: "too many failed authentications" } },
@@ -170,7 +176,6 @@ async function answer(req: Request, requestId: string): Promise<Response> {
       { "retry-after": String(gate.retryAfterSec) },
     );
 
-  const agent = await agentForToken(token);
   if (!agent) {
     await limit.penalise("badTokenPerIp", ip);
     return unauthorised("invalid or revoked token");
