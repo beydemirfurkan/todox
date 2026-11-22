@@ -102,9 +102,9 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
             className="pop grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
             aria-label={t("reportTitle")}
           >
-            <Stat n={report.totals.completed} label={t("totalsCompleted")} fill="var(--ok)" />
-            <Stat n={report.totals.created} label={t("totalsCreated")} fill="var(--k-decision)" />
-            <Stat n={report.totals.touched} label={t("totalsTouched")} fill="var(--k-note)" />
+            <Stat n={report.totals.completed} label={t("totalsCompleted")} tone="tone-mint" />
+            <Stat n={report.totals.created} label={t("totalsCreated")} tone="tone-sky" />
+            <Stat n={report.totals.touched} label={t("totalsTouched")} tone="tone-sand" />
             <Stat
               text={duration(report.totals.active_ms, t)}
               label={
@@ -126,7 +126,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                   .filter(Boolean)
                   .join(" · ")
               }
-              fill="var(--accent)"
+              tone="tone-apricot"
             />
           </section>
 
@@ -250,25 +250,21 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
   );
 }
 
+/** A number on its own pastel tile, with what it counts written under it. */
 function Stat({
   n,
   text,
   label,
-  fill,
+  tone,
 }: {
   n?: number;
   text?: string;
   label: string;
-  fill: string;
+  tone: string;
 }) {
   return (
-    <div className="sticker p-4">
-      <div
-        className="on-fill display inline-block rounded-full border-[1.5px] border-line px-2.5 pt-[2px] pb-[3px] text-[22px] leading-none font-bold"
-        style={{ background: fill, borderColor: "var(--edge-dark)" }}
-      >
-        {text ?? n}
-      </div>
+    <div className={`tone-panel ${tone} !p-5`}>
+      <div className="display text-[36px] leading-none">{text ?? n}</div>
       <p className="mt-2 text-[13.5px] text-muted">{label}</p>
     </div>
   );

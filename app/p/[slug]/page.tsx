@@ -41,6 +41,7 @@ import {
   Blob,
   Chip,
   Composer,
+  Progress,
   Empty,
   ExpandableText,
   Field,
@@ -378,7 +379,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
         </div>
 
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="display text-[26px] leading-[1.1] font-bold sm:text-[33px]">
+          <h1 className="display text-[32px] leading-[1.1] sm:text-[44px]">
             {project.name}
           </h1>
           {/* Whose project this is, said once and up front. A joined project
@@ -452,6 +453,19 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
               {t("localPathLabel")}: {project.root_path}
             </span>
           )}
+        </div>
+
+        <div className="max-w-xl pt-2">
+          <Progress
+            counts={{
+              todo: groups.counts.todo,
+              doing: groups.counts.doing,
+              blocked: groups.counts.blocked,
+              done: all.filter((task) => task.status === "done").length,
+            }}
+            titles={{ todo: t("queued"), doing: t("colDoing"), blocked: t("colBlocked") }}
+            t={t}
+          />
         </div>
       </header>
 
