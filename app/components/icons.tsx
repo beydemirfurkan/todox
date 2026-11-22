@@ -27,7 +27,8 @@ export type IconName =
   | "brain"
   | "home"
   | "search"
-  | "chart";
+  | "chart"
+  | "sun";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   inbox: (
@@ -90,6 +91,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M4 20h16" />
       <path d="M7 16v-5M12 16V7M17 16v-8" />
+    </>
+  ),
+  // Today.
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
     </>
   ),
 };

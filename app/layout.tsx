@@ -8,12 +8,11 @@ import { getLang, getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import { publicUrl } from "@/lib/public-url";
 import { LogoMark } from "./components";
+import { AppSidebar } from "./components/app-sidebar";
 import { LangSwitcher } from "./features/lang-switcher";
 import { Notifications } from "./features/notifications";
-import { SearchBox } from "./features/search-box";
 import { TabBar } from "./features/tab-bar";
 import { TzProbe } from "./features/tz-probe";
-import { UserMenu } from "./features/user-menu";
 import { defaultOpenGraphImage } from "./metadata-shared";
 
 const geist = Geist({ variable: "--font-geist", subsets: ["latin", "latin-ext"] });
@@ -67,7 +66,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** One theme: the browser chrome and form controls match the dark page. */
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#0f0f11",
   colorScheme: "dark",
   // Edge to edge on a phone with a notch or a home indicator; the bars pad
   // themselves with env(safe-area-inset-*) so nothing sits under either.
@@ -90,88 +89,64 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {t("skipToContent")}
         </a>
 
-        {/* On a phone this is an app bar: one row, pinned, the wordmark and
-            the two things you reach for from anywhere -- search and what is
-            new. Everything else lives in the tab bar at the bottom. */}
-        <header className="app-bar relative z-20 mx-auto flex w-full page-column flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
-          {/* "/" for everyone now: signed out it is the page that explains what
-              this is, which used to be nowhere. */}
-          <Link href="/" className="brand flex items-center gap-2.5">
-            <LogoMark size={28} />
-            <span className="display text-[22px] leading-none">
-              todox
-            </span>
-          </Link>
-          <span className="mono mt-1 hidden border-l border-line pl-3 text-meta text-faint sm:block">
-            {t("tagline")}
-          </span>
-
-          {user ? (
-            <>
-              {/* One row of tools for both sizes, so the bell is rendered (and
-                  its feed fetched) once. On a phone it is the only one: search,
-                  the report, the brain and the account are tabs at the bottom,
-                  and the language is under Account. From `md` the search box,
-                  the language and the user menu come back here. */}
-              <div className="ml-auto flex items-center gap-2">
-                <div className="hidden w-[210px] transition-[width] duration-200 focus-within:w-[280px] md:block">
+        {user ? (
+          <div className="app-shell">
+            <AppSidebar user={user} t={t} />
+            <div className="app-content">
+              {/* On a phone this is the app bar: the wordmark and the bell,
+                  pinned. Everything else is a tab at the bottom. From `md` the
+                  sidebar carries all of it and this bar is gone. */}
+              <header className="app-bar relative z-20 flex w-full items-center gap-3 px-5 md:hidden">
+                <Link href="/" className="brand flex items-center gap-2.5">
+                  <LogoMark size={26} />
+                  <span className="display text-[20px] leading-none">todox</span>
+                </Link>
+                <div className="ml-auto flex items-center gap-2">
+                  {/* Its own boundary: the feed can only be fetched once the
+                      session is known, so awaiting it here would put a second
+                      sequential query in front of every page. */}
                   <Suspense>
-                    <SearchBox
-                      placeholder={t("searchPlaceholder")}
-                      label={t("searchLabel")}
-                      clearLabel={t("searchClear")}
-                    />
+                    <Notifications userId={user.id} />
                   </Suspense>
                 </div>
-                <div className="hidden md:block">
-                  <LangSwitcher lang={lang} t={t} />
-                </div>
-                {/* Its own boundary: the feed can only be fetched once the
-                    session is known, so awaiting it here would put a second
-                    sequential query in front of every page. */}
-                <Suspense>
-                  <Notifications userId={user.id} />
-                </Suspense>
-              </div>
-
-              {/* The wrapper carries the breakpoint: `.user-menu` sets its own
-                  display, and unlayered CSS outranks a Tailwind utility. */}
-              <div className="hidden shrink-0 md:block">
-                <UserMenu
-                  user={user}
-                  labels={{
-                    navAccount: t("navAccount"),
-                    navReport: t("navReport"),
-                    navBrain: t("navBrain"),
-                    signOut: t("signOut"),
-                    working: t("working"),
-                  }}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="ml-auto flex items-center gap-2">
-              <LangSwitcher lang={lang} t={t} />
-              <Link href="/login" className="pill">
-                {t("signIn")}
-              </Link>
+              </header>
+              <main id="main" className="app-main relative z-10 mx-auto w-full page-column flex-1">
+                {children}
+              </main>
             </div>
-          )}
-        </header>
+          </div>
+        ) : (
+          <>
+            <header className="app-bar relative z-20 mx-auto flex w-full page-column flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
+              <Link href="/" className="brand flex items-center gap-2.5">
+                <LogoMark size={28} />
+                <span className="display text-[22px] leading-none">todox</span>
+              </Link>
+              <span className="mono mt-1 hidden border-l border-line pl-3 text-meta text-faint sm:block">
+                {t("tagline")}
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <LangSwitcher lang={lang} t={t} />
+                <Link href="/login" className="btn btn-quiet">
+                  {t("signIn")}
+                </Link>
+              </div>
+            </header>
+            <main
+              id="main"
+              className="relative z-10 mx-auto w-full page-column flex-1 px-5 pt-2 pb-16"
+            >
+              {children}
+            </main>
+            <SiteFooter t={t} />
+          </>
+        )}
 
-        <main
-          id="main"
-          className="relative z-10 mx-auto w-full page-column flex-1 px-5 pt-2 pb-16"
-        >
-          {children}
-        </main>
-
-        <SiteFooter t={t} />
         {user && (
           <TabBar
             label={t("tabBarLabel")}
             tabs={[
-              { href: "/", label: t("tabProjects"), icon: "home" },
+              { href: "/", label: t("navToday"), icon: "sun" },
               { href: "/search", label: t("tabSearch"), icon: "search" },
               { href: "/report", label: t("tabReport"), icon: "chart" },
               { href: "/me", label: t("tabBrain"), icon: "brain" },

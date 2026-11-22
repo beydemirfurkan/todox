@@ -95,6 +95,12 @@ export const en = {
   breadcrumb: "Breadcrumb",
   navReport: "Report",
   navBrain: "Brain",
+  navToday: "Today",
+  sidebarLabel: "Main menu",
+  sidebarProjects: "Projects",
+  sidebarSearch: "Search",
+  sidebarNoProjects: "A project appears here on its own the first time your agent opens a repository.",
+  sidebarOpenCount: "{n} open tasks",
   metaTitleBrain: "Your brain — todox",
   brainTitle: "Your brain",
   brainLede:

@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 /*
-  todox — a developer tool, dark only (decision on task #811, 2026-11-22:
-  the user asked for one dark, developer-first look; the light theme and
-  the notebook motif are gone).
+  todox — dark only, calm (task #824, 2026-11-22: the "calm list"
+  redesign; the user found the developer-dense look too busy and asked for
+  something that reads like a todo app, still dark).
 
-  Near-black graphite, surfaces one step up with a hairline edge, no
-  shadows anywhere. Type is Geist throughout, with DM Mono for ids, paths,
+  A soft near-black page, surfaces one step up, generous spacing, large
+  radii, no shadows anywhere. Type is Geist throughout, with DM Mono for ids, paths,
   counts and anything a terminal would print. One brand colour: orange.
 
   Two text colours exist for a reason: --ink sits on the page and the
@@ -26,26 +26,28 @@
 :root {
   color-scheme: dark;
 
-  --paper: #09090b;
-  --card: #111114;
-  --inset: #0c0c0f;
+  --paper: #0f0f11;
+  --card: #17171a;
+  --inset: #131316;
+  --raised: #1c1c20;
+  --control: #26262b;
 
-  --ink: #ececef;
+  --ink: #ededef;
   --ink-head: #fafafa;
-  --on-fill: #111111;
-  --line: #24242a;
-  --line-strong: #ececef;
+  --on-fill: #1a0e08;
+  --line: #26262b;
+  --line-strong: #ededef;
   --edge-dark: rgba(0, 0, 0, 0.5);
-  --muted: #a3a3ad;
-  --faint: #85858f;
-  --rule: #1b1b20;
+  --muted: #a1a1aa;
+  --faint: #8a8a93;
+  --rule: #1f1f23;
   --shadow-col: transparent;
   --wash: rgba(255, 255, 255, 0.04);
   --wash-strong: rgba(255, 255, 255, 0.08);
   --scrim: rgba(0, 0, 0, 0.66);
 
-  --accent: #ff7a2e;
-  --accent-ink: #ff9a5c;
+  --accent: #ff7a45;
+  --accent-ink: #ff9a70;
   --danger-ink: #ff9d8a;
   --k-decision: #7db4f5;
   --k-dead_end: #ff8a70;
@@ -61,7 +63,7 @@
   --tone-lilac: #1a1630;
   --tone-sand: #17161a;
 
-  --band: #060607;
+  --band: #0b0b0d;
   --band-ink: #ececef;
   --band-muted: #9a9aa4;
   --band-rule: #1b1b20;
@@ -72,8 +74,8 @@
   --shadow-pop: none;
   --shadow-frame: 0 0 0 1px var(--line);
 
-  --radius-card: 10px;
-  --radius-inner: 7px;
+  --radius-card: 16px;
+  --radius-inner: 12px;
   --radius-pill: 999px;
 }
 
@@ -81,6 +83,8 @@
   --color-paper: var(--paper);
   --color-card: var(--card);
   --color-inset: var(--inset);
+  --color-raised: var(--raised);
+  --color-control: var(--control);
   --color-ink: var(--ink);
   --color-inkHead: var(--ink-head);
   --color-accentInk: var(--accent-ink);
@@ -110,14 +114,14 @@
      for this app, and `text-body` matches what a field renders at.
      12px is the floor: the dashboard once set a hundred and twenty nodes at
      11-13px in the quieter grey, and the page read as texture. */
-  --text-meta: 12px;
-  --text-meta--line-height: 1.4;
-  --text-small: 13.5px;
-  --text-small--line-height: 1.45;
-  --text-body: 15px;
+  --text-meta: 13px;
+  --text-meta--line-height: 1.45;
+  --text-small: 14px;
+  --text-small--line-height: 1.5;
+  --text-body: 16px;
   --text-body--line-height: 1.6;
-  --text-lead: 17px;
-  --text-lead--line-height: 1.4;
+  --text-lead: 18px;
+  --text-lead--line-height: 1.45;
 }
 
 html {
@@ -212,17 +216,9 @@ textarea {
 
 body {
   position: relative;
+  /* A plain page. The scattered-glyph backdrop went with the calm redesign:
+     texture behind the work was part of what read as busy. */
   background-color: var(--paper);
-  /* The desk a developer works at: the glyphs of the trade -- braces, a
-     prompt, a branch, a hash, a schema -- scattered at a slant and drawn so
-     faintly they read as texture, fading out down the page so nothing sits
-     behind the work. The tile is public/backdrop.svg. */
-  background-image:
-    linear-gradient(to bottom, transparent 0, var(--paper) 900px),
-    url("/backdrop.svg");
-  background-size: 100% 100%, 480px 480px;
-  background-repeat: no-repeat, repeat;
-  background-position: 0 0, center -40px;
   color: var(--ink);
   font-family: var(--font-geist), ui-sans-serif, sans-serif;
   font-size: 16px;
@@ -426,6 +422,98 @@ body:has([data-wide-page]) .page-column {
   max-width: 88rem;
 }
 
+/* ------------------------------------------------------------ app shell */
+
+/* Signed in, from `md` up: a sidebar on the left that stays put, the page on
+   the right. The page keeps its reading column inside the space it is given.
+   No marketing footer here -- the sidebar is the way around. */
+.app-shell {
+  display: flex;
+  min-height: 100dvh;
+}
+.app-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+.app-main {
+  padding: 16px 20px 64px;
+}
+.app-sidebar {
+  display: none;
+}
+@media (min-width: 768px) {
+  .app-main {
+    padding: 40px clamp(24px, 4vw, 64px) 80px;
+  }
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    width: 248px;
+    height: 100dvh;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    padding: 24px 14px 20px;
+    border-right: 1px solid var(--rule);
+  }
+}
+.sidebar-projects {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: none;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.sidebar-link:hover {
+  background: #18181b;
+  color: var(--ink);
+}
+.sidebar-link[aria-current="page"] {
+  background: var(--raised);
+  color: var(--ink);
+}
+.sidebar-link[aria-current="page"] > svg {
+  color: var(--accent);
+}
+.sidebar-avatar {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #2a2a30;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.app-sidebar .searchbox {
+  height: 40px;
+  border-radius: 10px;
+  border-width: 1px;
+}
+/* The bell sits at the sidebar's left edge, so its panel opens rightwards. */
+.app-sidebar .user-menu-panel {
+  left: 0;
+  right: auto;
+  transform-origin: top left;
+}
+
 /* The scrollers inside a board: a column of cards, and the panel beside
    them. A full-width system scrollbar in each was four grey bars across one
    screen; thin and the colour of a rule, they read as an edge. */
@@ -529,23 +617,24 @@ body:has([data-wide-page]) .page-column {
 
 /* ------------------------------------------------------------- controls */
 
-/* The action is a graphite capsule: filled, compact, decisive -- a
-   punctuation mark under the sentence it acts on. `.btn-quiet` is the
-   second action beside a first: the same capsule as an outline. */
+/* The action is the orange button: one per screen where it can be helped,
+   dark text on the fill. `.btn-quiet` is the second action beside a first:
+   the same shape, outlined. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  font-weight: 550;
+  font-weight: 600;
   font-size: 14px;
   line-height: 1.4;
-  border: 1.5px solid var(--line-strong);
-  border-radius: var(--radius-pill);
-  padding: 7px 20px;
-  background: var(--line-strong);
-  color: var(--paper);
+  min-height: 40px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 8px 18px;
+  background: var(--accent);
+  color: var(--on-fill);
   box-shadow: var(--shadow-sm);
   transition:
     transform 0.12s ease,
@@ -553,19 +642,21 @@ body:has([data-wide-page]) .page-column {
     background-color 0.12s ease;
 }
 .btn:hover {
-  filter: brightness(1.25);
+  filter: brightness(1.08);
 }
 .btn:active {
   transform: translateY(1px);
 }
 .btn-quiet {
-  background: var(--card);
+  background: transparent;
   color: var(--ink);
-  border-color: var(--line);
+  border-color: #2a2a30;
+  font-weight: 500;
   box-shadow: none;
 }
 .btn-quiet:hover {
-  border-color: var(--line-strong);
+  border-color: #3a3a42;
+  background: var(--raised);
   filter: none;
 }
 
@@ -608,12 +699,14 @@ body:has([data-wide-page]) .page-column {
   justify-content: center;
   font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   font-weight: 500;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1;
-  padding: 6px 14px;
-  border: 1px solid var(--line);
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
   border-radius: var(--radius-pill);
-  background: var(--card);
+  background: transparent;
+  color: var(--muted);
 }
 
 /* `.pill` in a group: filters, periods, languages, the agent picker, the entry
@@ -623,18 +716,29 @@ body:has([data-wide-page]) .page-column {
    look and the announcement cannot drift apart -- a call site that forgets the
    attribute renders as unselected, which is visible rather than silent. */
 .seg {
-  background: var(--inset);
+  background: transparent;
   color: var(--muted);
 }
-/* Selected is ink on the paper turned over: the charcoal pill. Orange is
-   kept for the marker moments, not for every chosen option. */
+.seg:hover {
+  color: var(--ink);
+}
+/* Selected is a raised pill in the group's well, not a colour: orange is
+   kept for the one action on the screen. */
 .seg[aria-current],
 .seg[aria-pressed="true"],
 .peer:checked ~ .seg {
-  background: var(--line-strong);
-  color: var(--paper);
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow-sm);
+  background: var(--control);
+  color: var(--ink);
+  border-color: var(--control);
+}
+/* The well a row of `.seg` pills sits in. */
+.seg-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--card);
 }
 
 .link-more {
@@ -1864,14 +1968,8 @@ pre {
     background: var(--paper);
     border-bottom: 1px solid var(--line);
   }
-  body[data-signed-in] > main {
-    padding-top: 16px;
+  body[data-signed-in] .app-main {
     padding-bottom: calc(var(--tab-bar-h) + var(--safe-bottom) + 28px);
-  }
-  /* The tabs are the way around; the marketing footer under every screen of
-     a signed-in app was a second page of links nobody was looking for. */
-  body[data-signed-in] > .site-footer {
-    display: none;
   }
 
   /* Menus become sheets. Same panels, same markup, same open/close logic;
