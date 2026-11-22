@@ -1,142 +1,80 @@
 @import "tailwindcss";
 
 /*
-  todox — a calm reading room with a scrapbook on the desk.
-  A warm canvas, white cards that float on a soft shadow, graphite ink, and
-  colour only where it means "look here": pastel panels that frame a picture
-  of the product, and one marker, orange, for the phrase that matters.
-  Light by default; a warm dark version follows the system setting
-  (decision on task #809; the blend itself is task #811).
+  todox — a developer tool, dark only (decision on task #811, 2026-11-22:
+  the user asked for one dark, developer-first look; the light theme and
+  the notebook motif are gone).
 
-  Two text colours exist for a reason: --ink sits on the canvas, the cards
-  and the pastel panels; --on-fill sits on the bright marker colours.
+  Near-black graphite, surfaces one step up with a hairline edge, no
+  shadows anywhere. Type is Geist throughout, with DM Mono for ids, paths,
+  counts and anything a terminal would print. One brand colour: orange.
 
-  Two greys exist for a reason too: --muted is for sentences, --faint is for
-  metadata -- timestamps, ids, paths, slugs -- and nothing under 12px. A
-  sentence in --faint is the bug.
+  Two text colours exist for a reason: --ink sits on the page and the
+  surfaces; --on-fill sits on the bright marker and kind colours.
 
-  Orange is two tokens, not one. --accent is the marker itself: a fill under
-  dark text, a highlight, a stroke. Orange *text* uses --accent-ink, which is
-  the same marker pressed harder and clears 4.5:1 on the card.
+  Two greys too: --muted is for sentences, --faint for metadata (an id, a
+  timestamp, a path) and nothing under 12px. A sentence in --faint is the
+  bug.
 
-  The pastels (--tone-*) are surfaces, never text and never a status on
-  their own: a panel behind a framed screenshot, a column's wash, the dot on
-  a chip. Ink on any of them reads at well over 10:1 in both themes.
+  Orange is two tokens: --accent is the fill, the stroke, the focus ring;
+  --accent-ink is orange *text*, lifted so it reads on the surfaces.
+
+  The --tone-* colours are dark tints for a tile or a panel, never text and
+  never a status on their own.
 */
 
 :root {
-  --paper: #f8f4ee;
-  --card: #ffffff;
-  --inset: #f3eee7;
+  color-scheme: dark;
 
-  --ink: #1b1a19;
-  --ink-head: #1b1a19;
-  --on-fill: #171717;
-  /* A card is cut out by a hairline and a soft, layered shadow; controls
-     carry the full graphite stroke, which is what makes them read as
-     buttons. */
-  --line: #e4ddd3;
-  --line-strong: #1b1a19;
-  --edge-dark: rgba(23, 23, 23, 0.85);
-  --muted: #4d4740;
-  --faint: #6b645c;
-  --rule: #ece6dd;
-  --shadow-col: rgba(40, 30, 20, 0.16);
-  /* tints for hover and selected rows, and the veil behind a drawer */
-  --wash: rgba(40, 30, 20, 0.045);
-  --wash-strong: rgba(40, 30, 20, 0.085);
-  --scrim: rgba(27, 26, 25, 0.36);
+  --paper: #09090b;
+  --card: #111114;
+  --inset: #0c0c0f;
 
-  --accent: #ff6f1e;
-  --accent-ink: #b84508;
-  /* an error said in words: the dead-end red pressed hard enough to read */
-  --danger-ink: #b3261e;
+  --ink: #ececef;
+  --ink-head: #fafafa;
+  --on-fill: #111111;
+  --line: #24242a;
+  --line-strong: #ececef;
+  --edge-dark: rgba(0, 0, 0, 0.5);
+  --muted: #a3a3ad;
+  --faint: #85858f;
+  --rule: #1b1b20;
+  --shadow-col: transparent;
+  --wash: rgba(255, 255, 255, 0.04);
+  --wash-strong: rgba(255, 255, 255, 0.08);
+  --scrim: rgba(0, 0, 0, 0.66);
+
+  --accent: #ff7a2e;
+  --accent-ink: #ff9a5c;
+  --danger-ink: #ff9d8a;
   --k-decision: #7db4f5;
   --k-dead_end: #ff8a70;
   --k-question: #ffc94d;
   --k-handoff: #c3a8ff;
-  --k-note: #dcd2c6;
+  --k-note: #a8a29e;
   --ok: #6fcf8a;
 
-  /* Pastel surfaces. Each one is a panel colour, picked so the ink above
-     clears 12:1 on it. */
-  --tone-mint: #cdebd3;
-  --tone-butter: #fbecaa;
-  --tone-sky: #d3e0fa;
-  --tone-apricot: #ffdcc4;
-  --tone-lilac: #e3dafd;
-  --tone-sand: #ece3d6;
+  --tone-mint: #0f2219;
+  --tone-butter: #221d0c;
+  --tone-sky: #0f1a2e;
+  --tone-apricot: #26170d;
+  --tone-lilac: #1a1630;
+  --tone-sand: #17161a;
 
-  /* The graphite band the page ends on, and any section that inverts. */
-  --band: #1b1a19;
-  --band-ink: #f5f1ea;
-  --band-muted: #cfc9c0;
-  --band-rule: #34312e;
+  --band: #060607;
+  --band-ink: #ececef;
+  --band-muted: #9a9aa4;
+  --band-rule: #1b1b20;
 
-  /* Layered, the way paper lifts off a desk: a contact shadow, a near one
-     and a long soft one. Never one hard offset. */
   --shadow: none;
   --shadow-sm: none;
   --shadow-lg: none;
   --shadow-pop: none;
-  /* a screenshot set into a pastel panel */
   --shadow-frame: 0 0 0 1px var(--line);
 
-  --radius-card: 12px;
-  --radius-inner: 8px;
-  /* Notebook paper: the faint blue-grey ruling and the red margin line. */
-  --ruling: #e6e0f0;
-  --margin-line: #f3b2a6;
+  --radius-card: 10px;
+  --radius-inner: 7px;
   --radius-pill: 999px;
-}
-
-/* After dark: warm graphite stock, cream ink, the marker unchanged. The
-   pastels go deep rather than bright, so the ink above them -- which is now
-   cream -- still clears the same ratio. Fills keep dark text in both themes,
-   so the kind colours and --on-fill do not move. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #161412;
-    --card: #211e1b;
-    --inset: #1a1816;
-
-    --ink: #f5f1ea;
-    --ink-head: #fbf8f3;
-    --line: #3a3530;
-    --line-strong: #efe9e0;
-    --edge-dark: rgba(0, 0, 0, 0.5);
-    --muted: #cfc8be;
-    --faint: #a9a197;
-    --rule: #2c2824;
-    --shadow-col: rgba(0, 0, 0, 0.5);
-    --wash: rgba(245, 241, 234, 0.05);
-    --wash-strong: rgba(245, 241, 234, 0.09);
-    --scrim: rgba(6, 5, 4, 0.62);
-
-    --accent: #ff7a2e;
-    --accent-ink: #ff9a5c;
-    --danger-ink: #ff9d8a;
-
-    --tone-mint: #1f3a29;
-    --tone-butter: #3b3417;
-    --tone-sky: #1e2b45;
-    --tone-apricot: #422a1b;
-    --tone-lilac: #2d2547;
-    --tone-sand: #2e2924;
-
-    --ruling: #2a2733;
-    --margin-line: #5a2f29;
-    --band: #0e0d0c;
-    --band-ink: #f5f1ea;
-    --band-muted: #bdb6ac;
-    --band-rule: #2a2724;
-
-    --shadow: none;
-    --shadow-sm: none;
-    --shadow-lg: none;
-    --shadow-pop: none;
-    --shadow-frame: 0 0 0 1px var(--line);
-  }
 }
 
 @theme inline {
@@ -161,7 +99,7 @@
   --color-apricot: var(--tone-apricot);
   --color-lilac: var(--tone-lilac);
   --color-sand: var(--tone-sand);
-  --font-display: var(--font-fraunces);
+  --font-display: var(--font-geist);
   --font-sans: var(--font-geist);
   --font-mono: var(--font-dm-mono);
 
@@ -183,7 +121,7 @@
 }
 
 html {
-  color-scheme: light dark;
+  color-scheme: dark;
   /* Firefox scrollbars, which ignore ::-webkit-scrollbar entirely */
   scrollbar-color: var(--rule) var(--paper);
   scrollbar-width: thin;
@@ -275,16 +213,14 @@ textarea {
 body {
   position: relative;
   background-color: var(--paper);
-  /* faint grain over a pencil dot grid, both as plain background layers --
-     a fixed blend-mode overlay here caused repaint tearing while scrolling.
-     The dot is --rule pulled halfway back to the paper, not --rule itself:
-     at full strength it competed with 12px metadata in the gutters. */
+  /* A faint engineering grid, fading out down the page: texture for the
+     first screen, nothing behind the work further down. */
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"),
-    radial-gradient(color-mix(in oklab, var(--rule) 55%, var(--paper)) 1.2px, transparent 1.2px);
-  background-size:
-    160px 160px,
-    22px 22px;
+    linear-gradient(to bottom, transparent 0, var(--paper) 720px),
+    linear-gradient(to right, var(--rule) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
+  background-repeat: no-repeat, repeat, repeat;
   color: var(--ink);
   font-family: var(--font-geist), ui-sans-serif, sans-serif;
   font-size: 16px;
@@ -297,16 +233,12 @@ body {
   max-width: 68ch;
 }
 
-/* Fraunces, soft and set a little tight: the literary voice for headlines.
-   Controls, labels and body copy are Geist -- the serif is for what a page
-   says, never for what a person clicks. Never capitalised by CSS: the
-   lowercase is written into the copy, so a name or an acronym keeps its own
-   case. */
+/* Headlines are Geist, heavy and tight: a tool's voice, not a book's. The
+   lowercase is written into the copy, never forced here. */
 .display {
-  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
-  font-weight: 560;
-  font-variation-settings: "SOFT" 100, "WONK" 0;
-  letter-spacing: -0.015em;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 620;
+  letter-spacing: -0.035em;
 }
 h1.display,
 h2.display,
@@ -384,20 +316,18 @@ summary:focus-visible,
    colour pressed hard enough to read (--accent-ink), a degree or two off
    the line. For labels and asides, never for something a person must act on. */
 .scrawl {
-  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   font-style: italic;
   font-weight: 450;
-  font-variation-settings: "SOFT" 100, "WONK" 1;
   color: var(--accent-ink);
   transform: rotate(-2deg);
   transform-origin: left center;
 }
 /* The same hand, in ink: what is written *on* a label rather than about it. */
 .scrawl-ink {
-  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   font-style: italic;
   font-weight: 500;
-  font-variation-settings: "SOFT" 100, "WONK" 1;
   color: var(--ink);
 }
 
@@ -405,13 +335,6 @@ summary:focus-visible,
    it. The stroke is a background image so it wraps with the line. */
 .marker {
   color: var(--accent-ink);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 12' preserveAspectRatio='none'%3E%3Cpath d='M2 8.5C40 4 80 3.5 120 5.5s58 3 76-1' fill='none' stroke='%23ff6f1e' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-size: 100% 0.2em;
-  background-position: 0 96%;
-  padding-bottom: 0.06em;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
 }
 
 /* The name label stuck on a notebook's cover. */
@@ -508,21 +431,11 @@ summary:focus-visible,
 
 /* ------------------------------------------------------------- stickers */
 
-/* The card is a page from a ring-bound notebook: flat paper, a hairline
-   edge, a row of punched holes along the top and the red margin line down
-   its left. No ruling -- lines under text that does not sit on them read as
-   noise -- and no shadow: paper lies on the desk, it does not float.
-   `.paper` is the same sheet for a card that is not a `.sticker` (the
-   board's task cards). */
+/* A surface: one step up from the page, a hairline edge, no shadow.
+   `.paper` is the same surface for a card that is not a `.sticker`. */
 .sticker,
 .paper {
   background-color: var(--card);
-  background-image:
-    radial-gradient(circle at 50% 50%, var(--paper) 0 3.4px, var(--line) 3.5px 4.4px, transparent 4.6px),
-    linear-gradient(to right, transparent 7px, var(--margin-line) 7px, var(--margin-line) 8px, transparent 8px);
-  background-size: 22px 22px, auto;
-  background-repeat: repeat-x, no-repeat;
-  background-position: 14px -2px, 0 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
 }
@@ -753,10 +666,9 @@ body:has([data-wide-page]) .page-column {
   cursor: pointer;
   user-select: none;
   text-decoration: underline;
-  text-decoration-style: wavy;
-  text-decoration-color: var(--accent);
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1.5px;
+  text-decoration-color: color-mix(in srgb, var(--muted) 45%, transparent);
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
 }
 .link-more:hover {
   color: var(--ink);
@@ -816,7 +728,7 @@ summary {
   border-radius: 999px;
   background: var(--inset);
   color: var(--muted);
-  font-family: var(--font-fraunces), cursive;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   font-size: 20px;
   font-weight: 700;
   line-height: 1;
@@ -909,7 +821,7 @@ textarea {
    It used to carry `!min-h-0 !text-[20px] !leading-snug !font-bold` -- four
    overrides standing in for one missing variant. */
 .textarea-title {
-  font-family: var(--font-fraunces), cursive;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
@@ -1691,7 +1603,7 @@ pre {
   margin-top: 1.5em;
   margin-bottom: 0.55em;
   color: var(--ink);
-  font-family: var(--font-fraunces), cursive;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   font-weight: 700;
   line-height: 1.25;
 }

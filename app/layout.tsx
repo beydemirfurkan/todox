@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { DM_Mono, Fraunces, Geist } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { DM_Mono, Geist } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
 import "./globals.css";
@@ -15,14 +15,6 @@ import { TzProbe } from "./features/tz-probe";
 import { UserMenu } from "./features/user-menu";
 import { defaultOpenGraphImage } from "./metadata-shared";
 
-// Fraunces is variable: the SOFT and WONK axes are what make it the rounded,
-// hand-cut display face rather than a book serif, so they are loaded too.
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin", "latin-ext"],
-  axes: ["SOFT", "WONK", "opsz"],
-  style: ["normal", "italic"],
-});
 const geist = Geist({ variable: "--font-geist", subsets: ["latin", "latin-ext"] });
 const dmMono = DM_Mono({
   variable: "--font-dm-mono",
@@ -72,6 +64,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/** One theme: the browser chrome and form controls match the dark page. */
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+  colorScheme: "dark",
+};
+
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { lang, t } = await getT();
   const user = await currentUser();
@@ -79,7 +77,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang={lang}
-      className={`${fraunces.variable} ${geist.variable} ${dmMono.variable} h-full antialiased`}
+      className={`${geist.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <TzProbe />
@@ -93,11 +91,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               this is, which used to be nowhere. */}
           <Link href="/" className="brand flex items-center gap-2.5">
             <Blob mood="happy" size={36} className="bob" />
-            <span className="display text-[26px] leading-none font-bold tracking-tight">
+            <span className="display text-[22px] leading-none">
               todox
             </span>
           </Link>
-          <span className="display mt-1 hidden -rotate-2 text-[14px] text-muted sm:block">
+          <span className="mono mt-1 hidden border-l border-line pl-3 text-meta text-faint sm:block">
             {t("tagline")}
           </span>
 

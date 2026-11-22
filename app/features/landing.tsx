@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import type { T } from "@/lib/i18n";
-import { Blob, Chip, SparkleSticker } from "../components";
+import { Blob } from "../components";
 import { KIND_COLOR, kindLabel } from "../kinds";
 import { BriefingPreview } from "./briefing-preview";
 import { Explainer, VsNative } from "./explainer";
@@ -37,11 +37,11 @@ export function Landing({ t }: { t: T }) {
 function Hero({ t }: { t: T }) {
   return (
     <section className="pop flex flex-col items-center gap-6 pt-8 text-center sm:pt-14">
-      <p className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-small text-muted shadow-[var(--shadow-sm)]">
+      <p className="mono inline-flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-meta text-muted">
         <span aria-hidden="true" className="size-2 rounded-full bg-[var(--accent)]" />
         {t("landingScrawl")}
       </p>
-      <h1 className="display max-w-[15ch] text-[clamp(42px,7.4vw,92px)] leading-[1.02]">
+      <h1 className="display max-w-[16ch] text-[clamp(40px,7vw,84px)] leading-[1.02]">
         <Headline t={t} />
       </h1>
       <p className="max-w-[52ch] text-[17px] leading-relaxed text-muted">{t("landingLede")}</p>
@@ -69,57 +69,45 @@ function Hero({ t }: { t: T }) {
 function Stage({ t }: { t: T }) {
   return (
     <figure className="pop relative" style={{ animationDelay: "120ms" }}>
-      <div className="tone-panel tone-sand dot-grid relative overflow-hidden !px-4 !pt-10 !pb-0 sm:!px-16 sm:!pt-16">
-        <div aria-hidden="true" className="scrap tone-panel tone-mint absolute -top-6 -left-10 h-48 w-72 -rotate-6" />
-        <div aria-hidden="true" className="scrap tone-panel tone-butter absolute -right-12 bottom-24 h-56 w-64 rotate-[8deg]" />
-        <div aria-hidden="true" className="scrap tone-panel tone-lilac absolute top-10 right-24 hidden h-24 w-40 rotate-[-4deg] md:block" />
-
-        <div className="frame relative mx-auto max-w-[860px] !rounded-b-none">
-          <Image
-            src="/screenshots/board.jpg"
-            alt={t("landingShotAlt")}
-            width={1920}
-            height={885}
-            sizes="(max-width: 1024px) 100vw, 860px"
-            priority
-            className="h-auto w-full"
-          />
+      {/* A window, the way a developer meets every tool: a title bar with
+          the address in it, and the product inside. */}
+      <div className="overflow-hidden rounded-[12px] border border-line bg-card">
+        <div className="flex items-center gap-1.5 border-b border-line px-4 py-3" aria-hidden="true">
+          <span className="size-2.5 rounded-full bg-[var(--line)]" />
+          <span className="size-2.5 rounded-full bg-[var(--line)]" />
+          <span className="size-2.5 rounded-full bg-[var(--line)]" />
+          <span className="mono mx-auto rounded-[6px] bg-inset px-3 py-1 text-meta text-faint">todox.dev/p/todox</span>
         </div>
+        <Image
+          src="/screenshots/board.jpg"
+          alt={t("landingShotAlt")}
+          width={1920}
+          height={780}
+          sizes="(max-width: 1100px) 100vw, 1100px"
+          priority
+          className="h-auto w-full"
+        />
       </div>
 
-      <PinnedNote kind="dead_end" text={t("landingSampleDeadEnd")} t={t} className="top-[18%] -left-4 -rotate-3 lg:-left-10" />
-      <PinnedNote kind="handoff" text={t("landingSampleHandoff")} t={t} className="top-[46%] -right-4 rotate-2 lg:-right-10" />
-      <PinnedNote kind="question" text={t("landingSampleQuestion")} t={t} className="bottom-[14%] left-[6%] rotate-1" />
-      <SparkleSticker size={44} tilt={8} className="absolute top-4 right-8 hidden sm:block" />
+      <div className="pointer-events-none absolute right-4 bottom-16 hidden w-[300px] flex-col gap-2 md:flex lg:-right-6" aria-hidden="true">
+        <Toast kind="dead_end" text={t("landingSampleDeadEnd")} t={t} />
+        <Toast kind="handoff" text={t("landingSampleHandoff")} t={t} />
+      </div>
 
-      <figcaption className="mt-4 text-center text-small text-muted">{t("landingShotCaption")}</figcaption>
+      <figcaption className="mt-5 text-center text-small text-muted">{t("landingShotCaption")}</figcaption>
     </figure>
   );
 }
 
-const NOTE_TONE = { dead_end: "tone-apricot", handoff: "tone-lilac", question: "tone-butter" } as const;
-
-/** A sticky note taped to the desk: a pastel square, a strip of tape across
- *  its top, the kind in a chip and one line in the reader's language. */
-function PinnedNote({
-  kind,
-  text,
-  t,
-  className,
-}: {
-  kind: keyof typeof NOTE_TONE;
-  text: string;
-  t: T;
-  className: string;
-}) {
+/** What an agent just wrote, the way the app would announce it. */
+function Toast({ kind, text, t }: { kind: "dead_end" | "handoff"; text: string; t: T }) {
   return (
-    <div
-      aria-hidden="true"
-      className={`tone-panel ${NOTE_TONE[kind]} absolute z-10 hidden w-[220px] flex-col items-start gap-2 !rounded-[4px] !p-4 !pt-5 md:flex ${className}`}
-    >
-      <span className="tape" />
-      <Chip color={KIND_COLOR[kind]}>{kindLabel(t, kind)}</Chip>
-      <p className="text-[14px] leading-snug text-ink">{text}</p>
+    <div className="flex items-start gap-3 rounded-[10px] border border-line bg-card p-3">
+      <span className="mt-1.5 size-2 shrink-0 rounded-full" style={{ background: KIND_COLOR[kind] }} />
+      <div className="min-w-0">
+        <p className="mono text-meta text-faint">log_entry · {kindLabel(t, kind)}</p>
+        <p className="mt-0.5 text-[13.5px] leading-snug text-ink">{text}</p>
+      </div>
     </div>
   );
 }
@@ -127,7 +115,7 @@ function PinnedNote({
 /** One more invitation, said once, with the agent mascot beside it. */
 function Closing({ t }: { t: T }) {
   return (
-    <section className="tone-panel tone-apricot pop flex flex-col items-center gap-5 !px-6 !py-14 text-center">
+    <section className="sticker pop flex flex-col items-center gap-5 px-6 py-14 text-center">
       <Blob mood="happy" size={64} className="bob" />
       <h2 className="display max-w-[20ch] text-[clamp(28px,4vw,40px)] leading-[1.1]">{t("landingConnectTitle")}</h2>
       <p className="max-w-[52ch] text-[15.5px] leading-relaxed text-muted">{t("landingConnectBody")}</p>

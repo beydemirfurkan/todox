@@ -219,7 +219,7 @@ function Card({
         href={`/p/${slug}/t/${task.id}`}
         panelHref={boardHref(slug, { task: task.id, view: "task" })}
         isCurrent={isSelected}
-        className="board-card paper flex flex-col gap-2 pt-6 pr-3.5 pb-3.5 pl-5 aria-[current]:border-accent aria-[current]:shadow-[0_0_0_1.5px_var(--accent)]"
+        className="board-card paper flex flex-col gap-2 p-3.5 aria-[current]:border-accent aria-[current]:shadow-[0_0_0_1.5px_var(--accent)]"
       >
         <span className="mono pr-8 text-meta text-faint">#{task.id}</span>
         <span className="line-clamp-2 text-[15px] leading-snug font-medium break-words">
@@ -256,7 +256,7 @@ const MENU_STATUSES: Status[] = ["todo", "doing", "blocked", "done", "dropped"];
  */
 function StatusMenu({ taskId, current, t }: { taskId: number; current: Status; t: T }) {
   return (
-    <details className="status-menu absolute top-4 right-2">
+    <details className="status-menu absolute top-2 right-2">
       <summary
         aria-label={t("boardMoveMenu", { id: taskId })}
         title={t("boardMoveMenu", { id: taskId })}
