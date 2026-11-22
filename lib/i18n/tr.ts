@@ -96,14 +96,14 @@ export const tr: Record<Key, string> = {
   metaTitleBrain: "Beynin — todox",
   brainTitle: "Beynin",
   brainLede:
-    "Her ajanın, hangi projede ve hangi modelle olursa olsun, işe başlamadan önce senin hakkında okuduğu şey: kim olduğun, neyle çalıştığın, nasıl çalıştığın ve her yerde geçerli kuralların. Ajanlar öğrendikçe buraya yazar; sen düzeltirsin.",
+    "Her agent'ın, hangi projede ve hangi modelle olursa olsun, işe başlamadan önce senin hakkında okuduğu şey: kim olduğun, neyle çalıştığın, nasıl çalıştığın ve her yerde geçerli kuralların. Agent'lar öğrendikçe buraya yazar; sen düzeltirsin.",
   brainProfile: "Kimsin",
   brainProfileHint: "Rolün, konuşup yazdığın diller, neye doğru çalıştığın.",
   brainStack: "Neyle çalışıyorsun",
   brainStackHint: "Diller, framework'ler, araçlar ve ilk elini attığın şeyler.",
   brainWorkflow: "Nasıl çalışıyorsun",
   brainWorkflowHint: "Değişikliklerin nasıl yapılmasını, gözden geçirilmesini, anlatılmasını ve yayına alınmasını sevdiğin.",
-  brainSectionEmpty: "Henüz bir şey yok. Buraya kendin yaz ya da bir ajan öğrendiğinde ekler.",
+  brainSectionEmpty: "Henüz bir şey yok. Buraya kendin yaz ya da bir agent öğrendiğinde ekler.",
   brainAdd: "Ekle",
   brainRules: "Her projede geçerli kurallar",
   brainRulesSub: "Nerede çalışırsan çalış geçerli olan kurallar, tuzaklar ve tercihler.",
@@ -113,11 +113,11 @@ export const tr: Record<Key, string> = {
   brainMapEmpty: "Son {n} günde açık işi ya da yazılmış bir şeyi olan proje yok.",
   brainMapRow:
     "{entries} kayıt · {open} açık · {decisions} karar · {deadEnds} çıkmaz · {questions} soru",
-  brainAgentView: "Ajanın okuduğu",
+  brainAgentView: "Agent'ın okuduğu",
   brainAgentViewSub:
     "get_developer proje gerekmeden tam olarak bunu döndürür. Her get_context brifingi yukarıdaki üç bölümle açılır.",
   brainCardTitle: "Beynin",
-  brainCardBody: "Her ajanın, her projede senin hakkında ilk okuduğu şey.",
+  brainCardBody: "Her agent'ın, her projede senin hakkında ilk okuduğu şey.",
   brainOpen: "Aç",
   brainYou: "sen",
   brainNotesCount: "senin hakkında not",
@@ -210,10 +210,10 @@ export const tr: Record<Key, string> = {
   inviteEmailMismatch: "Bu davetin gönderildiği e-posta adresiyle giriş yap.",
   inviteInvalidTitle: "Bu davet artık kullanılamıyor",
   inviteInvalidBody: "Süresi dolmuş, iptal edilmiş veya daha önce kabul edilmiş olabilir.",
-  habitTitle: "Ajanının edinmesi gereken alışkanlık",
+  habitTitle: "Agent'ının edinmesi gereken alışkanlık",
   habitIntro:
-    "Token araçları ajanına tanıtır; onları kullanmasını sağlayan bu dört satırdır. Satırları ajanının kullanıcı düzeyindeki hafıza dosyasına yapıştır: bir reponun içindekine değil, her projede okuduğu dosyaya. pnpm install:mcp bunu senin yerine yapmayı önerir.",
-  habitWhere: "Her ajanın okuduğu dosya:",
+    "Token araçları agent'ına tanıtır; onları kullanmasını sağlayan bu dört satırdır. Satırları agent'ının kullanıcı düzeyindeki hafıza dosyasına yapıştır: bir reponun içindekine değil, her projede okuduğu dosyaya. pnpm install:mcp bunu senin yerine yapmayı önerir.",
+  habitWhere: "Her agent'ın okuduğu dosya:",
   apiTokensIntro:
     "Agent bunlardan biriyle giriş yapar. Bir tane oluştur; hangi agent'ı kullanıyorsan ona olduğu gibi yapıştırabileceğin bir kurulum metni çıkar. Agent yalnızca senin hesabına erişir.",
   tokenName: "ne için",
@@ -342,7 +342,7 @@ export const tr: Record<Key, string> = {
   laneMore: "+{n} tane daha",
   waitingTitle: "Seni bekleyenler",
   waitingBody:
-    "Ajanın tek başına ilerletemedikleri: yanıtlanmamış bir soru, takılmış bir görev, yapılıyor durumunda bırakılıp üstüne bir şey yazılmamış iş.",
+    "Agent'ın tek başına ilerletemedikleri: yanıtlanmamış bir soru, takılmış bir görev, yapılıyor durumunda bırakılıp üstüne bir şey yazılmamış iş.",
   waitingMore: "ve {n} tane daha, kendi projelerinde.",
   projectNamePh: "ad",
   projectPathPh: "/repo/için/mutlak/yol (isteğe bağlı)",
@@ -518,8 +518,8 @@ export const tr: Record<Key, string> = {
   updated: "güncellendi",
   linkedAt: "bağlandı",
   by: "yazan",
-  byAgentOf: "yazan ajan ({who})",
-  byAgent: "yazan bir ajan",
+  byAgentOf: "yazan agent ({who})",
+  byAgent: "yazan bir agent",
 
   searchTitle: "Arama",
   searchIntro:
@@ -587,7 +587,7 @@ export const tr: Record<Key, string> = {
   profNotes: "Nasıl çalışıyor",
   profFooter: "todox ile tutuluyor",
   privacyStore6:
-    "Kodunun nerede durduğu, ajanının bildirdiği kadarıyla: her makinedeki her checkout'un mutlak yolu, içindeki kimlik bilgileri temizlenmiş haliyle reponun uzak adresi ve bağladığın dosyaların yolları ile içerik hash'leri. Yerel MCP sürecini kullanıyorsan ayrıca her oturumun dalı, commit başlıkları ve değişen dosya sayısı. Bir dosyanın içeriği asla.",
+    "Kodunun nerede durduğu, agent'ının bildirdiği kadarıyla: her makinedeki her checkout'un mutlak yolu, içindeki kimlik bilgileri temizlenmiş haliyle reponun uzak adresi ve bağladığın dosyaların yolları ile içerik hash'leri. Yerel MCP sürecini kullanıyorsan ayrıca her oturumun dalı, commit başlıkları ve değişen dosya sayısı. Bir dosyanın içeriği asla.",
   privacyStore5:
     "Açık profil, yalnızca sen açarsan: görünen adın, kullanıcı adın, hakkında yazın, gün gün yazdıklarının sayısı ve işaretlediğin projeler ile notlar. Varsayılan olarak kapalıdır ve arama motorlarından dizine eklememelerini ister.",
   periodAll: "Tüm zamanlar",
