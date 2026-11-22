@@ -26,7 +26,9 @@ export function SearchBox({
         el instanceof HTMLTextAreaElement ||
         (el as HTMLElement | null)?.isContentEditable;
 
-      const isCommandK = e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey);
+      // Chrome's autofill sends keydown events with no `key` at all.
+      const key = typeof e.key === "string" ? e.key : "";
+      const isCommandK = key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey);
       if (isCommandK || (e.key === "/" && !typing)) {
         e.preventDefault();
         ref.current?.focus();
