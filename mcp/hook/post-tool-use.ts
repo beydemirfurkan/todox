@@ -1,6 +1,6 @@
-import { resolve } from "node:path";
+import { posix } from "node:path";
 
-import { isInside } from "../../lib/util/paths";
+import { isAbsolutePath, isInside, normalisePath } from "../../lib/util/paths";
 import { appendEvent } from "./state";
 import type { HookContext, HookInput, HookOutput } from "./types";
 
@@ -48,8 +48,18 @@ export async function postToolUse(ctx: HookContext): Promise<HookOutput> {
 function editsWorkingTree(input: HookInput): boolean {
   const cwd = input.cwd;
   if (!cwd) return false;
-  return editedPaths(input).some((path) => isInside(resolve(cwd, path), cwd));
+  return editedPaths(input).some((path) => isInside(againstCwd(path, cwd), cwd));
 }
+
+/**
+ * A patch header's path is relative to the session's directory; a tool's
+ * `file_path` is absolute. Joined as text, not with `path.resolve`, which on
+ * Windows turns `/repo/a.ts` into `C:\\repo\\a.ts` and puts every edit outside
+ * a `/repo` checkout. `posix.normalize` on the slashed form folds `..`, so a
+ * patch to `../other/a.ts` is not counted as inside.
+ */
+const againstCwd = (path: string, cwd: string): string =>
+  posix.normalize(normalisePath(isAbsolutePath(path) ? path : `${cwd}/${path}`));
 
 export function editedPaths(input: HookInput): string[] {
   const given = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
