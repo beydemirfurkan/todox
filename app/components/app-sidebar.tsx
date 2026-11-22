@@ -47,7 +47,7 @@ export function AppSidebar({ user, t }: { user: PublicUser; t: T }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5">
-        <h2 className="px-3 pb-2 text-meta font-semibold tracking-[0.04em] text-faint uppercase">
+        <h2 className="px-3 pb-2 text-small font-medium text-faint">
           {t("sidebarProjects")}
         </h2>
         <Suspense fallback={null}>

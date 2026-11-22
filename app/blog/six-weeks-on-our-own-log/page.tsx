@@ -273,13 +273,13 @@ export default function SixWeeksOnOurOwnLog() {
       </ol>
 
       <div className="sticker mt-8 p-4">
-        <p className="mono mb-2 text-[12px] tracking-[.08em] text-faint uppercase">
+        <p className="mono mb-2 text-[12px] text-faint">
           What changed this week
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-[14px]">
             <thead>
-              <tr className="mono text-left text-meta tracking-[.06em] text-faint uppercase">
+              <tr className="mono text-left text-meta text-faint">
                 <th className="py-1.5 pr-3 font-medium">Finding</th>
                 <th className="py-1.5 pr-3 font-medium">Change</th>
                 <th className="py-1.5 font-medium">Measured</th>

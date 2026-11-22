@@ -37,7 +37,6 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
 
   return (
     <AuthShell
-      fill="var(--k-handoff)"
       title={t("registerTitle")}
       intro={t("registerIntro")}
       footer={

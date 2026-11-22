@@ -1526,23 +1526,36 @@ pre {
    of the dark stock, with a soft drop and the same accent focus ring the
    search box uses. The menu panel is the same idea on a heavier blur, with
    the same animation language as the rest of the pop-in elements. */
-/* The language popup is the account menu with a flag in the trigger. The name
-   stays beside it: a flag is a country, and English is not one country's --
-   alone it would be a guess. Below 400px the trigger keeps just the flag and
-   the panel still says both. */
-.lang-menu .user-menu-trigger {
-  gap: 6px;
-  padding-inline: 10px;
-}
-.lang-menu .user-menu-item {
-  display: flex;
+/* The language switcher: a quiet button like the sidebar's rows, not a
+   bordered pill. The panel is the shared menu, with a tick on the current
+   language as well as aria-checked. */
+.lang-menu-trigger {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
-@media (max-width: 400px) {
-  .lang-menu-name {
-    display: none;
-  }
+.lang-menu-trigger:hover,
+.lang-menu-trigger[aria-expanded="true"] {
+  background: var(--card);
+  color: var(--ink);
+}
+.lang-menu-panel {
+  min-width: 168px;
+}
+.lang-menu-item {
+  gap: 10px;
 }
 
 /* The in-form dropdown. It is the navbar menu at control size: same trigger,
@@ -1889,11 +1902,8 @@ pre {
 .account-token-table thead th {
   color: var(--faint);
   background: var(--wash);
-  font-family: var(--font-dm-mono), ui-monospace, monospace;
-  font-size: 10px;
+  font-size: var(--text-meta);
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 .account-token-table tbody tr:last-child > * {
   border-bottom: 0;
@@ -2554,9 +2564,11 @@ pre {
   transform-origin: center;
   animation: mascot-blink 5s ease-in-out 1.2s infinite;
 }
+/* Turned about the shoulder, in the drawing's own units: a box-relative
+   origin swung the arm off the body. */
 .mascot .mascot-arm {
-  transform-box: fill-box;
-  transform-origin: left center;
+  transform-box: view-box;
+  transform-origin: 97px 44px;
   animation: mascot-wave 0.9s ease-in-out 0.3s 2;
 }
 @keyframes mascot-blink {

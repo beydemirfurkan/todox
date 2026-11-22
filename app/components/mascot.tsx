@@ -33,16 +33,9 @@ export function Mascot({
       <path d="M86 26V8h10v18l-5-4z" fill="#ffd84d" />
       <rect x="20" y="20" width="80" height="80" rx="24" fill="var(--accent)" />
       <rect x="12" y="60" width="14" height="10" rx="5" fill="var(--accent)" transform="rotate(-20 19 65)" />
-      <rect
-        x="0"
-        y="-5"
-        width="14"
-        height="10"
-        rx="5"
-        fill="var(--accent)"
-        transform="translate(97 44) rotate(-50)"
-        className="mascot-arm"
-      />
+      <g className="mascot-arm">
+        <rect x="0" y="-5" width="14" height="10" rx="5" fill="var(--accent)" transform="translate(97 44) rotate(-50)" />
+      </g>
       <circle cx="36" cy="72" r="5" fill="#ff4d6d" opacity=".35" />
       <circle cx="86" cy="72" r="5" fill="#ff4d6d" opacity=".35" />
       {mood === "happy" ? <HappyFace /> : <PuzzledFace />}

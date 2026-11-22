@@ -26,7 +26,7 @@ export default async function VerifyPage({ searchParams }: PageProps<"/verify">)
 
   if (state === "ok")
     return (
-      <AuthShell fill="var(--ok)" title={t("verifyTitle")}>
+      <AuthShell title={t("verifyTitle")}>
         <p className="text-[15px]">{t("verifyOk")}</p>
         <Link href="/" className="btn mt-4 inline-block">
           {t("continueToApp")}
@@ -38,7 +38,7 @@ export default async function VerifyPage({ searchParams }: PageProps<"/verify">)
     const user = await currentUser();
     return (
       <AuthShell
-        fill="var(--k-dead_end)"
+        mood="puzzled"
         title={t("verifyFailedTitle")}
         intro={t("verifyFailed")}
       >

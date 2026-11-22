@@ -81,7 +81,7 @@ export function ProjectMenu({
         data-state={isOpen ? "open" : "closed"}
       >
         <form action={saveDetails} className="flex flex-col gap-3 p-2">
-          <p className="text-meta font-semibold tracking-[0.04em] text-faint uppercase">
+          <p className="text-small font-medium text-faint">
             {labels.details}
           </p>
           <input type="hidden" name="id" value={project.id} />
