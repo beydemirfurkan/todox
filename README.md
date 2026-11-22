@@ -3,146 +3,120 @@
 # todox
 
 **Working memory for developers and their agents.**
-Not a checklist — a log your next session can actually resume from.
+Not a checklist. A log the next session can pick up from.
 
 [![ci](https://github.com/beydemirfurkan/todox/actions/workflows/ci.yml/badge.svg)](https://github.com/beydemirfurkan/todox/actions/workflows/ci.yml)
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-ffd84d)](LICENSE)
 [![live](https://img.shields.io/badge/live-todox.dev-6cb7f5)](https://www.todox.dev)
 
-An issue tracker is written human-to-human. todox is written agent-to-agent,
-with a human reading over its shoulder. Every task carries the decisions behind
-it, the approaches that failed, the questions still open, and the note the last
-session left behind.
+Agents forget everything between sessions. todox gives them a shared log:
+what was decided, what failed, what is still open, and where the last
+session stopped.
 
-A fresh agent calls `get_context`, reads that, and starts where the last one
-stopped — without walking into a wall somebody already hit. The briefing is
-capped rather than unbounded, in rows *and* in bytes, and it reports what the
-caps left out instead of trimming in silence. Nothing is ever cut mid-sentence:
-every record comes back named and dated with its first line, and a `body` of
-null means the budget was spent, not that the record is empty.
+A new session calls `get_context` and starts where the last one left off,
+without repeating a mistake somebody already made.
 
 <p align="center">
   <img src="public/screenshots/task-log.jpg" width="720" alt="A task in todox: its status as a row of choices, where the last session left off, then the log of a decision, a dead end and a handoff, with the task's details beside it">
 </p>
 
-## how it works
+## How it works
 
 <img src="docs/how-it-works.svg" width="880" alt="The agent on your machine talks MCP to todox: it reads a briefing with get_context, writes tasks and log entries while it works, and sends the sha256 of the files it links, because the server has no copy of your code. You read the same log in the browser.">
 
-Your agent does the writing; you read over its shoulder. One log per
-repository, whichever machine or agent touched it last:
+Your agent writes. You read. There is one log per repository, whichever
+machine or agent touched it last.
 
 | Today | One project |
 | --- | --- |
 | <img src="public/screenshots/dashboard.jpg" width="420" alt="Today: a quick-add field, then everything in progress across every project with the last note under each, then what is up next, important first"> | <img src="public/screenshots/project.jpg" width="420" alt="A project: its tasks as a list grouped into in progress and up next, a switch to a board, and the project menu behind the three dots"> |
 
-## what goes in a log
+## What goes in a log
 
 | kind | what it means |
 | --- | --- |
-| `decision` | what you chose, and why the alternatives lost |
-| `dead_end` | an approach that did **not** work — the highest-value entry, because it stops the repeat |
+| `decision` | what you chose, and why |
+| `dead_end` | what did **not** work, so nobody tries it again |
 | `question` | something only a human can answer |
-| `handoff` | end-of-session state, written for a stranger |
+| `handoff` | where the session stopped, written for a stranger |
 | `note` | everything else |
 
-Three things fall out of treating the log as the product:
+What you get from that:
 
-- **Stale context is flagged, and never faked.** Linked files are hashed by the
-  side that can see them — the agent — and the server stores the hashes and
-  compares. If the code moves on, `get_context` says the note may be lying.
-  Until an agent has actually looked, the note is marked as never checked
-  rather than claimed to be fresh: context that lies is worse than none, and
-  that includes lying about how sure we are.
-- **Reports come from the log, not from commits.** Every status change is an
-  event, so *what did I finish today, how long did it take, which model did it*
-  is a query rather than archaeology. A task set `doing` and walked away from
-  counts as the morning it was set, not the weeks since — and the report
-  says how much it left out, rather than folding it into the headline.
-- **A file can be asked what is known about it.** The same links that carry the
-  hashes are readable from the other end: `get_file_context` takes a path and
-  answers with the tasks that touched it, their dead ends, and any standing
-  note attached to it. Paths are folded to their repo-relative form, so a link
-  made on one machine is found from another.
+- **Stale notes are flagged.** The agent hashes the files a task links. When
+  the code changes, the briefing says the note may be out of date.
+- **Reports come from the log.** What got done today, how long it took, and
+  which model did it.
+- **Files have a history.** `get_file_context` lists the tasks and dead ends
+  that touched a file.
+- **The briefing has a budget.** It is capped in rows and bytes, and it says
+  what it left out.
 
-## why not the memory your agent already has?
+## Why not your agent's own memory?
 
-Claude Code writes its own notes now (auto memory, on by default since
-February 2026), and Cursor and Codex have theirs. Use them: they are good at
-remembering that you prefer pnpm. What their documentation says, in its own
-words, is that they are per repository, per machine ("machine-local … not
-shared across machines") and per tool, and shared with nobody ("just you").
-todox is for what falls outside that line:
+Claude Code, Cursor and Codex each keep their own notes. They are good for
+preferences like "use pnpm". But each one is tied to one machine and one
+tool, and nobody else can read it.
 
-- **Two machines, one log.** A repository is identified by its remote, so the
-  note left on the laptop is read on the desktop.
-- **Every agent, one log.** Claude Code, Codex, Cursor and VS Code all speak
-  MCP; the handoff one leaves is what the next one reads, whichever it is.
-- **The people, too.** A project can be shared, and the log carries who wrote
-  what and which model did it.
-- **A shape a note in a file does not have.** Tasks that open and close, dead
-  ends as their own kind, a report read from the log, a stale note that says
-  so — and a briefing that reports what its caps left out.
+todox covers the rest:
 
-### beside other memory servers
+- **Two machines, one log.** A repository is identified by its git remote.
+- **Every agent, one log.** Claude Code, Codex, Cursor, VS Code and
+  OpenCode all speak MCP.
+- **Shared with people.** Projects can be shared, and every entry says who
+  wrote it and which model.
+- **Real structure.** Tasks open and close, dead ends are their own kind, and
+  stale notes say so.
 
-Compared with what each project's own README says (read 2026-10-16). Where a
-README does not describe something, the cell says so rather than guessing.
+### Compared with other memory servers
+
+Based on each project's own README (read 2026-10-16). Where a README says
+nothing, the cell says so.
 
 | | todox | [MCP memory server](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | [Basic Memory](https://github.com/basicmachines-co/basic-memory) | [Mem0](https://github.com/mem0ai/mem0) |
 | --- | --- | --- | --- | --- |
-| What it stores | tasks, each with a log of decisions, dead ends, questions and handoffs; standing notes | a knowledge graph: entities, relations, observations | Markdown notes, with a SQLite index locally | facts an LLM extracts from conversations |
-| Where | Postgres, hosted or your own | a local JSONL file | files on your disk; a paid cloud option syncs them | self-hosted server or a managed platform |
-| Two machines | one log, a repository identified by its git remote | not described; the file is not safe on a network filesystem | manual (Git, Syncthing) or the cloud option | through the server or platform |
-| Work with a shape | yes: a task opens and closes, and a dead end is its own kind | not described | free-form observations with categories; no task or dead-end type described | not described |
-| Knows when code moved on | yes: the agent hashes linked files and a changed one is flagged | not described | not described | not described |
-| Needs an LLM API key | no | not described | not described | yes; OpenAI is the default |
+| Stores | tasks with a log; standing notes | a knowledge graph | Markdown notes | facts an LLM extracts |
+| Lives in | Postgres, hosted or yours | a local JSONL file | files on your disk | a server or managed platform |
+| Two machines | yes, by git remote | not described | Git, Syncthing or paid cloud | through the server |
+| Dead ends as a kind | yes | not described | not described | not described |
+| Notices changed code | yes, by file hash | not described | not described | not described |
+| Needs an LLM key | no | not described | not described | yes |
 
-They solve different problems. A knowledge graph or a notes vault is a good
-place for what is true about a person or a domain; todox is for the state of
-work in a repository, and for not repeating what already failed there.
+A knowledge graph is good for facts about a person or a domain. todox is for
+the state of work in a repository.
 
-## try it
+## Try it
 
-**[todox.dev](https://www.todox.dev)** — anyone can register, with an email
-and password or with Google or GitHub. Small personal deployment, no uptime
-promise. Self-host if the log matters to you.
+**[todox.dev](https://www.todox.dev)**: sign up with email, Google or
+GitHub. It is a small personal deployment with no uptime promise, so
+self-host if the log matters to you.
 
-## run your own
+## Run your own
 
 ```bash
 pnpm install
-cp .env.example .env.local     # any Postgres 15+; see below for a container
-pnpm db:migrate                # idempotent
+cp .env.example .env.local     # any Postgres 15+
+pnpm db:migrate
 pnpm seed                      # optional demo account: demo / todox-demo
 pnpm dev
 ```
 
-## connect an agent
+## Connect an agent
 
-todox is a remote MCP server. There is nothing to install and no repository to
-clone: point any MCP client at the URL with an agent token.
+Create a token on the Account page. It gives you text to paste into your
+agent.
 
-Create a token on the Account page and it hands you text you can paste straight
-into whichever agent you use.
-
-**Claude Code: the plugin.** It carries the server, the session
-protocol as a skill, and one reminder at session start; it asks for the token
-once and keeps it in your Claude Code settings:
+**Claude Code: the plugin.** It installs the server, the session habit and a
+reminder at session start, and asks for the token once.
+[`plugin/README.md`](plugin/README.md) has the details.
 
 ```bash
 claude plugin marketplace add beydemirfurkan/todox
 claude plugin install todox@todox
 ```
 
-Everything below still applies to it — the plugin is the config and the
-habit, installed rather than pasted. See [`plugin/README.md`](plugin/README.md) for
-what it does and does not do.
-
-**Codex: the same plugin.** One directory, two manifests: the same
-skill and the same hook script, briefing at session start and asking once for
-the handoff at the end. Codex runs the stdio server from the release tarball
-and reads the token from your environment:
+**Codex: the same plugin.** It reads the token from your environment. Codex
+asks you to review the plugin's hooks before it runs them.
 
 ```bash
 export TODOX_TOKEN=todox_…            # in your shell profile
@@ -150,22 +124,50 @@ codex plugin marketplace add beydemirfurkan/todox
 codex plugin add todox@todox
 ```
 
-Codex asks you to review a plugin's hooks before it runs them; until you do,
-the plugin is the MCP server alone.
-
-**Any client, by hand.** The shape is always the same — one URL, one header:
+**Any client, by hand.** One URL and one header:
 
 ```bash
-# Claude Code without the plugin. --scope user, because the default is this directory only.
+# Claude Code without the plugin. --scope user, so it works in every project.
 claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp \
   --header "Authorization: Bearer todox_…"
 ```
 
+```toml
+# Codex — ~/.codex/config.toml
+[mcp_servers.todox]
+url = "https://www.todox.dev/api/mcp"
+http_headers = { Authorization = "Bearer todox_…" }
+```
+
 ```json
-// OpenCode v1 — ~/.config/opencode/opencode.json.
-// MCP key is `mcp` (server name is a direct key under it), NOT `mcpServers`.
-// `type` is `"remote"`, NOT `"http"` — the Claude/Cursor/VS Code value is
-// silently ignored on OpenCode.
+// Cursor — ~/.cursor/mcp.json
+{
+  "mcpServers": {
+    "todox": {
+      "type": "http",
+      "url": "https://www.todox.dev/api/mcp",
+      "headers": { "Authorization": "Bearer todox_…" }
+    }
+  }
+}
+```
+
+```json
+// VS Code — user-level mcp.json ("MCP: Open User Configuration").
+// The root key is "servers", not "mcpServers".
+{
+  "servers": {
+    "todox": {
+      "type": "http",
+      "url": "https://www.todox.dev/api/mcp",
+      "headers": { "Authorization": "Bearer todox_…" }
+    }
+  }
+}
+```
+
+```json
+// OpenCode v1 — ~/.config/opencode/opencode.json. Type is "remote".
 {
   "mcp": {
     "todox": {
@@ -178,7 +180,7 @@ claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp
 ```
 
 ```jsonc
-// OpenCode v2 — same key, server now nested under `mcp.servers`.
+// OpenCode v2 — the server moves under mcp.servers.
 {
   "mcp": {
     "servers": {
@@ -192,44 +194,8 @@ claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp
 }
 ```
 
-```toml
-# Codex — ~/.codex/config.toml
-[mcp_servers.todox]
-url = "https://www.todox.dev/api/mcp"
-http_headers = { Authorization = "Bearer todox_…" }
-```
-
-```json
-// Cursor — ~/.cursor/mcp.json, the one in your home directory.
-{
-  "mcpServers": {
-    "todox": {
-      "type": "http",
-      "url": "https://www.todox.dev/api/mcp",
-      "headers": { "Authorization": "Bearer todox_…" }
-    }
-  }
-}
-```
-
-```json
-// VS Code — the user-level mcp.json ("MCP: Open User Configuration").
-// The root key is "servers", NOT "mcpServers". This is the one client
-// that differs, and getting it wrong is silent.
-{
-  "servers": {
-    "todox": {
-      "type": "http",
-      "url": "https://www.todox.dev/api/mcp",
-      "headers": { "Authorization": "Bearer todox_…" }
-    }
-  }
-}
-```
-
-> **The MCP config key and the `type` value differ per agent, and the
-> wrong combination is silently ignored — no error, no warning, the tool
-> just does not show up:**
+> **Get the key and the type right.** A wrong combination fails silently:
+> the tools just never show up.
 >
 > | agent | key | `type` |
 > | --- | --- | --- |
@@ -240,8 +206,7 @@ http_headers = { Authorization = "Bearer todox_…" }
 > | VS Code (Copilot Chat) | `servers.NAME` | `"http"` |
 > | Codex | TOML `[mcp_servers.NAME]` | n/a |
 
-Where those files live differs by platform, and VS Code is the one that is
-not where a Linux habit puts it:
+Where the config file lives:
 
 | agent | macOS | Linux | Windows |
 | --- | --- | --- | --- |
@@ -251,23 +216,14 @@ not where a Linux habit puts it:
 | OpenCode | `~/.config/opencode/opencode.json` | same | same |
 | VS Code | `~/Library/Application Support/Code/User/mcp.json` | `~/.config/Code/User/mcp.json` | `%APPDATA%\Code\User\mcp.json` |
 
-**Install it globally, not per project.** Every one of these tools defaults to
-the directory you are standing in — `claude mcp add` without a scope,
-`.cursor/mcp.json`, `.vscode/mcp.json` — and a memory that only exists in one
-repository is the opposite of the point. It also fails quietly: the tools
-simply are not there in the next project, so the agent never mentions them.
+**Install it for your user, not for one project.** Most clients default to the
+current directory, and a memory that exists in one repository is not much of
+a memory.
 
-Spell out `"type": "http"`. A client that finds a `url` without one tends to
-assume a local command and fails with something unhelpful.
+### Then tell your agent to use it
 
-### then tell your agent to use it
-
-Connecting is not the same as being used, and the gap is bigger than it looks.
-An MCP server's `instructions` are background reading; a skill or a CLAUDE.md
-rule is an instruction. When they disagree, the server loses — measured, in a
-fresh project, with todox connected the whole time and never once called.
-
-So put four lines in the memory file your agent actually obeys:
+A connected server is not a used one. Agents follow their memory file far more
+reliably than a server's instructions. Add these lines to it:
 
 ```markdown
 todox MCP is installed here — persistent memory across projects.
@@ -280,45 +236,13 @@ todox MCP is installed here — persistent memory across projects.
 - Always pass your own model id.
 ```
 
-Or let the installer do it:
+Or let the installer write them (`--dry-run` shows the block first):
 
 ```bash
 pnpm install:mcp claude-code --write-memory
 ```
 
-Run in a terminal, the installer asks before writing it, with yes as the
-default — a connected agent with no habit is the most common way todox ends up
-unused. With no terminal it writes nothing unless `--write-memory` is passed,
-and `--no-write-memory` skips the question, because that file is yours rather
-than ours. It is idempotent — the block is fenced with an HTML comment, so a second run replaces
-it instead of leaving two sets of instructions where the older one wins. Add
-`--dry-run` to see the exact block first.
-
-When the tools do not show up at all, the silent failure is usually one of
-the two tables above, and there is a command that reads the files the way each
-client does and says which:
-
-```bash
-npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz doctor
-```
-
-Per client: the entry, its `type`, its root key, a leftover in a location the
-client never reads, whether the memory file carries the habit, and whether the
-server answers the token it found (masked in the output). It also names a
-todox entry sitting in the current checkout's own config for what it is.
-Nothing is changed; [docs/mcp.md](docs/mcp.md) has the detail.
-
-If you skip this and the account then connects for days without calling a
-tool, the server says so at the top of its instructions on the next session —
-"connected for N days and has not called a tool" — and hands the agent the
-four lines and the path of your client's memory file, telling it to append
-them and to tell you it did. Measured from `tool_usage`, so it is said only
-while it is true and stops the moment a tool is called. That is how an account
-whose client changed, or whose memory file was never written, comes back
-without anybody having to ask.
-
-**The user-level file, not the project one.** This is the same trap as the
-config above, one directory over:
+Use the user-level file, so it applies everywhere:
 
 | Agent | The file that applies everywhere |
 | --- | --- |
@@ -328,15 +252,12 @@ config above, one directory over:
 | VS Code | `~/.copilot/instructions/todox.md` |
 | OpenCode | `~/.config/opencode/AGENTS.md` |
 
-A repository's own `AGENTS.md`, and the per-project rules files the editors also
-read, apply inside that checkout only. A cross-project memory installed into one
-project is the thing this whole section exists to avoid.
+If an account stays connected for days without calling a tool, the server
+notices and asks the agent to add these lines itself.
 
-**The longer version, as a skill.** The four lines are the habit; the whole
-session protocol — the same text the server sends at `initialize` — can also
-sit in the client's user-level skills directory, where every one of these
-clients loads a `SKILL.md` by its description when the moment matches, and
-spends nothing on it otherwise:
+**The full protocol as a skill.** The same text the server sends at startup
+can live in your skills directory, where the client loads it only when it is
+relevant:
 
 ```bash
 pnpm install:mcp claude-code --write-skill
@@ -350,32 +271,26 @@ pnpm install:mcp claude-code --write-skill
 | VS Code | `~/.copilot/skills/todox/SKILL.md` |
 | OpenCode | `~/.config/opencode/skills/todox/SKILL.md` |
 
-The file is wholly todox's — a directory of its own, nothing of yours inside —
-so a second run after an upgrade replaces it. It is generated from the same
-text as the server instructions rather than written twice, which is what keeps
-the two from disagreeing.
+The token never goes in these files. It stays in your MCP config.
 
-The token stays out of that file — it lives in your MCP config. This is the
-habit, not the credential.
+**Tools not showing up?** `doctor` reads each client's files the way the client
+does and tells you what is wrong. It changes nothing.
 
-### optional: local mode
+```bash
+npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz doctor
+```
 
-The hosted server has no filesystem — but your agent does, and that is enough:
-it sends the hash when it links a file (which counts as a check, so the link
-reads fresh at once) and calls `report_file_hashes` with what it finds
-afterwards, so staleness works over HTTP like anywhere else. Either hex case is
-accepted, so PowerShell's `(Get-FileHash f).Hash` works as it is.
+### Optional: local mode
 
-The stdio server does that part itself rather than asking. Worth running if you
-would rather not spend an agent's attention on it, or want the hashing to
-happen even when the agent forgets. There is nothing to clone:
+Over HTTP, the agent sends file hashes itself. The local stdio server does the
+hashing for you, so staleness works even when the agent forgets:
 
 ```bash
 TODOX_TOKEN=todox_… TODOX_URL=https://www.todox.dev \
   npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz
 ```
 
-Or as an MCP config, which is the form an agent wants:
+As an MCP config:
 
 ```json
 {
@@ -392,88 +307,66 @@ Or as an MCP config, which is the form an agent wants:
 }
 ```
 
-**There is no npm package, and that is a decision rather than a to-do.** A
-GitHub Release needs no account and no token to publish or to install from, so
-the tarball is the whole distribution and `npx` takes its URL directly. The URL
-above always resolves to the newest release; every release also carries a
-`todox-mcp-<version>.tgz` if you would rather pin and choose when to move.
+There is no npm package, on purpose. A GitHub Release needs no account to
+publish or install. Each release also carries `todox-mcp-<version>.tgz` if
+you want to pin a version.
 
-It carries only what the stdio server actually loads — no Next, no React, no
-Postgres driver, because it talks to the API over HTTP and never opens a
-database. `pnpm pack:mcp` builds it, and fails the build if anything
-server-side ever finds its way into the tool surface again.
+### Optional: a git hook
 
-From a clone, `pnpm -C /path/to/todox mcp` still works and is what to use when
-you are changing the tools themselves.
-
-### optional: a git hook, for any client
-
-The briefing's `observations` section — what git did while an earlier session
-ran — needs something on your machine to watch. The stdio server and the
-Claude Code plugin do it for their own sessions; for every other client, or for
-commits made with no agent at all, a git hook does it per repository:
+The briefing can show what git did while an earlier session ran. The plugin
+and the local server record that for their own sessions. For anything else,
+install the hook per repository:
 
 ```bash
 cd your-repo
 npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz hook install --token todox_…
 ```
 
-It adds a marked block to `.git/hooks/post-commit` and `post-rewrite` (an
-existing hook is kept), copies one dependency-free script to `~/.todox`, and
-saves the token there readable by you only. After each commit it sends counts,
-a branch and up to three commit subjects in the background — the commit never
-waits for it — and stands down while the stdio server or the plugin has written
-for that project in the last half hour. `hook status` says what is installed,
-`hook uninstall` takes out only its own block. Repositories that commit their
-hooks (husky, lefthook) are not edited; it prints the line to add instead.
+After each commit it sends counts, the branch and up to three commit subjects,
+never a diff, in the background. `hook status` and `hook uninstall` do what
+they say. Repositories managed by husky or lefthook are not edited; it prints
+the line to add instead.
 
-### tools
+### Tools
 
 | tool | what it does |
 | --- | --- |
-| `get_context` | **Call this first.** Standing rules, project decisions and gotchas, every open task with its decisions, dead ends, questions, files and last handoff — plus stale-file warnings. Resolves a project from a slug, a name, or any path inside it. Capped in rows and in bytes, never truncated: every record keeps its id, kind, date and first line, and a `body` of null means the budget was spent — `get_task` reads it. Open tasks untouched for 14+ days come back as a line each in `idle_tasks` — title, status, days idle, last handoff head — outside every budget. Pass `focus` — a sentence about what the session is for — and both budgets are spent on the records that answer it rather than the newest ones, which is what lets them be smaller. Answers with one line of JSON, empty lists left out. `shape: "digest"` returns the same briefing as a plain-text index under `max_chars` (default 9,500) — rules, live tasks with their last handoff, then questions, dead ends and decisions by headline — and says what the ceiling left out; it is what a session-start hook can inject whole. |
-| `get_developer` | **Who the developer is**, with no project needed: their profile, stack and workflow notes in full, the rules they keep in every project, their projects with open and done counts, and the last 30 days (tasks done, models in the log, questions waiting on them). Plain text under 6,000 characters; `shape: "full"` for the JSON. For a conversation with no checkout, or an agent meeting this person for the first time. The same notes open every `get_context` briefing as its `developer` section. |
-| `create_task` | Capture work. Pass `cwd` or an explicit `project`; the tool schema requires one before the call runs. Registering a **new** one also needs `repo_root` or `repo_url`. The receipt returns the task path and body length without echoing the body, and — when dead ends in the same project share at least two terms with the title — up to three of them as `related_dead_ends`, so "has this been tried?" is answered before the work starts. |
-| `update_task` | Status, title, body, priority. Moving to `doing`/`done` is where durations come from. |
-| `log_entry` | Append one of the five kinds. `answers_entry_id` closes a `question` — the only thing that does. |
-| `delete_entry` | For an entry that was wrong when it was written. One overtaken by later work is history, not an error — append instead. |
-| `activity_report` | Today / this week / any window: durations, models, importance, decisions, dead ends, open questions. `format:"markdown"` is written to be pasted into a status update. |
-| `link_files` | Attach paths with their hashes to a task or a context note — the files the work touches, and the plan it follows, wherever that lives: a path outside the repository is hashed like any other, a URL (a claude.ai artifact, say) is kept as written and never hashed. Safe to call again for the same file. |
-| `report_file_hashes` | Hosted only: what the linked files look like on disk now. The local process does this for itself. |
-| `accept_file_change` · `unlink_file` | Clear a stale warning once you have read the change, or drop a link that has stopped meaning anything. Nothing else can clear it — the server never sees the file. |
-| `add_context` | Knowledge that outlives a task; omit the project to make it account-wide. |
-| `get_context_note` | One **note** in full, for the ones whose body the briefing capped and for reading past a search snippet. An entry the budget did not reach is read with `get_task`. |
-| `get_file_context` | What is known about one file: the tasks that touched it with their dead ends, and the notes attached to it, each with its link (id, hash, status). `linked:false` when there is nothing. Absolute or repo-relative; both find a link made on another machine. |
-| `session_status` | **Call before finishing.** The tasks you changed or wrote on in this project within the last 12 hours (any status), each with whether a handoff was written since the last thing you did there — plus tasks left `doing` for 7+ days with nothing logged. Ids, titles, dates and one boolean; the `hint` says what each list still needs. The wrap-up rule asks for a handoff on every task touched, and this is the list it assumed the agent would remember. |
-| `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
-| `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier. Words that only one of the two languages treats as noise are dropped, so a question does not match every record containing the word "a". `kinds` narrows to dead ends or decisions; `project` stops it looking elsewhere. Ask in the language the log is written in — it stems, it does not translate — and if a sentence finds nothing, retry with the distinctive identifiers alone (3+ characters; shorter ones match as whole words only). |
-| `get_task` | One task with its log and linked files. |
-| `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. Projects are newest-activity-first and carry `activity_at`. |
-| `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A path or remote that is already registered returns that project rather than a twin. A summary is worth adding. |
-| `delete_project` | The way back from a mistyped `cwd`. Takes the project and everything under it; `confirm` must be the slug. |
-| `merge_projects` | The way back from one repo registered twice. Moves tasks, notes and paths into the surviving project; `confirm` must be the slug of the one being merged away. |
+| `get_context` | **Call first.** Rules, decisions, dead ends, open tasks and stale-file warnings for a project. Pass `focus` to spend the budget on what matters for this session. `shape: "digest"` returns a plain-text version. |
+| `get_developer` | Who the developer is: profile, standing rules, projects and the last 30 days. No project needed. |
+| `create_task` | Capture work that will outlive this session. Warns about related dead ends. |
+| `update_task` | Status, title, body, priority. `doing` and `done` are where durations come from. |
+| `log_entry` | Add a decision, dead end, question, handoff or note. `answers_entry_id` closes a question. |
+| `delete_entry` | Remove an entry that was wrong when written. |
+| `activity_report` | What got done in a period, with durations and models. `format: "markdown"` for a status update. |
+| `link_files` | Attach files (with hashes) or URLs to a task or note. |
+| `report_file_hashes` | Hosted only: send the current hashes of linked files. |
+| `accept_file_change` · `unlink_file` | Clear a stale warning, or drop a link. |
+| `add_context` | A note that outlives a task. Leave out the project to make it account-wide. |
+| `get_context_note` | One note in full. |
+| `get_file_context` | Tasks, dead ends and notes attached to one file. |
+| `session_status` | **Call before finishing.** What you touched and which tasks still need a handoff. |
+| `update_context` · `delete_context` | Fix or remove a note. |
+| `search` | Search every project, in English or Turkish. `kinds` narrows to dead ends or decisions. |
+| `get_task` | One task with its log and files. |
+| `list_tasks` · `list_projects` | The plain lists. |
+| `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers a project. |
+| `delete_project` | Undo a mistyped `cwd`. `confirm` must be the slug. |
+| `merge_projects` | Merge a repository that was registered twice. |
 
-Every write tool takes a `model`, and the server instructions tell the agent to
-always pass it. That is what makes the per-model breakdown real rather than
-guessed.
+Every write tool takes a `model`, so reports know which model did what.
 
-### prompts
-
-Three, because there are three moments this is for. They show up in your
-client's own menu, so you can see what the server does without reading
-anything:
+### Prompts
 
 | prompt | when |
 | --- | --- |
-| `start_session` | before planning — read what earlier sessions established |
-| `wrap_up` | before finishing — leave a handoff, and the dead ends especially |
+| `start_session` | before planning |
+| `wrap_up` | before finishing |
 | `standup` | when somebody asks what got done |
 
-## deploying
+## Deploying
 
-A container and a Postgres beside it. `docker-compose.yml` at the root is that,
-assembled — the database publishes no port at all and is reachable only over
-the compose network:
+One app container and one Postgres. `docker-compose.yml` has both, and the
+database publishes no port:
 
 ```bash
 cp .env.example .env       # set POSTGRES_PASSWORD and TODOX_PUBLIC_URL
@@ -481,115 +374,67 @@ docker compose up -d --build
 docker compose exec app pnpm db:migrate
 ```
 
-The migration is a separate line on purpose; see the note at the end of this
-section. todox.dev itself runs the same two containers on one host.
-
 | variable | why |
 | --- | --- |
-| `DATABASE_URL` | Postgres. When the database is a neighbour on the same network this is its service name, and no certificate or public port is involved. |
-| `DATABASE_POOL_MAX` | Optional, default 20. Connections this process may hold. Raise it only after checking the server's own `max_connections`, which every replica shares. |
-| `TODOX_PUBLIC_URL` | Verification links, reset links and the agent setup snippet are built from it — get it wrong and people, and their agents, land on the wrong host. |
-| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional, but the first four together. Without them mail is printed to the server log rather than sent. Port defaults to 587 (STARTTLS). What `MAIL_FROM` may be depends on the provider: a mailbox provider usually wants the address that authenticated, while an API-key provider wants any address on a domain verified with it. If a sending limit is hit, messages are dropped and the failure shows up only in the log. |
-| `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_ID` · `GITHUB_CLIENT_SECRET` | Optional, in pairs. Each pair turns on "Continue with Google / GitHub" on the sign-in, sign-up and invitation pages; without it the button is not shown. Register `<TODOX_PUBLIC_URL>/api/auth/<google\|github>/callback` as the redirect. Only who signed in is kept, never a provider token. An existing account is linked automatically only when the provider has verified the address. |
+| `DATABASE_URL` | Postgres. |
+| `DATABASE_POOL_MAX` | Optional, default 20. Connections per process. |
+| `TODOX_PUBLIC_URL` | Mail links and the agent setup snippet are built from it. |
+| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional. Without them, mail is printed to the log. Port defaults to 587. |
+| `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_ID` · `GITHUB_CLIENT_SECRET` | Optional, in pairs. Each turns on its sign-in button. Callback: `<TODOX_PUBLIC_URL>/api/auth/<google\|github>/callback`. |
 
-Run `pnpm db:migrate` when the schema changes. It deliberately does not run at
-startup: DDL racing between instances of a rolling deploy is a bad way to
-discover lock contention, and the schema is idempotent precisely so the decision
-can be made after a deploy rather than during one. From the host:
+`pnpm db:migrate` does not run at startup, so two instances never race on the
+schema. Run it after a deploy that changes the schema:
 
 ```bash
 docker exec <container> pnpm db:migrate
 ```
 
-That is also why the image keeps its dev dependencies instead of using Next's
-`standalone` output — pruning them removes `tsx` and everything under
-`scripts/`, and a database that is deliberately unreachable from the internet
-can only be migrated from something already inside the network.
+**A merge is not a deploy.** The image tag is the git sha. Compare
+`docker inspect <container> --format '{{.Config.Image}}'` with
+`git rev-parse origin/main` to see what is really running.
 
-A merge is not a deploy. The image tag is the git sha, so
-`docker inspect <container> --format '{{.Config.Image}}'` against
-`git rev-parse origin/main` says whether the code you are reading is the code
-that is running.
+## Your data
 
-## taking your data with you
-
-The Account page has a **Download my data** button, and `/api/export` answers
-the same file to a bearer token — so an agent can write the backup without the
-result passing through a model. It carries every project you own with its
-tasks, log, context notes and file hashes, and nothing about anybody else: no
-credential, no collaborator, no share token, and no projects that were shared
-*with* you, which belong to whoever made them.
-
-Loading one into an instance you run:
+**Download my data** on the Account page, or `/api/export` with a token, gives
+you every project you own: tasks, log, notes and file hashes. Nothing about
+anyone else.
 
 ```bash
 pnpm db:import ./todox-export-2026-08-18.json your-username
 ```
 
-Additive, never destructive: nothing is deleted or overwritten, and a project
-whose slug is taken arrives under the next free one. Task events come across
-too, so durations in a report on the restored copy say what they said on the
-original.
+Import only adds. It never deletes or overwrites.
 
-## security
+## Security
 
-Passwords are scrypt; sessions, agent tokens and email links are stored as
-hashes only. Ownership is enforced in one module, and a row belonging to someone
-else answers 404 rather than 403 so ids cannot be probed. Rate limits live in
-the database, so they hold across instances.
-
-Details, and an honest list of what is **not** covered, in
+Passwords use scrypt. Sessions, tokens and email links are stored only as
+hashes. Another user's row answers 404, so ids cannot be probed. Rate limits
+live in the database. The full picture, including what is not covered, is in
 [SECURITY.md](SECURITY.md).
 
-## known gaps
+## Known gaps
 
-- Search finds identifiers through `pg_trgm`. `pnpm db:migrate` creates it
-  where the database role may; where it may not (a Postgres without contrib),
-  that half of search falls back to a sequential scan. The `postgres:18` image
-  in `docker-compose.yml` has it.
-- Staleness is per-file hash; per-symbol would be the honest version. Hosted,
-  it depends on the agent actually sending hashes — the instructions ask, and
-  nothing can make it.
-- Tests cover the agent surface, the auth boundary and the repositories that
-  answer "is this yours"; much of the UI is checked by eye, not by test.
-- Observations see what git can tell them and which task a session set to
-  `doing`, so they answer "what changed" and "on what" — never "why". They
-  also need a process on your machine (the Claude Code plugin, `npx
-  todox-mcp`, or the git hook): connected to `/api/mcp` alone, the section
-  stays empty.
-- The briefing's byte budget covers log bodies, note bodies and task bodies.
-  One axis is still bounded only by a row count: the *heads* of carried
-  entries and tasks, fifty tasks' worth. It is far smaller than what the
-  budgets fixed — one project went from 143 KB to about 55 KB on the log
-  alone — but it is not bounded in bytes, and `pnpm bench:memory` prints it
-  so the next reader does not have to discover it.
+- Search finds identifiers through `pg_trgm`. Without that extension, that half
+  of search is slower.
+- Staleness is per file, not per function. Hosted, it depends on the agent
+  sending hashes.
+- Observations show what changed, never why, and need the plugin, the local
+  server or the git hook.
+- The UI is checked by eye more than by tests.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
-- Search opens with `/` or ⌘K; lists have no keyboard navigation yet.
 
-## cutting a release
+## Cutting a release
 
 ```bash
 git tag vX.Y.Z && git push origin vX.Y.Z    # the version in package.json
 ```
 
-That is the procedure. The workflow checks the tag against `package.json`,
-runs the checks, builds the stdio package and attaches it to a GitHub Release —
-no account and no credential involved, so `npx <that tarball url>` works from
-the first tag.
+The workflow checks the tag, runs the checks, and attaches the stdio package
+to a GitHub Release. `server.json` and the tag must match, or the release
+stops.
 
-Two names go up: `todox-mcp-<version>.tgz`, and the same bytes as
-`todox-mcp.tgz` so that `/releases/latest/download/todox-mcp.tgz` is an address
-worth writing into a config once. Nothing is published to npm, on purpose — see
-the local-mode section above.
+## Contributing
 
-`server.json` pins the MCP registry entry to the same version and
-`server-json.test.ts` holds it there, so the tag, the package and the registry
-move together or the release stops.
-
-## contributing
-
-The rules the codebase actually follows, and how to run the checks:
-[CONTRIBUTING.md](CONTRIBUTING.md).
-
-MIT — see [LICENSE](LICENSE).
+Rules and checks: [CONTRIBUTING.md](CONTRIBUTING.md). MIT — see
+[LICENSE](LICENSE).
