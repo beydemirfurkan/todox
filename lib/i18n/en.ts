@@ -140,6 +140,13 @@ export const en = {
   settingsDanger: "Danger zone",
   settingsMergeTitle: "Merge with another project",
   settingsMergeBody: "If this repository was registered twice, ask your agent to call merge_projects: it moves every task, note and log line into one project.",
+  taskLeftOff: "Where it left off",
+  taskDetails: "Details",
+  taskProject: "Project",
+  taskOpened: "Opened",
+  taskWorked: "Worked on",
+  taskWorkedNone: "not started",
+  logEarlier: "{n} earlier entries",
   metaTitleBrain: "Your brain — todox",
   brainTitle: "Your brain",
   brainLede:
