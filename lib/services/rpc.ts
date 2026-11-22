@@ -52,11 +52,12 @@ import { hashToken } from "../util/tokens";
  */
 /**
  * Who placed the call when it was not an agent: a client-side hook that asks
- * on the agent's behalf (the Claude Code plugin's SessionStart and Stop).
- * Counted under its own name so `tool_usage` keeps describing agents -- see
- * `usageName`.
+ * on the agent's behalf (the Claude Code plugin's SessionStart and Stop) or a
+ * git hook reporting a commit. Counted under its own name so `tool_usage`
+ * keeps describing agents -- see `usageName`.
  */
-export type Carrier = "claude-code-hook";
+export const CARRIERS = ["claude-code-hook", "git-hook"] as const;
+export type Carrier = (typeof CARRIERS)[number];
 
 export type RpcContext = { userId: number; token?: string; carrier?: Carrier };
 
@@ -628,9 +629,15 @@ export const methods = {
       task_ids?: number[];
       started_at?: string;
       source?: ObservationSource;
+      repo_url?: string;
     },
   ) => {
-    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }));
+    // The remote finds a repository the account already knows under another
+    // path -- a second checkout, a second machine. Resolution only: a carrier
+    // never registers a project, that is the agent's call.
+    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }), {
+      repoUrl: p.repo_url,
+    });
     await assertProjectAccess(userId, project.id);
 
     // Read before the write: afterwards it would answer with the row this call

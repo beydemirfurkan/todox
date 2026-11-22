@@ -679,6 +679,7 @@ export const SHAPES = {
         "Tasks this session set to 'doing', so the next briefing can name the ones that got no handoff",
       ),
     started_at: z.string().max(MAX.line).optional(),
+    repo_url: repoIdentity,
     source: z
       .enum(OBSERVATION_SOURCES)
       .optional()

@@ -306,6 +306,14 @@ async function main() {
     (await all("SELECT 1 FROM observations WHERE project_id = ? AND source = 'git-hook'", [gitProject.id])).length === 2,
   );
 
+  await projectsRepo.update(owner.id, gitProject.id, { repo_url: `https://github.com/example/${gitSlug}` });
+  const elsewhere = (await invoke({ userId: owner.id }, "recordObservation", {
+    ...observation({ session_id: `git:${rnd()}`, source: "git-hook" }),
+    cwd: `/nowhere/${rnd()}/${gitSlug}`,
+    repo_url: `https://github.com/example/${gitSlug}`,
+  })) as { project?: string };
+  expect("a second checkout at an unknown path finds its project by the remote", elsewhere.project === gitSlug);
+
   // ------------------------------------------------------- 5. somebody else's
   line("an observation belonging to somebody else");
 

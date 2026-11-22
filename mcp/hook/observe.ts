@@ -71,8 +71,13 @@ async function observe({ ctx, rpc, sessionId, cwd }: Observing): Promise<void> {
     taskIds,
     startedAt: start?.at ?? ctx.now().toISOString(),
   };
+  const remote = git.remote(dir);
   const send = (f: typeof facts) =>
-    rpc("recordObservation", { ...observationPayload(f), source: "claude-code-hook" }) as Promise<{
+    rpc("recordObservation", {
+      ...observationPayload(f),
+      ...(remote ? { repo_url: remote } : {}),
+      source: "claude-code-hook",
+    }) as Promise<{
       last_head_sha?: string | null;
       skipped?: string;
     }>;
