@@ -5,9 +5,12 @@ import { redirect } from "next/navigation";
 import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import { loginAction } from "../auth-actions";
-import { authMessages } from "../auth-messages";
+import { authMessages, isAuthCode } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
 import { AuthShell } from "../features/auth-shell";
+import { OAuthButtons } from "../features/oauth-buttons";
+import { enabledProviders } from "@/lib/services/oauth-providers";
+
 import { pageOpenGraph } from "../metadata-shared";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +30,9 @@ const first = (value: string | string[] | undefined) =>
   (Array.isArray(value) ? value[0] : value) ?? "";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const next = first((await searchParams).next);
+  const asked = await searchParams;
+  const next = first(asked.next);
+  const errorCode = first(asked.error);
   const safeNext = /^\/invite\?token=[A-Za-z0-9_-]{32,}$/.test(next) ? next : "";
   if (await currentUser()) redirect(safeNext || "/");
   const { t } = await getT();
@@ -50,6 +55,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         </>
       }
     >
+      {isAuthCode(errorCode) && (
+        <p role="alert" className="mb-4 text-small text-[var(--k-dead_end)]">
+          {authMessages(t)[errorCode]}
+        </p>
+      )}
+      <OAuthButtons providers={enabledProviders()} next={safeNext || undefined} t={t} />
       <AuthForm
         action={loginAction}
         submitLabel={t("signIn")}

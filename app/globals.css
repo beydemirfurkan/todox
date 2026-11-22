@@ -573,6 +573,39 @@ body:has([data-wide-page]) .page-column {
   }
 }
 
+/* Sign in with a provider: a quiet full-width button above the form. */
+.oauth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+}
+.oauth-button:hover {
+  background: var(--control);
+}
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--faint);
+  font-size: 13px;
+}
+.oauth-divider::before,
+.oauth-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+}
+
 /* A row on a settings page: what it is on the left, its control on the
    right, wrapping under it on a phone. */
 .settings-row {

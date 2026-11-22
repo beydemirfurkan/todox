@@ -8,6 +8,9 @@ import { registerAction } from "../auth-actions";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
 import { AuthShell } from "../features/auth-shell";
+import { OAuthButtons } from "../features/oauth-buttons";
+import { enabledProviders } from "@/lib/services/oauth-providers";
+
 import { pageOpenGraph } from "../metadata-shared";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +49,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
         </Link>
       }
     >
+      <OAuthButtons providers={enabledProviders()} next={safeNext || undefined} t={t} />
       <AuthForm
         action={registerAction}
         submitLabel={t("signUp")}

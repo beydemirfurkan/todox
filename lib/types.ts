@@ -10,7 +10,8 @@ export type User = {
   username: string;
   email: string;
   name: string;
-  password_hash: string;
+  /** Null for an account made through Google or GitHub that has not set one. */
+  password_hash: string | null;
   created_at: string;
   email_verified_at: string | null;
   /** Whether /u/<username> answers at all. */
@@ -32,7 +33,10 @@ export type AuthTokenRow = {
 };
 
 /** Everything the UI needs about the signed-in person, minus the secret. */
-export type PublicUser = Omit<User, "password_hash">;
+export type PublicUser = Omit<User, "password_hash"> & {
+  /** Whether a password can sign this account in, without saying what it is. */
+  has_password: boolean;
+};
 
 export type Session = {
   id: number;

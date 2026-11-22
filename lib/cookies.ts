@@ -6,3 +6,4 @@ export const SESSION_COOKIE = "todox_session";
 export const LANG_COOKIE = "todox_lang";
 /** IANA name, set by the browser so report windows use the reader's day. */
 export const TZ_COOKIE = "todox_tz";
+export const OAUTH_COOKIE = "todox_oauth";

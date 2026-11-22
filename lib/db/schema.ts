@@ -24,6 +24,24 @@ CREATE TABLE IF NOT EXISTS users (
 -- case-insensitive uniqueness: "Ada" and "ada" are the same account
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (lower(username));
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users (lower(email));
+-- An account made by signing in with Google or GitHub has no password until
+-- its owner sets one. Dropping a constraint that is already gone is a no-op.
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+-- Which outside identity may sign in as which account. Identity only: no
+-- access or refresh token is kept, because nothing here calls the provider
+-- after sign-in. One identity per provider per account, and one account per
+-- identity.
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+  id               SERIAL PRIMARY KEY,
+  user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider         TEXT NOT NULL,
+  provider_user_id TEXT NOT NULL,
+  email            TEXT,
+  created_at       TEXT NOT NULL,
+  UNIQUE (provider, provider_user_id),
+  UNIQUE (user_id, provider)
+);
 
 -- Single-use secrets for password reset and email verification. Only the hash
 -- is stored, and it dies once used.

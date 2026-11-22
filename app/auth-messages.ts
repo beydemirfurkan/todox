@@ -13,7 +13,22 @@ const CODES = [
   "tooManyAttempts",
   "linkInvalid",
   "confirmMismatch",
+  "reauthRequired",
+  "passwordNotSet",
+  "oauthFailed",
+  "oauthCancelled",
+  "oauthLinkedElsewhere",
+  "oauthProviderTaken",
+  "oauthEmailUnverified",
+  "oauthNoEmail",
+  "oauthLastMethod",
 ] as const;
+
+export type AuthCode = (typeof CODES)[number];
+
+/** A code from the address, if it is one of ours; anything else is ignored. */
+export const isAuthCode = (value: string): value is AuthCode =>
+  (CODES as readonly string[]).includes(value);
 
 export function authMessages(t: T): Record<string, string> {
   return Object.fromEntries(CODES.map((c) => [c, t(`err_${c}` as Key)]));

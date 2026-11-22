@@ -33,6 +33,9 @@ const PUBLIC = [
   // cookie. Left out, the gate would answer an agent with an HTML login page
   // instead of the file. The route authenticates for itself, both ways.
   "/api/export",
+  // Signing in with Google or GitHub starts and ends here, before there is a
+  // session to have. Both routes decide for themselves what a caller may do.
+  "/api/auth/",
   // The container's own liveness check, which has no cookie and never will.
   // Redirected, it answers 307 to a runtime that only asked whether this
   // process can serve anything -- and a redirect is a perfectly healthy

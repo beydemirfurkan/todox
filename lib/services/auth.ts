@@ -20,9 +20,34 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const MIN_PASSWORD = 8;
 
 export const publicUser = (u: User): PublicUser => {
-  const { password_hash: _omit, ...rest } = u;
-  return rest;
+  const { password_hash: hash, ...rest } = u;
+  return { ...rest, has_password: hash !== null };
 };
+
+/**
+ * How recently an account without a password must have signed in before it
+ * may change a credential or delete itself.
+ *
+ * The password is what stops a stolen cookie from becoming permanent
+ * ownership (see `changeEmail`). An account made through Google or GitHub has
+ * none to type, so a fresh trip through the provider stands in for it: the
+ * cookie alone is not enough, a sign-in from the last few minutes is.
+ */
+export const RECENT_SIGN_IN_MS = 15 * 60_000;
+
+async function signedInRecently(userId: number, sessionToken: string | undefined) {
+  if (!sessionToken) return false;
+  const session = await sessions.openedAt(sessionToken, userId);
+  return session !== undefined && Date.now() - Date.parse(session.created_at) < RECENT_SIGN_IN_MS;
+}
+
+/** The password when the account has one; a recent sign-in when it does not. */
+async function provesOwnership(user: User, password: string, sessionToken: string | undefined) {
+  if (user.password_hash === null) return signedInRecently(user.id, sessionToken);
+  return verifyPassword(password, user.password_hash);
+}
+
+const REAUTH: FieldError = { field: "form", code: "reauthRequired" };
 
 export function validateRegistration(input: {
   username: string;
@@ -122,15 +147,24 @@ export async function userForSession(token: string): Promise<PublicUser | undefi
   return u ? publicUser(u) : undefined;
 }
 
+/**
+ * Sets a new password, or the first one for an account made through Google or
+ * GitHub -- which proves itself with a recent sign-in instead of a password it
+ * does not have.
+ */
 export async function changePassword(
   userId: number,
   current: string,
   next: string,
+  sessionToken?: string,
 ): Promise<Result<true>> {
   const user = await users.byId(userId);
   if (!user) return { ok: false, errors: [{ field: "form", code: "badCredentials" }] };
-  if (!(await verifyPassword(current, user.password_hash)))
-    return { ok: false, errors: [{ field: "current", code: "badCredentials" }] };
+  if (!(await provesOwnership(user, current, sessionToken)))
+    return {
+      ok: false,
+      errors: [user.password_hash === null ? REAUTH : { field: "current", code: "badCredentials" }],
+    };
   if (next.length < MIN_PASSWORD)
     return { ok: false, errors: [{ field: "password", code: "passwordShort" }] };
 
@@ -164,6 +198,10 @@ export async function changeEmail(
   const user = await users.byId(userId);
   if (!user) return { ok: false, errors: [{ field: "form", code: "badCredentials" }] };
 
+  // No fresh-sign-in shortcut here: the address is how a password gets reset,
+  // so an account without one sets a password before it may move it.
+  if (user.password_hash === null)
+    return { ok: false, errors: [{ field: "current", code: "passwordNotSet" }] };
   if (!(await verifyPassword(currentPassword, user.password_hash)))
     return { ok: false, errors: [{ field: "current", code: "badCredentials" }] };
 
@@ -204,12 +242,16 @@ export async function deleteAccount(
   userId: number,
   password: string,
   confirmation: string,
+  sessionToken?: string,
 ): Promise<Result<true>> {
   const user = await users.byId(userId);
   if (!user) return { ok: false, errors: [{ field: "form", code: "badCredentials" }] };
 
-  if (!(await verifyPassword(password, user.password_hash)))
-    return { ok: false, errors: [{ field: "password", code: "badCredentials" }] };
+  if (!(await provesOwnership(user, password, sessionToken)))
+    return {
+      ok: false,
+      errors: [user.password_hash === null ? REAUTH : { field: "password", code: "badCredentials" }],
+    };
 
   // Case-insensitive, like every other username comparison here: `byUsername`
   // matches on `lower(username)` and login accepts either case. A phone that

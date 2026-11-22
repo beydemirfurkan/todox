@@ -488,6 +488,7 @@ section. todox.dev itself runs the same two containers on one host.
 | `DATABASE_POOL_MAX` | Optional, default 20. Connections this process may hold. Raise it only after checking the server's own `max_connections`, which every replica shares. |
 | `TODOX_PUBLIC_URL` | Verification links, reset links and the agent setup snippet are built from it — get it wrong and people, and their agents, land on the wrong host. |
 | `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional, but the first four together. Without them mail is printed to the server log rather than sent. Port defaults to 587 (STARTTLS). What `MAIL_FROM` may be depends on the provider: a mailbox provider usually wants the address that authenticated, while an API-key provider wants any address on a domain verified with it. If a sending limit is hit, messages are dropped and the failure shows up only in the log. |
+| `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_ID` · `GITHUB_CLIENT_SECRET` | Optional, in pairs. Each pair turns on "Continue with Google / GitHub" on the sign-in, sign-up and invitation pages; without it the button is not shown. Register `<TODOX_PUBLIC_URL>/api/auth/<google\|github>/callback` as the redirect. Only who signed in is kept, never a provider token. An existing account is linked automatically only when the provider has verified the address. |
 
 Run `pnpm db:migrate` when the schema changes. It deliberately does not run at
 startup: DDL racing between instances of a rolling deploy is a bad way to

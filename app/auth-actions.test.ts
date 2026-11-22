@@ -51,6 +51,7 @@ vi.mock("@/lib/session", () => ({
   requireUser: mocks.requireUser,
   setSessionCookie: mocks.setSessionCookie,
   clearSessionCookie: mocks.clearSessionCookie,
+  currentSessionToken: async () => "session-token",
 }));
 vi.mock("@/lib/services/rate-limit", () => ({
   check: (...a: unknown[]) => (mocks.order.push("check"), mocks.check(...a)),

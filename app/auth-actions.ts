@@ -14,9 +14,16 @@ import {
   sessionAfterReset,
 } from "@/lib/services/account-recovery";
 import * as auth from "@/lib/services/auth";
+import { unlink } from "@/lib/services/oauth";
+import { isProvider } from "@/lib/services/oauth-flow";
 import * as limit from "@/lib/services/rate-limit";
 import { clientIp as addressOf } from "@/lib/server/client-ip";
-import { clearSessionCookie, requireUser, setSessionCookie } from "@/lib/session";
+import {
+  clearSessionCookie,
+  currentSessionToken,
+  requireUser,
+  setSessionCookie,
+} from "@/lib/session";
 
 const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ?? "";
 /** Passwords keep their whitespace; trimming them silently changes the secret. */
@@ -206,6 +213,7 @@ export async function changePasswordAction(
     user.id,
     raw(fd, "current"),
     raw(fd, "password"),
+    await currentSessionToken(),
   );
   if (!result.ok) return { errors: result.errors };
 
@@ -279,6 +287,7 @@ export async function deleteAccountAction(
     user.id,
     raw(fd, "password"),
     str(fd, "confirm"),
+    await currentSessionToken(),
   );
   if (!result.ok) {
     await limit.penalise("emailChangePerUser", String(user.id));
@@ -342,4 +351,20 @@ export async function revokeAllTokensAction() {
   const user = await requireUser();
   await auth.revokeAllApiTokens(user.id);
   revalidatePath("/account");
+}
+
+/* ------------------------------------------------- sign-in providers */
+
+/**
+ * Disconnect Google or GitHub. Refused when it is the account's last way in
+ * -- no password and no other provider -- because that would lock the owner
+ * out with no way back but support.
+ */
+export async function unlinkProviderAction(fd: FormData) {
+  const user = await requireUser();
+  const provider = str(fd, "provider");
+  if (!isProvider(provider)) redirect("/account?tab=connections");
+  const removed = await unlink(user.id, provider);
+  revalidatePath("/account");
+  redirect(removed ? "/account?tab=connections" : "/account?tab=connections&error=oauthLastMethod");
 }
