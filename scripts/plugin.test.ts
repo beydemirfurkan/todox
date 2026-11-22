@@ -13,6 +13,7 @@ import {
   PLUGIN_ROOT,
   SKILL_PATH,
 } from "./plugin-sync";
+import { importedSpecifiers } from "./bundle-node";
 
 /**
  * The plugin is the agent surface again, for a client that installs plugins.
@@ -112,7 +113,7 @@ describe("the hook bundle", () => {
   });
 
   it("imports nothing but node's built-ins, because a plugin has no node_modules", () => {
-    const specifiers = [...bundle().matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1]);
+    const specifiers = importedSpecifiers(bundle());
     expect(specifiers.length).toBeGreaterThan(0);
     expect(specifiers.filter((s) => !s.startsWith("node:"))).toEqual([]);
     expect(bundle()).not.toMatch(/\brequire\(/);

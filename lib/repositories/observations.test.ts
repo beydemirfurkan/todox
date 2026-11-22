@@ -135,14 +135,14 @@ describe("two carriers", () => {
   });
 
   /**
-   * How a hook's write learns the stdio process is already watching the same
-   * checkout. Scoped to the account, or one person's stdio process would
+   * How a poorer carrier's write learns a richer one is already watching the
+   * same checkout. Scoped to the account, or one person's stdio process would
    * silence another person's hooks on a shared project.
    */
-  it("asks one account's own rows, for one carrier, since a moment", () => {
-    expect(QUERIES.observedBySince).toContain("user_id = ?");
-    expect(QUERIES.observedBySince).toContain("project_id = ?");
-    expect(QUERIES.observedBySince).toContain("source = ?");
-    expect(QUERIES.observedBySince).toContain("observed_at >= ?");
+  it("asks one account's own rows, for a set of carriers, since a moment", () => {
+    expect(QUERIES.observedBySourcesSince).toContain("user_id = ?");
+    expect(QUERIES.observedBySourcesSince).toContain("project_id = ?");
+    expect(QUERIES.observedBySourcesSince).toContain("source = ANY(?)");
+    expect(QUERIES.observedBySourcesSince).toContain("observed_at >= ?");
   });
 });

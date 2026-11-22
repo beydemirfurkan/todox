@@ -107,14 +107,14 @@ export const QUERIES = {
           LIMIT ?`,
 
   /**
-   * Whether one carrier has written for this account and project since a
-   * moment -- how a hook's write learns the stdio process is already watching
-   * the same checkout. Account-scoped for the reason `lastHead` is: another
-   * person's stdio process is watching another checkout.
+   * Whether any of some carriers has written for this account and project
+   * since a moment -- how a poorer carrier learns a richer one is already
+   * watching the same checkout. Account-scoped for the reason `lastHead` is:
+   * another person's process is watching another checkout.
    */
-  observedBySince: `SELECT 1 FROM observations
-                     WHERE user_id = ? AND project_id = ? AND source = ? AND observed_at >= ?
-                     LIMIT 1`,
+  observedBySourcesSince: `SELECT 1 FROM observations
+                            WHERE user_id = ? AND project_id = ? AND source = ANY(?) AND observed_at >= ?
+                            LIMIT 1`,
 
   purge: `DELETE FROM observations WHERE expires_at <= ?`,
 } as const;
@@ -151,13 +151,13 @@ export const lastHeadFor = async (userId: number, projectId: number) =>
   (await one<{ head_sha: string | null }>(QUERIES.lastHead, [userId, projectId]))?.head_sha ??
   null;
 
-export const observedBySince = async (
+export const observedBySourcesSince = async (
   userId: number,
   projectId: number,
-  source: string,
+  sources: readonly string[],
   since: string,
 ): Promise<boolean> =>
-  Boolean(await one(QUERIES.observedBySince, [userId, projectId, source, since]));
+  Boolean(await one(QUERIES.observedBySourcesSince, [userId, projectId, [...sources], since]));
 
 type Paged = BriefingObservation & { total: number };
 

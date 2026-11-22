@@ -275,6 +275,45 @@ async function main() {
     !("skipped" in (later as object)),
   );
 
+  // --------------------------------------------------------- 4c. a git hook
+  line("a git hook is a third carrier, and stands down while a richer one is active");
+
+  const gitSlug = `observe-git-${rnd()}`;
+  const gitProject = await projectsRepo.create(owner.id, { name: gitSlug, slug: gitSlug, summary: "throwaway" });
+  const gitWrite = () =>
+    invoke({ userId: owner.id }, "recordObservation", {
+      project: gitSlug,
+      ...observation({ session_id: `git:${rnd()}`, source: "git-hook" }),
+    }) as Promise<{ skipped?: string }>;
+
+  expect("a git hook's write is taken when nothing else watches", (await gitWrite()).skipped === undefined);
+  expect(
+    "and the briefing says a git hook saw it",
+    (await briefing(owner.id, gitProject)).observations[0]?.source === "git-hook",
+  );
+  await invoke({ userId: owner.id }, "recordObservation", {
+    project: gitSlug,
+    ...observation({ session_id: `cc:${rnd()}`, source: "claude-code-hook", started_at: now() }),
+  });
+  expect("skipped while the plugin's hooks wrote in the last half hour", (await gitWrite()).skipped === "carrier_active");
+  await run("UPDATE observations SET observed_at = ? WHERE project_id = ? AND source <> 'git-hook'", [
+    new Date(Date.now() - 31 * 60_000).toISOString(),
+    gitProject.id,
+  ]);
+  expect("taken again once that carrier has been quiet for longer", (await gitWrite()).skipped === undefined);
+  expect(
+    "and one git-hook row was not written while skipped",
+    (await all("SELECT 1 FROM observations WHERE project_id = ? AND source = 'git-hook'", [gitProject.id])).length === 2,
+  );
+
+  await projectsRepo.update(owner.id, gitProject.id, { repo_url: `https://github.com/example/${gitSlug}` });
+  const elsewhere = (await invoke({ userId: owner.id }, "recordObservation", {
+    ...observation({ session_id: `git:${rnd()}`, source: "git-hook" }),
+    cwd: `/nowhere/${rnd()}/${gitSlug}`,
+    repo_url: `https://github.com/example/${gitSlug}`,
+  })) as { project?: string };
+  expect("a second checkout at an unknown path finds its project by the remote", elsewhere.project === gitSlug);
+
   // ------------------------------------------------------- 5. somebody else's
   line("an observation belonging to somebody else");
 
