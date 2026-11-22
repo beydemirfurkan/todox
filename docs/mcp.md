@@ -202,6 +202,31 @@ and never the token or a response body.
 `TODOX_HOOKS=off` turns every hook off; `TODOX_STOP=off` only the Stop hook's
 request for a handoff; `TODOX_OBSERVE=off` only the observation.
 
+## What the git hook sends
+
+`todox-mcp hook install` (0.1.6 and later) is the third carrier, for any client
+or none: a block in one repository's `post-commit` and `post-rewrite` hooks that
+runs `~/.todox/git-hook.mjs` detached, after git has already made the commit.
+
+| When | Sends |
+|---|---|
+| After a commit, and once after a rebase or amend | `recordObservation`: the repository's `origin` URL (credentials stripped, so a second checkout finds its project), branch, two commit ids, commit and dirty-file counts, up to three commit subjects, `source: "git-hook"` |
+
+Each machine, branch and day is one row (`session_id` is `git:` + a short hash
+of the host name + branch + date), so a day of commits updates one observation
+rather than adding one per commit. A rebase's replayed commits are not sent one
+by one. The server drops the write while the stdio process or the Claude Code
+plugin has written for the same project in the last 30 minutes, since a commit
+inside an agent's session belongs to that session's row; and it never registers
+a project — a repository todox does not know yet is logged and skipped.
+
+What it keeps between commits — the day's base commit and the last state sent
+— sits in the repository's own git directory (`todox-observe.json`), never in
+the working tree. Its token is in `~/.todox/config.json` (mode 0600) unless
+`TODOX_TOKEN` is set, and its errors in `~/.todox/git-hook/hook.log`. Calls are
+counted as `hook:recordObservation`. `TODOX_OBSERVE=off` or `TODOX_HOOKS=off`
+turns it off; `todox-mcp hook uninstall` removes it.
+
 ## What the server counts
 
 The server keeps a count of which methods were called, per account, per day —
