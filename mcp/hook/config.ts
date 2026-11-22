@@ -37,6 +37,20 @@ export const HOSTED_URL = "https://www.todox.dev";
 
 type Env = Record<string, string | undefined>;
 
+/**
+ * The plugin's own prompted token first, then the environment's.
+ *
+ * Cursor's hooks are handed the prompted value as `TODOX_PLUGIN_TOKEN="${token}"`
+ * in the command line. Whether Cursor substitutes a plugin variable there is
+ * not documented: if it does not, the shell expands `${token}` to nothing, or
+ * the text reaches us unexpanded -- and either must fall through to
+ * `TODOX_TOKEN` rather than silence it.
+ */
+export function tokenFrom(env: Env): string | undefined {
+  const given = [env.CLAUDE_PLUGIN_OPTION_TOKEN, env.TODOX_PLUGIN_TOKEN, env.TODOX_TOKEN];
+  return given.find((value) => value && !value.startsWith("${")) || undefined;
+}
+
 export function hookConfig(
   env: Env,
   pluginRoot: string | undefined,
@@ -44,7 +58,7 @@ export function hookConfig(
   client: HookClient = "claude-code",
 ): HookConfig {
   return {
-    token: env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || undefined,
+    token: tokenFrom(env),
     url: env.TODOX_URL || (pluginRoot && urlFromMcpJson(pluginRoot, warn)) || HOSTED_URL,
     dataDir: dataDirFrom(env, client),
     disabled: env.TODOX_HOOKS === "off",

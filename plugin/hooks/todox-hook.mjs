@@ -102,9 +102,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 var HOSTED_URL = "https://www.todox.dev";
+function tokenFrom(env) {
+  const given = [env.CLAUDE_PLUGIN_OPTION_TOKEN, env.TODOX_PLUGIN_TOKEN, env.TODOX_TOKEN];
+  return given.find((value) => value && !value.startsWith("${")) || void 0;
+}
 function hookConfig(env, pluginRoot, warn, client = "claude-code") {
   return {
-    token: env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || void 0,
+    token: tokenFrom(env),
     url: env.TODOX_URL || pluginRoot && urlFromMcpJson(pluginRoot, warn) || HOSTED_URL,
     dataDir: dataDirFrom(env, client),
     disabled: env.TODOX_HOOKS === "off",
@@ -546,7 +550,7 @@ var DIGEST_CHARS = 9200;
 async function sessionStart(ctx) {
   recordStart(ctx);
   if (!ctx.rpc) {
-    ctx.log("session-start", "no token (CLAUDE_PLUGIN_OPTION_TOKEN): reminder only");
+    ctx.log("session-start", "no token (CLAUDE_PLUGIN_OPTION_TOKEN or TODOX_TOKEN): reminder only");
     return inject(reminderFor(ctx));
   }
   if (!ctx.input.cwd) return inject(REMINDER);
