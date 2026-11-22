@@ -76,7 +76,14 @@ describe("the methods that take nothing but an id", () => {
 
     it(`${method} refuses an id that is not a number`, () => {
       expect(() => parseParams(method, { [field]: "7 OR 1=1" })).toThrow(/invalid params/);
-      expect(() => parseParams(method, { [field]: "7" })).toThrow(/invalid params/);
+      expect(() => parseParams(method, { [field]: "" })).toThrow(/invalid params/);
+      expect(() => parseParams(method, { [field]: "-7" })).toThrow(/invalid params/);
+      expect(() => parseParams(method, { [field]: "7.5" })).toThrow(/invalid params/);
+      expect(() => parseParams(method, { [field]: null })).toThrow(/invalid params/);
+    });
+
+    it(`${method} reads the digits of an id as the id`, () => {
+      expect(parseParams(method, { [field]: "7" })).toEqual({ [field]: 7 });
     });
 
     it(`${method} refuses a fractional id`, () => {
@@ -504,7 +511,7 @@ describe("logEntry answers_entry_id", () => {
     expect(() => parseParams("logEntry", { ...base, answers_entry_id: "118 OR 1=1" })).toThrow(
       /invalid params/,
     );
-    expect(() => parseParams("logEntry", { ...base, answers_entry_id: "118" })).toThrow(
+    expect(() => parseParams("logEntry", { ...base, answers_entry_id: "118a" })).toThrow(
       /invalid params/,
     );
     expect(() => parseParams("logEntry", { ...base, answers_entry_id: 1.5 })).toThrow(
@@ -714,14 +721,38 @@ describe("recordObservation's carrier", () => {
 });
 
 /** create_task and search answer with `id`; get_task took only `task_id` (B18). */
-describe("getTask's id", () => {
-  it("takes task_id or id", () => {
-    expect(parseParams("getTask", { task_id: 3 })).toEqual({ task_id: 3 });
-    expect(parseParams("getTask", { id: 3 })).toEqual({ id: 3 });
+/**
+ * Lab v2: Claude Code writes the first call to each tool before it has read
+ * the schema, as `{"id": "651"}`. Both shapes now land on `task_id: 651`.
+ */
+describe("a task's id, however the first call guesses it", () => {
+  for (const method of ["getTask", "updateTask"] as const) {
+    const rest = method === "updateTask" ? { status: "doing" } : {};
+
+    it(`${method} takes task_id or id, as a number or its digits`, () => {
+      for (const given of [{ task_id: 3 }, { id: 3 }, { task_id: "3" }, { id: "3" }]) {
+        expect(parseParams(method, { ...given, ...rest })).toEqual({ task_id: 3, ...rest });
+      }
+    });
+
+    it(`${method} refuses both, and neither`, () => {
+      expect(() => parseParams(method, { task_id: 3, id: 4, ...rest })).toThrow(/not both/);
+      expect(() => parseParams(method, { ...rest })).toThrow(/task_id/);
+    });
+
+    it(`${method} still refuses an id that is not digits`, () => {
+      expect(() => parseParams(method, { id: "651a", ...rest })).toThrow(/invalid params/);
+      expect(() => parseParams(method, { id: "abc", ...rest })).toThrow(/invalid params/);
+    });
+  }
+
+  it("folds the digits of every other row id too", () => {
+    expect(parseParams("logEntry", { task_id: "9", kind: "note", body: "b", answers_entry_id: "4" }))
+      .toMatchObject({ task_id: 9, answers_entry_id: 4 });
+    expect(parseParams("linkFiles", { context_id: "5", paths: [{ path: "a.ts" }] })).toMatchObject({ context_id: 5 });
   });
 
-  it("refuses both, and neither", () => {
-    expect(() => parseParams("getTask", { task_id: 3, id: 4 })).toThrow(/not both/);
-    expect(() => parseParams("getTask", {})).toThrow(/task_id/);
+  it("does not offer `id` where it would be ambiguous", () => {
+    expect(() => parseParams("logEntry", { id: 9, kind: "note", body: "b" })).toThrow(/invalid params/);
   });
 });

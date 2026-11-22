@@ -69,6 +69,34 @@ const MAX = {
   files: 500,
 } as const;
 
+/**
+ * A row id, as a number or as the digits of one.
+ *
+ * Claude Code loads an MCP tool's schema only when the tool is first used, so
+ * the first call to each tool is written from a guess -- and the guess is
+ * `get_task {"id": "651"}`, the id as the string a listing printed. Lab v2
+ * (2026-11-22) spent four of its nine refusals on exactly that, each followed
+ * by the same call done right. Digits only: "", "12a" and "-1" still refuse.
+ *
+ * Folded to a number in `parseParams`, not by a transform here, because this
+ * schema is also the tool's JSON schema and a transform has no JSON form. A
+ * union does: it is advertised as `anyOf`.
+ */
+const rowId = z.union([
+  z.number().int(),
+  z.string().regex(/^\d{1,15}$/, "expected a numeric id"),
+]);
+
+/** The keys `parseParams` folds from digits to a number. */
+const ROW_ID_KEYS = [
+  "task_id",
+  "id",
+  "entry_id",
+  "context_id",
+  "ref_id",
+  "answers_entry_id",
+] as const;
+
 const model = z
   .string()
   .max(MAX.line)
@@ -307,10 +335,11 @@ export const SHAPES = {
 
   // `id` as well, because create_task and search answer with `id` and an
   // agent hands it straight back: the first dogfood run spent a refusal on
-  // exactly that (2026-11-22, B18). One of the two, never both.
+  // exactly that (2026-11-22, B18), and lab v2 the same on update_task. One of
+  // the two, never both; `parseParams` hands the handler `task_id`.
   getTask: {
-    task_id: z.number().int().optional(),
-    id: z.number().int().optional().describe("Same as task_id, as create_task and search return it."),
+    task_id: rowId.optional(),
+    id: rowId.optional().describe("Same as task_id, as create_task and search return it."),
     model,
   },
 
@@ -358,7 +387,8 @@ export const SHAPES = {
   },
 
   updateTask: {
-    task_id: z.number().int(),
+    task_id: rowId.optional(),
+    id: rowId.optional().describe("Same as task_id, as create_task and search return it."),
     title: z.string().min(1).max(MAX.line).optional(),
     body: z.string().max(MAX.text).optional(),
     status: z.enum(STATUSES).optional(),
@@ -367,7 +397,7 @@ export const SHAPES = {
   },
 
   logEntry: {
-    task_id: z.number().int(),
+    task_id: rowId,
     kind: z
       .enum(ENTRY_KINDS)
       .describe(
@@ -381,9 +411,7 @@ export const SHAPES = {
         "One thing, for a stranger: the first line is the headline the briefing shows, the body a screen at most. Measurements and listings go in the task body or a note, not here.",
       ),
     author: z.enum(["agent", "human"]).optional(),
-    answers_entry_id: z
-      .number()
-      .int()
+    answers_entry_id: rowId
       .optional()
       .describe(
         "Id of the `question` entry on this task that this entry settles. The only way a question closes; both stay readable through get_task.",
@@ -399,7 +427,7 @@ export const SHAPES = {
    * with another entry rather than removing this one.
    */
   deleteEntry: {
-    entry_id: z.number().int(),
+    entry_id: rowId,
     model,
   },
 
@@ -410,10 +438,8 @@ export const SHAPES = {
    * ownership join all existed already -- no surface could reach them.
    */
   linkFiles: {
-    task_id: z.number().int().optional(),
-    context_id: z
-      .number()
-      .int()
+    task_id: rowId.optional(),
+    context_id: rowId
       .optional()
       .describe("Attach the files to a context note instead of a task. Pass one or the other."),
     paths: z
@@ -440,9 +466,7 @@ export const SHAPES = {
   },
 
   unlinkRef: {
-    ref_id: z
-      .number()
-      .int()
+    ref_id: rowId
       .describe("From the `files` of get_context or get_task. Removes the link, not the file."),
     model,
   },
@@ -453,7 +477,7 @@ export const SHAPES = {
    * ever tell it the two hashes differ, never that the difference is fine.
    */
   acceptRef: {
-    ref_id: z.number().int(),
+    ref_id: rowId,
     model,
   },
 
@@ -489,9 +513,7 @@ export const SHAPES = {
    * not the note.
    */
   getContextNote: {
-    context_id: z
-      .number()
-      .int()
+    context_id: rowId
       .describe(
         "From the `id` of a note in get_context's global_context or project_context, or from a search hit of type 'context'.",
       ),
@@ -539,7 +561,7 @@ export const SHAPES = {
    * cannot be corrected stops being worth trusting the moment it is wrong.
    */
   updateContext: {
-    context_id: z.number().int(),
+    context_id: rowId,
     kind: z.enum(CONTEXT_KINDS).optional(),
     title: z.string().min(1).max(MAX.line).optional(),
     body: z
@@ -552,9 +574,7 @@ export const SHAPES = {
   },
 
   deleteContext: {
-    context_id: z
-      .number()
-      .int()
+    context_id: rowId
       .describe("Prefer update_context when the note is merely out of date."),
     model,
   },
@@ -730,6 +750,9 @@ const OBJECTS: Record<string, z.ZodType> = {
   updateTask: z
     .object(SHAPES.updateTask)
     .strict()
+    .refine((p) => (p.task_id === undefined) !== (p.id === undefined), {
+      message: "pass `task_id` (or `id`), not both",
+    })
     .refine(
       (p) =>
         p.title !== undefined ||
@@ -812,10 +835,24 @@ export const isMethod = (name: string): name is MethodName =>
 /** Throws with a message an agent can act on; the RPC route maps it to a 400. */
 export function parseParams(method: MethodName, params: unknown): Record<string, unknown> {
   const result = OBJECTS[method].safeParse(params ?? {});
-  if (result.success) return result.data as Record<string, unknown>;
+  if (result.success) return withNumericIds(result.data as Record<string, unknown>);
 
   const detail = result.error.issues
     .map((i) => (i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message))
     .join("; ");
   throw new BadRequest(`invalid params for ${method} — ${detail}`, "schema");
+}
+
+/**
+ * `rowId` admits the digits of an id; the handlers are written for a number,
+ * and `id` is only ever the task's id under another name.
+ */
+function withNumericIds(params: Record<string, unknown>): Record<string, unknown> {
+  const folded = { ...params };
+  for (const key of ROW_ID_KEYS) {
+    if (typeof folded[key] === "string") folded[key] = Number(folded[key]);
+  }
+  if (folded.id !== undefined && folded.task_id === undefined) folded.task_id = folded.id;
+  delete folded.id;
+  return folded;
 }
