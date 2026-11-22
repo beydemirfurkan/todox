@@ -108,6 +108,26 @@ describe("what is left out", () => {
   });
 });
 
+describe("what a member wrote elsewhere", () => {
+  it("carries this account's own entries in projects it does not own, without their ids", async () => {
+    // Otherwise a member's own words in a shared project had no copy at all.
+    await exportAccount(7);
+    const elsewhere = mocks.all.mock.calls
+      .map(([t]) => String(t))
+      .find((t) => t.includes("p.user_id <> ?"));
+    expect(elsewhere).toContain("e.user_id = ?");
+    expect(elsewhere).toContain("p.name AS project");
+    expect(elsewhere).not.toMatch(/SELECT[^]*\be\.id\b[^]*FROM/);
+  });
+
+  it("is its own section, which the importer does not read", async () => {
+    mocks.all.mockResolvedValue([{ project: "api" }]);
+    const bundle = await exportAccount(7);
+    expect(bundle.written_elsewhere).toEqual([{ project: "api" }]);
+    expect(bundle.counts.written_elsewhere).toBe(1);
+  });
+});
+
 describe("the bundle", () => {
   it("names its format and version, so an importer can refuse an unknown one", async () => {
     const bundle = await exportAccount(7);

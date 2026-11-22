@@ -10,6 +10,7 @@ import { AuthForm } from "../features/auth-form";
 import { AuthShell } from "../features/auth-shell";
 import { OAuthButtons } from "../features/oauth-buttons";
 import { enabledProviders } from "@/lib/services/oauth-providers";
+import { isRegistrationOpen } from "@/lib/services/registration";
 
 import { pageOpenGraph } from "../metadata-shared";
 
@@ -35,6 +36,20 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
   if (await currentUser()) redirect(safeNext || "/");
   const { t } = await getT();
 
+  if (!isRegistrationOpen()) {
+    return (
+      <AuthShell
+        title={t("registerTitle")}
+        intro={t("err_registrationClosed")}
+        footer={
+          <Link href="/login" className="link-more">
+            {t("haveAccount")}
+          </Link>
+        }
+      />
+    );
+  }
+
   return (
     <AuthShell
       title={t("registerTitle")}
@@ -50,6 +65,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
     >
       <OAuthButtons providers={enabledProviders()} next={safeNext || undefined} t={t} />
       <AuthForm
+          submitClassName="btn w-full"
         action={registerAction}
         submitLabel={t("signUp")}
         pendingLabel={t("signingUp")}

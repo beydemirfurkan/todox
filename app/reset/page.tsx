@@ -25,6 +25,7 @@ export default async function ResetPage({ searchParams }: PageProps<"/reset">) {
     >
       {token ? (
         <AuthForm
+          submitClassName="btn w-full"
           action={resetPasswordAction}
           submitLabel={t("resetSubmit")}
           pendingLabel={t("saving")}

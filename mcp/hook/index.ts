@@ -1,4 +1,5 @@
 import { createClient } from "../rpc-client";
+import { checkRefs } from "../workspace";
 import { hookClientFrom } from "./clients";
 import { dataDirFrom, hookConfig, type HookConfig } from "./config";
 import { workspaceGit } from "./git";
@@ -75,7 +76,7 @@ function contextFor(parts: { client: HookClient; config: HookConfig; log: Logger
   const rpc = parts.config.token
     ? createClient(parts.config.url, parts.config.token, { headers: CARRIER, timeoutMs: RPC_TIMEOUT_MS })
     : null;
-  return { ...parts, rpc, now: () => new Date(), git: workspaceGit };
+  return { ...parts, rpc, now: () => new Date(), git: workspaceGit, checkFiles: checkRefs };
 }
 
 function parseInput(raw: string): Record<string, unknown> {

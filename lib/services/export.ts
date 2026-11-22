@@ -45,6 +45,13 @@ export type ExportBundle = {
   contexts: unknown[];
   refs: unknown[];
   /**
+   * What this account wrote in projects somebody else owns. Read-only and
+   * self-contained -- project name and task title instead of ids that would
+   * point at nothing in a restored copy -- so `db:import` leaves it alone.
+   * Without it, a member's own words in a shared project had no copy at all.
+   */
+  written_elsewhere: unknown[];
+  /**
    * `observations` is absent on purpose, and this is the note that says so
    * rather than leaving it looking forgotten.
    *
@@ -91,8 +98,10 @@ const countFor = (userId: number) =>
           JOIN projects p ON p.id = t.project_id WHERE p.user_id = ?)
      + (SELECT COUNT(*) FROM task_events v JOIN tasks t ON t.id = v.task_id
           JOIN projects p ON p.id = t.project_id WHERE p.user_id = ?)
+     + (SELECT COUNT(*) FROM entries     e JOIN tasks t ON t.id = e.task_id
+          JOIN projects p ON p.id = t.project_id WHERE e.user_id = ? AND p.user_id <> ?)
        AS n`,
-    [userId, userId, userId, userId, userId, userId],
+    [userId, userId, userId, userId, userId, userId, userId, userId],
   );
 
 /**
@@ -109,7 +118,7 @@ export async function exportAccount(userId: number): Promise<ExportBundle> {
   const total = Number((await countFor(userId))?.n ?? 0);
   if (total > EXPORT_MAX_ROWS) throw new ExportTooLarge(total);
 
-  const [projects, projectPaths, tasks, entries, events, contexts, refs] = await Promise.all([
+  const [projects, projectPaths, tasks, entries, events, contexts, refs, elsewhere] = await Promise.all([
     all(
       `SELECT id, slug, name, root_path, summary, archived, created_at, share_log
          FROM projects WHERE user_id = ? ORDER BY id`,
@@ -163,6 +172,17 @@ export async function exportAccount(userId: number): Promise<ExportBundle> {
         ORDER BY r.id`,
       [userId, userId],
     ),
+    // Signed by this account, in a project it does not own. The signature is
+    // the whole claim: these are the person's own words, not the project.
+    all(
+      `SELECT p.name AS project, t.title AS task, e.kind, e.body, e.author, e.model, e.created_at
+         FROM entries e
+         JOIN tasks t    ON t.id = e.task_id
+         JOIN projects p ON p.id = t.project_id
+        WHERE e.user_id = ? AND p.user_id <> ?
+        ORDER BY e.id`,
+      [userId, userId],
+    ),
   ]);
 
   return {
@@ -177,6 +197,7 @@ export async function exportAccount(userId: number): Promise<ExportBundle> {
       task_events: events.length,
       contexts: contexts.length,
       refs: refs.length,
+      written_elsewhere: elsewhere.length,
     },
     projects,
     project_paths: projectPaths,
@@ -185,5 +206,6 @@ export async function exportAccount(userId: number): Promise<ExportBundle> {
     task_events: events,
     contexts,
     refs,
+    written_elsewhere: elsewhere,
   };
 }

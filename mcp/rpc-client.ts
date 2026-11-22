@@ -1,3 +1,5 @@
+import { HOSTED_URL } from "./hook/config";
+
 /**
  * Thin transport to the todox server. The MCP process runs on the developer's
  * machine; the data lives wherever todox is hosted, so everything goes over
@@ -58,7 +60,10 @@ export function createClient(baseUrl: string, token: string, options: ClientOpti
 
 export function readConfig() {
   const token = process.env.TODOX_TOKEN;
-  const url = process.env.TODOX_URL ?? "http://localhost:3000";
+  // The same default as the hooks and the git hook. It was localhost, so a
+  // todox.dev user who set only TODOX_TOKEN -- what the Codex steps say --
+  // got a stdio server talking to nothing while the hooks beside it worked.
+  const url = process.env.TODOX_URL?.trim() || HOSTED_URL;
   if (!token) {
     throw new Error(
       "TODOX_TOKEN is not set. Create an agent token on the Account page and pass it " +

@@ -192,6 +192,26 @@ describe("a new account", () => {
     expect(oauthRepo.createUserWithIdentity).toHaveBeenCalledWith(expect.objectContaining({ name: "ada" }));
   });
 
+  it("is refused when the instance is closed to new accounts", async () => {
+    vi.stubEnv("TODOX_REGISTRATION", "Closed");
+    try {
+      expect(await signIn()).toEqual({ ok: false, code: "registrationClosed" });
+      expect(oauthRepo.createUserWithIdentity).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("still signs an existing identity in when closed", async () => {
+    vi.stubEnv("TODOX_REGISTRATION", "closed");
+    try {
+      oauthRepo.byIdentity.mockResolvedValue({ user_id: 5 });
+      expect(await signIn()).toEqual({ ok: true, userId: 5, how: "signed_in" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("is refused without an address", async () => {
     expect(await signIn({ email: null })).toEqual({ ok: false, code: "oauthNoEmail" });
     expect(oauthRepo.createUserWithIdentity).not.toHaveBeenCalled();

@@ -125,12 +125,13 @@ export default async function AccountPage({
   // that person had been invited to -- and handed over the id needed to take
   // one. The link in the invitation email still works for an unverified
   // address, because holding it is the proof this list cannot ask for.
-  const [tokens, pendingInvites, joinedProjects] = await Promise.all([
+  const [tokens, pendingInvites, joinedProjects, sharedProjects] = await Promise.all([
     listApiTokens(user.id),
     user.email_verified_at
       ? invitationsRepo.listPendingForEmail(user.email, new Date().toISOString())
       : Promise.resolve([]),
     membershipsRepo.listByUser(user.id),
+    membershipsRepo.sharedOwnedBy(user.id),
   ]);
   const asked = await searchParams;
   const requestedTab = asked.tab;
@@ -593,6 +594,23 @@ export default async function AccountPage({
         </summary>
         <div className="max-w-xl border-t border-dashed border-rule p-4">
           <p className="mb-3 text-[14px] text-muted">{t("deleteAccountNote")}</p>
+          {sharedProjects.length > 0 && (
+            <div className="mb-4">
+              <p className="mb-2 text-[14px] text-muted">{t("deleteAccountShared")}</p>
+              <ul className="flex flex-col gap-1.5">
+                {sharedProjects.map((project) => (
+                  <li key={project.id} className="flex flex-wrap items-baseline gap-x-2">
+                    <Link href={`/p/${project.slug}/settings?tab=team`} className="link-more">
+                      {project.name}
+                    </Link>
+                    <span className="text-meta text-faint">
+                      {t("deleteAccountSharedMembers", { n: project.members })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {!user.has_password && (
             <p className="mb-3 text-[14px] text-muted">{t("deleteAccountReauthNote")}</p>
           )}

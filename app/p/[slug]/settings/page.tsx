@@ -18,6 +18,7 @@ import {
   removeProjectMemberAction,
   revokeProjectInviteAction,
   setProjectOnProfileAction,
+  transferOwnershipAction,
   updateProjectAction,
 } from "../../../actions";
 import { authMessages } from "../../../auth-messages";
@@ -80,7 +81,15 @@ export default async function ProjectSettingsPage({
       <Tabs tabs={tabs} current={tab} label={t("settingsSections")} />
 
       {tab === "general" && <GeneralSettings project={project} t={t} />}
-      {tab === "team" && <TeamSettings project={project} user={user} t={t} />}
+      {tab === "team" && (
+        <TeamSettings
+          project={project}
+          user={user}
+          notice={teamNotice(asked, t)}
+          transferTo={Number(asked.transfer_to) || null}
+          t={t}
+        />
+      )}
       {tab === "sharing" && <SharingSettings project={project} user={user} t={t} />}
       {tab === "danger" && <DangerSettings project={project} t={t} />}
     </div>
@@ -126,19 +135,62 @@ function GeneralSettings({ project, t }: { project: Project; t: T }) {
   );
 }
 
+type Asked = Record<string, string | string[] | undefined>;
+
+const INVITE_NOTICES = {
+  sent: "inviteResultSent",
+  invalid: "inviteResultInvalid",
+  exists: "inviteResultExists",
+  limited: "inviteResultLimited",
+  "not-owner": "inviteResultFailed",
+  unverified: "inviteNeedsVerifiedEmail",
+} as const;
+
+/** What the last invite or transfer on this tab came to, from the address. */
+function teamNotice(asked: Asked, t: T): { text: string; isError: boolean } | null {
+  if (asked.transfer === "failed") return { text: t("transferFailed"), isError: true };
+  const invite = typeof asked.invite === "string" ? asked.invite : "";
+  if (!(invite in INVITE_NOTICES)) return null;
+  const key = INVITE_NOTICES[invite as keyof typeof INVITE_NOTICES];
+  return { text: t(key), isError: invite !== "sent" };
+}
+
 /** Who is in it, who is invited, and the way to ask somebody new. */
-async function TeamSettings({ project, user, t }: { project: Project; user: PublicUser; t: T }) {
+async function TeamSettings({
+  project,
+  user,
+  notice,
+  transferTo,
+  t,
+}: {
+  project: Project;
+  user: PublicUser;
+  notice: { text: string; isError: boolean } | null;
+  transferTo: number | null;
+  t: T;
+}) {
   const [members, invitations] = await Promise.all([
     membershipsRepo.listByProject(project.id),
     invitationsRepo.listByProject(project.id),
   ]);
+  const heir = members.find((member) => member.id === transferTo);
   return (
     <div className="flex flex-col gap-6">
+      {heir && <TransferConfirm project={project} heir={heir} t={t} />}
+      {notice && (
+        <p
+          role={notice.isError ? "alert" : "status"}
+          className={`text-small ${notice.isError ? "text-[var(--k-dead_end)]" : "text-muted"}`}
+        >
+          {notice.text}
+        </p>
+      )}
       {!user.email_verified_at ? (
         <p className="text-small text-muted">{t("inviteNeedsVerifiedEmail")}</p>
       ) : (
         <form action={inviteProjectAction} className="flex flex-wrap items-end gap-2.5">
           <input type="hidden" name="project_id" value={project.id} />
+          <input type="hidden" name="slug" value={project.slug} />
           <Field label={t("inviteEmail")} className="min-w-[14rem] flex-1">
             <input name="email" type="email" autoComplete="email" required />
           </Field>
@@ -163,13 +215,22 @@ async function TeamSettings({ project, user, t }: { project: Project; user: Publ
               {/* The owner sees addresses because the owner invited them. */}
               <span className="mono text-meta break-all text-faint">{member.email}</span>
             </span>
-            <form action={removeProjectMemberAction}>
-              <input type="hidden" name="membership_id" value={member.id} />
-              <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
-                {t("removeCollaborator")}
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/p/${project.slug}/settings?tab=team&transfer_to=${member.id}`}
+                className="btn btn-quiet"
+              >
+                {t("transferOwnership")}
                 <span className="sr-only"> — {member.name}</span>
-              </SubmitButton>
-            </form>
+              </Link>
+              <form action={removeProjectMemberAction}>
+                <input type="hidden" name="membership_id" value={member.id} />
+                <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+                  {t("removeCollaborator")}
+                  <span className="sr-only"> — {member.name}</span>
+                </SubmitButton>
+              </form>
+            </div>
           </li>
         ))}
         {invitations.map((invitation) => (
@@ -192,6 +253,41 @@ async function TeamSettings({ project, user, t }: { project: Project; user: Publ
         <p className="text-small text-muted">{t("teamAlone")}</p>
       )}
     </div>
+  );
+}
+
+/**
+ * A second step, because a transfer cannot be taken back by the person who
+ * made it: once it goes through, only the new owner can hand it back.
+ */
+function TransferConfirm({
+  project,
+  heir,
+  t,
+}: {
+  project: Project;
+  heir: { id: number; name: string };
+  t: T;
+}) {
+  return (
+    <section className="sticker-flat flex flex-col gap-3 p-5" aria-labelledby="transfer-title">
+      <h2 id="transfer-title" className="text-[15px] font-semibold">
+        {t("transferConfirmTitle", { who: heir.name })}
+      </h2>
+      <p className="text-small text-muted">{t("transferConfirmBody", { who: heir.name })}</p>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <form action={transferOwnershipAction}>
+          <input type="hidden" name="membership_id" value={heir.id} />
+          <input type="hidden" name="slug" value={project.slug} />
+          <SubmitButton className="btn btn-danger" pendingLabel={t("working")}>
+            {t("transferConfirmSubmit")}
+          </SubmitButton>
+        </form>
+        <Link href={`/p/${project.slug}/settings?tab=team`} className="link-more">
+          {t("transferCancel")}
+        </Link>
+      </div>
+    </section>
   );
 }
 

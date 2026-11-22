@@ -207,13 +207,18 @@ header; the name predates them.
 | Hook | Sends | When |
 |---|---|---|
 | SessionStart | `getContext` with your `cwd`, the repository's `origin` URL (credentials stripped), `shape: "digest"`, `create_if_missing: false` | startup, resume, `/clear`, after compaction |
+| SessionStart | `getContext` (full, same arguments) for the files linked to open tasks, then `reportRefs`: each link's id and the sha256 of the file as it is on this machine, or null when it is gone | when an open task has a linked file this machine can read |
 | Stop | `sessionStatus` with your `cwd` and a window of hours | only if this session touched a todox task |
 | PreCompact (Claude Code only) | `sessionStatus`, the same call as Stop | before compaction, only if this session touched a todox task |
 | Stop, SessionEnd | `recordObservation`: the `origin` URL, branch, two commit ids, commit and dirty-file counts, up to three commit subjects, ids of tasks set to `doing` | only if git changed since the last one sent |
 
 The remote is there so a second checkout of a repository todox already knows,
 at a path it has not seen, finds its project; it only ever resolves one, never
-registers one. Nothing else leaves your machine: no diff, no file path beyond
+registers one. The hashes are what the stdio server has always reported on
+every read: over the hosted endpoint nothing else can check a linked file, so
+without them a note about code that has since changed was never flagged. A file
+outside the repository, a secret file or one written on your other machine is
+not hashed. Nothing else leaves your machine: no diff, no file path beyond
 the working directory you were already sending, no prompt, no transcript. What the hooks
 remember between calls — which tasks this session touched, whether it edited
 files, whether it was already stopped once — stays in a file per session under

@@ -1,5 +1,5 @@
 {
-  "description": "todox's command hooks: no model call, nothing sent but todox's own RPC, and every failure exits 0. SessionStart puts the project's briefing digest in front of the session, after compaction too; PreCompact asks the compaction summary to keep what those tasks' write-up needs; Stop asks once for the handoff on tasks this session left unwritten; Stop and SessionEnd record what git did, as counts.",
+  "description": "todox's command hooks: no model call, nothing sent but todox's own RPC, and every failure exits 0. SessionStart puts the project's briefing digest in front of the session, after compaction too, and hashes the files linked to open tasks so a note about changed code is flagged; PreCompact asks the compaction summary to keep what those tasks' write-up needs; Stop asks once for the handoff on tasks this session left unwritten; Stop and SessionEnd record what git did, as counts.",
   "hooks": {
     "SessionStart": [
       {

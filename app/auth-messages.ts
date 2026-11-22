@@ -22,6 +22,8 @@ const CODES = [
   "oauthNoEmail",
   "oauthLastMethod",
   "oauthLinkExpired",
+  "hasSharedProjects",
+  "registrationClosed",
 ] as const;
 
 export type AuthCode = (typeof CODES)[number];

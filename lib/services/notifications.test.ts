@@ -32,7 +32,12 @@ describe("notificationText", () => {
     for (const lang of LANGS) {
       const t = translator(lang);
       for (const kind of NOTIFICATION_KINDS) {
-        const text = notificationText(row({ kind }), t);
+        // A deleted project's notice carries its name in `detail`, as written.
+        const gone = kind === "project_deleted";
+        const text = notificationText(
+          row(gone ? { kind, detail: "todox", project_id: null, project_name: null } : { kind }),
+          t,
+        );
         expect(text.trim(), `${lang}/${kind}`).not.toBe("");
         // A placeholder left unsubstituted is the failure this catches.
         expect(text, `${lang}/${kind}`).not.toContain("{");
