@@ -520,7 +520,7 @@ export type TeammateEntry = {
 export const recentByOthers = (projectId: number, viewerId: number, since: string, limit: number) =>
   all<TeammateEntry>(
     `SELECT e.id, e.task_id, t.title AS task, e.kind, e.created_at,
-            left(${FIRST_LINE}, ${HEAD_CHARS}) AS head,
+            left(${FIRST_LINE}, ?) AS head,
             e.author, e.model, u.name AS author_name
        FROM entries e
        JOIN tasks t ON t.id = e.task_id
@@ -528,7 +528,7 @@ export const recentByOthers = (projectId: number, viewerId: number, since: strin
       WHERE t.project_id = ? AND e.user_id IS NOT NULL AND e.user_id <> ? AND e.created_at >= ?
       ORDER BY e.id DESC
       LIMIT ?`,
-    [projectId, viewerId, since, limit],
+    [HEAD_CHARS, projectId, viewerId, since, limit],
   );
 
 export type EntryCounts = {
