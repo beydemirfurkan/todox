@@ -1,7 +1,7 @@
 import { ENTRY_KINDS } from "@/lib/constants";
 import type { T } from "@/lib/i18n";
 import { KIND_COLOR, kindHint, kindLabel } from "../kinds";
-import { Blob, Chip } from "../components";
+import { Chip, LogoMark } from "../components";
 
 /**
  * The product explains itself on the way in, so nobody has to read a README
@@ -104,7 +104,7 @@ function ReadArt({ t }: { t: T }) {
   return (
     <div className="space-y-3 p-3.5">
       <div className="flex items-center gap-2">
-        <Blob mood="happy" size={26} />
+        <LogoMark size={22} />
         <div className="min-w-0">
           <p className="text-[12.5px] font-medium text-ink">{t("landingNewSession")}</p>
           <p className="text-meta text-faint">{t("landingKnowsNow")}</p>
@@ -248,7 +248,7 @@ function ShapesIcon() {
 export function FirstRun({ t, children }: { t: T; children?: React.ReactNode }) {
   return (
     <div className="sticker pop flex flex-col items-center gap-3 p-8 text-center">
-      <Blob mood="happy" size={64} className="bob" />
+      <LogoMark size={48} />
       <h2 className="display text-[24px]">{t("firstRunTitle")}</h2>
       <p className="max-w-sm text-[14.5px] text-muted">{t("firstRunBody")}</p>
       {children}

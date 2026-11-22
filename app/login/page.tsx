@@ -34,8 +34,6 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   return (
     <AuthShell
-      shyLabel={t("mascotShy")}
-      mood="happy"
       title={t("loginTitle")}
       intro={t("loginIntro")}
       footer={

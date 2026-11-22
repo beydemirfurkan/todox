@@ -42,7 +42,6 @@ export default function Error({
 
   return (
     <AuthShell
-      mood="worried"
       fill="var(--k-dead_end)"
       title={t("errorTitle")}
       intro={t("errorBody")}

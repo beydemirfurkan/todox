@@ -30,7 +30,6 @@ export default async function ForgotPage({ searchParams }: PageProps<"/forgot">)
 
   return (
     <AuthShell
-      mood={sent ? "happy" : "worried"}
       fill={sent ? "var(--ok)" : "var(--accent)"}
       title={t("forgotTitle")}
       intro={sent ? undefined : t("forgotIntro")}

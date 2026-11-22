@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import type { T } from "@/lib/i18n";
-import { Blob } from "../components";
+import { LogoMark } from "../components";
 import { KIND_COLOR, kindLabel } from "../kinds";
 import { BriefingPreview } from "./briefing-preview";
 import { Explainer, VsNative } from "./explainer";
@@ -79,7 +79,7 @@ function Stage({ t }: { t: T }) {
           <span className="mono mx-auto rounded-[6px] bg-inset px-3 py-1 text-meta text-faint">todox.dev/p/todox</span>
         </div>
         <Image
-          src="/screenshots/board.jpg"
+          src="/screenshots/board-dark.jpg"
           alt={t("landingShotAlt")}
           width={1920}
           height={780}
@@ -116,7 +116,7 @@ function Toast({ kind, text, t }: { kind: "dead_end" | "handoff"; text: string; 
 function Closing({ t }: { t: T }) {
   return (
     <section className="sticker pop flex flex-col items-center gap-5 px-6 py-14 text-center">
-      <Blob mood="happy" size={64} className="bob" />
+      <LogoMark size={48} />
       <h2 className="display max-w-[20ch] text-[clamp(28px,4vw,40px)] leading-[1.1]">{t("landingConnectTitle")}</h2>
       <p className="max-w-[52ch] text-[15.5px] leading-relaxed text-muted">{t("landingConnectBody")}</p>
       <div className="flex flex-wrap items-center justify-center gap-3">

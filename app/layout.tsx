@@ -7,7 +7,7 @@ import type { T } from "@/lib/i18n";
 import { getLang, getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import { publicUrl } from "@/lib/public-url";
-import { Blob } from "./components";
+import { LogoMark } from "./components";
 import { LangSwitcher } from "./features/lang-switcher";
 import { Notifications } from "./features/notifications";
 import { SearchBox } from "./features/search-box";
@@ -90,7 +90,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {/* "/" for everyone now: signed out it is the page that explains what
               this is, which used to be nowhere. */}
           <Link href="/" className="brand flex items-center gap-2.5">
-            <Blob mood="happy" size={36} className="bob" />
+            <LogoMark size={28} />
             <span className="display text-[22px] leading-none">
               todox
             </span>
@@ -196,10 +196,11 @@ function SiteFooter({ t }: { t: T }) {
     <footer className="site-band mt-20">
       <div className="mx-auto grid w-full page-column grid-cols-2 gap-10 px-5 pt-14 pb-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div className="col-span-2 flex flex-col gap-3 md:col-span-1">
-          <span className="display text-[26px] leading-none">todox</span>
-          <p className="display max-w-[18ch] text-[22px] leading-[1.2] text-[var(--band-muted)]">
-            {t("tagline")}
-          </p>
+          <span className="flex items-center gap-2.5">
+            <LogoMark size={26} />
+            <span className="display text-[22px] leading-none">todox</span>
+          </span>
+          <p className="mono text-meta text-[var(--band-muted)]">{t("tagline")}</p>
         </div>
         {columns.map((column) => (
           <nav key={column.title} aria-label={column.title} className="flex flex-col gap-3 text-[14px]">

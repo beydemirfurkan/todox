@@ -107,7 +107,6 @@ export const tr: Record<Key, string> = {
   signOut: "Çıkış yap",
 
   loginTitle: "Tekrar hoş geldin",
-  mascotShy: "bakmıyorum",
   loginIntro: "Projelerine ve arkalarındaki kayda ulaşmak için giriş yap.",
   registerTitle: "Hesabını oluştur",
   registerIntro: "Projelerin, kaydın, agent'ların. Hiçbirini başkası göremez.",
@@ -596,9 +595,9 @@ export const tr: Record<Key, string> = {
     "Agentın her oturuma bir öncekinden hiçbir şey bilmeden başlıyor. Bunun bedelini iki kez ödüyorsun — bir kez projeyi baştan anlatırken, bir kez de önceki oturumun çoktan tosladığı duvara yeniden toslarken.",
   landingCta: "Hesap oluştur",
   landingSecondary: "Zaten hesabım var",
-  landingScrawl: "geliştiriciler ve birlikte çalıştıkları agent'lar için —",
-  landingHeadline: "agentının {mark} defter",
-  landingHeadlineMark: "gerçekten tuttuğu",
+  landingScrawl: "MCP sunucusu · açık kaynak · geliştiriciler ve agent'ları için",
+  landingHeadline: "agent'ların için {mark}",
+  landingHeadlineMark: "çalışma belleği",
   landingCtaNote: "Açık kaynak. Hepsini istediğin an dışa aktar.",
   landingConnectTitle: "Hâlihazırda kullandığın agent'la çalışır",
   landingConnectBody:

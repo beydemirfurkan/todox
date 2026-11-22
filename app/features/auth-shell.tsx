@@ -1,38 +1,25 @@
-import type { Mood } from "../components";
-import { AuthMascot } from "./auth-mascot";
+import { LogoMark } from "../components";
 
 /**
- * Auth pages are one small card on a very wide page. Left in the normal flow
- * they sit against the top edge with a screen of nothing underneath, which
- * reads as unfinished rather than as focused.
- *
- * So: centre the card in the viewport, let a soft glow behind it anchor the
- * composition instead of leaving it floating on flat dark, and give it Todd.
- *
- * He used to be a small decoration above the heading. Standing behind the card
- * with his hands on it he does the same job better, and the heading moves
- * inside the card because it is his hands that hold the top edge now.
+ * Auth pages are one small card on a very wide page, centred in the viewport
+ * with a faint glow behind it so it does not float on flat dark. The mark
+ * sits above the heading; `fill` tints the glow, so a failed link or an
+ * invalid invitation reads differently before a word of it is read -- and
+ * the heading still says it, because colour never says it alone.
  */
 export function AuthShell({
-  mood = "happy",
   fill = "var(--accent)",
   title,
   intro,
-  shyLabel,
   children,
   footer,
 }: {
-  mood?: Mood;
   fill?: string;
   title: string;
   intro?: string;
-  /** What Todd says while a password field has focus; only the pages that
-   *  have one pass it. */
-  shyLabel?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-}) {
-  return (
+}) {  return (
     <div className="relative flex min-h-[calc(100vh-160px)] flex-col items-center justify-center py-8">
       {/* Sized against its container, not in absolute pixels: at 520px wide it
           hung 100px off the side of a phone and made the whole page drag
@@ -44,15 +31,14 @@ export function AuthShell({
       />
 
       <div className="pop w-full max-w-[26rem]">
-        <AuthMascot mood={mood} fill={fill} shyLabel={shyLabel}>
-          <div className="mb-4 text-center">
-            <h1 className="display text-[26px] leading-tight font-bold">{title}</h1>
-            {intro && (
-              <p className="mt-1.5 text-[14px] leading-snug text-muted">{intro}</p>
-            )}
+        <div className="mb-6 flex flex-col items-center gap-4 text-center">
+          <LogoMark size={40} />
+          <div>
+            <h1 className="display text-[28px] leading-tight">{title}</h1>
+            {intro && <p className="mt-1.5 text-[14px] leading-snug text-muted">{intro}</p>}
           </div>
-          {children}
-        </AuthMascot>
+        </div>
+        <div className="sticker p-6">{children}</div>
 
         {footer && (
           <div
