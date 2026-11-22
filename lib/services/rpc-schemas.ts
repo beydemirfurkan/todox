@@ -574,7 +574,7 @@ export const SHAPES = {
 
   activityReport: {
     period: z
-      .enum(["today", "yesterday", "week", "last_week", "month", "all"])
+      .enum(["today", "yesterday", "week", "last_week", "month", "last_30_days", "all"])
       .optional()
       .describe("Default 'today'. 'week' is the current Monday-based week."),
     from: datetime.optional(),

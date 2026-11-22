@@ -1,4 +1,5 @@
 import { OPEN_STATUSES, type EntryKind, type Status } from "../constants";
+import { byDay, type ReportDay } from "./report-days";
 import * as entriesRepo from "../repositories/entries";
 import * as eventsRepo from "../repositories/events";
 import * as projectsRepo from "../repositories/projects";
@@ -101,6 +102,11 @@ export type ActivityReport = {
     active_ms: number;
   }[];
   by_model: { model: string; entries: number; tasks: number }[];
+  /**
+   * The window day by day, in its own timezone: what the charts draw. Empty
+   * for a window longer than `MAX_REPORT_DAYS`, where a bar a day is noise.
+   */
+  by_day: ReportDay[];
   completed: TaskReport[];
   in_progress: TaskReport[];
   decisions: ReportEntry[];
@@ -502,6 +508,16 @@ export async function activityReport(
     },
     by_project: byProject,
     by_model: byModel,
+    by_day: byDay(period, {
+      created: created.map((r) => r.created_at),
+      completed: completed.flatMap((r) => (r.closed_at ? [r.closed_at] : [])),
+      entries: periodEntries.filter((e) => e.kind !== "question" || !answered.has(e.id)),
+      attended: candidates.flatMap((task) =>
+        doingSpans(task, eventsByTask.get(task.id) ?? [], logs.get(task.id) ?? []).flatMap(
+          (span) => span.attended,
+        ),
+      ),
+    }),
     completed,
     in_progress: inProgress,
     decisions: pick("decision"),

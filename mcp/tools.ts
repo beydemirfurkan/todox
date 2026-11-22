@@ -466,7 +466,7 @@ function registerPrompts(server: McpServer) {
         // offered no completion in the client and turned a typo into a schema
         // error one call later.
         period: z
-          .enum(["today", "yesterday", "week", "last_week", "month"])
+          .enum(["today", "yesterday", "week", "last_week", "month", "last_30_days"])
           .optional()
           .describe("Default: today"),
       },
@@ -1005,7 +1005,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "What got done (today / this week / any window)",
       description:
-        "What got done in a window, from the log: tasks completed and opened, time in 'doing' and lead time, models, decisions, dead ends, open questions. format:'markdown' to hand on, 'json' to reason over. Prefer a named period to 'all'.",
+        "What got done in a window, from the log: tasks completed and opened, time in 'doing' and lead time, models, decisions, dead ends, open questions. `by_day` breaks the window into local days (finished, time in doing, entries by kind) for windows up to 92 days. format:'markdown' to hand on, 'json' to reason over. Prefer a named period to 'all'; 'last_30_days' is a rolling month.",
       annotations: READ_ONLY,
     },
     {

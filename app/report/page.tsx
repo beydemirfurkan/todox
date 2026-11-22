@@ -16,8 +16,10 @@ import {
   IconTile,
   MarkdownPreview,
   Panel,
+  ShareBars,
   StatBadges,
 } from "../components";
+import { Daily } from "./daily";
 import { privatePageMetadata } from "../metadata-shared";
 import { CopyMarkdown } from "../features/copy-markdown";
 import { IMPORTANCE_COLOR, KIND_COLOR, statusLabel } from "../kinds";
@@ -30,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const PERIODS: PeriodName[] = ["today", "yesterday", "week", "last_week", "month"];
+const PERIODS: PeriodName[] = ["today", "yesterday", "week", "last_week", "month", "last_30_days"];
 
 /**
  * The pills, and nothing else.
@@ -138,36 +140,45 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
             ]}
           />
 
-          {report.by_project.length > 1 && (
-            <Panel delay={80} title={t("byProject")}>
-              <ul className="space-y-1.5">
-                {report.by_project.map((bp) => (
-                  <li key={bp.slug} className="flex flex-wrap items-center gap-2">
-                    <Link
-                      href={`/p/${bp.slug}`}
-                      className="display text-[15px] font-bold underline decoration-dotted underline-offset-2"
-                    >
-                      {bp.name}
-                    </Link>
-                    {/* The slug, because the name is not unique and this row
-                        is where that stops being harmless: two projects called
-                        crm.marcaspio sit in production today, and in this list
-                        they were two identical rows with different links. The
-                        home page's cards have always shown both. */}
-                    <span className="mono text-meta text-faint">{bp.slug}</span>
-                    <Chip color="var(--ok)">
-                      {bp.completed} {t("totalsCompleted")}
-                    </Chip>
-                    <Chip>
-                      {bp.touched} {t("totalsTouched")}
-                    </Chip>
-                    <span className="mono ml-auto text-[12px] text-muted">
-                      {duration(bp.active_ms, t)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
+          {report.by_day.length > 1 && <Daily report={report} t={t} />}
+
+          {(report.by_project.length > 1 || report.by_model.length > 0) && (
+            <div
+              className={`grid gap-5 ${report.by_project.length > 1 && report.by_model.length > 0 ? "lg:grid-cols-2" : ""}`}
+            >
+              {report.by_project.length > 1 && (
+                <Panel delay={80} title={t("byProject")}>
+                  <ShareBars
+                    color="var(--accent)"
+                    rows={report.by_project.map((bp) => ({
+                      key: bp.slug,
+                      // The slug beside the name: names are not unique, and two
+                      // identical rows with different links are a trap.
+                      label: (
+                        <Link href={`/p/${bp.slug}`} className="hover:underline">
+                          {bp.name} <span className="mono text-meta text-faint">{bp.slug}</span>
+                        </Link>
+                      ),
+                      value: bp.active_ms || bp.touched,
+                      text: `${bp.completed} ${t("totalsCompleted")} · ${bp.touched} ${t("totalsTouched")} · ${duration(bp.active_ms, t)}`,
+                    }))}
+                  />
+                </Panel>
+              )}
+              {report.by_model.length > 0 && (
+                <Panel delay={100} title={t("byModel")}>
+                  <ShareBars
+                    color="var(--k-decision)"
+                    rows={report.by_model.map((m) => ({
+                      key: m.model,
+                      label: <code className="mono text-[13px] break-all">{m.model}</code>,
+                      value: m.entries,
+                      text: `${m.entries} ${t("totalsEntries")} · ${m.tasks} ${t("task")}`,
+                    }))}
+                  />
+                </Panel>
+              )}
+            </div>
           )}
 
           {report.completed.length > 0 && (
@@ -220,22 +231,6 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
               items={report.open_questions}
               t={t}
             />
-            {report.by_model.length > 0 && (
-              <Panel delay={260} title={t("byModel")}>
-                <ul className="space-y-1.5">
-                  {report.by_model.map((m) => (
-                    <li key={m.model} className="flex flex-wrap items-center gap-2">
-                      <code className="mono rounded border-[1.5px] border-line bg-inset px-1.5 text-[12.5px] break-all">
-                        {m.model}
-                      </code>
-                      <span className="text-[13.5px] text-muted">
-                        {m.entries} {t("totalsEntries")} · {m.tasks} {t("task")}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </Panel>
-            )}
           </div>
 
           <Panel delay={300} title="markdown">
