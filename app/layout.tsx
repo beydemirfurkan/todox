@@ -196,8 +196,8 @@ function SiteFooter({ t }: { t: T }) {
   ];
   return (
     <footer className="site-band mt-20">
-      <div className="mx-auto grid w-full page-column gap-10 px-5 pt-14 pb-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-        <div className="flex flex-col gap-3">
+      <div className="mx-auto grid w-full page-column grid-cols-2 gap-10 px-5 pt-14 pb-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="col-span-2 flex flex-col gap-3 md:col-span-1">
           <span className="display text-[26px] leading-none">todox</span>
           <p className="display max-w-[18ch] text-[22px] leading-[1.2] text-[var(--band-muted)]">
             {t("tagline")}

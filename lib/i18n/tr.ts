@@ -569,6 +569,13 @@ export const tr: Record<Key, string> = {
   deleteProjectConfirm: "Onaylamak için {slug} yaz",
   deleteProjectSubmit: "Sil, içindekilerle birlikte",
 
+  landingHowTitle: "Nasıl çalışır",
+  landingSampleDecision: "Görev başına değil, tür başına sınırlandı.",
+  landingSampleDeadEnd: "1 MB gövde tavanı geçerli çağrıları reddetti.",
+  landingSampleHandoff: "Bayt bütçesi girdi. Sıradaki: başlıkları kırp.",
+  landingSampleQuestion: "Kapanan görevler brifingde kalsın mı?",
+  landingNewSession: "yeni bir oturum",
+  landingKnowsNow: "başlamadan önce şunları bilir:",
   landingLede:
     "Agentın her oturuma bir öncekinden hiçbir şey bilmeden başlıyor. Bunun bedelini iki kez ödüyorsun — bir kez projeyi baştan anlatırken, bir kez de önceki oturumun çoktan tosladığı duvara yeniden toslarken.",
   landingCta: "Hesap oluştur",
@@ -577,10 +584,6 @@ export const tr: Record<Key, string> = {
   landingHeadline: "agentının {mark} defter",
   landingHeadlineMark: "gerçekten tuttuğu",
   landingCtaNote: "Açık kaynak. Hepsini istediğin an dışa aktar.",
-  landingArrowNote: "sonraki oturumun okuduğu şey",
-  landingLabelProject: "proje",
-  landingLabelTask: "görev",
-  landingLabelState: "durum",
   landingConnectTitle: "Hâlihazırda kullandığın agent'la çalışır",
   landingConnectBody:
     "Tek bir adres ve bir token. Kurulacak paket yok, ayakta tutulacak yerel süreç yok — MCP konuşan her şey bağlanır: Claude Code, Codex, Cursor, VS Code.",
