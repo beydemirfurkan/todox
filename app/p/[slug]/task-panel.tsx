@@ -114,9 +114,9 @@ export async function TaskPanel({ task, slug, t }: { task: Task; slug: string; t
             {t("earlierEntries", { n: earlier })}
           </Link>
         )}
-        <ol className="space-y-2">
+        <ol className="divide-y divide-[var(--rule)]">
           {log.rows.map((entry) => (
-            <li key={entry.id} className="sticker-flat min-w-0 p-3">
+            <li key={entry.id} className="min-w-0 py-3 first:pt-1">
               <div className="flex flex-wrap items-center gap-2">
                 <Chip color={KIND_COLOR[entry.kind]} title={kindHint(t, entry.kind)}>
                   {kindLabel(t, entry.kind)}

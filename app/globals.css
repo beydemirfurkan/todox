@@ -479,6 +479,21 @@ summary:focus-visible,
   overflow: hidden;
 }
 
+/* A strip of masking tape holding a note down: translucent, a little
+   crooked, its ends cut square. Decoration only. */
+.tape {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 64px;
+  height: 18px;
+  translate: -50% 0;
+  rotate: -4deg;
+  background: color-mix(in srgb, var(--tone-sand) 75%, transparent);
+  border-left: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
+}
+
 /* Graph paper, for the back of a collage. */
 .dot-grid {
   background-image: radial-gradient(var(--line) 1.2px, transparent 1.3px);
