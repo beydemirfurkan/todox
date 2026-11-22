@@ -54,6 +54,7 @@ const localWs: Workspace = {
   }),
   clientInfo: async () => null,
   hasHabit: async () => null,
+  launchDir: () => undefined,
 };
 
 const remoteWs: Workspace = {
@@ -64,6 +65,7 @@ const remoteWs: Workspace = {
   checkRefs: () => null,
   clientInfo: async () => null,
   hasHabit: async () => null,
+  launchDir: () => undefined,
 };
 
 describe("argument filtering", () => {
@@ -361,6 +363,40 @@ describe("project reference schemas", () => {
       expect(required).toContain("cwd");
     },
   );
+
+  /**
+   * Claude Code calls a deferred tool once before it has loaded the schema,
+   * and the guess for get_context was `{}` -- one refusal per session in the
+   * lab. A stdio process was launched in the session's directory, so locally
+   * that call is answered with it rather than refused.
+   */
+  it("fills the launch directory into a local call that names neither", async () => {
+    const ws: Workspace = { ...localWs, launchDir: () => "/home/dev/repo" };
+    const { tools, calls } = harness(ws, { project: { slug: "p" } });
+    // A plain shape: neither field required, so the client sends `{}` as is.
+    expect(tools.get("get_context")!.config.inputSchema).not.toBeInstanceOf(z.ZodType);
+
+    await tools.get("get_context")!.handler({});
+    expect(calls[0]!.params.cwd).toBe("/home/dev/repo");
+  });
+
+  it("leaves an explicit project or cwd alone", async () => {
+    const ws: Workspace = { ...localWs, launchDir: () => "/home/dev/repo" };
+    const { tools, calls } = harness(ws, { project: { slug: "p" } });
+    await tools.get("get_context")!.handler({ project: "api" });
+    await tools.get("get_context")!.handler({ cwd: "/elsewhere" });
+    expect(calls.map((c) => [c.params.project, c.params.cwd])).toEqual([
+      ["api", undefined],
+      [undefined, "/elsewhere"],
+    ]);
+  });
+
+  it("still refuses a hosted call that names neither, and says to send cwd", () => {
+    const schema = harness(remoteWs).tools.get("get_context")!.config.inputSchema as unknown as z.ZodType;
+    const result = schema.safeParse({});
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toMatch(/^pass `cwd`/);
+  });
 });
 
 /**

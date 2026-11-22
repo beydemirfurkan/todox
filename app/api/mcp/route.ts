@@ -45,6 +45,7 @@ function buildRemoteWorkspace(agent: AgentIdentity): Workspace {
     clientInfo: async () => clientDuringSetup(agent),
     // No disk here: the notes fall back to the token-age rule above.
     hasHabit: async () => null,
+    launchDir: () => undefined,
   };
 }
 

@@ -56,6 +56,12 @@ export type Workspace = {
    *  Asked because the same 600-700 bytes of setup advice opened every stdio
    *  briefing, to agents that had followed it long ago (dogfood 2026-11-22). */
   hasHabit(client: McpClientId): Promise<boolean | null>;
+  /** The directory the client launched this process in, which is the
+   *  session's working directory for every client that spawns a stdio server
+   *  per session. undefined on the hosted route, which has no such thing.
+   *  Lets a first call that arrives with no arguments at all -- Claude Code
+   *  guesses before it has loaded a deferred schema -- still be answered. */
+  launchDir(): string | undefined;
 };
 
 /** Calls a todox RPC method: over HTTP from the laptop, in-process on the server. */
@@ -286,7 +292,7 @@ function schemaWithProjectReference(shape: z.ZodRawShape): z.ZodType {
     .object(shape)
     .strict()
     .refine((value) => value.project || value.cwd, {
-      message: "pass either `project` or `cwd`",
+      message: "pass `cwd`: the absolute path of your working directory (`pwd`). `project` (a slug) only when there is no checkout",
     })
     .meta({
       anyOf: [{ required: ["project"] }, { required: ["cwd"] }],
@@ -599,8 +605,12 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       ),
     ) as z.ZodRawShape;
 
+    // Locally a call that names neither is still answerable: this process
+    // was started in the session's directory. Requiring one of them there
+    // only refused a call this side can complete.
+    const launchDir = local ? ws.launchDir() : undefined;
     const inputSchema =
-      opts.referenceRequirement === "project-or-cwd"
+      opts.referenceRequirement === "project-or-cwd" && !launchDir
         ? schemaWithProjectReference(advertised)
         : advertised;
 
@@ -612,6 +622,8 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       let params = Object.fromEntries(
         Object.entries(args).filter(([k]) => accepted.includes(k)),
       );
+      if (launchDir && opts.referenceRequirement && params.project === undefined && params.cwd === undefined)
+        params.cwd = launchDir;
       // Only a process running beside the developer knows their timezone.
       // Without it the server measures "today" in UTC.
       if (accepted.includes("tz") && params.tz === undefined) {
