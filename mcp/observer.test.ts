@@ -689,3 +689,54 @@ describe("noticing a task taken on", () => {
     for (const c of calls) expect(c.params).toMatchObject({ task_ids: [12] });
   });
 });
+
+/**
+ * The last look, when the process is closing. A session shorter than the
+ * interval looked once at a clean tree, edited inside the interval, and
+ * exited with nothing recorded (dogfood 2026-11-22, B10).
+ */
+describe("the last look", () => {
+  it("records a tree that went dirty inside the interval", async () => {
+    const h = harness();
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
+    h.advance(THROTTLE_MS / 4);
+    h.state!.dirty = 2;
+    await h.observer.notice("logEntry", {});
+    expect(h.calls).toHaveLength(0);
+
+    await h.observer.flush();
+
+    expect(h.calls).toHaveLength(1);
+    expect(lastWrite(h.calls)).toMatchObject({ files_changed: 2 });
+  });
+
+  it("writes a changed state past the write interval too", async () => {
+    const h = harness();
+    h.state!.dirty = 1;
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
+    h.advance(THROTTLE_MS / 4);
+    h.state!.dirty = 3;
+    await h.observer.flush();
+    expect(h.calls).toHaveLength(2);
+    expect(lastWrite(h.calls)).toMatchObject({ files_changed: 3 });
+  });
+
+  it("still stays quiet when nothing changed", async () => {
+    const h = harness();
+    await h.observer.notice("getContext", { cwd: `${ROOT}/sub` });
+    await h.observer.flush();
+    expect(h.calls).toHaveLength(0);
+
+    h.state!.dirty = 1;
+    await h.observer.flush();
+    await h.observer.flush();
+    expect(h.calls).toHaveLength(1);
+  });
+
+  it("does nothing when observing is off", async () => {
+    const h = harness({ enabled: false });
+    h.state!.dirty = 1;
+    await h.observer.flush();
+    expect(h.calls).toHaveLength(0);
+  });
+});
