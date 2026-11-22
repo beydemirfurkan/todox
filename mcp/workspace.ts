@@ -149,6 +149,18 @@ export const gitBranch = (dir: string): string | undefined =>
 export const gitHead = (dir: string): string | undefined =>
   git(dir, ["rev-parse", "HEAD"]) || undefined;
 
+/** HEAD's first parent. Undefined for a root commit. */
+export const gitParent = (dir: string): string | undefined =>
+  git(dir, ["rev-parse", "--verify", "--quiet", "HEAD^"]) || undefined;
+
+/**
+ * The repository's own directory, absolute. Not always `<root>/.git`: in a
+ * linked worktree `.git` is a file pointing elsewhere, and that elsewhere is
+ * where git keeps a rebase's state and where a hook may keep its own.
+ */
+export const gitDir = (dir: string): string | undefined =>
+  git(dir, ["rev-parse", "--absolute-git-dir"]) || undefined;
+
 /** How many files carry uncommitted changes. */
 export function gitDirtyCount(dir: string): number | undefined {
   const out = git(dir, ["status", "--porcelain"]);

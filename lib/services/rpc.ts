@@ -52,11 +52,12 @@ import { hashToken } from "../util/tokens";
  */
 /**
  * Who placed the call when it was not an agent: a client-side hook that asks
- * on the agent's behalf (the Claude Code plugin's SessionStart and Stop).
- * Counted under its own name so `tool_usage` keeps describing agents -- see
- * `usageName`.
+ * on the agent's behalf (the Claude Code plugin's SessionStart and Stop) or a
+ * git hook reporting a commit. Counted under its own name so `tool_usage`
+ * keeps describing agents -- see `usageName`.
  */
-export type Carrier = "claude-code-hook";
+export const CARRIERS = ["claude-code-hook", "git-hook"] as const;
+export type Carrier = (typeof CARRIERS)[number];
 
 export type RpcContext = { userId: number; token?: string; carrier?: Carrier };
 
