@@ -75,6 +75,7 @@ const NO_STORE = new Set([
   "/verify",
   "/account",
   "/report",
+  "/me",
   "/search",
 ]);
 

@@ -38,6 +38,7 @@ type Kind = "read" | "write" | "automatic";
 const KIND = {
   getContext: "read",
   getContextNote: "read",
+  getDeveloper: "read",
   getTask: "read",
   getFileContext: "read",
   listTasks: "read",

@@ -24,6 +24,7 @@ import {
   addContextAction,
   createTaskAction,
   deleteContextAction,
+  updateContextAction,
   deleteProjectAction,
   inviteProjectAction,
   removeProjectMemberAction,
@@ -658,7 +659,11 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                   {projectContext.length === 0 ? (
                     <Empty>{t("projectContextEmpty")}</Empty>
                   ) : (
-                    <NoteGroups notes={projectContext} t={t} deleteAction={deleteContextAction} />
+                    <NoteGroups
+                      notes={projectContext}
+                      t={t}
+                      actions={{ remove: deleteContextAction, update: updateContextAction }}
+                    />
                   )}
                 </div>
               </div>

@@ -278,6 +278,21 @@ export const SHAPES = {
     model,
   },
 
+  /**
+   * The account-level brain: who the developer is, across every project. No
+   * project and no cwd, on purpose -- this is the call an agent with no
+   * checkout, or one that has just met this person, can make.
+   */
+  getDeveloper: {
+    shape: z
+      .enum(["text", "full"])
+      .optional()
+      .describe(
+        "'text' (default) answers with a plain-text brief under 6000 characters; 'full' with the JSON it is built from.",
+      ),
+    model,
+  },
+
   listTasks: {
     project: ref.optional(),
     cwd: ref

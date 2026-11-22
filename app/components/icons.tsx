@@ -18,7 +18,7 @@ const STROKE = {
   focusable: "false" as const,
 };
 
-export type IconName = "inbox" | "alert" | "terminal" | "doc" | "user";
+export type IconName = "inbox" | "alert" | "terminal" | "doc" | "user" | "brain";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   inbox: (
@@ -43,6 +43,17 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
       <path d="M14 3v6h6M8 13h8M8 17h5" />
+    </>
+  ),
+  // A node with its links: the brain here is a graph of what is known.
+  brain: (
+    <>
+      <circle cx="12" cy="12" r="2.5" />
+      <circle cx="5" cy="6" r="1.8" />
+      <circle cx="19" cy="6" r="1.8" />
+      <circle cx="5" cy="18" r="1.8" />
+      <circle cx="19" cy="18" r="1.8" />
+      <path d="m6.5 7.2 3.6 3.2M17.5 7.2l-3.6 3.2M6.5 16.8l3.6-3.2M17.5 16.8l-3.6-3.2" />
     </>
   ),
   user: (

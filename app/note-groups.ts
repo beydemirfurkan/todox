@@ -14,6 +14,10 @@ import type { ContextKind } from "@/lib/constants";
 
 /** What bites first, then why things are the way they are, then how, then taste. */
 export const NOTE_KIND_ORDER: readonly ContextKind[] = [
+  // Who the developer is comes before anything about code.
+  "profile",
+  "stack",
+  "workflow",
   "gotcha",
   "decision",
   "convention",

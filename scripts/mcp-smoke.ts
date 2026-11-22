@@ -520,6 +520,30 @@ async function runSuite(mode: Mode, token: string) {
     throw new Error("the note came back without its body");
   console.log("note reached the file:", rule.title);
   await text("delete_context", { context_id: fileNote.id });
+
+  // The developer's own brain: written account-wide, read with no project, and
+  // refused -- with a reason that says what to do -- when aimed at a project.
+  const profile = JSON.parse(
+    await text("add_context", {
+      kind: "profile",
+      title: "SMOKE-PROFILE",
+      body: "Writes TypeScript, reviews in Turkish.",
+    }),
+  );
+  const developer = await text("get_developer");
+  if (!developer.includes("SMOKE-PROFILE") || !developer.includes("reviews in Turkish"))
+    throw new Error(`get_developer did not carry the profile note in ${mode.label}`);
+  const refusedProfile = await text("add_context", {
+    cwd: SCRATCH,
+    kind: "profile",
+    title: "SMOKE-PROFILE-IN-PROJECT",
+    body: "x",
+    ...(mode.local ? {} : { repo_root: SCRATCH }),
+  });
+  if (!refusedProfile.includes("describes the developer"))
+    throw new Error(`a profile note aimed at a project was not refused in ${mode.label}`);
+  await text("delete_context", { context_id: profile.id });
+  console.log("get_developer carries the profile; a project profile is refused");
   const status = linked.files[0].status;
 
   // Fresh on both transports. A hash sent with a link is what the caller just

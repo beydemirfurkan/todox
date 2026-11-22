@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import {
   DEFAULT_PRIORITY,
   isContextKind,
+  isDeveloperKind,
   isEntryKind,
   isPriority,
   isStatus,
@@ -377,6 +378,7 @@ export async function addContextAction(fd: FormData) {
   const body = str(fd, "body");
   const kind = str(fd, "kind");
   if (!title || !body || !isContextKind(kind)) return;
+  if (project && isDeveloperKind(kind)) return;
   await contexts.create({
     user_id: user.id,
     project_id: project?.id ?? null,
@@ -384,6 +386,35 @@ export async function addContextAction(fd: FormData) {
     title,
     body,
   });
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Correcting a note from the panel. Until now only an agent could, through
+ * `update_context`; a person who saw a stale rule could delete it and nothing
+ * else. Same guard as the agent path: ownership first, and a project note
+ * cannot become one of the developer's kinds.
+ */
+export async function updateContextAction(fd: FormData) {
+  const user = await writingUser();
+  const id = num(fd, "context_id");
+  await assertContext(user.id, id);
+  const title = str(fd, "title");
+  const body = str(fd, "body");
+  const kind = str(fd, "kind");
+  if (!title || !body) return;
+  const patch = isContextKind(kind) ? { title, body, kind } : { title, body };
+  if (isDeveloperKind(patch.kind) && (await contexts.byId(id))?.project_id != null) return;
+  await contexts.update(id, patch);
+  revalidatePath("/", "layout");
+}
+
+/** Shows or hides an account-wide note on the public profile. */
+export async function setContextPublicAction(fd: FormData) {
+  const user = await writingUser();
+  const id = num(fd, "context_id");
+  await assertContext(user.id, id);
+  await contexts.setPublic(id, str(fd, "public") === "1");
   revalidatePath("/", "layout");
 }
 

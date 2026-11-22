@@ -68,7 +68,7 @@ function footer(slug: string, dropped: Record<string, number>): string {
 
 /** The longest footer `fill` could ask for, so its room is set aside first. */
 function worstCaseDropped(): Record<string, number> {
-  const names = ["rules", "tasks", "questions", "dead ends", "decisions", "changed files", "observations", "idle tasks"];
+  const names = ["developer notes", "rules", "tasks", "questions", "dead ends", "decisions", "changed files", "observations", "idle tasks"];
   return Object.fromEntries(names.map((name) => [name, 9999]));
 }
 
@@ -101,6 +101,7 @@ function keptAny(lines: string[], section: Section): boolean {
 function sections(brief: Briefing): Section[] {
   const tasks = [...brief.open_tasks].sort((a, b) => doingFirst(a.status) - doingFirst(b.status));
   return [
+    { name: "developer notes", heading: "The developer (who they are, what they use, how they work):", items: brief.developer.map(developerLine) },
     { name: "rules", heading: "Rules (account-wide):", items: brief.global_context.map(noteLine) },
     { name: "rules", heading: "Rules (this project):", items: brief.project_context.map(noteLine) },
     { name: "tasks", heading: "Live tasks:", items: tasks.map(taskLines) },
@@ -115,6 +116,14 @@ function sections(brief: Briefing): Section[] {
 }
 
 const doingFirst = (status: string) => (status === "doing" ? 0 : 1);
+
+/** The one section that carries bodies: it is short, and it is the point. */
+const DEVELOPER_LINE_CHARS = 700;
+
+function developerLine(note: { id: number; kind: string; title: string; body: string | null }): string {
+  const body = note.body ? `: ${note.body.replace(/\s+/g, " ").trim()}` : ` (note ${note.id})`;
+  return clip(`- [${note.kind}] ${note.title}${body}`, DEVELOPER_LINE_CHARS);
+}
 
 function noteLine(note: { id: number; kind: string; title: string }): string {
   return clip(`- [${note.kind}] ${note.title} (note ${note.id})`, LINE_CHARS);

@@ -245,6 +245,11 @@ CREATE TABLE IF NOT EXISTS contexts (
 CREATE INDEX IF NOT EXISTS idx_contexts_project ON contexts (project_id);
 CREATE INDEX IF NOT EXISTS idx_contexts_user ON contexts (user_id);
 
+-- Whether an account-wide note shows on the owner's public profile. Off by
+-- default and meaningful only with project_id NULL: a project note never
+-- reaches the profile, whatever this says.
+ALTER TABLE contexts ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
+
 -- Files in play, hashed at link time so we can tell the agent when a note it
 -- is about to trust describes code that has since moved on.
 -- Files in play. \`hash\` is what the file looked like when it was linked;

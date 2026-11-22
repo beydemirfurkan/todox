@@ -45,7 +45,7 @@ describe("the gate on a signed-out visitor", () => {
     expect(location(res)).toContain("/login");
   });
 
-  it.each(["/p/todox", "/p/todox/t/12", "/account", "/search", "/report"])(
+  it.each(["/p/todox", "/p/todox/t/12", "/account", "/search", "/report", "/me"])(
     "does not hand out %s",
     (path) => {
       expect(location(proxy(request(path)))).toContain("/login");
@@ -131,6 +131,11 @@ describe("cache headers", () => {
     // These render one account's rows. A shared cache holding one is the
     // failure worth spending a header on.
     const res = proxy(request("/report", signedIn));
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("keeps the brain page out of every cache: it is one person's profile", () => {
+    const res = proxy(request("/me", signedIn));
     expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 

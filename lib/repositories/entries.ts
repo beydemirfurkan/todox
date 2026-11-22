@@ -653,3 +653,48 @@ export async function openQuestionsByProjects(
     total: Number(rows[0]?.total ?? 0),
   };
 }
+
+/**
+ * Which models wrote this account's log since `since`, busiest first. Read
+ * through `idx_entries_created`, so the window bounds the scan.
+ */
+export async function modelsSince(
+  userId: number,
+  since: string,
+  limit: number,
+): Promise<{ model: string; entries: number }[]> {
+  const rows = await all<{ model: string; entries: string }>(
+    `SELECT e.model, COUNT(*) AS entries
+       FROM entries e
+       JOIN tasks t ON t.id = e.task_id
+       JOIN projects p ON p.id = t.project_id
+       LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+      WHERE e.created_at >= ? AND e.model IS NOT NULL
+        AND (p.user_id = ? OR pm.user_id IS NOT NULL)
+      GROUP BY e.model ORDER BY COUNT(*) DESC LIMIT ?`,
+    [userId, since, userId, limit],
+  );
+  return rows.map((r) => ({ model: r.model, entries: Number(r.entries) }));
+}
+
+/**
+ * Entries per project and kind since `since`, for the brain map: how much was
+ * written where, and of what. One grouped read over the window, through
+ * `idx_entries_created`; counts only.
+ */
+export async function kindCountsByProjectSince(
+  userId: number,
+  since: string,
+): Promise<{ project_id: number; kind: EntryKind; n: number }[]> {
+  const rows = await all<{ project_id: number; kind: EntryKind; n: string }>(
+    `SELECT t.project_id, e.kind, COUNT(*) AS n
+       FROM entries e
+       JOIN tasks t ON t.id = e.task_id
+       JOIN projects p ON p.id = t.project_id
+       LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+      WHERE e.created_at >= ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)
+      GROUP BY t.project_id, e.kind`,
+    [userId, since, userId],
+  );
+  return rows.map((r) => ({ project_id: r.project_id, kind: r.kind, n: Number(r.n) }));
+}

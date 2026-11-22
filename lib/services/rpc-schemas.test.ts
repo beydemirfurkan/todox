@@ -112,6 +112,21 @@ describe("parseParams", () => {
     ).toThrow(/invalid params/);
   });
 
+  it("get_developer takes no project: a cwd or a project is refused, not ignored", () => {
+    expect(() => parseParams("getDeveloper", { cwd: "/repo" })).toThrow(/invalid params/);
+    expect(() => parseParams("getDeveloper", { project: "x" })).toThrow(/invalid params/);
+    expect(() => parseParams("getDeveloper", { shape: "digest" })).toThrow(/invalid params/);
+    expect(parseParams("getDeveloper", { shape: "full" })).toEqual({ shape: "full" });
+  });
+
+  it("knows the developer's own note kinds, and nothing invented beside them", () => {
+    for (const kind of ["profile", "stack", "workflow"])
+      expect(() => parseParams("addContext", { kind, title: "x", body: "x" })).not.toThrow();
+    expect(() => parseParams("addContext", { kind: "persona", title: "x", body: "x" })).toThrow(
+      /invalid params/,
+    );
+  });
+
   it("rejects any unrecognised key rather than ignoring it", () => {
     expect(() => parseParams("updateTask", { task_id: 1, colour: "red" })).toThrow(
       /invalid params/,
@@ -177,6 +192,7 @@ describe("model field round-trips through parseParams on every method", () => {
     listProjects: {},
     listTasks: { project: "x" },
     getContext: { cwd: "/tmp" },
+    getDeveloper: {},
     getTask: { task_id: 1 },
     createProject: { name: "x" },
     updateProject: { project: "x", summary: "y" },

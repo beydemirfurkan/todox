@@ -135,6 +135,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 labels={{
                   navAccount: t("navAccount"),
                   navReport: t("navReport"),
+                  navBrain: t("navBrain"),
                   signOut: t("signOut"),
                   working: t("working"),
                 }}

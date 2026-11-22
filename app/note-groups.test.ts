@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ContextKind } from "@/lib/constants";
+import { CONTEXT_KINDS, type ContextKind } from "@/lib/constants";
 
 import { groupNotes, NOTE_KIND_ORDER, NOTES_PER_KIND } from "./note-groups";
 
@@ -18,14 +18,21 @@ const note = (kind: ContextKind, updated_at = "2026-08-01T00:00:00Z") => ({
 });
 
 describe("groupNotes", () => {
-  it("reads gotchas first, then decisions, conventions, preferences", () => {
+  it("reads the developer first, then gotchas, decisions, conventions, preferences", () => {
     const groups = groupNotes([
       note("preference"),
       note("convention"),
       note("decision"),
       note("gotcha"),
+      note("workflow"),
+      note("stack"),
+      note("profile"),
     ]);
     expect(groups.map((g) => g.kind)).toEqual(NOTE_KIND_ORDER);
+  });
+
+  it("drops no kind: every kind a note can be has a place in the order", () => {
+    expect([...NOTE_KIND_ORDER].sort()).toEqual([...CONTEXT_KINDS].sort());
   });
 
   it("leaves out a kind with nothing in it, rather than an empty heading", () => {

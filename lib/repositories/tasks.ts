@@ -537,3 +537,19 @@ export async function stalledByProjects(
     total: Number(rows[0]?.total ?? 0),
   };
 }
+
+/**
+ * How many tasks this account finished since `since`, across every project it
+ * can see. One number for `get_developer`'s "lately" line; the report has the
+ * detail.
+ */
+export async function countDoneSince(userId: number, since: string): Promise<number> {
+  const row = await one<{ n: string }>(
+    `SELECT COUNT(*) AS n FROM tasks t JOIN projects p ON p.id = t.project_id
+      LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+      WHERE (p.user_id = ? OR pm.user_id IS NOT NULL)
+        AND t.status = 'done' AND t.closed_at >= ?`,
+    [userId, userId, since],
+  );
+  return Number(row?.n ?? 0);
+}
