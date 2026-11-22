@@ -23,6 +23,7 @@ const CODES = [
   "oauthNoEmail",
   "oauthLastMethod",
   "oauthLinkExpired",
+  "hasSharedProjects",
   "registrationClosed",
 ] as const;
 

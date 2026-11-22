@@ -1,4 +1,5 @@
 import { all, one, run, type Statement } from "../db/client";
+import { now } from "../util/time";
 import type { ProjectMembership } from "../types";
 
 export type MembershipView = ProjectMembership & {
@@ -107,3 +108,75 @@ export const removeOwned = (ownerId: number, membershipId: number) =>
       WHERE pm.id = ? AND p.id = pm.project_id AND p.user_id = ?`,
     [membershipId, ownerId],
   );
+
+/** Whether this account already reaches some project under this route slug. */
+export const isAccessSlugTaken = async (userId: number, slug: string): Promise<boolean> =>
+  Boolean(
+    await one("SELECT 1 AS n FROM project_memberships WHERE user_id = ? AND access_slug = ?", [
+      userId,
+      slug,
+    ]),
+  );
+
+/**
+ * The incoming owner's membership, retired as the project becomes theirs.
+ *
+ * Guarded on the outgoing owner still holding the project, so a transfer that
+ * lost a race deletes nothing: the statements after it are guarded the same
+ * way and the whole transaction becomes a no-op.
+ */
+export const removeForTransferStmt = (input: {
+  projectId: number;
+  toUserId: number;
+  fromUserId: number;
+}): Statement => ({
+  text: `DELETE FROM project_memberships
+          WHERE project_id = ? AND user_id = ?
+            AND EXISTS (SELECT 1 FROM projects WHERE id = ? AND user_id = ?)`,
+  params: [input.projectId, input.toUserId, input.projectId, input.fromUserId],
+});
+
+/** The outgoing owner stays on as a member, once the project has moved. */
+export const createForTransferStmt = (input: {
+  projectId: number;
+  fromUserId: number;
+  toUserId: number;
+  accessSlug: string;
+  rootPath: string | null;
+}): Statement => ({
+  text: `INSERT INTO project_memberships
+           (project_id, user_id, access_slug, root_path, invited_by, created_at)
+         SELECT ?, ?, ?, ?, ?, ?
+          WHERE EXISTS (SELECT 1 FROM projects WHERE id = ? AND user_id = ?)`,
+  params: [
+    input.projectId,
+    input.fromUserId,
+    input.accessSlug,
+    input.rootPath,
+    input.toUserId,
+    now(),
+    input.projectId,
+    input.toUserId,
+  ],
+});
+
+export type SharedProject = { id: number; name: string; slug: string; members: number };
+
+/**
+ * Projects this account owns that somebody else is a member of.
+ *
+ * Deleting the account would take these, and the members' work in them, with
+ * it -- which is why account deletion asks for each to be handed on first.
+ */
+export async function sharedOwnedBy(userId: number): Promise<SharedProject[]> {
+  const rows = await all<{ id: number; name: string; slug: string; members: string }>(
+    `SELECT p.id, p.name, p.slug, COUNT(pm.id) AS members
+       FROM projects p
+       JOIN project_memberships pm ON pm.project_id = p.id
+      WHERE p.user_id = ?
+      GROUP BY p.id, p.name, p.slug
+      ORDER BY p.name`,
+    [userId],
+  );
+  return rows.map((r) => ({ ...r, members: Number(r.members) }));
+}
