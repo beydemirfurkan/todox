@@ -99,9 +99,16 @@ const localWorkspace: Workspace = {
  * never attaches, and the helpful "create a token on the Account page" message
  * comes out as an uncaught stack trace instead.
  */
+/**
+ * Past this, a tool call fails instead of hanging the agent's turn on a server
+ * that stopped answering. Well above the server's own 25-second statement
+ * timeout, so a slow but working call still comes back with its real answer.
+ */
+const TOOL_CALL_TIMEOUT_MS = 60_000;
+
 async function main() {
   const { token, url } = readConfig();
-  const call = createClient(url, token);
+  const call = createClient(url, token, { timeoutMs: TOOL_CALL_TIMEOUT_MS });
 
   // The MCP SDK consumes `initialize` before any tool callback runs, so we
   // cannot capture clientInfo from there. Instead, the parent process sets
