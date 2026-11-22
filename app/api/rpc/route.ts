@@ -8,7 +8,7 @@ import { userForApiToken } from "@/lib/services/auth";
 import { BadRequest, refusalReason, TooSlow } from "@/lib/services/errors";
 import { NotYours } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
-import { invoke, type Carrier } from "@/lib/services/rpc";
+import { CARRIERS, invoke, type Carrier } from "@/lib/services/rpc";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -122,11 +122,13 @@ const fail = (status: number, error: string, requestId: string) =>
   NextResponse.json({ ok: false, error }, { status, headers: idHeader(requestId) });
 
 /**
- * A client-side hook says so in a header, and only the one value is taken:
+ * A client-side hook says so in a header, and only the known values are taken:
  * anything else is an ordinary agent call. It changes nothing but the name the
  * call is counted under (`usageName`), so a caller that lies about it can only
  * hide its own calls from its own account's numbers.
  */
 function carrierOf(headers: Headers): { carrier?: Carrier } {
-  return headers.get("x-todox-carrier") === "claude-code-hook" ? { carrier: "claude-code-hook" } : {};
+  const claimed = headers.get("x-todox-carrier");
+  const carrier = CARRIERS.find((c) => c === claimed);
+  return carrier ? { carrier } : {};
 }
