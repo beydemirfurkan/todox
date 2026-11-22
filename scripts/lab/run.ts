@@ -7,6 +7,9 @@
  *   pnpm lab:run --dry-run            print the commands, run nothing
  *   pnpm lab:run --repeat 2           the whole lab twice, from a fresh setup
  *                                     each time, into <run>/r1 and <run>/r2
+ *   pnpm lab:run --habit              agents that have the habit `install:mcp`
+ *                                     writes (run lab:setup --habit first, or
+ *                                     let --repeat do it)
  *
  * Personas run side by side; one persona's sessions run in order, each in a
  * fresh process, so the only thing that carries from one to the next is what
@@ -34,6 +37,7 @@ import {
   RUNS,
   TSX,
 } from "./paths";
+import { memoryBlock } from "../install-mcp/memory";
 import { PERSONAS, personaByKey, type Persona, type PersonaKey, type Session } from "./personas";
 
 localDatabaseOnly("lab:run");
@@ -45,6 +49,12 @@ const MAX_BUDGET_USD = "5";
 const BASE_RUN_ID = process.env.TODOX_LAB_RUN ?? new Date().toISOString().slice(0, 10);
 /** `<run>`, or `<run>/r<n>` inside a repeated lab. Set once per repetition. */
 let RUN_ID = BASE_RUN_ID;
+/**
+ * Whether the agents run with the habit installed. Off, the lab measures the
+ * worst case -- connected, never told to use it -- which is what v1 and v2
+ * measured and stays the baseline.
+ */
+const HAS_HABIT = process.argv.includes("--habit");
 export const runDir = (persona: PersonaKey, session: number) =>
   join(RUNS, RUN_ID, `${persona}-s${session}`);
 
@@ -60,6 +70,7 @@ export interface SessionMeta {
   durationMs: number;
   exitCode: number | null;
   timedOut: boolean;
+  habit: boolean;
 }
 
 interface Command {
@@ -80,6 +91,9 @@ function claudeCommand(persona: PersonaKey, prompt: string): Command {
     args: [
       "-p",
       prompt,
+      // The user CLAUDE.md this run cannot read (project settings only),
+      // appended instead: see `writeHabit` in setup.ts.
+      ...(HAS_HABIT ? ["--append-system-prompt", memoryBlock()] : []),
       "--setting-sources",
       "project",
       "--settings",
@@ -279,6 +293,7 @@ async function runSession(p: Persona, n: number, isDryRun: boolean): Promise<voi
     durationMs,
     exitCode,
     timedOut,
+    habit: HAS_HABIT,
   };
   writeFileSync(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
   console.log(
@@ -319,11 +334,12 @@ function freshLabFor(personas: Persona[], isDryRun: boolean): void {
     return;
   }
   if (isDryRun) {
-    console.log(`[lab] ${RUN_ID}: would run lab:setup --reset`);
+    console.log(`[lab] ${RUN_ID}: would run lab:setup --reset${HAS_HABIT ? " --habit" : ""}`);
     return;
   }
-  console.log(`[lab] ${RUN_ID}: lab:setup --reset`);
-  execFileSync(TSX, [join(import.meta.dirname, "setup.ts"), "--reset"], { stdio: "inherit" });
+  const setupArgs = [join(import.meta.dirname, "setup.ts"), "--reset", ...(HAS_HABIT ? ["--habit"] : [])];
+  console.log(`[lab] ${RUN_ID}: lab:setup ${setupArgs.slice(1).join(" ")}`);
+  execFileSync(TSX, setupArgs, { stdio: "inherit" });
 }
 
 async function main(): Promise<void> {
