@@ -12,56 +12,64 @@ in `app/globals.css` under `@theme inline`.
 
 | Helper | For |
 | --- | --- |
-| `.sticker` / `.sticker-flat` | the white card on its layered shadow, and the quieter well inside it |
-| `.btn` / `.btn-quiet` | the graphite capsule (the action), and its outline twin (the second action) |
+| `.sticker` / `.paper` / `.sticker-flat` | the card surface (one step up from the page, hairline edge, no shadow), and the quieter well inside it |
+| `.btn` / `.btn-quiet` | the filled capsule (the action), and its outline twin (the second action) |
 | `.pill` | nav, report period and language pills |
-| `.link-more` | the wavy-underline text button |
-| `.lift` | hover raise |
+| `.link-more` | the underlined text button |
+| `.lift` | hover response on a whole card (a brightness step, never a raise) |
 | `.pop` | entry animation, staggered with an inline `animationDelay` |
 | `.row-action` | an action that appears on hover **and on touch** |
 | `.searchbox` | the search field frame |
 | `.on-fill` | dark text on a bright fill |
-| `.display` / `.mono` | Fraunces for headlines only; DM Mono for ids and paths. Body, controls and labels are Geist |
-| `.marker` | one phrase under the orange marker, inline in a heading |
-| `.tone-panel` + `.tone-mint` / `-butter` / `-sky` / `-apricot` / `-lilac` / `-sand` | a pastel surface: a panel behind a picture of the product, a stat tile |
-| `.frame` | a screenshot or a drawing of a screen set into a panel |
-| `.dot-grid` / `.scrap` | graph-paper background and a torn-edge scrap, for a collage |
-| `.site-band` (+ `.band-link`, `.band-label`) | the graphite band every page ends on |
-| `.board-col` + `data-drop-status` | a board column, washed by its status, and a drop target |
+| `.display` / `.mono` | Geist set heavy and tight for headings; DM Mono for ids, paths, counts and anything a terminal would print |
+| `.marker` | the one phrase of a heading in orange |
+| `.callout` | a notice that needs a look but is not an error: amber wash and edge, with `IconTile name="alert"` |
+| `.tone-panel` + `.tone-mint` / `-butter` / `-sky` / `-apricot` / `-lilac` / `-sand` | a dark-tinted surface behind a drawing of the product (the landing only) |
+| `.frame` | a drawing of a screen set into a panel |
+| `.site-band` (+ `.band-link`, `.band-label`) | the band every page ends on |
+| `.board-col` + `data-drop-status` | a board column (a neutral well, its status as a rule along the top) and a drop target |
+| `.stat-badge` | one number as a pill; `StatBadges` lays a row of them out |
 | `.prose` | 68ch measure for body copy |
 
-Components: `app/components/` (`Panel`, `Empty`, `Chip`, `Counter`, `Field`,
-`StatusDot`, `Blob`, and the decorative stickers) via the barrel
-`app/components/index.ts`. Client-side pieces: `app/features/`. The board's
+The page backdrop is `public/backdrop.svg`: faint line icons of the trade on
+a 480px tile, faded out down the page in `body`. It is an XML file, so its
+comment may not contain a double hyphen -- one did, and the file silently
+stopped drawing. Check it with `xmllint --noout public/backdrop.svg`.
+
+Components: `app/components/` via the barrel `app/components/index.ts` --
+`Panel`, `Empty`, `Chip`, `Counter`, `Field`, `StatusDot`, `StatBadges` (a row
+of numbers as badges: dot, mono figure, word), `IconTile` (a line icon on an inset tile,
+where a picture helps an empty state or a notice) and `LogoMark` (the prompt
+tile; brand only). Client-side pieces: `app/features/`. The board's
 drag-and-drop is `app/p/[slug]/board-dnd.tsx`.
 
 ## The look, in six rules
 
-A calm reading room with a scrapbook on the desk (tasks #809 and #811): a
-warm canvas, white cards that float, graphite ink, colour only where it means
-"look here".
+A developer tool, dark only (task #811, 2026-11-22): near-black graphite,
+surfaces one step up, hairlines instead of shadows, one orange.
 
-- **Pictures before paragraphs.** On a page somebody reads to decide -- the
-  landing, an empty state, the dashboard summary -- say it with a drawing of
-  the screen (markup in a `.frame`, so it follows theme and language) or a
-  number on a tile, and keep the sentence under it short.
-- **The panel is for people.** Agents never look at it. Every state a
-  person needs to act on is visible without opening anything, and everything
-  an agent can do to a task a person can do too -- the board's cards move by
-  drag *and* by a menu of plain forms.
-- **Orange is the one accent, and it is two tokens.** `--accent` is the
-  marker: a fill, a stroke, a highlight. Orange *text* is `--accent-ink`
-  (`text-accentInk`); an error in words is `--danger-ink`.
-- **Pastels are surfaces, never signals.** `--tone-*` colour a panel or a
-  tile with ink on it. A status or kind is a `Chip` (a dot and a pale wash,
-  ink text) or a `StatusDot` with its word -- colour never alone.
-- **Actions are a graphite capsule.** `.btn` is filled; the second action
-  beside it is `.btn-quiet`. Selected is the graphite pill
-  (`.seg[aria-current]`). Matte: no `backdrop-filter`, shadows from
-  `--shadow*` only, never a hard offset.
-- **Both themes.** Light is the default; `prefers-color-scheme: dark` swaps
-  the `:root` tokens, the pastels included (they go deep, so the cream ink
-  still reads). A literal colour gets neither theme.
+- **Dark is the only theme.** There is no light palette and no
+  `prefers-color-scheme` switch; `color-scheme: dark` and the viewport's
+  `themeColor` tell the browser so. Mail is the exception and stays light, for
+  the reason written above `BRAND` in `lib/services/mail-templates.ts`.
+- **Nothing casts a shadow.** Every `--shadow*` token is `none`. A surface is
+  told apart by its step in lightness and a 1px `--line` edge; a selected card
+  by a 1px `--accent` ring.
+- **Orange is the one accent, and it is two tokens.** `--accent` is a fill, a
+  stroke, a focus ring; orange *text* is `--accent-ink` (`text-accentInk`); an
+  error in words is `--danger-ink`.
+- **Colour is a dot, never a fill behind text.** A status or kind is a `Chip`
+  or a `StatusDot` with its word; a number in `StatBadges` has a dot beside
+  its word. The `--tone-*` tints are for the landing's drawings, not for
+  meaning, and colour never says anything alone.
+- **Dense, then readable.** 14px titles on cards, `text-meta` mono for ids and
+  times, headings in `.display` without `font-bold` (the class sets the
+  weight). A number a person scans for is a badge in `StatBadges`, never a big
+  tile: a summary costs one line of the screen.
+- **The panel is for people.** Agents never look at it. Every state a person
+  needs to act on is visible without opening anything, and everything an
+  agent can do to a task a person can do too -- the board's cards move by drag
+  *and* by a menu of plain forms.
 
 ## Mobile rules
 
@@ -132,16 +140,14 @@ const m=new Map();for(const e of document.querySelectorAll('main *')){if(![...e.
 ({stepCardOverPaper:(okL(card)-okL(paper)).toFixed(3), stepRowUnderCard:(okL(card)-okL(row)).toFixed(3), outlineOnPaper:cr(line,paper), under12px:[...m].filter(([k])=>parseFloat(k)<12), rows:[...m].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>n+'× '+k+' → '+cr(k.slice(k.indexOf(' ')+1),card))})
 ```
 
-The page is light now, so the WCAG ratio means what it says. What to hold:
-`under12px` is empty; any row that is a sentence (not `.mono`) reads at 6:1 or
-better against the card, metadata in `--faint` at 4.5:1 or better; orange and
-red text never use the fill tokens. The surface steps are deliberately small
-on cream — a card is cut out by its `--line` hairline and its soft shadow,
-not by a lighter fill — so `stepCardOverPaper` is not a target any more.
-
-**Run it twice**, once per theme: in Playwright, `page.emulateMedia({
-colorScheme: "dark" })` and the same script again. The dark tokens are a
-separate set, and a pair that passes on cream can fail on brown.
+What to hold, measured on the dark palette (2026-11-22): `under12px` is
+empty; any row that is a sentence (not `.mono`) reads at 6:1 or better
+against the card (`--muted` is 7.5:1), metadata in `--faint` at 4.5:1 or
+better (it is 5.2:1); orange and red text never use the fill tokens. The
+surface steps are deliberately small -- `stepCardOverPaper` is about 0.04 and
+the outline about 1.3:1 -- because a card is told apart by its hairline and
+its step together, the way the tools this sits beside do it. Do not let
+either drop below those numbers; raising them is fine.
 
 The `--on-fill` rows (dark text on chips) will show a low number against the
 card — they sit on a bright fill, not on the card, and are fine.

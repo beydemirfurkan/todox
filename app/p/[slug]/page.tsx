@@ -38,15 +38,15 @@ import { SubmitButton } from "../../features/submit";
 import { PanelLink } from "../../features/panel-link";
 import { ProjectSettingsDrawer } from "../../features/project-settings-drawer";
 import {
-  Blob,
   Chip,
   Composer,
-  Progress,
   Empty,
   ExpandableText,
   Field,
   Group,
+  IconTile,
   NoteGroups,
+  Progress,
   StatusDot,
 } from "../../components";
 import { privatePageMetadata } from "../../metadata-shared";
@@ -476,21 +476,15 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
         // judgement with the person who knows.
         <section
           aria-labelledby="twin-heading"
-          className="on-fill sticker pop flex items-start gap-3.5 p-4"
-          style={{ background: "var(--k-question)", animationDelay: "30ms" }}
+          className="callout pop flex items-start gap-3.5 p-4"
+          style={{ animationDelay: "30ms" }}
         >
-          <Blob
-            mood="worried"
-            size={46}
-            fill="var(--paper)"
-            stroke="var(--ink)"
-            className="shrink-0"
-          />
+          <IconTile name="alert" color="var(--k-question)" />
           <div className="min-w-0">
-            <h2 id="twin-heading" className="display text-[17px] font-bold">
+            <h2 id="twin-heading" className="text-[15px] font-semibold">
               {t("twinTitle", { name: project.name })}
             </h2>
-            <p className="mt-0.5 text-[14px]">{t("twinBody")}</p>
+            <p className="mt-0.5 text-[14px] text-muted">{t("twinBody")}</p>
             <ul className="mono mt-2 space-y-0.5 text-[12px]">
               {twins.map((p) => (
                 <li key={p.id} className="break-all">
@@ -513,26 +507,20 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
         // something that changes without a navigation; this changes with one.
         <section
           aria-labelledby="stale-heading"
-          className="on-fill sticker pop flex items-start gap-3.5 p-4"
-          style={{ background: "var(--k-question)", animationDelay: "40ms" }}
+          className="callout pop flex items-start gap-3.5 p-4"
+          style={{ animationDelay: "40ms" }}
         >
-          <Blob
-            mood="worried"
-            size={46}
-            fill="var(--paper)"
-            stroke="var(--ink)"
-            className="shrink-0"
-          />
+          <IconTile name="alert" color="var(--k-question)" />
           <div className="min-w-0">
             {/* A real heading, so the banner is something you can navigate to
                 rather than a bold paragraph that only looks like a title. The
                 count is the true one, whatever the list below shows. */}
-            <h2 id="stale-heading" className="display text-[17px] font-bold">
+            <h2 id="stale-heading" className="text-[15px] font-semibold">
               {stale.length === 1
                 ? t("staleTitleOne")
                 : t("staleTitleMany", { n: stale.length })}
             </h2>
-            <p className="mt-0.5 text-[14px]">{t("staleBody")}</p>
+            <p className="mt-0.5 text-[14px] text-muted">{t("staleBody")}</p>
             <ul className="mono mt-2 space-y-0.5 text-[12px]">
               {stale.slice(0, STALE_SHOWN).map((s) => (
                 <li key={s} className="break-all">

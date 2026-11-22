@@ -1,4 +1,4 @@
-import { Blob, type Mood } from "./blob";
+import { IconTile } from "./icons";
 
 /**
  * The header row a panel and a group share, so the two read as one family.
@@ -46,16 +46,10 @@ export function Panel({
   );
 }
 
-export function Empty({
-  children,
-  mood = "sleep",
-}: {
-  children: React.ReactNode;
-  mood?: Mood;
-}) {
+export function Empty({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 py-2">
-      <Blob mood={mood} size={38} fill="var(--inset)" stroke="var(--ink)" className="shrink-0" />
+      <IconTile name="inbox" />
       <p className="text-[14px] text-muted">{children}</p>
     </div>
   );

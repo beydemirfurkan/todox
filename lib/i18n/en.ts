@@ -498,6 +498,7 @@ export const en = {
   searchAllProjects: "all projects",
   searchNoResults: "Nothing matched. Try fewer words, or a term you know appears in what you are after.",
   searchPrompt: "Type a query up top.",
+  searchResultsTitle: "Results",
   resultsCount: "results",
   hit_task: "task",
   hit_entry: "log",

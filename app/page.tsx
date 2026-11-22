@@ -25,17 +25,18 @@ import { Picker } from "./features/picker";
 import { SubmitButton } from "./features/submit";
 import { kindOptions } from "./kinds";
 import {
-  Blob,
   Composer,
   Counter,
   Empty,
   Field,
   Group,
+  IconTile,
   NoteGroups,
   ProjectFields,
   ProjectLanes,
   ProjectRow,
   WaitingList,
+  StatBadges,
 } from "./components";
 import { QUIET_AFTER_DAYS } from "./p/[slug]/board";
 import { groupProjects, isLive } from "./project-groups";
@@ -257,12 +258,14 @@ export default async function Home() {
         // a document has one h1, and this is now it.
         <>
           <h1 className="display pop text-[32px] leading-[1.1] sm:text-[44px]">{t("projects")}</h1>
-          <StatTiles
-            tiles={[
-              { mark: "var(--k-decision)", n: live.length, label: t("statLive"), href: "#live" },
-              { mark: "var(--accent)", n: totals.doing, label: t("statDoing"), href: "#live" },
-              { mark: "var(--k-dead_end)", n: totals.blocked, label: t("statBlocked"), href: "#live" },
-              { mark: "var(--k-question)", n: waiting.items.length + waiting.omitted, label: t("statWaiting"), href: waiting.items.length > 0 ? "#waiting" : undefined },
+          <StatBadges
+            className="pop"
+            style={{ animationDelay: "30ms" }}
+            stats={[
+              { mark: "var(--k-decision)", value: live.length, label: t("statLive"), href: "#live" },
+              { mark: "var(--accent)", value: totals.doing, label: t("statDoing"), href: "#live" },
+              { mark: "var(--k-dead_end)", value: totals.blocked, label: t("statBlocked"), href: "#live" },
+              { mark: "var(--k-question)", value: waiting.items.length + waiting.omitted, label: t("statWaiting"), href: waiting.items.length > 0 ? "#waiting" : undefined },
             ]}
             label={t("statSummary")}
           />
@@ -296,7 +299,7 @@ export default async function Home() {
             <Counter n={live.length} label={t("projectsCount")} />
           </h2>
           {live.length === 0 ? (
-            <Empty mood="happy">{t("liveProjectsEmpty")}</Empty>
+            <Empty>{t("liveProjectsEmpty")}</Empty>
           ) : (
             <ProjectLanes
               lanes={live.map((p) => ({
@@ -352,7 +355,7 @@ export default async function Home() {
           delay={180}
         >
           {quiet.length === 0 ? (
-            <Empty mood="happy">{t("quietEmpty")}</Empty>
+            <Empty>{t("quietEmpty")}</Empty>
           ) : (
             <ul className="space-y-1.5">
               {quiet.map((p) => (
@@ -422,9 +425,9 @@ export default async function Home() {
         aria-labelledby="hook-up"
       >
         <div className="flex items-start gap-4">
-          <Blob mood="idle" size={52} fill="var(--k-handoff)" className="shrink-0" />
+          <IconTile name="terminal" color="var(--accent-ink)" />
           <div className="min-w-0 flex-1">
-            <h2 id="hook-up" className="display text-[18px] font-bold">
+            <h2 id="hook-up" className="text-[16px] font-semibold">
               {t("hookTitle")}
             </h2>
             <p className="mt-1 text-[14px] text-muted">{t("hookBody")}</p>
@@ -439,49 +442,3 @@ export default async function Home() {
   );
 }
 
-/**
- * The account in four numbers, each on its own pastel tile: how much is
- * moving and how much needs a person. A number with its words beside it,
- * never a colour alone; a tile with somewhere to go is a link to it.
- */
-function StatTiles({
-  tiles,
-  label,
-}: {
-  tiles: { mark: string; n: number; label: string; href?: string }[];
-  label: string;
-}) {
-  return (
-    <ul
-      aria-label={label}
-      className="sticker pop grid grid-cols-2 overflow-hidden lg:grid-cols-4"
-      style={{ animationDelay: "30ms" }}
-    >
-      {tiles.map((tile) => {
-        const body = (
-          <>
-            <span className="flex items-center gap-2 text-small text-muted">
-              <span aria-hidden="true" className="size-2 rounded-full" style={{ background: tile.mark }} />
-              {tile.label}
-            </span>
-            <span className="display mt-2 block text-[32px] leading-none tabular-nums">{tile.n}</span>
-          </>
-        );
-        return (
-          <li
-            key={tile.label}
-            className="min-w-0 border-line even:border-l [&:nth-child(n+3)]:border-t lg:[&:nth-child(n+2)]:border-l lg:[&:nth-child(n+3)]:border-t-0"
-          >
-            {tile.href ? (
-              <a href={tile.href} className="block p-4 hover:bg-[var(--wash)]">
-                {body}
-              </a>
-            ) : (
-              <div className="p-4">{body}</div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}

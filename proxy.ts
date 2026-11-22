@@ -44,6 +44,8 @@ const PUBLIC = [
   "/robots.txt",
   "/sitemap.xml",
   "/llms.txt",
+  // The page backdrop, drawn behind the landing and the sign-in pages too.
+  "/backdrop.svg",
   // The product screenshots the landing page shows somebody without an
   // account -- the one visitor they are for.
   "/screenshots/",

@@ -33,19 +33,20 @@ import { LogComposer, type KindStrings } from "../../../../features/log-composer
 import { Picker } from "../../../../features/picker";
 import { SubmitButton } from "../../../../features/submit";
 import {
-  Blob,
   Chip,
   Counter,
+  currentTab,
   Empty,
   EntryBody,
   ExpandableText,
   Field,
+  IconTile,
   Panel,
   RefBadge,
   StatusDot,
-  Tabs,
-  currentTab,
   type Tab,
+  Tabs,
+  StatBadges,
 } from "../../../../components";
 import { privatePageMetadata } from "../../../../metadata-shared";
 
@@ -181,7 +182,8 @@ export default async function TaskPage({
         </form>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
+      <KindTally entries={entries} files={refs.length} t={t} />
+
       <div className="min-w-0 space-y-5">
       <Panel delay={40} title={t("taskBrief")}>
             {/* Clamped: the brief sits between the reader and the history
@@ -368,9 +370,9 @@ export default async function TaskPage({
 
           <Panel delay={190} title={t("whatAgentSees")}>
             <div className="flex items-start gap-3">
-              <Blob mood="idle" size={44} fill="var(--k-handoff)" className="shrink-0" />
+              <IconTile name="terminal" color="var(--accent-ink)" />
               <p className="text-[14px] text-muted">
-                <code className="mono rounded border-[1.5px] border-line bg-accent px-1 text-[13px] break-all text-onFill">
+                <code className="mono rounded-[5px] border border-line bg-inset px-1.5 py-0.5 text-[13px] break-all text-[var(--accent-ink)]">
                   get_context(&quot;{slug}&quot;)
                 </code>{" "}
                 {t("agentSeesBody")}
@@ -380,18 +382,15 @@ export default async function TaskPage({
         </div>
       )}
       </div>
-
-      <KindTally entries={entries} files={refs.length} t={t} />
-      </div>
     </div>
   );
 }
 
 /**
- * The log at a glance, beside it: how many decisions, dead ends, open
- * questions and handoffs this task carries, each on its own pastel tile with
- * the word under the number. A person opening a task asks "has this been
- * tried, is anything waiting on me" before they read a single entry.
+ * The log at a glance, under the title: how many decisions, dead ends, open
+ * questions and handoffs this task carries, and the files in play. A person
+ * opening a task asks "has this been tried, is anything waiting on me"
+ * before they read a single entry.
  */
 function KindTally({
   entries,
@@ -402,28 +401,20 @@ function KindTally({
   files: number;
   t: T;
 }) {
-  const tiles: { kind: EntryKind; tone: string }[] = [
-    { kind: "decision", tone: "tone-sky" },
-    { kind: "dead_end", tone: "tone-apricot" },
-    { kind: "question", tone: "tone-butter" },
-    { kind: "handoff", tone: "tone-lilac" },
-  ];
+  const kinds: EntryKind[] = ["decision", "dead_end", "question", "handoff"];
   return (
-    <aside aria-label={t("logAtAGlance")} className="pop space-y-3 lg:sticky lg:top-4" style={{ animationDelay: "80ms" }}>
-      <ul className="grid grid-cols-2 gap-3">
-        {tiles.map((tile) => (
-          <li key={tile.kind} className={`tone-panel ${tile.tone} !p-4`}>
-            <span className="display block text-[30px] leading-none">
-              {entries.filter((e) => e.kind === tile.kind).length}
-            </span>
-            <span className="mt-1.5 block text-small text-muted">{kindLabel(t, tile.kind)}</span>
-          </li>
-        ))}
-      </ul>
-      <a href="?t=files" className="tone-panel tone-sand flex items-center justify-between !px-4 !py-3 text-small hover:brightness-[0.97]">
-        <span className="text-muted">{t("filesInPlay")}</span>
-        <span className="display text-[20px] leading-none">{files}</span>
-      </a>
-    </aside>
+    <StatBadges
+      label={t("logAtAGlance")}
+      className="pop"
+      style={{ animationDelay: "40ms" }}
+      stats={[
+        ...kinds.map((kind) => ({
+          label: kindLabel(t, kind),
+          value: entries.filter((e) => e.kind === kind).length,
+          mark: KIND_COLOR[kind],
+        })),
+        { label: t("filesInPlay"), value: files, mark: "var(--k-note)", href: "?t=files" },
+      ]}
+    />
   );
 }

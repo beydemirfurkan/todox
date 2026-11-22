@@ -213,14 +213,16 @@ textarea {
 body {
   position: relative;
   background-color: var(--paper);
-  /* A faint engineering grid, fading out down the page: texture for the
-     first screen, nothing behind the work further down. */
+  /* The desk a developer works at: the glyphs of the trade -- braces, a
+     prompt, a branch, a hash, a schema -- scattered at a slant and drawn so
+     faintly they read as texture, fading out down the page so nothing sits
+     behind the work. The tile is public/backdrop.svg. */
   background-image:
-    linear-gradient(to bottom, transparent 0, var(--paper) 720px),
-    linear-gradient(to right, var(--rule) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
-  background-size: 100% 100%, 48px 48px, 48px 48px;
-  background-repeat: no-repeat, repeat, repeat;
+    linear-gradient(to bottom, transparent 0, var(--paper) 900px),
+    url("/backdrop.svg");
+  background-size: 100% 100%, 480px 480px;
+  background-repeat: no-repeat, repeat;
+  background-position: 0 0, center -40px;
   color: var(--ink);
   font-family: var(--font-geist), ui-sans-serif, sans-serif;
   font-size: 16px;
@@ -312,46 +314,16 @@ summary:focus-visible,
 
 /* --------------------------------------------------------- the marker */
 
-/* A note scrawled in the margin: the display face in italic, the marker's
-   colour pressed hard enough to read (--accent-ink), a degree or two off
-   the line. For labels and asides, never for something a person must act on. */
-.scrawl {
-  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  font-style: italic;
-  font-weight: 450;
-  color: var(--accent-ink);
-  transform: rotate(-2deg);
-  transform-origin: left center;
-}
-/* The same hand, in ink: what is written *on* a label rather than about it. */
-.scrawl-ink {
-  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  font-style: italic;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-/* One phrase under the marker: orange ink with a rough stroke drawn beneath
-   it. The stroke is a background image so it wraps with the line. */
+/* One phrase in the brand colour: the headline's emphasis. */
 .marker {
   color: var(--accent-ink);
 }
 
-/* The name label stuck on a notebook's cover. */
-.name-label {
-  background: var(--card);
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  padding: 8px 12px 6px;
-  box-shadow: var(--shadow-lg);
-}
-
-/* The graphite band the page ends on: the calm after the colour above it.
-   The orange stays for one phrase inside it, not for the band. */
+/* The band the page ends on: a step darker than the page, under a hairline. */
 .site-band {
   background: var(--band);
   color: var(--band-ink);
-  border-radius: 40px 40px 0 0;
+  border-top: 1px solid var(--line);
 }
 .site-band .band-link {
   color: var(--band-muted);
@@ -370,15 +342,33 @@ summary:focus-visible,
   background: var(--accent);
   color: var(--on-fill);
 }
-@media (max-width: 640px) {
-  .site-band {
-    border-radius: 28px 28px 0 0;
-  }
+/* One number as a badge: dot, mono figure, the word. `StatBadges` lays a
+   row of them out; a long label wraps inside its badge rather than off it. */
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 14px 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  font-size: 13.5px;
+  line-height: 1.3;
 }
 
-/* --------------------------------------------------------- pastel panels */
+/* A notice that needs a look but is not an error: a faint amber wash and
+   edge on the card surface, the icon in amber, the heading says what it is. */
+.callout {
+  background: color-mix(in srgb, var(--k-question) 6%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--k-question) 32%, var(--line));
+  border-radius: var(--radius-card);
+  color: var(--ink);
+}
 
-/* A pastel panel: the coloured surface a picture of the product sits on.
+/* --------------------------------------------------------- tinted panels */
+
+/* A tinted panel: the dark-tinted surface a drawing of the product sits on.
    The tone is a class (`tone-mint` ...), so a panel's colour is decided
    where it is drawn and the palette stays in one place. */
 .tone-panel {
@@ -393,8 +383,8 @@ summary:focus-visible,
 .tone-lilac { background: var(--tone-lilac); }
 .tone-sand { background: var(--tone-sand); }
 
-/* A screenshot, or a drawing of a screen, set into a panel: white, rounded
-   a step tighter than the panel, lifted on its own shadow. */
+/* A screenshot, or a drawing of a screen, set into a panel: the card
+   surface, rounded a step tighter than the panel, edged by a hairline. */
 .frame {
   background: var(--card);
   border-radius: var(--radius-inner);
@@ -402,34 +392,7 @@ summary:focus-visible,
   overflow: hidden;
 }
 
-/* A strip of masking tape holding a note down: translucent, a little
-   crooked, its ends cut square. Decoration only. */
-.tape {
-  position: absolute;
-  top: -9px;
-  left: 50%;
-  width: 64px;
-  height: 18px;
-  translate: -50% 0;
-  rotate: -4deg;
-  background: color-mix(in srgb, var(--tone-sand) 75%, transparent);
-  border-left: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
-  border-right: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
-}
-
-/* Graph paper, for the back of a collage. */
-.dot-grid {
-  background-image: radial-gradient(var(--line) 1.2px, transparent 1.3px);
-  background-size: 18px 18px;
-}
-
-/* A scrap of paper torn off a pad: the jagged edge is a clip-path, so it
-   wraps whatever colour the tone class gives it. Decoration only. */
-.scrap {
-  clip-path: polygon(0% 6%, 6% 0%, 14% 4%, 22% 0%, 31% 5%, 40% 1%, 49% 4%, 58% 0%, 67% 5%, 76% 1%, 85% 4%, 93% 0%, 100% 5%, 98% 100%, 0% 97%);
-}
-
-/* ------------------------------------------------------------- stickers */
+/* ------------------------------------------------------------- surfaces */
 
 /* A surface: one step up from the page, a hairline edge, no shadow.
    `.paper` is the same surface for a card that is not a `.sticker`. */
@@ -1643,7 +1606,7 @@ pre {
 @keyframes pop-in {
   from {
     opacity: 0;
-    transform: translateY(9px) rotate(-1deg);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -1651,25 +1614,11 @@ pre {
   }
 }
 .pop {
-  animation: pop-in 0.42s cubic-bezier(0.24, 1.2, 0.4, 1) both;
-}
-
-@keyframes bob {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-3deg);
-  }
-  50% {
-    transform: translateY(-3px) rotate(3deg);
-  }
-}
-.bob {
-  animation: bob 3.4s ease-in-out infinite;
+  animation: pop-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pop,
-  .bob {
+  .pop {
     animation: none;
   }
   .lift:hover {
@@ -1818,7 +1767,7 @@ pre {
      paint is an inline background, which this mode forces to Canvas -- the same
      colour as what is behind them. Without a ring they stop being on the page at
      all. Scoped to the round decorative spans rather than to `[aria-hidden]`,
-     which would also catch every mascot and rule. */
+     which would also catch every icon and rule. */
   span[aria-hidden="true"].rounded-full {
     border-color: CanvasText;
   }

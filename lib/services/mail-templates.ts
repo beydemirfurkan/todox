@@ -14,20 +14,21 @@
  */
 
 /**
- * The app's light palette (task #809). A mail client has no dark-mode token
- * to follow, and cream with charcoal reads in both: clients that invert
- * colours invert a light message cleanly, which they never did for the old
- * near-black one. `accent` is the orange pressed hard enough to be link text
- * (5:1 on the paper); the button is an outline, as in the app.
+ * Mail stays light while the app is dark (task #811), on purpose: a mail
+ * client has no dark-mode token to follow, and clients that invert colours
+ * invert a light message cleanly, which they never did for a near-black one.
+ * So the app's neutrals, lifted to their light counterparts, and its one
+ * orange -- `accent` is that orange pressed hard enough to be link text (5:1
+ * on the paper); the button is an outline, as in the app.
  */
 const BRAND = {
-  paper: "#f7efe9",
-  card: "#fdfbf9",
-  ink: "#171717",
-  head: "#2b1a07",
-  muted: "#574b42",
+  paper: "#f4f4f5",
+  card: "#ffffff",
+  ink: "#18181b",
+  head: "#09090b",
+  muted: "#52525b",
   accent: "#b84508",
-  rule: "#e5d9cd",
+  rule: "#e4e4e7",
 } as const;
 
 /**

@@ -18,7 +18,13 @@ import {
   revokeTokenAction,
   updateNameAction,
 } from "../auth-actions";
-import { Blob, Chip, Counter, Empty, Panel } from "../components";
+import {
+  Chip,
+  Counter,
+  Empty,
+  IconTile,
+  Panel,
+} from "../components";
 import { privatePageMetadata } from "../metadata-shared";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
@@ -127,9 +133,9 @@ export default async function AccountPage({
   return (
     <div className="space-y-6">
       <div className="sticker pop flex flex-wrap items-center gap-x-4 gap-y-3 p-4">
-        <Blob mood="happy" size={48} className="shrink-0" />
+        <IconTile name="user" color="var(--accent-ink)" className="!size-12" />
         <div className="min-w-[12rem] flex-1">
-          <h1 className="display text-[26px] leading-tight font-bold sm:text-[30px]">
+          <h1 className="display text-[26px] leading-tight sm:text-[30px]">
             {user.name}
           </h1>
           <p className="mono mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
@@ -151,19 +157,12 @@ export default async function AccountPage({
       {!user.email_verified_at && (
         <div
           role="status"
-          className="on-fill sticker pop flex flex-wrap items-center gap-3 p-4"
-          style={{ background: "var(--k-question)" }}
+          className="callout pop flex flex-wrap items-center gap-3 p-4"
         >
-          <Blob
-            mood="worried"
-            size={40}
-            fill="var(--paper)"
-            stroke="var(--ink)"
-            className="shrink-0"
-          />
+          <IconTile name="alert" color="var(--k-question)" />
           <div className="min-w-[15rem] flex-1">
-            <p className="display text-[15px] font-bold">{t("verifyPending")}</p>
-            <p className="text-[13.5px]">{t("verifyPendingNote")}</p>
+            <p className="text-[15px] font-semibold">{t("verifyPending")}</p>
+            <p className="text-[13.5px] text-muted">{t("verifyPendingNote")}</p>
           </div>
           <form action={resendVerificationAction} className="shrink-0">
             <SubmitButton className="btn btn-quiet" pendingLabel={t("sendingLink")}>

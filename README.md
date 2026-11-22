@@ -34,7 +34,7 @@ repository, whichever machine or agent touched it last:
 
 | Projects | One project |
 | --- | --- |
-| <img src="public/screenshots/dashboard.jpg" width="420" alt="The projects page: what is in flight in each, where the last session left off, and the notes that hold in every project"> | <img src="public/screenshots/project.jpg" width="420" alt="A project page: the task in flight with its dead ends and decisions counted, the standing notes, then queued and done work"> |
+| <img src="public/screenshots/dashboard.jpg" width="420" alt="The projects page: the totals, what is waiting on you, and each project in flight with its progress and where the last session left off"> | <img src="public/screenshots/project.jpg" width="420" alt="A project board: queued, doing and blocked columns, a strip to drop finished work on, and the open task's log beside them"> |
 
 ## What goes in a log
 

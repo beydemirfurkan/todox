@@ -487,6 +487,7 @@ export const tr: Record<Key, string> = {
   searchAllProjects: "tüm projeler",
   searchNoResults: "Eşleşen bir şey yok. Daha az kelime dene, ya da aradığın şeyde geçtiğini bildiğin bir terim.",
   searchPrompt: "Yukarıdaki kutuya bir şey yaz.",
+  searchResultsTitle: "Sonuçlar",
   resultsCount: "sonuç",
   hit_task: "görev",
   hit_entry: "kayıt",

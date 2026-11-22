@@ -14,21 +14,24 @@ const ROOT = process.cwd();
 const W = 1200;
 const H = 630;
 
-// The notebook palette (task #809): cream paper, charcoal ink, one marker.
-const PAPER = "#fdfbf9";
-const DOT = "#ebe1d7";
-const INK = "#171717";
-const HEAD = "#2b1a07";
-const ACCENT = "#ff6f1e";
-const ACCENT_INK = "#b84508";
-const LINE = "#c9bcae";
+// The dark palette (task #811): near-black graphite, one orange, the kind
+// colours as dots. Same values as the tokens in app/globals.css.
+const PAPER = "#09090b";
+const CARD = "#111114";
+const GRID = "#1b1b20";
+const INK = "#fafafa";
+const MUTED = "#a3a3ad";
+const FAINT = "#85858f";
+const LINE = "#24242a";
+const ACCENT = "#ff7a2e";
+const ACCENT_INK = "#ff9a5c";
+const ON_FILL = "#111111";
 
 /**
  * satori needs a real font file; woff2 is not supported, so ask for TTF.
  * Old Android is the UA that makes Google serve a plain .ttf; modern ones get
  * woff2 and MSIE gets an extensionless webfont blob, neither of which satori
- * can parse. Static instances only, so Fraunces comes without its SOFT axis
- * here -- close enough at card size.
+ * can parse.
  */
 async function googleTtf(family: string): Promise<ArrayBuffer | null> {
   try {
@@ -44,50 +47,51 @@ async function googleTtf(family: string): Promise<ArrayBuffer | null> {
   }
 }
 
-function Blob({ size }: { size: number }) {
+/** The mark: the same tile, prompt and cursor as app/icon.svg. */
+function Mark({ size }: { size: number }) {
   return (
-    <svg width={size} height={(size * 74) / 76} viewBox="0 0 76 74">
-      <g stroke={INK} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        <path d="M15 37C9 22 23 9 39 11c17 2 26 14 22 29-4 14-22 24-35 18-8-4-6-9-11-21Z" fill={ACCENT} />
-        <path d="M38 11c1-4 4-5 6-3" />
-        <circle cx="30" cy="35" r="3.4" fill={INK} stroke="none" />
-        <circle cx="47" cy="33" r="3.4" fill={INK} stroke="none" />
-        <path d="M31 44q7 9 15 0" />
-      </g>
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="8" fill={ACCENT} />
+      <path d="M9 11l5 5-5 5" fill="none" stroke={ON_FILL} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17 21h6" stroke={ON_FILL} strokeWidth="2.6" strokeLinecap="round" />
     </svg>
   );
 }
 
-function Chip({ label, fill }: { label: string; fill: string }) {
+/** One of the kinds the log keeps: a dot in its colour and the word. */
+function Kind({ label, color }: { label: string; color: string }) {
   return (
     <div
       style={{
         display: "flex",
-        background: fill,
-        color: INK,
-        border: `1.5px solid ${INK}`,
-        borderRadius: 20,
-        padding: "4px 16px 6px",
-        fontSize: 24,
-        fontFamily: "Geist",
+        alignItems: "center",
+        gap: 10,
+        background: CARD,
+        border: `1px solid ${LINE}`,
+        borderRadius: 999,
+        padding: "6px 18px 8px 14px",
+        fontSize: 22,
+        fontFamily: "DM Mono",
+        color: MUTED,
       }}
     >
+      <div style={{ display: "flex", width: 10, height: 10, borderRadius: 10, background: color }} />
       {label}
     </div>
   );
 }
 
 async function main() {
-  const [display, italic, sans] = await Promise.all([
-    googleTtf("Fraunces:wght@600"),
-    googleTtf("Fraunces:ital,wght@1,500"),
+  const [bold, regular, mono] = await Promise.all([
+    googleTtf("Geist:wght@600"),
     googleTtf("Geist:wght@400"),
+    googleTtf("DM+Mono:wght@400"),
   ]);
-  console.log(display && italic && sans ? "using Fraunces + Geist" : "a font fetch failed, using the default for it");
+  console.log(bold && regular && mono ? "using Geist + DM Mono" : "a font fetch failed, using the default for it");
   const fonts = [
-    ...(display ? [{ name: "Fraunces", data: display, weight: 600 as const, style: "normal" as const }] : []),
-    ...(italic ? [{ name: "Fraunces", data: italic, weight: 500 as const, style: "italic" as const }] : []),
-    ...(sans ? [{ name: "Geist", data: sans, weight: 400 as const, style: "normal" as const }] : []),
+    ...(bold ? [{ name: "Geist", data: bold, weight: 600 as const, style: "normal" as const }] : []),
+    ...(regular ? [{ name: "Geist", data: regular, weight: 400 as const, style: "normal" as const }] : []),
+    ...(mono ? [{ name: "DM Mono", data: mono, weight: 400 as const, style: "normal" as const }] : []),
   ];
 
   const image = new ImageResponse(
@@ -98,62 +102,36 @@ async function main() {
           height: H,
           display: "flex",
           flexDirection: "column",
+          justifyContent: "space-between",
+          padding: "60px 72px 56px",
           background: PAPER,
-          backgroundImage: `radial-gradient(${DOT} 1.5px, transparent 1.5px)`,
-          backgroundSize: "26px 26px",
-          fontFamily: "Fraunces",
+          backgroundImage: `linear-gradient(to right, ${GRID} 1px, transparent 1px), linear-gradient(to bottom, ${GRID} 1px, transparent 1px)`,
+          backgroundSize: "48px 48px",
+          fontFamily: "Geist",
           color: INK,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", padding: "56px 72px 0", flexGrow: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <Blob size={60} />
-            <div style={{ display: "flex", fontSize: 46, fontWeight: 600, color: HEAD }}>todox</div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              marginTop: 34,
-              fontSize: 30,
-              fontStyle: "italic",
-              fontWeight: 500,
-              color: ACCENT_INK,
-              transform: "rotate(-1.5deg)",
-            }}
-          >
-            for developers, and the agents they work with —
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", marginTop: 10, fontSize: 84, lineHeight: 1.04, fontWeight: 600, color: HEAD }}>
-            <div style={{ display: "flex", whiteSpace: "nowrap" }}>the notebook your agent</div>
-            <div style={{ display: "flex", alignItems: "flex-end" }}>
-              <div style={{ display: "flex", flexDirection: "column", color: ACCENT_INK }}>
-                actually keeps
-                <div style={{ display: "flex", height: 7, marginTop: -8, borderRadius: 7, background: ACCENT, transform: "rotate(-0.6deg)" }} />
-              </div>
-            </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <Mark size={56} />
+          <div style={{ display: "flex", fontSize: 44, fontWeight: 600, letterSpacing: -1.5 }}>todox</div>
+          <div style={{ display: "flex", marginLeft: 8, paddingLeft: 20, borderLeft: `1px solid ${LINE}`, fontSize: 22, fontFamily: "DM Mono", color: FAINT }}>
+            MCP server · open source
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: ACCENT,
-            borderRadius: "48px 48px 0 0",
-            padding: "26px 72px 30px",
-            borderTop: `1.5px solid ${LINE}`,
-          }}
-        >
+        <div style={{ display: "flex", flexDirection: "column", fontSize: 96, lineHeight: 1.02, fontWeight: 600, letterSpacing: -4 }}>
+          <div style={{ display: "flex" }}>working memory</div>
+          <div style={{ display: "flex", color: ACCENT_INK }}>for your agents</div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: 12 }}>
-            <Chip label="decision" fill="#7db4f5" />
-            <Chip label="dead end" fill="#ff8a70" />
-            <Chip label="question" fill="#ffc94d" />
-            <Chip label="handoff" fill="#c3a8ff" />
+            <Kind label="decision" color="#7db4f5" />
+            <Kind label="dead_end" color="#ff8a70" />
+            <Kind label="question" color="#ffc94d" />
+            <Kind label="handoff" color="#c3a8ff" />
           </div>
-          <div style={{ display: "flex", fontSize: 24, fontFamily: "Geist", color: INK }}>todox.dev</div>
+          <div style={{ display: "flex", fontSize: 24, fontFamily: "DM Mono", color: MUTED }}>todox.dev</div>
         </div>
       </div>
     ),
