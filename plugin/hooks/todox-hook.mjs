@@ -365,64 +365,6 @@ async function observe({ ctx, rpc, sessionId, cwd }) {
   });
 }
 
-// mcp/hook/session-end.ts
-async function sessionEnd(ctx) {
-  await observeSession(ctx);
-  return null;
-}
-
-// mcp/hook/session-start.ts
-var REMINDER = "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on every task it names.";
-var PREAMBLE = "todox fetched this project's briefing for you (digest; get_context with a focus has the bodies). Before finishing: session_status with cwd, then a handoff on every task it names.";
-var DIGEST_CHARS = 9200;
-async function sessionStart(ctx) {
-  recordStart(ctx);
-  if (!ctx.rpc) {
-    ctx.log("session-start", "no token (CLAUDE_PLUGIN_OPTION_TOKEN): reminder only");
-    return inject(REMINDER);
-  }
-  if (!ctx.input.cwd) return inject(REMINDER);
-  try {
-    const result = await ctx.rpc("getContext", {
-      cwd: ctx.input.cwd,
-      ...remoteOf(ctx, ctx.input.cwd),
-      shape: "digest",
-      max_chars: DIGEST_CHARS,
-      create_if_missing: false
-    });
-    if (typeof result.digest !== "string") throw new Error("getContext answered without a digest");
-    return inject(`${PREAMBLE}
-
-${result.digest}`);
-  } catch (e) {
-    ctx.log("session-start", `briefing not fetched, reminder only: ${e.message}`);
-    return inject(REMINDER);
-  }
-}
-function recordStart(ctx) {
-  const sessionId = ctx.input.session_id;
-  try {
-    pruneSessions(ctx.config.dataDir);
-    if (sessionId) appendEvent(ctx.config.dataDir, sessionId, { t: "start", at: ctx.now().toISOString(), ...baseline(ctx) });
-  } catch (e) {
-    ctx.log("session-start", `state not written: ${e.message}`);
-  }
-}
-function baseline(ctx) {
-  if (ctx.input.source && ctx.input.source !== "startup" && ctx.input.source !== "clear") return {};
-  const dir = ctx.input.cwd ? ctx.git.root(ctx.input.cwd) : void 0;
-  const head = dir ? ctx.git.head(dir) : void 0;
-  return head ? { head } : {};
-}
-function remoteOf(ctx, cwd) {
-  const dir = ctx.git.root(cwd);
-  const remote = dir ? ctx.git.remote(dir) : void 0;
-  return remote ? { repo_url: remote } : {};
-}
-function inject(text) {
-  return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } };
-}
-
 // mcp/hook/stop.ts
 var MAX_WINDOW_HOURS = 168;
 async function stop(ctx) {
@@ -487,6 +429,92 @@ function editsWithoutTask(ctx, sessionId, events) {
   return { systemMessage: NO_TASK_MESSAGE };
 }
 
+// mcp/hook/pre-compact.ts
+var MAX_CHARS = 4e3;
+async function preCompact(ctx) {
+  const { session_id: sessionId, cwd } = ctx.input;
+  if (!sessionId || !cwd || ctx.config.stopMode === "off") return null;
+  const events = readEvents(ctx.config.dataDir, sessionId);
+  if (events.some((e) => e.t === "optout")) return null;
+  const taskIds = new Set(events.flatMap((e) => e.t === "task" ? [e.id] : []));
+  if (taskIds.size === 0) return events.some((e) => e.t === "edit") ? UNTRACKED_EDITS : null;
+  const owed = await owedTasks(ctx, cwd, taskIds, windowHours(events, ctx.now()));
+  if (owed.length === 0 && !ctx.rpc) return summaryInstructions([...taskIds].map((id) => `- #${id}`));
+  if (owed.length === 0) return null;
+  return summaryInstructions(owed.map(describeOwed));
+}
+function describeOwed(task) {
+  const why = [task.status === "doing" ? "still 'doing'" : null, task.handoff_missing ? "no handoff since its last change" : null].filter(Boolean).join("; ");
+  return `- #${task.id} "${task.title}"${why ? `: ${why}` : ""}`;
+}
+function summaryInstructions(taskLines) {
+  return [
+    "todox: this session touched tasks it has not written up, and what is not in todox is lost with this compaction.",
+    "In the summary, keep for each task below: its id, its true status, the decisions made and why, every approach that failed and why, and the next step.",
+    ...taskLines,
+    "Also keep this instruction in the summary: right after compaction, before anything else, write these up in todox -- update_task to the true status, log_entry(kind:'dead_end') for each failed approach, log_entry(kind:'handoff') with the state, the next step and what to watch. Pass your model id."
+  ].join("\n").slice(0, MAX_CHARS);
+}
+var UNTRACKED_EDITS = "todox: this session edited files but wrote nothing to todox. In the summary, keep what was changed and why, and every approach that failed and why. Also keep this instruction: if the work will not finish this session, create_task with cwd and log_entry(kind:'handoff') right after compaction; record failed approaches as dead_end.";
+
+// mcp/hook/session-end.ts
+async function sessionEnd(ctx) {
+  await observeSession(ctx);
+  return null;
+}
+
+// mcp/hook/session-start.ts
+var REMINDER = "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on every task it names.";
+var PREAMBLE = "todox fetched this project's briefing for you (digest; get_context with a focus has the bodies). Before finishing: session_status with cwd, then a handoff on every task it names.";
+var DIGEST_CHARS = 9200;
+async function sessionStart(ctx) {
+  recordStart(ctx);
+  if (!ctx.rpc) {
+    ctx.log("session-start", "no token (CLAUDE_PLUGIN_OPTION_TOKEN): reminder only");
+    return inject(REMINDER);
+  }
+  if (!ctx.input.cwd) return inject(REMINDER);
+  try {
+    const result = await ctx.rpc("getContext", {
+      cwd: ctx.input.cwd,
+      ...remoteOf(ctx, ctx.input.cwd),
+      shape: "digest",
+      max_chars: DIGEST_CHARS,
+      create_if_missing: false
+    });
+    if (typeof result.digest !== "string") throw new Error("getContext answered without a digest");
+    return inject(`${PREAMBLE}
+
+${result.digest}`);
+  } catch (e) {
+    ctx.log("session-start", `briefing not fetched, reminder only: ${e.message}`);
+    return inject(REMINDER);
+  }
+}
+function recordStart(ctx) {
+  const sessionId = ctx.input.session_id;
+  try {
+    pruneSessions(ctx.config.dataDir);
+    if (sessionId) appendEvent(ctx.config.dataDir, sessionId, { t: "start", at: ctx.now().toISOString(), ...baseline(ctx) });
+  } catch (e) {
+    ctx.log("session-start", `state not written: ${e.message}`);
+  }
+}
+function baseline(ctx) {
+  if (ctx.input.source && ctx.input.source !== "startup" && ctx.input.source !== "clear") return {};
+  const dir = ctx.input.cwd ? ctx.git.root(ctx.input.cwd) : void 0;
+  const head = dir ? ctx.git.head(dir) : void 0;
+  return head ? { head } : {};
+}
+function remoteOf(ctx, cwd) {
+  const dir = ctx.git.root(cwd);
+  const remote = dir ? ctx.git.remote(dir) : void 0;
+  return remote ? { repo_url: remote } : {};
+}
+function inject(text) {
+  return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } };
+}
+
 // mcp/hook/user-prompt-submit.ts
 var OPT_OUT = /\b(no-handoff|todox off)\b/i;
 async function userPromptSubmit(ctx) {
@@ -505,6 +533,7 @@ var HANDLERS = {
   "post-tool-use": postToolUse,
   "user-prompt-submit": userPromptSubmit,
   stop,
+  "pre-compact": preCompact,
   "session-end": sessionEnd
 };
 async function runHook(event, rawInput, env) {
@@ -546,7 +575,7 @@ async function readStdin() {
 async function main() {
   const event = process.argv[2] ?? "";
   const output = await runHook(event, await readStdin(), process.env);
-  if (output) process.stdout.write(JSON.stringify(output));
+  if (output) process.stdout.write(typeof output === "string" ? output : JSON.stringify(output));
 }
 if (process.argv[1]?.endsWith("todox-hook.mjs")) {
   main().catch((e) => {

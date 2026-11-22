@@ -14,6 +14,8 @@ export interface HookInput {
   tool_input?: Record<string, unknown>;
   tool_response?: unknown;
   prompt?: string;
+  /** PreCompact: "manual" for /compact, "auto" when the context filled. */
+  trigger?: string;
 }
 
 /**
@@ -34,5 +36,10 @@ export interface HookContext {
   git: HookGit;
 }
 
-/** Printed to stdout as JSON; null prints nothing. */
-export type HookOutput = Record<string, unknown> | null;
+/**
+ * Printed to stdout: an object as JSON, a string as it is, null as nothing.
+ * The string is PreCompact's: Claude Code reads that hook's plain stdout as
+ * instructions for the compaction summary, and a JSON object there would be
+ * read as text.
+ */
+export type HookOutput = Record<string, unknown> | string | null;
