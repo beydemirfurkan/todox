@@ -45,11 +45,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const tabIds = ["profile", "public", "email", "password", "connections", "tokens", "invites"] as const;
+const tabIds = ["profile", "public", "signin", "tokens", "invites"] as const;
 type TabId = (typeof tabIds)[number];
 
-function isTabId(value: string | undefined): value is TabId {
-  return tabIds.includes(value as TabId);
+/**
+ * Email, password and connected accounts were three tabs and are now one,
+ * because seven no longer fit beside the sidebar. Their old addresses are
+ * still linked from the sign-in redirects and from mail, so they keep working.
+ */
+const SIGNIN_ALIASES = new Set(["email", "password", "connections"]);
+
+function tabFor(value: string | undefined): TabId {
+  if (value && SIGNIN_ALIASES.has(value)) return "signin";
+  return tabIds.includes(value as TabId) ? (value as TabId) : "profile";
 }
 
 function TabIcon({ tab }: { tab: TabId }) {
@@ -66,22 +74,10 @@ function TabIcon({ tab }: { tab: TabId }) {
         <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5S9.6 5.8 12 3.5Z" />
       </>
     ),
-    email: (
-      <>
-        <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
-        <path d="m5 7 7 5.4L19 7" />
-      </>
-    ),
-    password: (
+    signin: (
       <>
         <rect x="4" y="10" width="16" height="10" rx="2.5" />
         <path d="M8 10V7.5a4 4 0 0 1 8 0V10M12 14v2.5" />
-      </>
-    ),
-    connections: (
-      <>
-        <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
-        <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
       </>
     ),
     tokens: (
@@ -140,13 +136,11 @@ export default async function AccountPage({
   const requestedTab = asked.tab;
   const askedError = Array.isArray(asked.error) ? asked.error[0] : asked.error;
   const tabValue = Array.isArray(requestedTab) ? requestedTab[0] : requestedTab;
-  const activeTab: TabId = isTabId(tabValue) ? tabValue : "profile";
+  const activeTab = tabFor(tabValue);
   const tabs: Array<{ id: TabId; label: string }> = [
     { id: "profile", label: t("profile") },
     { id: "public", label: t("pubTitle") },
-    { id: "email", label: t("changeEmail") },
-    { id: "password", label: user.has_password ? t("changePassword") : t("setPassword") },
-    { id: "connections", label: t("tabConnections") },
+    { id: "signin", label: t("tabSignIn") },
     { id: "tokens", label: t("apiTokens") },
     { id: "invites", label: t("invites") },
   ];
@@ -313,9 +307,17 @@ export default async function AccountPage({
         </Panel>
       )}
 
-      {activeTab === "email" && (
+      {activeTab === "signin" && (
+        <div className="flex flex-col gap-5">
+        <Panel delay={40} title={t("tabConnections")}>
+          <Connections userId={user.id} errorCode={askedError ?? ""} t={t} />
+        </Panel>
         <Panel delay={40} title={t("changeEmail")}>
           <div className="max-w-xl">
+            {!user.has_password ? (
+              <p className="text-[13.5px] text-muted">{t("changeEmailNeedsPassword")}</p>
+            ) : (
+              <>
             <p className="mb-3 text-[13.5px] text-muted">{t("changeEmailNote")}</p>
             <AuthForm
               action={changeEmailAction}
@@ -339,11 +341,11 @@ export default async function AccountPage({
                 },
               ]}
             />
+              </>
+            )}
           </div>
         </Panel>
-      )}
 
-      {activeTab === "password" && (
         <Panel delay={40} title={user.has_password ? t("changePassword") : t("setPassword")}>
           <div className="max-w-xl">
             <p className="mb-3 text-[13.5px] text-muted">
@@ -375,12 +377,8 @@ export default async function AccountPage({
             />
           </div>
         </Panel>
-      )}
 
-      {activeTab === "connections" && (
-        <Panel delay={40} title={t("tabConnections")}>
-          <Connections userId={user.id} errorCode={askedError ?? ""} t={t} />
-        </Panel>
+        </div>
       )}
 
       {activeTab === "tokens" && (
