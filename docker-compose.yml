@@ -62,6 +62,14 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      # Optional, in pairs: each pair turns on its sign-in button. Listed here
+      # because compose passes nothing from .env it is not told about.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-}
+      TODOX_SLOW_MS: ${TODOX_SLOW_MS:-}
       # How many proxies sit in front of this. Behind one reverse proxy it is 1;
       # add a CDN in front and it becomes 2. Too high reaches into the part of
       # `x-forwarded-for` the caller writes, which is what the rate limits are
