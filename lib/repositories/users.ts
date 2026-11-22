@@ -94,9 +94,6 @@ export const updatePasswordForConsumedTokenStmt = (input: {
   params: [input.passwordHash, input.userId, input.tokenId, input.consumedAt],
 });
 
-export const updatePassword = (id: number, passwordHash: string) =>
-  runStmt(updatePasswordStmt(id, passwordHash));
-
 /** Never `password_hash` or `email_verified_at`: those have their own writers. */
 const PROFILE_COLUMNS = ["name", "email"] as const;
 
