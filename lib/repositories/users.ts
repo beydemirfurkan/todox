@@ -94,6 +94,38 @@ export async function updateProfile(id: number, patch: { name?: string; email?: 
   await run(`UPDATE users SET ${set.sql} WHERE id = ?`, [...set.values, id]);
 }
 
+/** What a public profile may say about its owner. Never the email. */
+export interface PublicUser {
+  id: number;
+  username: string;
+  name: string;
+  bio: string | null;
+  created_at: string;
+}
+
+/**
+ * The owner of /u/<username>, or nothing -- and nothing for every reason it
+ * could be nothing: no such user, profile off, address not verified. One
+ * answer, so the page cannot be used to ask which usernames exist.
+ */
+export const findPublicProfile = (username: string) =>
+  one<PublicUser>(
+    `SELECT id, username, name, bio, created_at FROM users
+      WHERE lower(username) = lower(?) AND profile_public AND email_verified_at IS NOT NULL`,
+    [username],
+  );
+
+const PUBLIC_PROFILE_COLUMNS = ["profile_public", "bio"] as const;
+
+export async function updatePublicProfile(
+  id: number,
+  patch: { profile_public?: boolean; bio?: string | null },
+) {
+  const set = setClause(patch, PUBLIC_PROFILE_COLUMNS);
+  if (!set.sql) return;
+  await run(`UPDATE users SET ${set.sql} WHERE id = ?`, [...set.values, id]);
+}
+
 export const remove = (id: number) => run("DELETE FROM users WHERE id = ?", [id]);
 
 export const list = () => all<User>("SELECT * FROM users ORDER BY id");

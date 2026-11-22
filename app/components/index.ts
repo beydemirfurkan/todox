@@ -10,7 +10,7 @@ export { Group } from "./group";
 export { MarkdownPreview } from "./markdown-preview";
 export { NoteGroups } from "./note-list";
 export { BrainMap } from "./brain-map";
-export { DayBars, ShareBars } from "./charts";
+export { DayBars, Heatmap, ShareBars } from "./charts";
 export { Empty, Panel } from "./panel";
 export { Progress, ProjectLanes, WaitingList, type ProjectLane } from "./project-lanes";
 export { ProjectFields, ProjectRow, type ProjectCountRow } from "./project-list";

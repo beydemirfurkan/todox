@@ -350,3 +350,23 @@ export const reassignStmt = (fromId: number, intoId: number): Statement => ({
   text: "UPDATE contexts SET project_id = ? WHERE project_id = ?",
   params: [intoId, fromId],
 });
+
+/** An account note its owner chose to show on their profile. */
+export interface PublicNote {
+  id: number;
+  kind: ContextKind;
+  title: string;
+  body: string;
+}
+
+/** Account-wide notes marked public, developer kinds first. Project notes can
+ *  never be public: `setPublic` refuses them and this reads none. */
+export const publicNotes = (userId: number, limit: number) =>
+  all<PublicNote>(
+    `SELECT id, kind, title, body FROM contexts
+      WHERE user_id = ? AND project_id IS NULL AND is_public
+      ORDER BY CASE kind WHEN 'profile' THEN 0 WHEN 'stack' THEN 1 WHEN 'workflow' THEN 2 ELSE 3 END,
+               updated_at DESC
+      LIMIT ?`,
+    [userId, limit],
+  );

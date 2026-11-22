@@ -43,7 +43,11 @@ where a picture helps an empty state or a notice) and `LogoMark` (the prompt
 tile; brand only). `BrainMap` draws the developer and their projects as
 plain server-side SVG: hidden from assistive tech and below `sm`, always
 beside a list that says the same numbers in words -- the pattern for any
-drawing of data here. `NoteGroups` takes `actions` (`remove`, `update`, and
+drawing of data here. Charts live in `app/components/charts.tsx` -- `DayBars`
+(a bar per day, stacked series, an sr-only table of the numbers), `ShareBars`
+(a row per item with the figure in words and a bar under it) and `Heatmap` (a
+year of days; wide, so it sits in an `overflow-x-auto` box with a
+`min-w`). No chart library: reach for these before adding one. `NoteGroups` takes `actions` (`remove`, `update`, and
 `publish` for account-wide notes). Client-side pieces: `app/features/`. The board's
 drag-and-drop is `app/p/[slug]/board-dnd.tsx`.
 

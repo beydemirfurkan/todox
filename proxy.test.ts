@@ -108,6 +108,16 @@ describe("what stays reachable without a session", () => {
   it("serves a share link and its children", () => {
     expect(redirected(proxy(request("/s/abc123")))).toBe(false);
   });
+
+  it("serves a public profile to somebody signed out", () => {
+    // The page answers 404 itself until its owner turns it on; the gate must
+    // not answer first with a login page, which would say the path is real.
+    expect(redirected(proxy(request("/u/demo")))).toBe(false);
+  });
+
+  it("does not open a signed-in page that merely starts with u", () => {
+    expect(location(proxy(request("/usage")))).toContain("/login");
+  });
 });
 
 describe("the prefix match, which is the dangerous part", () => {
@@ -149,6 +159,11 @@ describe("cache headers", () => {
     // The render depends on the language cookie, so a shared cache keyed on the
     // URL alone would hand one reader another reader's language.
     const res = proxy(request("/s/abc123"));
+    expect(res.headers.get("cache-control")).toBe("private, max-age=60");
+  });
+
+  it("caches a public profile privately, like a share link", () => {
+    const res = proxy(request("/u/demo"));
     expect(res.headers.get("cache-control")).toBe("private, max-age=60");
   });
 

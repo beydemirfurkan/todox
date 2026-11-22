@@ -698,3 +698,28 @@ export async function kindCountsByProjectSince(
   );
   return rows.map((r) => ({ project_id: r.project_id, kind: r.kind, n: Number(r.n) }));
 }
+
+/**
+ * One person's entries per local day and kind since `since`: the profile's
+ * year of activity. Their own writes only -- `user_id`, or for rows older than
+ * that column, the project's owner -- so a shared project does not paint one
+ * person's year with another's work. Counts only, through
+ * `idx_entries_user_created`.
+ */
+export async function dailyKindsByAuthor(
+  userId: number,
+  since: string,
+  tz: string,
+): Promise<{ day: string; kind: EntryKind; n: number }[]> {
+  const rows = await all<{ day: string; kind: EntryKind; n: string }>(
+    `SELECT to_char(e.created_at::timestamptz AT TIME ZONE ?, 'YYYY-MM-DD') AS day, e.kind, COUNT(*) AS n
+       FROM entries e
+       JOIN tasks t ON t.id = e.task_id
+       JOIN projects p ON p.id = t.project_id
+      WHERE e.created_at >= ?
+        AND (e.user_id = ? OR (e.user_id IS NULL AND p.user_id = ?))
+      GROUP BY 1, 2`,
+    [tz, since, userId, userId],
+  );
+  return rows.map((r) => ({ day: r.day, kind: r.kind, n: Number(r.n) }));
+}

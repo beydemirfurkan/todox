@@ -30,6 +30,7 @@ import {
   removeProjectMemberAction,
   revokeProjectInviteAction,
   updateProjectAction,
+  setProjectOnProfileAction,
 } from "../../actions";
 import { authMessages } from "../../auth-messages";
 import { kindOptions, priorityOptions } from "../../kinds";
@@ -338,6 +339,16 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                     working: t("working"),
                   }}
                 />
+                <form action={setProjectOnProfileAction} className="mt-3 flex flex-wrap items-center gap-3">
+                  <input type="hidden" name="project_id" value={project.id} />
+                  <input type="hidden" name="on_profile" value={project.on_profile ? "0" : "1"} />
+                  <span className="min-w-[12rem] flex-1 text-small text-muted">
+                    {project.on_profile ? t("projectOnProfileOn") : t("projectOnProfileOff")}
+                  </span>
+                  <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+                    {project.on_profile ? t("projectOnProfileHide") : t("projectOnProfileShow")}
+                  </SubmitButton>
+                </form>
               </section>
 
               <section

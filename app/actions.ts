@@ -11,12 +11,14 @@ import {
   isEntryKind,
   isPriority,
   isStatus,
+  PROFILE_BIO_MAX,
 } from "@/lib/constants";
 import { isLang } from "@/lib/i18n";
 import { LANG_COOKIE } from "@/lib/lang";
 import * as contexts from "@/lib/repositories/contexts";
 import * as entries from "@/lib/repositories/entries";
 import * as projects from "@/lib/repositories/projects";
+import * as users from "@/lib/repositories/users";
 import type { TaskPatch } from "@/lib/repositories/tasks";
 import * as invitations from "@/lib/repositories/project-invitations";
 import * as collaboration from "@/lib/services/collaboration";
@@ -141,6 +143,30 @@ export async function rotateShareAction(fd: FormData) {
   const id = num(fd, "project_id");
   await assertProject(user.id, id);
   await sharing.rotate(user.id, id);
+  revalidatePath("/", "layout");
+}
+
+/* --------------------------------------------------------- public profile */
+
+/**
+ * Turns /u/<username> on or off and sets the bio. Publishing is outward-facing,
+ * so like a share link it needs a verified address; turning it off never does.
+ */
+export async function updatePublicProfileAction(fd: FormData) {
+  const user = await writingUser();
+  const isPublic = fd.get("profile_public") === "on";
+  if (isPublic && !user.email_verified_at) return;
+  const bio = String(fd.get("bio") ?? "").trim().slice(0, PROFILE_BIO_MAX);
+  await users.updatePublicProfile(user.id, { profile_public: isPublic, bio: bio || null });
+  revalidatePath("/account");
+}
+
+/** Owner only: a member cannot put somebody else's project on a profile. */
+export async function setProjectOnProfileAction(fd: FormData) {
+  const user = await writingUser();
+  const id = num(fd, "project_id");
+  await assertProject(user.id, id);
+  await projects.setOnProfile(id, fd.get("on_profile") === "1");
   revalidatePath("/", "layout");
 }
 

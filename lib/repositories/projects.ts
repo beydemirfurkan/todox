@@ -308,3 +308,24 @@ export const setShare = (
   ]);
 
 export const freshShareToken = () => shareToken();
+
+export const setOnProfile = (id: number, onProfile: boolean) =>
+  run("UPDATE projects SET on_profile = ? WHERE id = ?", [onProfile, id]);
+
+/** A project as a public profile names it: no path, no remote, no token. */
+export interface ProfileProject {
+  id: number;
+  slug: string;
+  name: string;
+  summary: string | null;
+}
+
+/** The owner's projects marked for their profile. Owned only: a member cannot
+ *  publish somebody else's project. */
+export const listOnProfile = (userId: number, limit: number) =>
+  all<ProfileProject>(
+    `SELECT id, slug, name, summary FROM projects
+      WHERE user_id = ? AND on_profile AND archived = 0
+      ORDER BY name LIMIT ?`,
+    [userId, limit],
+  );

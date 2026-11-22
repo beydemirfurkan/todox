@@ -53,6 +53,12 @@ export const POLICIES = {
    */
   sharePerIp: { limit: 120, windowMs: 15 * MINUTE },
   /**
+   * Views of a public profile, per address. The same reasoning as a share
+   * link: it answers without a session, so the ceiling is what stops a
+   * crawler from turning it into a stream of grouped reads.
+   */
+  profilePerIp: { limit: 120, windowMs: 15 * MINUTE },
+  /**
    * Writes from a signed-in browser, per account.
    *
    * The agent surface has been metered per token since it existed; every server

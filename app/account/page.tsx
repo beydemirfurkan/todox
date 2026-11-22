@@ -30,7 +30,8 @@ import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
 import { SubmitButton } from "../features/submit";
 import { TokenForm } from "../features/token-form";
-import { acceptProjectInviteAction } from "../actions";
+import { acceptProjectInviteAction, updatePublicProfileAction } from "../actions";
+import { PROFILE_BIO_MAX } from "@/lib/constants";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getT();
@@ -40,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const tabIds = ["profile", "email", "password", "tokens", "invites"] as const;
+const tabIds = ["profile", "public", "email", "password", "tokens", "invites"] as const;
 type TabId = (typeof tabIds)[number];
 
 function isTabId(value: string | undefined): value is TabId {
@@ -53,6 +54,12 @@ function TabIcon({ tab }: { tab: TabId }) {
       <>
         <circle cx="12" cy="8" r="3.25" />
         <path d="M5.8 19c.7-3.1 2.8-4.8 6.2-4.8s5.5 1.7 6.2 4.8" />
+      </>
+    ),
+    public: (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5S9.6 5.8 12 3.5Z" />
       </>
     ),
     email: (
@@ -124,6 +131,7 @@ export default async function AccountPage({
   const activeTab: TabId = isTabId(tabValue) ? tabValue : "profile";
   const tabs: Array<{ id: TabId; label: string }> = [
     { id: "profile", label: t("profile") },
+    { id: "public", label: t("pubTitle") },
     { id: "email", label: t("changeEmail") },
     { id: "password", label: t("changePassword") },
     { id: "tokens", label: t("apiTokens") },
@@ -213,6 +221,62 @@ export default async function AccountPage({
                 },
               ]}
             />
+          </div>
+        </Panel>
+      )}
+
+      {activeTab === "public" && (
+        <Panel delay={40} title={t("pubTitle")}>
+          <div className="max-w-xl space-y-4 p-4">
+            <p className="text-small leading-relaxed text-muted">{t("pubLede")}</p>
+            {user.profile_public && (
+              <p className="flex flex-wrap items-center gap-2 text-small">
+                <Chip color="var(--ok)">{t("pubIsOn")}</Chip>
+                <a
+                  href={`/u/${user.username}`}
+                  className="mono break-all text-accentInk underline underline-offset-2"
+                >
+                  {`${publicUrl()}/u/${user.username}`}
+                </a>
+              </p>
+            )}
+            <form action={updatePublicProfileAction} className="flex flex-col gap-3">
+              <label className="flex items-center gap-2 text-[15px]">
+                <input
+                  type="checkbox"
+                  name="profile_public"
+                  defaultChecked={user.profile_public}
+                  disabled={!user.email_verified_at && !user.profile_public}
+                />
+                {t("pubEnable")}
+              </label>
+              {!user.email_verified_at && (
+                <p className="text-small text-muted">{t("pubVerifyFirst")}</p>
+              )}
+              <label className="flex flex-col gap-1 text-small text-muted">
+                {t("pubBio")}
+                <textarea
+                  name="bio"
+                  rows={3}
+                  maxLength={PROFILE_BIO_MAX}
+                  defaultValue={user.bio ?? ""}
+                />
+                <span className="text-meta text-faint">{t("pubBioHint", { n: PROFILE_BIO_MAX })}</span>
+              </label>
+              <div>
+                <SubmitButton pendingLabel={t("saving")}>{t("save")}</SubmitButton>
+              </div>
+            </form>
+            <ul className="list-disc space-y-1 pl-5 text-small text-muted">
+              <li>{t("pubShowsProjects")}</li>
+              <li>
+                {t("pubShowsNotes")}{" "}
+                <Link href="/me" className="text-accentInk underline underline-offset-2">
+                  {t("navBrain")}
+                </Link>
+              </li>
+              <li>{t("pubNever")}</li>
+            </ul>
           </div>
         </Panel>
       )}
