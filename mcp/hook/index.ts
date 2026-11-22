@@ -1,5 +1,5 @@
 import { createClient } from "../rpc-client";
-import { hookClientFrom, normalizeInput, shapeOutput } from "./clients";
+import { hookClientFrom } from "./clients";
 import { dataDirFrom, hookConfig, type HookConfig } from "./config";
 import { workspaceGit } from "./git";
 import { fileLogger, type Logger } from "./log";
@@ -15,8 +15,9 @@ import { userPromptSubmit } from "./user-prompt-submit";
  * The Claude Code plugin's command hooks, one entry point for every event.
  *
  * Bundled into `plugin/hooks/todox-hook.mjs` by `pnpm plugin:sync` and run by
- * `plugin/hooks/run.sh <event> [claude-code|codex|cursor]` -- one bundle for
- * the three agents' plugins, which differ only in the hooks file that calls it. A command hook is a plain process: no model
+ * `plugin/hooks/run.sh <event> [claude-code|codex]` -- one bundle for both
+ * agents' plugins, which differ only in the hooks file that calls it. A
+ * command hook is a plain process: no model
  * call, no transcript parsing, and nothing here can block the developer
  * except the one deliberate case in the Stop hook. Every failure -- todox
  * down, no token, bad input -- prints nothing, exits 0, and leaves a line in
@@ -58,17 +59,17 @@ export async function runHook(
   try {
     const config = hookConfig(env, pluginRootFrom(env), (m) => log(event, m), client);
     if (config.disabled) return null;
-    const input = normalizeInput(client, parseInput(rawInput));
-    return shapeOutput(client, event, await handler(contextFor({ client, config, log, input })));
+    const input = parseInput(rawInput) as HookInput;
+    return await handler(contextFor({ client, config, log, input }));
   } catch (e) {
     log(event, `failed: ${(e as Error).message}`);
     return null;
   }
 }
 
-/** Claude Code and Codex both set CLAUDE_PLUGIN_ROOT; Cursor has its own name. */
+/** Claude Code sets CLAUDE_PLUGIN_ROOT; Codex sets it and PLUGIN_ROOT. */
 const pluginRootFrom = (env: Record<string, string | undefined>): string | undefined =>
-  env.CLAUDE_PLUGIN_ROOT || env.PLUGIN_ROOT || env.CURSOR_PLUGIN_ROOT || undefined;
+  env.CLAUDE_PLUGIN_ROOT || env.PLUGIN_ROOT || undefined;
 
 function contextFor(parts: { client: HookClient; config: HookConfig; log: Logger; input: HookInput }): HookContext {
   const rpc = parts.config.token

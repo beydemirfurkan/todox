@@ -53,14 +53,9 @@ describe("token, data directory and the off switch", () => {
 });
 
 describe("which token a hook uses", () => {
-  it("prefers the plugin's prompted token, in Claude Code or Cursor, over the environment's", () => {
+  it("prefers Claude Code's prompted token, and falls back to TODOX_TOKEN for Codex", () => {
     expect(tokenFrom({ CLAUDE_PLUGIN_OPTION_TOKEN: "a", TODOX_TOKEN: "env" })).toBe("a");
-    expect(tokenFrom({ TODOX_PLUGIN_TOKEN: "c", TODOX_TOKEN: "env" })).toBe("c");
-  });
-
-  it("falls back to TODOX_TOKEN when Cursor left the variable empty or unexpanded", () => {
-    expect(tokenFrom({ TODOX_PLUGIN_TOKEN: "", TODOX_TOKEN: "env" })).toBe("env");
-    expect(tokenFrom({ TODOX_PLUGIN_TOKEN: "${token}", TODOX_TOKEN: "env" })).toBe("env");
-    expect(tokenFrom({ TODOX_PLUGIN_TOKEN: "${token}" })).toBeUndefined();
+    expect(tokenFrom({ TODOX_TOKEN: "env" })).toBe("env");
+    expect(tokenFrom({})).toBeUndefined();
   });
 });

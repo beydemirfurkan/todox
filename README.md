@@ -139,19 +139,19 @@ Everything else below still applies to it — the plugin is the same four lines,
 installed rather than pasted. See [`plugin/README.md`](plugin/README.md) for
 what it does and does not do.
 
-**Codex and Cursor install the same plugin.** One directory, three manifests:
-the same skill and the same hook script, briefing at session start and asking
-once for the handoff at the end. Codex runs the stdio server from the release
-tarball and reads the token from your environment; Cursor asks for it.
+**Codex installs the same plugin.** One directory, two manifests: the same
+skill and the same hook script, briefing at session start and asking once for
+the handoff at the end. Codex runs the stdio server from the release tarball
+and reads the token from your environment:
 
 ```bash
-export TODOX_TOKEN=todox_…            # Codex: in your shell profile
+export TODOX_TOKEN=todox_…            # in your shell profile
 codex plugin marketplace add beydemirfurkan/todox
+codex plugin add todox@todox
 ```
 
-In Cursor, add `https://github.com/beydemirfurkan/todox` as a plugin
-marketplace and install **todox** from it. Codex asks you to review a plugin's
-hooks before it runs them; until you do, the plugin is the MCP server alone.
+Codex asks you to review a plugin's hooks before it runs them; until you do,
+the plugin is the MCP server alone.
 
 ```bash
 # Claude Code. --scope user, because the default is this directory only.

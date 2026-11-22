@@ -194,8 +194,8 @@ const datetime = z
  * tool call, the plugin's hooks a session's edges, a git hook only commits.
  */
 /**
- * `plugin-hook` is the plugin's hooks in any agent that installs it -- Claude
- * Code, Codex, Cursor; the row's `client` says which. `claude-code-hook` is
+ * `plugin-hook` is the plugin's hooks in either agent that installs it --
+ * Claude Code or Codex; the row's `client` says which. `claude-code-hook` is
  * the same carrier under the name plugins up to 0.1.6 send, kept so an
  * installed plugin is not refused after a deploy.
  */
