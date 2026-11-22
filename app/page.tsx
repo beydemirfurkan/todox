@@ -314,7 +314,9 @@ export default async function Home() {
           delay={180}
         >
           {quiet.length === 0 ? (
-            <Empty>{t("quietEmpty")}</Empty>
+            // Only true beside live projects. With none in flight either, it
+            // contradicted the empty state just above it (B14).
+            <Empty>{live.length > 0 ? t("quietEmpty") : t("quietEmptyNothingLive")}</Empty>
           ) : (
             <ul className="space-y-1.5">
               {quiet.map((p) => (
@@ -323,6 +325,7 @@ export default async function Home() {
                   project={p}
                   counts={countsOf(p.id)}
                   teamSize={teamOf(p.id)}
+                  leftOff={leftOff.get(p.id)?.body ?? null}
                   t={t}
                 />
               ))}

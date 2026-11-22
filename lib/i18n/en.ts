@@ -340,6 +340,7 @@ export const en = {
   quietProjects: "Quiet",
   liveProjectsEmpty: "Nothing in flight in any project.",
   quietEmpty: "Every project has something in flight.",
+  quietEmptyNothingLive: "No project holds a task or a note yet.",
   colProject: "Project",
   openBoard: "Open the board",
   statLive: "projects in flight",
@@ -598,6 +599,8 @@ export const en = {
   profProjectRow: "{done} done · {open} open · {entries} entries lately",
   profNotes: "How they work",
   profFooter: "Kept with todox",
+  privacyStore6:
+    "Where your code lives, as your agent reports it: the absolute path of each checkout on each machine, the repository's remote URL with any credentials stripped, and the paths and content hashes of files you link. If you use the local MCP process, also the branch, commit subjects and the number of changed files of each session. Never the contents of a file.",
   privacyStore5:
     "A public profile, only if you turn it on: your display name, username, bio, counts of what you wrote per day, and the projects and notes you mark. It is off by default and asks search engines not to index it.",
   periodAll: "All time",

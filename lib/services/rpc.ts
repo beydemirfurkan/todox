@@ -131,9 +131,13 @@ export const methods = {
     ]);
 
     const carries = rows.filter((p) => counts.map.has(p.id) || withNotes.has(p.id));
+    // Empty projects are hidden as noise beside real ones. When every project
+    // is empty, hiding them answered a new user's only project with [] -- an
+    // agent reads that as "no projects" (dogfood 2026-11-22, B16).
+    const shown = carries.length > 0 ? carries : rows;
 
     return {
-      projects: carries.map((p) => ({
+      projects: shown.map((p) => ({
         slug: p.slug,
         name: p.name,
         root_path: p.root_path,
@@ -142,7 +146,7 @@ export const methods = {
         shared: Boolean(p.share_token),
         counts: counts.map.get(p.id) ?? counts.empty,
       })),
-      empty_projects_omitted: rows.length - carries.length,
+      empty_projects_omitted: rows.length - shown.length,
     };
   },
 
@@ -273,15 +277,17 @@ export const methods = {
     return { tasks: rows, omitted: Math.max(0, total - rows.length) };
   },
 
-  getTask: async ({ userId }, p: { task_id: number }) => {
-    await assertTask(userId, p.task_id);
+  getTask: async ({ userId }, params: { task_id?: number; id?: number }) => {
+    // The schema admits exactly one of the two, so one of them is here.
+    const taskId = (params.task_id ?? params.id) as number;
+    await assertTask(userId, taskId);
     const [task, log, refs] = await Promise.all([
-      tasksRepo.byId(p.task_id),
+      tasksRepo.byId(taskId),
       // The newest end of a long log is the useful end; the rest is history the
       // handoff already summarises. Cut in SQL: the slice was applied to a read
       // of the whole log, so the ceiling bounded the answer and not the cost.
-      entriesRepo.pageByTask(p.task_id, PAGE),
-      refsRepo.listByTask(p.task_id),
+      entriesRepo.pageByTask(taskId, PAGE),
+      refsRepo.listByTask(taskId),
     ]);
     return {
       ...task!,
