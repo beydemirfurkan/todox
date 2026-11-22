@@ -96,7 +96,14 @@ export function isValidTimeZone(tz: string): boolean {
 
 export type Period = { from: string; to: string; label: string; tz: string };
 
-export type PeriodName = "today" | "yesterday" | "week" | "last_week" | "month" | "all";
+export type PeriodName =
+  | "today"
+  | "yesterday"
+  | "week"
+  | "last_week"
+  | "month"
+  | "last_30_days"
+  | "all";
 
 export function resolvePeriod(
   name: PeriodName,
@@ -132,6 +139,10 @@ export function resolvePeriod(
       return span(addDays(startOfWeek(nowD, tz), -7, tz), startOfWeek(nowD, tz), "last_week");
     case "month":
       return span(startOfMonth(nowD, tz), nowD, "month");
+    // A rolling month: today and the 29 days before it, so the chart has the
+    // same width on the 1st as on the 30th.
+    case "last_30_days":
+      return span(addDays(startOfDay(nowD, tz), -29, tz), nowD, "last_30_days");
     case "all":
       return span(new Date(0), nowD, "all");
   }

@@ -39,6 +39,7 @@ const report = (over: Partial<ActivityReport> = {}): ActivityReport => ({
   },
   by_project: [],
   by_model: [],
+  by_day: [],
   completed: [],
   in_progress: [],
   decisions: [],
@@ -266,5 +267,18 @@ describe("what the report left out on purpose", () => {
     );
     expect(md).not.toMatch(/worked: ~/);
     expect(md).not.toMatch(/lower bound/);
+  });
+
+  it("adds a day-by-day table of only the days something happened", () => {
+    const day = (d: string, completed: number) => ({
+      day: d, created: 0, completed, active_ms: 0, decisions: 0, dead_ends: 0, questions: 0, handoffs: 0, notes: 0,
+    });
+    const md = renderMarkdown(
+      report({ by_day: [day("2026-09-01", 2), day("2026-09-02", 0), day("2026-09-03", 1)] }),
+      translator("en"),
+    );
+    expect(md).toContain("| 2026-09-01 | 2 |");
+    expect(md).toContain("| 2026-09-03 | 1 |");
+    expect(md).not.toContain("2026-09-02");
   });
 });

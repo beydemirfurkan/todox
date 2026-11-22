@@ -7,6 +7,7 @@ const PERIOD_KEY: Record<string, Key> = {
   week: "periodWeek",
   last_week: "periodLastWeek",
   month: "periodMonth",
+  last_30_days: "periodLast30",
   all: "periodAll",
 };
 
@@ -48,6 +49,29 @@ function entryBullet(e: ReportEntry): string {
  * first, then the finished work with what it cost, then the friction. Nothing
  * here is inferred from commits -- it all comes off the log.
  */
+/**
+ * The window day by day, as a table -- only the days something happened on,
+ * so a quiet month is a few rows and not thirty lines of zeros.
+ */
+function dailyTable(r: ActivityReport, t: T): string[] {
+  if (r.by_day.length < 2) return [];
+  const busy = r.by_day.filter(
+    (d) => d.completed || d.created || d.active_ms || d.decisions || d.dead_ends || d.questions || d.handoffs || d.notes,
+  );
+  if (!busy.length) return [];
+  return [
+    `## ${t("reportDaily")}`,
+    "",
+    `| | ${t("totalsCompleted")} | ${t("totalsCreated")} | ${t("totalsActive")} | ${t("totalsEntries")} |`,
+    "|---|---:|---:|---:|---:|",
+    ...busy.map(
+      (d) =>
+        `| ${d.day} | ${d.completed} | ${d.created} | ${duration(d.active_ms, t)} | ${d.decisions + d.dead_ends + d.questions + d.handoffs + d.notes} |`,
+    ),
+    "",
+  ];
+}
+
 export function renderMarkdown(r: ActivityReport, t: T): string {
   const out: string[] = [];
   const p = periodLabel(r.period.label, t);
@@ -83,6 +107,7 @@ export function renderMarkdown(r: ActivityReport, t: T): string {
         : ""),
   );
   out.push("");
+  out.push(...dailyTable(r, t));
 
   if (r.by_project.length > 1) {
     out.push(`## ${t("byProject")}`);
