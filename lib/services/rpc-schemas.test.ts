@@ -686,6 +686,12 @@ describe("recordObservation's carrier", () => {
       expect(() => parseParams("recordObservation", { ...base, source })).not.toThrow();
   });
 
+  it("takes the remote, so a carrier at a new path still finds the project", () => {
+    expect(() =>
+      parseParams("recordObservation", { ...base, source: "git-hook", repo_url: "https://github.com/a/b" }),
+    ).not.toThrow();
+  });
+
   it("refuses a carrier it does not know", () => {
     expect(() => parseParams("recordObservation", { ...base, source: "cursor" })).toThrow();
   });

@@ -161,6 +161,10 @@ export const gitParent = (dir: string): string | undefined =>
 export const gitDir = (dir: string): string | undefined =>
   git(dir, ["rev-parse", "--absolute-git-dir"]) || undefined;
 
+/** One git config value as this repository sees it, or undefined if unset. */
+export const gitConfigValue = (dir: string, key: string): string | undefined =>
+  git(dir, ["config", "--get", key]) || undefined;
+
 /** How many files carry uncommitted changes. */
 export function gitDirtyCount(dir: string): number | undefined {
   const out = git(dir, ["status", "--porcelain"]);

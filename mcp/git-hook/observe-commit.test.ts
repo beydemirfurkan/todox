@@ -20,6 +20,7 @@ function repo() {
     gitDir: () => gitDir,
     head: () => head,
     parent: () => PARENT,
+    remote: () => "https://github.com/example/repo",
     branch: () => "main",
     dirty: () => dirty,
     since: (_dir, base) =>
@@ -60,6 +61,7 @@ describe("a commit, observed by the git hook", () => {
       commit_subjects: "fix",
       started_at: NOW.toISOString(),
       source: "git-hook",
+      repo_url: "https://github.com/example/repo",
     });
   });
 
