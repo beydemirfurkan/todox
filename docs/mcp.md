@@ -202,12 +202,14 @@ The Claude Code plugin (0.1.5 and later) runs command hooks: plain processes,
 no model call, talking to nothing but your todox server's `/api/rpc` with the
 token you gave the plugin. Every call carries `x-todox-carrier:
 claude-code-hook`, so it is counted under `hook:<method>` and never as your
-agent's call (see below).
+agent's call (see below). The Codex hooks are the same script and send the same
+header; the name predates them.
 
 | Hook | Sends | When |
 |---|---|---|
 | SessionStart | `getContext` with your `cwd`, the repository's `origin` URL (credentials stripped), `shape: "digest"`, `create_if_missing: false` | startup, resume, `/clear`, after compaction |
 | Stop | `sessionStatus` with your `cwd` and a window of hours | only if this session touched a todox task |
+| PreCompact (Claude Code only) | `sessionStatus`, the same call as Stop | before compaction, only if this session touched a todox task |
 | Stop, SessionEnd | `recordObservation`: the `origin` URL, branch, two commit ids, commit and dirty-file counts, up to three commit subjects, ids of tasks set to `doing` | only if git changed since the last one sent |
 
 The remote is there so a second checkout of a repository todox already knows,
