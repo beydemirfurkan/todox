@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { OPEN_STATUSES } from "@/lib/constants";
-import type { T } from "@/lib/i18n";
 import { getT, getTz } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import * as apiTokens from "@/lib/repositories/api-tokens";
@@ -13,11 +12,12 @@ import * as memberships from "@/lib/repositories/project-memberships";
 import * as tasks from "@/lib/repositories/tasks";
 import { firstLine } from "@/lib/util/headline";
 import { accountProjects } from "./account-projects";
-import { clearEmptyProjectAction, createTaskAction } from "./actions";
+import { clearEmptyProjectAction } from "./actions";
 import { IconTile, WaitingList } from "./components";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { projectColor } from "./components/project-color";
-import { TaskRow } from "./components/task-row";
+import { QuickAdd } from "./components/quick-add";
+import { TaskRow, TaskSection } from "./components/task-row";
 import { FirstSteps } from "./features/first-steps";
 import { Landing } from "./features/landing";
 import { SubmitButton } from "./features/submit";
@@ -170,7 +170,7 @@ export default async function Home() {
         </p>
       </header>
 
-      <QuickAdd projects={allProjects} t={t} />
+      <QuickAdd target={{ projects: allProjects }} t={t} />
 
       {waiting.items.length > 0 && (
         <section aria-labelledby="waiting" className="flex flex-col gap-2">
@@ -303,81 +303,5 @@ export default async function Home() {
         </section>
       )}
     </div>
-  );
-}
-
-/** A titled list of task rows, with how many it is not showing. */
-function TaskSection({
-  id,
-  title,
-  hint,
-  isAccent = false,
-  shown,
-  total,
-  empty,
-  t,
-  children,
-}: {
-  id: string;
-  title: string;
-  hint?: string;
-  isAccent?: boolean;
-  shown: number;
-  total: number;
-  empty: string;
-  t: T;
-  children: React.ReactNode;
-}) {
-  return (
-    <section aria-labelledby={id} className="flex flex-col gap-2">
-      <h2 id={id} className="today-heading" data-accent={isAccent ? "true" : undefined}>
-        {title}
-        {hint && <span className="today-hint"> · {hint}</span>}
-      </h2>
-      {shown === 0 ? (
-        <p className="px-4 py-3 text-body text-muted">{empty}</p>
-      ) : (
-        <ul className="flex flex-col">{children}</ul>
-      )}
-      {total > shown && (
-        <p className="px-4 text-small text-muted">{t("todayMore", { n: total - shown })}</p>
-      )}
-    </section>
-  );
-}
-
-/**
- * Add a task without leaving Today: a title and which project it goes to.
- * The project the account touched last is preselected.
- */
-function QuickAdd({ projects, t }: { projects: { slug: string; name: string }[]; t: T }) {
-  return (
-    <form action={createTaskAction} className="quick-add">
-      <span aria-hidden="true" className="quick-add-plus">
-        +
-      </span>
-      <label className="sr-only" htmlFor="quick-add-title">
-        {t("todayAddLabel")}
-      </label>
-      <input
-        id="quick-add-title"
-        name="title"
-        required
-        autoComplete="off"
-        placeholder={t("todayAddPlaceholder")}
-        className="min-w-[12rem] flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-faint"
-      />
-      <label className="sr-only" htmlFor="quick-add-project">
-        {t("todayAddProject")}
-      </label>
-      <select id="quick-add-project" name="slug" className="quick-add-select">
-        {projects.map((project) => (
-          <option key={project.slug} value={project.slug}>
-            {project.name}
-          </option>
-        ))}
-      </select>
-      <SubmitButton pendingLabel={t("working")}>{t("todayAddSubmit")}</SubmitButton>
-    </form>
   );
 }

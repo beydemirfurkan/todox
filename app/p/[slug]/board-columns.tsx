@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { ago, type T } from "@/lib/i18n";
 import type { EntryCounts } from "@/lib/repositories/entries";
 import type { Task } from "@/lib/types";
@@ -6,9 +8,7 @@ import type { Status } from "@/lib/constants";
 import { setStatusAction } from "../../actions";
 import { Chip, Counter, StatusDot } from "../../components";
 import { ClosePopoverAfterSubmit } from "../../features/close-popover-after-submit";
-import { PanelLink } from "../../features/panel-link";
 import { kindLabel, statusLabel } from "../../kinds";
-import { boardHref } from "./board";
 import { BoardDnd } from "./board-dnd";
 
 /**
@@ -16,8 +16,8 @@ import { BoardDnd } from "./board-dnd";
  *
  * Closed work is not a column. A fourth one spent a quarter of the board on
  * rows nobody acts on, and on the project with the most history it was sixty
- * struck-through titles beside two in progress; it is a tab of the panel
- * instead, one click away and out of the way.
+ * struck-through titles beside two in progress; it is a fold under the list
+ * view instead, one click away and out of the way.
  *
  * A card says what the old row said -- urgency, the dead ends not to repeat,
  * the decisions behind the work -- and the one thing the row could not: where
@@ -59,14 +59,11 @@ export interface BoardColumn {
 export function Board({
   columns,
   slug,
-  selectedId,
   closedCount,
   t,
 }: {
   columns: BoardColumn[];
   slug: string;
-  /** The task the panel is showing, when it is showing one. */
-  selectedId: number | null;
   /** Tasks already closed, for the drop zone that closes one more. */
   closedCount: number;
   t: T;
@@ -86,9 +83,6 @@ export function Board({
             <span className="mono ml-1.5 opacity-70">{column.total}</span>
           </a>
         ))}
-        <a href="#panel" className="pill">
-          {t("panelLabel")}
-        </a>
       </nav>
       <BoardDnd moveAction={setStatusAction} labels={{ moving: t("boardMoving"), statusNames }}>
         {/* On a phone the columns sit side by side and swipe, one per screen
@@ -96,7 +90,7 @@ export function Board({
             pills above jump straight to one. From `md` a three-column grid. */}
         <div className="board-swipe flex min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto md:grid md:grid-cols-3 md:items-start md:overflow-visible">
           {columns.map((column) => (
-            <Column key={column.status} column={column} slug={slug} selectedId={selectedId} t={t} />
+            <Column key={column.status} column={column} slug={slug} t={t} />
           ))}
         </div>
         <DoneZone slug={slug} closedCount={closedCount} t={t} />
@@ -107,10 +101,9 @@ export function Board({
 }
 
 /**
- * Where a finished card goes. Not a fourth column -- closed work is a tab of
- * the panel, because sixty struck-through titles beside two in progress was
- * a quarter of the board spent on nothing -- but a strip a card can be
- * dropped on, which also links to that tab.
+ * Where a finished card goes. Not a fourth column -- sixty struck-through
+ * titles beside two in progress was a quarter of the board spent on nothing --
+ * but a strip a card can be dropped on, which also links to the closed work.
  */
 function DoneZone({ slug, closedCount, t }: { slug: string; closedCount: number; t: T }) {
   return (
@@ -122,24 +115,14 @@ function DoneZone({ slug, closedCount, t }: { slug: string; closedCount: number;
       <span className="text-[14px] font-semibold">{t("boardDoneZone")}</span>
       <Counter n={closedCount} label={t("tasks")} />
       <span className="hidden text-small text-muted md:inline">{t("boardDoneHint")}</span>
-      <a href={boardHref(slug, { task: null, view: "closed" })} className="link-more ml-auto text-small">
+      <a href={`/p/${slug}#closed`} className="link-more ml-auto text-small">
         {t("tabClosed")} →
       </a>
     </div>
   );
 }
 
-function Column({
-  column,
-  slug,
-  selectedId,
-  t,
-}: {
-  column: BoardColumn;
-  slug: string;
-  selectedId: number | null;
-  t: T;
-}) {
+function Column({ column, slug, t }: { column: BoardColumn; slug: string; t: T }) {
   const headingId = `column-${column.status}`;
   const showAllId = `show-all-${column.status}`;
   const isCutWhenStacked = column.cards.length > STACKED_CARDS;
@@ -178,13 +161,7 @@ function Column({
             their unscrolled offsets and made the page as long as the queue. */}
         <ul className="board-scroll relative space-y-2 max-md:[&>li:nth-child(n+6)]:hidden max-md:peer-checked:[&>li:nth-child(n+6)]:block md:-mr-1.5 md:min-h-0 md:overflow-y-auto md:pr-1.5">
           {column.cards.map((card) => (
-            <Card
-              key={card.task.id}
-              card={card}
-              slug={slug}
-              isSelected={card.task.id === selectedId}
-              t={t}
-            />
+            <Card key={card.task.id} card={card} slug={slug} t={t} />
           ))}
         </ul>
         {isCutWhenStacked && (
@@ -205,25 +182,13 @@ function Column({
   );
 }
 
-function Card({
-  card,
-  slug,
-  isSelected,
-  t,
-}: {
-  card: BoardCard;
-  slug: string;
-  isSelected: boolean;
-  t: T;
-}) {
+function Card({ card, slug, t }: { card: BoardCard; slug: string; t: T }) {
   const { task, counts, handoffHead, quietDays } = card;
   return (
     <li className="relative" draggable data-drag-id={task.id}>
-      <PanelLink
+      <Link
         href={`/p/${slug}/t/${task.id}`}
-        panelHref={boardHref(slug, { task: task.id, view: "task" })}
-        isCurrent={isSelected}
-        className="board-card paper flex flex-col gap-1.5 p-3 aria-[current]:border-accent aria-[current]:shadow-[0_0_0_1px_var(--accent)]"
+        className="board-card paper flex flex-col gap-1.5 p-3.5"
       >
         <span className="mono pr-8 text-meta text-faint">#{task.id}</span>
         <span className="line-clamp-2 text-[14px] leading-snug font-medium break-words">
@@ -244,7 +209,7 @@ function Card({
           <CardChips task={task} counts={counts} quietDays={quietDays} t={t} />
           <span className="mono ml-auto text-meta text-faint">{ago(task.updated_at, t)}</span>
         </span>
-      </PanelLink>
+      </Link>
       <StatusMenu taskId={task.id} current={task.status} t={t} />
     </li>
   );

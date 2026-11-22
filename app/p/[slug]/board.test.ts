@@ -2,77 +2,58 @@ import { describe, expect, it } from "vitest";
 
 import {
   QUIET_AFTER_DAYS,
-  boardHref,
   newest,
-  panelView,
+  projectHref,
+  projectTab,
   quietDays,
-  selectTaskId,
+  taskView,
 } from "./board";
 
 /**
- * The board's address is caller-supplied text, so the part worth asserting is
- * what happens when it is wrong: an unknown view, an id from another project,
- * a value sent twice.
+ * The project's address is caller-supplied text, so the part worth asserting
+ * is what happens when it is wrong: an unknown value, a value sent twice.
  */
-describe("panelView", () => {
-  it("reads a known view", () => {
-    expect(panelView("notes")).toBe("notes");
-    expect(panelView("closed")).toBe("closed");
+describe("projectTab", () => {
+  it("reads a known section", () => {
+    expect(projectTab("notes")).toBe("notes");
+    expect(projectTab("tasks")).toBe("tasks");
   });
 
-  it("falls back to the task view for anything else", () => {
-    expect(panelView(undefined)).toBe("task");
-    expect(panelView("everything")).toBe("task");
-    expect(panelView("")).toBe("task");
+  it("falls back to the tasks for anything else", () => {
+    expect(projectTab(undefined)).toBe("tasks");
+    expect(projectTab("everything")).toBe("tasks");
+    expect(projectTab("")).toBe("tasks");
   });
 
   it("takes the first of a repeated parameter", () => {
-    expect(panelView(["closed", "notes"])).toBe("closed");
+    expect(projectTab(["notes", "tasks"])).toBe("notes");
   });
 });
 
-describe("selectTaskId", () => {
-  const known = new Set([4, 7, 9]);
-
-  it("takes the asked id when it is one of this project's tasks", () => {
-    expect(selectTaskId("7", known, [4])).toBe(7);
-  });
-
-  it("ignores an id the project does not hold, without saying so", () => {
-    expect(selectTaskId("123", known, [9, 4])).toBe(9);
-  });
-
-  it("ignores text that is not an id", () => {
-    expect(selectTaskId("7; DROP", known, [4])).toBe(4);
-    expect(selectTaskId("", known, [4])).toBe(4);
-    expect(selectTaskId(undefined, known, [4])).toBe(4);
-  });
-
-  it("skips fallbacks that are missing or unknown", () => {
-    expect(selectTaskId(undefined, known, [undefined, 55, 9])).toBe(9);
-  });
-
-  it("is null when there is nothing to show", () => {
-    expect(selectTaskId("7", new Set(), [7])).toBeNull();
-    expect(selectTaskId(undefined, known, [])).toBeNull();
+describe("taskView", () => {
+  it("reads the board, and falls back to the list", () => {
+    expect(taskView("board")).toBe("board");
+    expect(taskView("list")).toBe("list");
+    expect(taskView(undefined)).toBe("list");
+    expect(taskView("closed")).toBe("list");
   });
 });
 
-describe("boardHref", () => {
+describe("projectHref", () => {
   it("leaves the defaults out", () => {
-    expect(boardHref("todox", { task: null, view: "task" })).toBe("/p/todox");
+    expect(projectHref("todox", { tab: "tasks", view: "list" })).toBe("/p/todox");
   });
 
-  it("carries the task and a non-default view", () => {
-    expect(boardHref("todox", { task: 7, view: "task" })).toBe("/p/todox?task=7");
-    expect(boardHref("todox", { task: 7, view: "notes" })).toBe("/p/todox?task=7&view=notes");
-    expect(boardHref("todox", { task: null, view: "closed" })).toBe("/p/todox?view=closed");
+  it("carries a non-default section and layout", () => {
+    expect(projectHref("todox", { tab: "tasks", view: "board" })).toBe("/p/todox?view=board");
+    expect(projectHref("todox", { tab: "notes", view: "list" })).toBe("/p/todox?tab=notes");
   });
 
   it("round-trips through the readers", () => {
-    const query = new URL(boardHref("todox", { task: 9, view: "closed" }), "http://x").searchParams;
-    expect(panelView(query.get("view") ?? undefined)).toBe("closed");
-    expect(selectTaskId(query.get("task") ?? undefined, new Set([9]), [])).toBe(9);
+    const query = new URL(projectHref("todox", { tab: "notes", view: "board" }), "http://x")
+      .searchParams;
+    expect(projectTab(query.get("tab") ?? undefined)).toBe("notes");
+    expect(taskView(query.get("view") ?? undefined)).toBe("board");
   });
 });
 
