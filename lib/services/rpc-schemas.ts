@@ -305,7 +305,14 @@ export const SHAPES = {
     model,
   },
 
-  getTask: { task_id: z.number().int(), model },
+  // `id` as well, because create_task and search answer with `id` and an
+  // agent hands it straight back: the first dogfood run spent a refusal on
+  // exactly that (2026-11-22, B18). One of the two, never both.
+  getTask: {
+    task_id: z.number().int().optional(),
+    id: z.number().int().optional().describe("Same as task_id, as create_task and search return it."),
+    model,
+  },
 
   createTask: {
     cwd: ref
@@ -731,6 +738,13 @@ const OBJECTS: Record<string, z.ZodType> = {
         p.priority !== undefined,
       { message: "pass at least one of title, body, status or priority" },
     ),
+
+  getTask: z
+    .object(SHAPES.getTask)
+    .strict()
+    .refine((p) => (p.task_id === undefined) !== (p.id === undefined), {
+      message: "pass `task_id` (or `id`), not both",
+    }),
 
   updateContext: z
     .object(SHAPES.updateContext)

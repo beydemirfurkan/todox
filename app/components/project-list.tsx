@@ -3,7 +3,9 @@ import Link from "next/link";
 import type { T } from "@/lib/i18n";
 import { ago } from "@/lib/i18n";
 import type { ProjectWithActivity } from "@/lib/services/project-activity";
+import { firstLine } from "@/lib/util/headline";
 import { slugify } from "@/lib/util/paths";
+import { kindLabel } from "../kinds";
 import { SubmitButton } from "../features/submit";
 import { Chip } from "./chip";
 import { Field } from "./field";
@@ -43,6 +45,15 @@ type ProjectProps = {
   t: T;
 };
 
+type ProjectRowProps = ProjectProps & {
+  /**
+   * The newest open handoff, if any. A quiet row said only a name and counts,
+   * so a project paused mid-task read the same as one never started
+   * (dogfood 2026-11-22, B14).
+   */
+  leftOff?: string | null;
+};
+
 /** The chip that says a project is not only yours, whichever side of it you are on. */
 export function ShareChip({ project, teamSize, t }: Omit<ProjectProps, "counts">) {
   if (project.access_role === "member" && project.owner_name)
@@ -52,7 +63,7 @@ export function ShareChip({ project, teamSize, t }: Omit<ProjectProps, "counts">
   return null;
 }
 
-export function ProjectRow({ project, counts, teamSize, t }: ProjectProps) {
+export function ProjectRow({ project, counts, teamSize, leftOff, t }: ProjectRowProps) {
   return (
     <li className="sticker-flat">
       <Link
@@ -77,6 +88,12 @@ export function ProjectRow({ project, counts, teamSize, t }: ProjectProps) {
           )}
           <span className="mono text-meta text-faint">{ago(project.activity_at, t)}</span>
         </span>
+        {leftOff && (
+          <span className="w-full min-w-0 basis-full truncate text-small text-muted">
+            <span className="sr-only">{kindLabel(t, "handoff")}: </span>
+            {firstLine(leftOff, 160)}
+          </span>
+        )}
       </Link>
     </li>
   );

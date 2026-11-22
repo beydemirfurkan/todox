@@ -331,6 +331,7 @@ export const tr: Record<Key, string> = {
   quietProjects: "Sessiz",
   liveProjectsEmpty: "Hiçbir projede uçuşta iş yok.",
   quietEmpty: "Her projede uçuşta bir iş var.",
+  quietEmptyNothingLive: "Henüz görev ya da not tutan bir proje yok.",
   colProject: "Proje",
   openBoard: "Panoyu aç",
   statLive: "uçuştaki proje",
@@ -585,6 +586,8 @@ export const tr: Record<Key, string> = {
   profProjectRow: "{done} bitti · {open} açık · son dönemde {entries} kayıt",
   profNotes: "Nasıl çalışıyor",
   profFooter: "todox ile tutuluyor",
+  privacyStore6:
+    "Kodunun nerede durduğu, ajanının bildirdiği kadarıyla: her makinedeki her checkout'un mutlak yolu, içindeki kimlik bilgileri temizlenmiş haliyle reponun uzak adresi ve bağladığın dosyaların yolları ile içerik hash'leri. Yerel MCP sürecini kullanıyorsan ayrıca her oturumun dalı, commit başlıkları ve değişen dosya sayısı. Bir dosyanın içeriği asla.",
   privacyStore5:
     "Açık profil, yalnızca sen açarsan: görünen adın, kullanıcı adın, hakkında yazın, gün gün yazdıklarının sayısı ve işaretlediğin projeler ile notlar. Varsayılan olarak kapalıdır ve arama motorlarından dizine eklememelerini ister.",
   periodAll: "Tüm zamanlar",

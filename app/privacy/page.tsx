@@ -32,6 +32,7 @@ export default async function PrivacyPage() {
         <li>{t("privacyStore3")}</li>
         <li>{t("privacyStore4")}</li>
         <li>{t("privacyStore5")}</li>
+        <li>{t("privacyStore6")}</li>
       </ul>
 
       <h2 className="display mt-8 text-[20px] font-bold">{t("privacyWhatWeDoNot")}</h2>

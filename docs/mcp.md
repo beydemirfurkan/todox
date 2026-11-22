@@ -124,6 +124,18 @@ If you install by hand, the JSON / TOML shape per client is documented in
 `scripts/install-mcp/clients/`, and the per-platform paths are in the README's
 "Connect an agent" section.
 
+## What every agent sends about where the code is
+
+Identity is a repository, not a folder, so todox stores both halves of it:
+the absolute path of each checkout, one per machine (`root_path`, and the
+paths in `project_paths`), and the repository's remote (`repo_url`), with any
+username or password in the URL stripped before it is saved. Files you link
+are stored as their path and a sha256 of their contents, so a note can be
+flagged when the code under it changes. The contents themselves are never
+sent. A path is a fact about your disk -- `/Users/<you>/...` names you -- and
+it is shown back to you on the project page as where each machine keeps the
+checkout.
+
 ## What the local process records on its own
 
 The stdio transport does one thing nobody asks it to. While a session runs it

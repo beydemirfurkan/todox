@@ -113,12 +113,27 @@ describe("what a project has to carry to be listed", () => {
     expect(empty_projects_omitted).toBe(0);
   });
 
-  it("leaves out a project with neither", async () => {
+  it("leaves out a project with neither, beside one that has something", async () => {
+    projects.list.mockResolvedValue([project(2, "rules-only"), project(3, "nothing-here")]);
+    contexts.projectIdsWithNotes.mockResolvedValue(new Set([2]));
+
+    const { projects: shown, empty_projects_omitted } = await list();
+
+    expect(shown.map((p) => p.slug)).toEqual(["rules-only"]);
+    expect(empty_projects_omitted).toBe(1);
+  });
+
+  /**
+   * A new user's only project is empty, and hiding it answered [] -- which an
+   * agent reads as "no projects at all" (dogfood 2026-11-22, B16).
+   */
+  it("shows the empty ones when there is nothing else to show", async () => {
     projects.list.mockResolvedValue([project(3, "nothing-here")]);
 
-    const { projects: shown } = await list();
+    const { projects: shown, empty_projects_omitted } = await list();
 
-    expect(shown).toEqual([]);
+    expect(shown.map((p) => p.slug)).toEqual(["nothing-here"]);
+    expect(empty_projects_omitted).toBe(0);
   });
 });
 

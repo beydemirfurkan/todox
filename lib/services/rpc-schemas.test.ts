@@ -712,3 +712,16 @@ describe("recordObservation's carrier", () => {
     expect(() => parseParams("recordObservation", { ...base, source: "cursor" })).toThrow();
   });
 });
+
+/** create_task and search answer with `id`; get_task took only `task_id` (B18). */
+describe("getTask's id", () => {
+  it("takes task_id or id", () => {
+    expect(parseParams("getTask", { task_id: 3 })).toEqual({ task_id: 3 });
+    expect(parseParams("getTask", { id: 3 })).toEqual({ id: 3 });
+  });
+
+  it("refuses both, and neither", () => {
+    expect(() => parseParams("getTask", { task_id: 3, id: 4 })).toThrow(/not both/);
+    expect(() => parseParams("getTask", {})).toThrow(/task_id/);
+  });
+});
