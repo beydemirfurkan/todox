@@ -12,7 +12,14 @@ import * as limit from "@/lib/services/rate-limit";
 import { bySharedToken } from "@/lib/services/sharing";
 import { pageOpenGraph } from "../../metadata-shared";
 import { KIND_COLOR, kindLabel, statusLabel } from "../../kinds";
-import { Blob, Chip, Counter, Empty, Panel, StatusDot } from "../../components";
+import {
+  Chip,
+  Counter,
+  Empty,
+  LogoMark,
+  Panel,
+  StatusDot,
+} from "../../components";
 
 export const dynamic = "force-dynamic";
 
@@ -131,7 +138,7 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
         right={<Counter n={openPage.total} label={t("queued")} />}
       >
         <ul className="space-y-2">
-          {open.length === 0 && <Empty mood="happy">{t("allClear")}</Empty>}
+          {open.length === 0 && <Empty>{t("allClear")}</Empty>}
           {open.map((task) => {
             const entries = logs.get(task.id) ?? [];
             return (
@@ -214,7 +221,7 @@ export default async function SharedProjectPage({ params }: PageProps<"/s/[token
       )}
 
       <div className="flex items-center gap-3 pt-2">
-        <Blob mood="sleep" size={36} fill="var(--inset)" stroke="var(--ink)" />
+        <LogoMark size={22} />
         <p className="text-[13px] text-muted">todox — {t("tagline")}</p>
       </div>
     </div>

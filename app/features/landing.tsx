@@ -13,8 +13,8 @@ import { Explainer, VsNative } from "./explainer";
  * Read top to bottom it is a sentence, a picture, and then the same idea
  * three more ways, each shorter on words than the last one was: the steps as
  * drawings, the objection as four tiles, the payload as itself. The product
- * is the picture -- a real screen laid on a desk with notes pinned round it
- * -- and the page leaves white space around everything else.
+ * is the picture -- a real screen in a window -- and the page leaves dark
+ * space around everything else.
  */
 export function Landing({ t }: { t: T }) {
   return (
@@ -61,10 +61,10 @@ function Hero({ t }: { t: T }) {
 }
 
 /**
- * The product on the desk: a framed screenshot on a pastel sheet of graph
- * paper, torn scraps behind it, and three notes pinned round it in the
- * kinds the log keeps. The notes are drawn from the dictionary, so they are
- * in the reader's language; on a phone they step out of the way.
+ * The product in a window, with what an agent just wrote announced beside
+ * it in two of the kinds the log keeps. The toasts are drawn from the
+ * dictionary, so they are in the reader's language; on a phone they step out
+ * of the way.
  */
 function Stage({ t }: { t: T }) {
   return (
@@ -112,7 +112,7 @@ function Toast({ kind, text, t }: { kind: "dead_end" | "handoff"; text: string; 
   );
 }
 
-/** One more invitation, said once, with the agent mascot beside it. */
+/** One more invitation, said once, under the mark. */
 function Closing({ t }: { t: T }) {
   return (
     <section className="sticker pop flex flex-col items-center gap-5 px-6 py-14 text-center">

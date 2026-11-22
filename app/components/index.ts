@@ -1,5 +1,6 @@
-export { Blob, type Mood } from "./blob";
 export { LogoMark } from "./logo-mark";
+export { IconTile, type IconName } from "./icons";
+export { StatBadges, type Stat } from "./stat-badges";
 export { Chip, Counter } from "./chip";
 export { EntryBody } from "./entry-body";
 export { ExpandableText } from "./expandable-text";
@@ -13,4 +14,3 @@ export { Progress, ProjectLanes, WaitingList, type ProjectLane } from "./project
 export { ProjectFields, ProjectRow, type ProjectCountRow } from "./project-list";
 export { Tabs, currentTab, type Tab } from "./tabs";
 export { RefBadge, StatusDot } from "./status";
-export { BoltSticker, HandArrow, HeartSticker, PencilSticker, SparkleSticker } from "./stickers";

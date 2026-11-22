@@ -94,7 +94,7 @@ describe("what stays reachable without a session", () => {
     expect(redirected(proxy(request("/api/health")))).toBe(false);
   });
 
-  it.each(["/icon.svg", "/opengraph-image.png", "/robots.txt", "/sitemap.xml", "/llms.txt"])(
+  it.each(["/icon.svg", "/backdrop.svg", "/opengraph-image.png", "/robots.txt", "/sitemap.xml", "/llms.txt"])(
     "serves %s, so previews and crawlers are not sent to a login form",
     (path) => {
       expect(redirected(proxy(request(path)))).toBe(false);

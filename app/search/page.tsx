@@ -76,7 +76,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
   return (
     <div className="space-y-6">
       <div className="pop prose">
-        <h1 className="display text-[33px] leading-[1.1] font-bold">
+        <h1 className="display text-[33px] leading-[1.1]">
           {query ? <>&ldquo;{query}&rdquo;</> : t("searchTitle")}
         </h1>
         {/* Only before there is anything to read.
@@ -93,9 +93,9 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
 
       {/* A GET form, so a filtered search is a URL somebody can keep. The
           query rides along in a hidden field rather than being retyped. */}
-      <form action="/search" className="flex flex-wrap items-end gap-2">
+      <form action="/search" className="flex flex-wrap items-end gap-3">
         <input type="hidden" name="q" value={query} />
-        <Field label={t("searchKind")} className="w-44">
+        <Field label={t("searchKind")}>
           <Picker
             name="kind"
             value={kind}
@@ -106,7 +106,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
             ]}
           />
         </Field>
-        <Field label={t("searchProject")} className="w-56">
+        <Field label={t("searchProject")}>
           <Picker
             name="project"
             value={slug}
@@ -122,10 +122,10 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
         </SubmitButton>
       </form>
 
-      <Panel delay={60} right={<Counter n={hits.length} label={t("resultsCount")} />}>
+      <Panel delay={60} title={t("searchResultsTitle")} right={<Counter n={hits.length} label={t("resultsCount")} />}>
         <div className="space-y-2.5" aria-live="polite">
           {query && hits.length === 0 && (
-            <Empty mood="worried">{t("searchNoResults")}</Empty>
+            <Empty>{t("searchNoResults")}</Empty>
           )}
           {!query && <Empty>{t("searchPrompt")}</Empty>}
           {hits.map((h) => {
@@ -157,7 +157,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
                   </span>
                 </div>
                 {h.snippet && (
-                  <p className="mt-1 line-clamp-2 text-[14px] text-muted">{h.snippet}</p>
+                  <p className="mt-1 line-clamp-2 text-[14px] text-muted"><Snippet text={h.snippet} /></p>
                 )}
               </Link>
             );
@@ -165,5 +165,29 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
         </div>
       </Panel>
     </div>
+  );
+}
+
+/**
+ * `ts_headline` marks the matched words with `<b>` and `</b>`, and the same
+ * string goes to agents over MCP, so the markers stay in the data. Here they
+ * are split out and the odd segments drawn as highlights -- as text, never
+ * as HTML: a body is written by people and agents, and an `<img onerror>`
+ * in one must not run on this page.
+ */
+function Snippet({ text }: { text: string }) {
+  const parts = text.split(/<\/?b>/);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <mark key={i} className="rounded-[3px] bg-[color-mix(in_srgb,var(--accent)_22%,transparent)] px-0.5 text-ink">
+            {part}
+          </mark>
+        ) : (
+          part
+        ),
+      )}
+    </>
   );
 }

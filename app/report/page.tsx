@@ -9,7 +9,15 @@ import { resolve } from "@/lib/services/project-resolver";
 import { periodLabel, renderMarkdown } from "@/lib/services/report-markdown";
 import { activityReport, type ReportEntry, type TaskReport } from "@/lib/services/reports";
 import { resolvePeriod, type PeriodName } from "@/lib/util/time";
-import { Blob, Chip, Counter, Empty, MarkdownPreview, Panel } from "../components";
+import {
+  Chip,
+  Counter,
+  Empty,
+  IconTile,
+  MarkdownPreview,
+  Panel,
+  StatBadges,
+} from "../components";
 import { privatePageMetadata } from "../metadata-shared";
 import { CopyMarkdown } from "../features/copy-markdown";
 import { IMPORTANCE_COLOR, KIND_COLOR, statusLabel } from "../kinds";
@@ -94,41 +102,41 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
 
       {report.totals.touched === 0 ? (
         <Panel delay={40}>
-          <Empty mood="sleep">{t("noActivity")}</Empty>
+          <Empty>{t("noActivity")}</Empty>
         </Panel>
       ) : (
         <>
-          <section
-            className="pop grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-            aria-label={t("reportTitle")}
-          >
-            <Stat n={report.totals.completed} label={t("totalsCompleted")} tone="tone-mint" />
-            <Stat n={report.totals.created} label={t("totalsCreated")} tone="tone-sky" />
-            <Stat n={report.totals.touched} label={t("totalsTouched")} tone="tone-sand" />
-            <Stat
-              text={duration(report.totals.active_ms, t)}
-              label={
-                // The denominator belongs on the tile, not in a footnote below
-                // the fold. A task closed without ever being set to `doing`
-                // contributes a clean zero to this figure, and until now the
-                // headline rolled every one of those in and said nothing --
-                // 43 of 78 completed tasks, measured in production.
-                [
-                  t("totalsActive"),
-                  report.totals.unmeasured
-                    ? t("totalsUnmeasured", { n: report.totals.unmeasured })
-                    : null,
-                  // The other caveat: what was cut, not what was never there.
-                  report.totals.discounted_ms
-                    ? t("totalsDiscounted", { d: duration(report.totals.discounted_ms, t) })
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")
-              }
-              tone="tone-apricot"
-            />
-          </section>
+          <StatBadges
+            label={t("reportTitle")}
+            className="pop"
+            stats={[
+              { label: t("totalsCompleted"), value: report.totals.completed, mark: "var(--ok)" },
+              { label: t("totalsCreated"), value: report.totals.created, mark: "var(--k-decision)" },
+              { label: t("totalsTouched"), value: report.totals.touched, mark: "var(--k-note)" },
+              {
+                value: duration(report.totals.active_ms, t),
+                mark: "var(--accent)",
+                label:
+                  // The denominator belongs on the tile, not in a footnote below
+                  // the fold. A task closed without ever being set to `doing`
+                  // contributes a clean zero to this figure, and until now the
+                  // headline rolled every one of those in and said nothing --
+                  // 43 of 78 completed tasks, measured in production.
+                  [
+                    t("totalsActive"),
+                    report.totals.unmeasured
+                      ? t("totalsUnmeasured", { n: report.totals.unmeasured })
+                      : null,
+                    // The other caveat: what was cut, not what was never there.
+                    report.totals.discounted_ms
+                      ? t("totalsDiscounted", { d: duration(report.totals.discounted_ms, t) })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+              },
+            ]}
+          />
 
           {report.by_project.length > 1 && (
             <Panel delay={80} title={t("byProject")}>
@@ -232,7 +240,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
 
           <Panel delay={300} title="markdown">
             <div className="flex flex-wrap items-start gap-4">
-              <Blob mood="happy" size={46} fill="var(--k-handoff)" className="shrink-0" />
+              <IconTile name="doc" color="var(--k-handoff)" />
               <div className="min-w-0 flex-1 space-y-3">
                 <p className="text-[14px] text-muted">{t("reportForManager")}</p>
                 <CopyMarkdown
@@ -246,26 +254,6 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
           </Panel>
         </>
       )}
-    </div>
-  );
-}
-
-/** A number on its own pastel tile, with what it counts written under it. */
-function Stat({
-  n,
-  text,
-  label,
-  tone,
-}: {
-  n?: number;
-  text?: string;
-  label: string;
-  tone: string;
-}) {
-  return (
-    <div className={`tone-panel ${tone} !p-5`}>
-      <div className="display text-[36px] leading-none">{text ?? n}</div>
-      <p className="mt-2 text-[13.5px] text-muted">{label}</p>
     </div>
   );
 }
