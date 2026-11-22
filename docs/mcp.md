@@ -177,6 +177,31 @@ project for your account, a hook's row is skipped (the stdio one sees every
 tool call, the hook only the start and the end), so a session never arrives
 twice. Other clients have no hooks; for them stdio remains the only carrier.
 
+## What the plugin's hooks send
+
+The Claude Code plugin (0.1.5 and later) runs command hooks: plain processes,
+no model call, talking to nothing but your todox server's `/api/rpc` with the
+token you gave the plugin. Every call carries `x-todox-carrier:
+claude-code-hook`, so it is counted under `hook:<method>` and never as your
+agent's call (see below).
+
+| Hook | Sends | When |
+|---|---|---|
+| SessionStart | `getContext` with your `cwd`, `shape: "digest"`, `create_if_missing: false` | startup, resume, `/clear`, after compaction |
+| Stop | `sessionStatus` with your `cwd` and a window of hours | only if this session touched a todox task |
+| Stop, SessionEnd | `recordObservation`: branch, two commit ids, commit and dirty-file counts, up to three commit subjects, ids of tasks set to `doing` | only if git changed since the last one sent |
+
+Nothing else leaves your machine: no diff, no file path beyond the working
+directory you were already sending, no prompt, no transcript. What the hooks
+remember between calls — which tasks this session touched, whether it edited
+files, whether it was already stopped once — stays in a file per session under
+the plugin's data directory, deleted after seven days. So do their errors, in
+`hook.log` (rotated at 64 KB), which records an event name and an error message
+and never the token or a response body.
+
+`TODOX_HOOKS=off` turns every hook off; `TODOX_STOP=off` only the Stop hook's
+request for a handoff; `TODOX_OBSERVE=off` only the observation.
+
 ## What the server counts
 
 The server keeps a count of which methods were called, per account, per day —

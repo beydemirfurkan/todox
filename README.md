@@ -560,7 +560,7 @@ Details, and an honest list of what is **not** covered, in
 ## Cutting a release
 
 ```bash
-git tag v0.1.4 && git push origin v0.1.4
+git tag v0.1.5 && git push origin v0.1.5
 ```
 
 That is the procedure. The workflow checks the tag against `package.json`,
