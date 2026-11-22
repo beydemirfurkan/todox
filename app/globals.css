@@ -75,17 +75,18 @@
 
   /* Layered, the way paper lifts off a desk: a contact shadow, a near one
      and a long soft one. Never one hard offset. */
-  --shadow: 0 1px 2px rgba(40, 30, 20, 0.05), 0 4px 12px rgba(40, 30, 20, 0.05),
-    0 18px 40px rgba(40, 30, 20, 0.05);
-  --shadow-sm: 0 1px 2px rgba(40, 30, 20, 0.12);
-  --shadow-lg: 0 2px 4px rgba(40, 30, 20, 0.06), 0 12px 24px rgba(40, 30, 20, 0.08),
-    0 32px 60px rgba(40, 30, 20, 0.08);
-  --shadow-pop: 0 2px 6px rgba(40, 30, 20, 0.08), 0 18px 44px rgba(40, 30, 20, 0.14);
+  --shadow: none;
+  --shadow-sm: none;
+  --shadow-lg: none;
+  --shadow-pop: none;
   /* a screenshot set into a pastel panel */
-  --shadow-frame: 0 0 0 1px rgba(40, 30, 20, 0.06), 0 10px 30px rgba(40, 30, 20, 0.16);
+  --shadow-frame: 0 0 0 1px var(--line);
 
-  --radius-card: 20px;
-  --radius-inner: 12px;
+  --radius-card: 12px;
+  --radius-inner: 8px;
+  /* Notebook paper: the faint blue-grey ruling and the red margin line. */
+  --ruling: #e6e0f0;
+  --margin-line: #f3b2a6;
   --radius-pill: 999px;
 }
 
@@ -123,16 +124,18 @@
     --tone-lilac: #2d2547;
     --tone-sand: #2e2924;
 
+    --ruling: #2a2733;
+    --margin-line: #5a2f29;
     --band: #0e0d0c;
     --band-ink: #f5f1ea;
     --band-muted: #bdb6ac;
     --band-rule: #2a2724;
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 16px 36px rgba(0, 0, 0, 0.45);
-    --shadow-pop: 0 18px 44px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
-    --shadow-frame: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.5);
+    --shadow: none;
+    --shadow-sm: none;
+    --shadow-lg: none;
+    --shadow-pop: none;
+    --shadow-frame: 0 0 0 1px var(--line);
   }
 }
 
@@ -490,13 +493,23 @@ summary:focus-visible,
 
 /* ------------------------------------------------------------- stickers */
 
-/* The card: white, floated on the layered shadow, a hairline to hold its
-   edge where the shadow is too soft to. */
-.sticker {
-  background: var(--card);
+/* The card is a page from a ring-bound notebook: flat paper, a hairline
+   edge, a row of punched holes along the top and the red margin line down
+   its left. No ruling -- lines under text that does not sit on them read as
+   noise -- and no shadow: paper lies on the desk, it does not float.
+   `.paper` is the same sheet for a card that is not a `.sticker` (the
+   board's task cards). */
+.sticker,
+.paper {
+  background-color: var(--card);
+  background-image:
+    radial-gradient(circle at 50% 50%, var(--paper) 0 3.4px, var(--line) 3.5px 4.4px, transparent 4.6px),
+    linear-gradient(to right, transparent 7px, var(--margin-line) 7px, var(--margin-line) 8px, transparent 8px);
+  background-size: 22px 22px, auto;
+  background-repeat: repeat-x, no-repeat;
+  background-position: 14px -2px, 0 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow);
 }
 
 /* The quieter card inside a card: a well, no shadow. */
@@ -536,12 +549,7 @@ body:has([data-wide-page]) .page-column {
     box-shadow 0.13s ease;
 }
 .lift:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-.lift:active {
-  transform: translateY(0);
-  box-shadow: var(--shadow);
+  filter: brightness(0.97);
 }
 
 /* ------------------------------------------------------------ the board */
@@ -573,8 +581,7 @@ body:has([data-wide-page]) .page-column {
   transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
 .board-card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
+  border-color: var(--line-strong);
 }
 [data-lifted] .board-card,
 .board-card[data-lifted] {
@@ -639,12 +646,10 @@ body:has([data-wide-page]) .page-column {
     background-color 0.12s ease;
 }
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
+  filter: brightness(1.25);
 }
 .btn:active {
-  transform: translateY(0);
-  box-shadow: none;
+  transform: translateY(1px);
 }
 .btn-quiet {
   background: var(--card);
@@ -654,7 +659,7 @@ body:has([data-wide-page]) .page-column {
 }
 .btn-quiet:hover {
   border-color: var(--line-strong);
-  box-shadow: var(--shadow-sm);
+  filter: none;
 }
 
 /* Irreversible. It should not look like the buttons that merely save
