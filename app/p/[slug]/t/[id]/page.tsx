@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { ENTRY_KINDS } from "@/lib/constants";
-import { ago } from "@/lib/i18n";
+import { ENTRY_KINDS, STATUSES, type EntryKind } from "@/lib/constants";
+import { ago, type T } from "@/lib/i18n";
 import { byline } from "./byline";
 import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
@@ -27,7 +27,7 @@ import {
   kindLabel,
   kindPlaceholder,
   priorityOptions,
-  statusOptions,
+  statusLabel,
 } from "../../../../kinds";
 import { LogComposer, type KindStrings } from "../../../../features/log-composer";
 import { Picker } from "../../../../features/picker";
@@ -138,75 +138,68 @@ export default async function TaskPage({
         / <span aria-current="page">#{task.id}</span>
       </nav>
 
-      <Panel
-            title={
-              <span className="flex items-center gap-2">
-                <StatusDot status={task.status} t={t} /> {t("task")} #{task.id}
-              </span>
-            }
-            right={
-              <form action={setStatusAction} className="flex flex-wrap items-center gap-1.5">
-                <input type="hidden" name="task_id" value={task.id} />
-                <Picker
+      <header className="pop space-y-4">
+        <h1 className="display max-w-[30ch] text-[30px] leading-[1.12] break-words sm:text-[40px]">
+          {task.title}
+        </h1>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="mono text-meta text-faint">#{task.id}</span>
+          {/* Only when it is not the middle one: a badge every task carries
+              says nothing. */}
+          {task.priority !== 2 && (
+            <Chip color={task.priority === 1 ? "var(--accent)" : "var(--k-note)"}>
+              {task.priority === 1 ? t("p1") : t("p3")}
+            </Chip>
+          )}
+          <span className="mono text-meta text-faint">
+            {t("updated")} {ago(task.updated_at, t)}
+          </span>
+        </div>
+        {/* One form, one button per status: the button pressed is the value,
+            so it needs no script, and the current status stays focusable and
+            says so with `aria-pressed` rather than going `disabled`. */}
+        <form action={setStatusAction}>
+          <input type="hidden" name="task_id" value={task.id} />
+          <fieldset className="border-0 p-0">
+            <legend className="sr-only">{t("statusLabel")}</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {STATUSES.map((status) => (
+                <button
+                  key={status}
+                  type="submit"
                   name="status"
-                  value={task.status}
-                  options={statusOptions(t)}
-                  label={t("statusLabel")}
-                  applyLabel={t("apply")}
-                  submitOnPick
-                />
-              </form>
-            }
-          >
-            {/* Read first, edit on request.
-                This page is opened to find out what a task is, and it used to
-                answer with a form: the title in a textarea, the body in a
-                second one, a priority select and a save button. Reading meant
-                looking at controls, and because the thing that reads as the
-                title was an editing control, the document had no real heading
-                -- there was a visually hidden h1 duplicating it to make the
-                outline valid, which is a workaround for a layout problem
-                rather than a fix.
+                  value={status}
+                  aria-pressed={task.status === status}
+                  className="pill seg gap-2"
+                >
+                  <StatusDot status={status} t={t} />
+                  <span aria-hidden="true">{statusLabel(t, status)}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </form>
+      </header>
 
-                The title is now the heading it always was. Editing is a
-                `details`, the same disclosure the new-project form and the
-                kinds reference already use, so it still works with no
-                JavaScript and the Server Action still lives in a real form. */}
-            <h1 className="display text-[21px] leading-snug font-bold sm:text-[24px]">
-              {task.title}
-            </h1>
-
-            {task.body && (
-              /* Clamped, like the log below it and the summary above it.
-                  The body is the brief -- goal, constraints, what counts as
-                  done -- and it sits between the reader and the history they
-                  came for. Measured on production: the median task body is
-                  1,384 characters and 113 of 193 are over 900, so this is
-                  usually a screen of scrolling before the first entry. Nothing
-                  is lost; ExpandableText only offers the control when the
-                  clamp actually bites. */
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
+      <div className="min-w-0 space-y-5">
+      <Panel delay={40} title={t("taskBrief")}>
+            {/* Clamped: the brief sits between the reader and the history
+                they came for, and the median body is 1,384 characters. */}
+            {task.body ? (
               <ExpandableText
                 text={task.body}
                 more={t("showMore")}
                 less={t("showLess")}
-                className="prose mt-2 text-[15px] leading-relaxed text-muted"
+                className="prose text-[15px] leading-relaxed text-muted"
               />
+            ) : (
+              <p className="text-small text-muted">{t("taskNoBrief")}</p>
             )}
 
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              {/* Only when it is not the middle one, the way the project page
-                  already does it: a badge every task carries says nothing. */}
-              {task.priority !== 2 && (
-                <Chip color={task.priority === 1 ? "var(--accent)" : "var(--k-note)"} tilt={-3}>
-                  {task.priority === 1 ? t("p1") : t("p3")}
-                </Chip>
-              )}
-              <span className="mono text-meta text-faint">
-                {t("updated")} {ago(task.updated_at, t)}
-              </span>
-            </div>
-
-            <details className="mt-3">
+            {/* Read first, edit on request: a disclosure, so it works with no
+                JavaScript and the Server Action still lives in a real form. */}
+            <details className="mt-4">
               <summary className="link-more text-meta">{t("editTask")}</summary>
               <form action={updateTaskAction} className="mt-3 space-y-2">
                 <input type="hidden" name="task_id" value={task.id} />
@@ -238,7 +231,7 @@ export default async function TaskPage({
                 </div>
               </form>
             </details>
-          </Panel>
+      </Panel>
 
       <Tabs tabs={tabs} current={tab} label={t("taskSections")} />
 
@@ -252,22 +245,13 @@ export default async function TaskPage({
             <ol>
               {entries.map((e, i) => (
                 <li key={e.id} className="group relative flex gap-3">
-                  <div className="flex w-4 flex-col items-center" aria-hidden="true">
-                    <span
-                      className="mt-1 size-4 shrink-0 rounded-full border-[1.5px] border-line"
-                      style={{ background: KIND_COLOR[e.kind], borderColor: "var(--edge-dark)" }}
-                    />
-                    {i < entries.length - 1 && (
-                      <span className="w-0 flex-1 border-l border-dashed border-rule" />
-                    )}
+                  <div className="flex w-3 flex-col items-center" aria-hidden="true">
+                    <span className="mt-1.5 size-3 shrink-0 rounded-full" style={{ background: KIND_COLOR[e.kind] }} />
+                    {i < entries.length - 1 && <span className="mt-1 w-0 flex-1 border-l border-rule" />}
                   </div>
-                  <article className="sticker-flat mb-4 min-w-0 flex-1 p-3">
+                  <article className="min-w-0 flex-1 pb-6">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Chip
-                        color={KIND_COLOR[e.kind]}
-                        title={kindHint(t, e.kind)}
-                        tilt={i % 2 ? 1.5 : -1.5}
-                      >
+                      <Chip color={KIND_COLOR[e.kind]} title={kindHint(t, e.kind)}>
                         {kindLabel(t, e.kind)}
                       </Chip>
                       <span className="mono text-meta text-faint">
@@ -395,6 +379,51 @@ export default async function TaskPage({
           </Panel>
         </div>
       )}
+      </div>
+
+      <KindTally entries={entries} files={refs.length} t={t} />
+      </div>
     </div>
+  );
+}
+
+/**
+ * The log at a glance, beside it: how many decisions, dead ends, open
+ * questions and handoffs this task carries, each on its own pastel tile with
+ * the word under the number. A person opening a task asks "has this been
+ * tried, is anything waiting on me" before they read a single entry.
+ */
+function KindTally({
+  entries,
+  files,
+  t,
+}: {
+  entries: { kind: EntryKind }[];
+  files: number;
+  t: T;
+}) {
+  const tiles: { kind: EntryKind; tone: string }[] = [
+    { kind: "decision", tone: "tone-sky" },
+    { kind: "dead_end", tone: "tone-apricot" },
+    { kind: "question", tone: "tone-butter" },
+    { kind: "handoff", tone: "tone-lilac" },
+  ];
+  return (
+    <aside aria-label={t("logAtAGlance")} className="pop space-y-3 lg:sticky lg:top-4" style={{ animationDelay: "80ms" }}>
+      <ul className="grid grid-cols-2 gap-3">
+        {tiles.map((tile) => (
+          <li key={tile.kind} className={`tone-panel ${tile.tone} !p-4`}>
+            <span className="display block text-[30px] leading-none">
+              {entries.filter((e) => e.kind === tile.kind).length}
+            </span>
+            <span className="mt-1.5 block text-small text-muted">{kindLabel(t, tile.kind)}</span>
+          </li>
+        ))}
+      </ul>
+      <a href="?t=files" className="tone-panel tone-sand flex items-center justify-between !px-4 !py-3 text-small hover:brightness-[0.97]">
+        <span className="text-muted">{t("filesInPlay")}</span>
+        <span className="display text-[20px] leading-none">{files}</span>
+      </a>
+    </aside>
   );
 }
