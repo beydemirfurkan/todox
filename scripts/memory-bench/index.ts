@@ -519,7 +519,12 @@ async function reportLogBudget(
         budget,
         focus,
       );
-      return [...page.rows.values()].flat();
+      // Who wrote each row, which the service turns into a `by` only for
+      // somebody else's line and otherwise drops -- so it is dropped here
+      // too, or this would count bytes the payload never carries.
+      return [...page.rows.values()]
+        .flat()
+        .map(({ user_id: _u, author: _a, model: _m, author_name: _n, ...entry }) => entry);
     };
 
     const flat = await paid();
