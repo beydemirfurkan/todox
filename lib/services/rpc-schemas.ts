@@ -148,6 +148,13 @@ const datetime = z
   })
   .describe("ISO datetime; overrides `period`");
 
+/**
+ * The processes that may write an observation, richest first: stdio sees every
+ * tool call, the plugin's hooks a session's edges, a git hook only commits.
+ */
+export const OBSERVATION_SOURCES = ["stdio", "claude-code-hook", "git-hook"] as const;
+export type ObservationSource = (typeof OBSERVATION_SOURCES)[number];
+
 export const SHAPES = {
   listProjects: { model },
 
@@ -673,10 +680,10 @@ export const SHAPES = {
       ),
     started_at: z.string().max(MAX.line).optional(),
     source: z
-      .enum(["stdio", "claude-code-hook"])
+      .enum(OBSERVATION_SOURCES)
       .optional()
       .describe(
-        "Which carrier saw this: the stdio process (default) or the Claude Code plugin's hooks. A hook's write is skipped while the stdio process is already observing the same project for this account.",
+        "Which carrier saw this: the stdio process (default), the Claude Code plugin's hooks, or a git hook. A poorer carrier's write is skipped while a richer one is already observing the same project for this account.",
       ),
     model,
   },

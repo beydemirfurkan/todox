@@ -26,7 +26,7 @@ import { merge as mergeProjects } from "./project-merge";
 import * as projectActivity from "./project-activity";
 import { existingFor, mustResolve, noMatch, resolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
-import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
+import { isMethod, parseParams, type MethodName, type ObservationSource } from "./rpc-schemas";
 import { silentAccountNudge } from "./nudge";
 import { highlightedTerms, search } from "./search";
 import { sessionStatus } from "./session-status";
@@ -627,7 +627,7 @@ export const methods = {
       commit_subjects?: string;
       task_ids?: number[];
       started_at?: string;
-      source?: "stdio" | "claude-code-hook";
+      source?: ObservationSource;
     },
   ) => {
     const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }));
@@ -638,8 +638,8 @@ export const methods = {
     // nothing.
     const previous = await observationsRepo.lastHeadFor(userId, project.id);
 
-    if (await stdioAlreadyObserving(userId, project.id, p))
-      return { ok: true, project: project.slug, last_head_sha: previous, skipped: "stdio_active" };
+    const shadowed = await shadowedBy(userId, project.id, p);
+    if (shadowed) return { ok: true, project: project.slug, last_head_sha: previous, skipped: shadowed };
 
     await observationsRepo.record({
       user_id: userId,
@@ -756,25 +756,45 @@ async function relatedDeadEnds(
   }
 }
 
+/** How long a richer carrier's last write keeps a git hook quiet. */
+export const CARRIER_ACTIVE_MS = 30 * 60_000;
+
 /**
- * Whether a hook's observation would describe a session the stdio process is
- * already describing.
+ * Who silences whom, and from when.
  *
- * A developer running the plugin's hooks with the stdio server as well has two
- * carriers watching one checkout, under two session ids, so without this every
- * session would arrive twice and the briefing's six observation slots would
- * hold three sessions. The stdio row wins because it is the richer one: it sees
- * every tool call, the hook sees only the session's edges. "Since the hook's
- * session began" rather than "ever", so yesterday's stdio session does not
- * silence today's hook-only one.
+ * Two carriers watching one checkout write two rows under two session ids,
+ * and the briefing's six observation slots then hold three sessions. So the
+ * richer carrier wins: stdio sees every tool call, the plugin's hooks see a
+ * session's edges, a git hook sees only commits.
+ *
+ * - A plugin hook stands down for stdio since its own session began, so
+ *   yesterday's stdio session does not silence today's hook-only one.
+ * - A git hook has no session to date from -- it fires per commit -- so it
+ *   stands down while either richer carrier has written in the last half
+ *   hour: a commit made inside an agent's session is that session's, and its
+ *   carrier will say so at its next write.
  */
-async function stdioAlreadyObserving(
+const SHADOWS: Partial<
+  Record<ObservationSource, { by: ObservationSource[]; reason: string; since: (p: { started_at?: string }) => string }>
+> = {
+  "claude-code-hook": { by: ["stdio"], reason: "stdio_active", since: (p) => p.started_at ?? now() },
+  "git-hook": {
+    by: ["stdio", "claude-code-hook"],
+    reason: "carrier_active",
+    since: () => new Date(Date.now() - CARRIER_ACTIVE_MS).toISOString(),
+  },
+};
+
+/** The reason a write is skipped because a richer carrier has it, or null. */
+async function shadowedBy(
   userId: number,
   projectId: number,
-  p: { source?: string; started_at?: string },
-): Promise<boolean> {
-  if (p.source !== "claude-code-hook") return false;
-  return observationsRepo.observedBySince(userId, projectId, "stdio", p.started_at ?? now());
+  p: { source?: ObservationSource; started_at?: string },
+): Promise<string | null> {
+  const rule = p.source ? SHADOWS[p.source] : undefined;
+  if (!rule) return null;
+  const active = await observationsRepo.observedBySourcesSince(userId, projectId, rule.by, rule.since(p));
+  return active ? rule.reason : null;
 }
 
 function pruneEmptyProjects(userId: number, keep: number) {
