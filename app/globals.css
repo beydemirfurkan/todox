@@ -465,7 +465,13 @@ body:has([data-wide-page]) .page-column {
    list grew past the sidebar, the page grew with it, and at the bottom of a
    long page the sticky sidebar ran out of room and slid away. Two projects
    in a seed database never showed it; sixty do. */
+/* Positioned so it is the containing block of the sr-only counts inside it:
+   those are absolute, and an absolute box whose containing block sits outside
+   a scroller is not clipped by it. Sixty of them reached past the shell,
+   lengthened the page by the hidden part of the list, and the sticky sidebar
+   slid away at the bottom of every long page. */
 .sidebar-projects {
+  position: relative;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
