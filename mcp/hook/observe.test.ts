@@ -54,7 +54,7 @@ describe("the hook as an observation carrier", () => {
       task_ids: [7],
       started_at: "2026-11-22T08:00:00.000Z",
       repo_url: "https://github.com/acme/repo.git",
-      source: "claude-code-hook",
+      source: "plugin-hook",
     });
   });
 

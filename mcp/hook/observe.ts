@@ -76,7 +76,7 @@ async function observe({ ctx, rpc, sessionId, cwd }: Observing): Promise<void> {
     rpc("recordObservation", {
       ...observationPayload(f),
       ...(remote ? { repo_url: remote } : {}),
-      source: "claude-code-hook",
+      source: "plugin-hook",
     }) as Promise<{
       last_head_sha?: string | null;
       skipped?: string;

@@ -237,13 +237,13 @@ async function main() {
   const hookStart = now();
   const alone = await invoke({ userId: owner.id }, "recordObservation", {
     project: hookSlug,
-    ...observation({ session_id: `cc:${rnd()}`, source: "claude-code-hook", started_at: hookStart }),
+    ...observation({ session_id: `cc:${rnd()}`, source: "plugin-hook", started_at: hookStart }),
   });
   expect("a hook's write is taken when nothing else watches", !("skipped" in (alone as object)));
   const hookBrief = await briefing(owner.id, hookProject);
   expect(
     "and the briefing says which carrier saw it",
-    hookBrief.observations[0]?.source === "claude-code-hook",
+    hookBrief.observations[0]?.source === "plugin-hook",
   );
 
   await invoke({ userId: owner.id }, "recordObservation", {
@@ -252,7 +252,7 @@ async function main() {
   });
   const shadowed = await invoke({ userId: owner.id }, "recordObservation", {
     project: hookSlug,
-    ...observation({ session_id: `cc:${rnd()}`, source: "claude-code-hook", started_at: hookStart }),
+    ...observation({ session_id: `cc:${rnd()}`, source: "plugin-hook", started_at: hookStart }),
   });
   expect(
     "a hook's write is skipped once stdio has observed the same project since the session began",
@@ -266,7 +266,7 @@ async function main() {
     project: hookSlug,
     ...observation({
       session_id: `cc:${rnd()}`,
-      source: "claude-code-hook",
+      source: "plugin-hook",
       started_at: new Date(Date.now() + 60_000).toISOString(),
     }),
   });
@@ -293,9 +293,10 @@ async function main() {
   );
   await invoke({ userId: owner.id }, "recordObservation", {
     project: gitSlug,
+    // The name plugins up to 0.1.6 still send: it must keep a git hook quiet too.
     ...observation({ session_id: `cc:${rnd()}`, source: "claude-code-hook", started_at: now() }),
   });
-  expect("skipped while the plugin's hooks wrote in the last half hour", (await gitWrite()).skipped === "carrier_active");
+  expect("skipped while the plugin's hooks (under their older name) wrote in the last half hour", (await gitWrite()).skipped === "carrier_active");
   await run("UPDATE observations SET observed_at = ? WHERE project_id = ? AND source <> 'git-hook'", [
     new Date(Date.now() - 31 * 60_000).toISOString(),
     gitProject.id,

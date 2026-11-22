@@ -180,7 +180,13 @@ const datetime = z
  * The processes that may write an observation, richest first: stdio sees every
  * tool call, the plugin's hooks a session's edges, a git hook only commits.
  */
-export const OBSERVATION_SOURCES = ["stdio", "claude-code-hook", "git-hook"] as const;
+/**
+ * `plugin-hook` is the plugin's hooks in any agent that installs it -- Claude
+ * Code, Codex, Cursor; the row's `client` says which. `claude-code-hook` is
+ * the same carrier under the name plugins up to 0.1.6 send, kept so an
+ * installed plugin is not refused after a deploy.
+ */
+export const OBSERVATION_SOURCES = ["stdio", "plugin-hook", "claude-code-hook", "git-hook"] as const;
 export type ObservationSource = (typeof OBSERVATION_SOURCES)[number];
 
 export const SHAPES = {
@@ -726,7 +732,7 @@ export const SHAPES = {
       .enum(OBSERVATION_SOURCES)
       .optional()
       .describe(
-        "Which carrier saw this: the stdio process (default), the Claude Code plugin's hooks, or a git hook. A poorer carrier's write is skipped while a richer one is already observing the same project for this account.",
+        "Which carrier saw this: the stdio process (default), the plugin's hooks (`plugin-hook`; `claude-code-hook` is its older name), or a git hook. A poorer carrier's write is skipped while a richer one is already observing the same project for this account.",
       ),
     model,
   },

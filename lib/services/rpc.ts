@@ -807,9 +807,10 @@ export const CARRIER_ACTIVE_MS = 30 * 60_000;
 const SHADOWS: Partial<
   Record<ObservationSource, { by: ObservationSource[]; reason: string; since: (p: { started_at?: string }) => string }>
 > = {
+  "plugin-hook": { by: ["stdio"], reason: "stdio_active", since: (p) => p.started_at ?? now() },
   "claude-code-hook": { by: ["stdio"], reason: "stdio_active", since: (p) => p.started_at ?? now() },
   "git-hook": {
-    by: ["stdio", "claude-code-hook"],
+    by: ["stdio", "plugin-hook", "claude-code-hook"],
     reason: "carrier_active",
     since: () => new Date(Date.now() - CARRIER_ACTIVE_MS).toISOString(),
   },
