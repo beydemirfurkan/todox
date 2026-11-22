@@ -1,7 +1,7 @@
 {
   "name": "todox",
   "displayName": "todox",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "The log your next session resumes from: decisions, dead ends, handoffs and open tasks, shared across machines, agents and people over the todox MCP server. Briefs a session with the log at start, and asks once for its handoff before it finishes.",
   "author": {
     "name": "Furkan Beydemir",

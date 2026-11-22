@@ -236,7 +236,7 @@ export function skillDocument(): string {
  * `server.json` there. Three files, one release, one test that fails when
  * somebody bumps only two of them.
  */
-export const SERVER_INFO = { name: "todox", version: "0.1.6" } as const;
+export const SERVER_INFO = { name: "todox", version: "0.1.7" } as const;
 
 const ok = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
