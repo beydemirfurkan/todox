@@ -14,38 +14,28 @@ import { ShareChip, slugDiffers, type ProjectCountRow } from "./project-list";
 import { StatusDot } from "./status";
 
 /**
- * The dashboard as a board: a lane per project that has work in flight, a cell
- * per open status, a few titles in each.
+ * The dashboard's projects with work in flight, one card each.
  *
- * These projects used to be cards that said "2 in flight, 1 stuck, 5 queued".
- * A count answers "how much"; it does not answer "what", and finding out meant
- * opening each project in turn. A lane prints the top of every status, so the
- * question a person opens the dashboard with -- what is going on, everywhere --
- * is answered by the page they are already on.
- *
- * Finished work is a number, not a cell of cards: it is the one status nobody
- * acts on from here, and sixty struck-through titles per lane is the wall this
- * page was folded to remove.
+ * A card answers the two questions a person opens the dashboard with, in
+ * the order they ask them: how far along is this (a bar, with its numbers
+ * written out beside it, because colour never says it alone), and what is
+ * happening in it right now (where the last session left off, and the
+ * tasks at the front of each open status). Finished work is part of the
+ * bar and a number, never a list -- it is the one status nobody acts on
+ * from here.
  */
 
 /** Where a task opens: the project's board with that task in its panel. */
 const taskHref = (slug: string, taskId: number) =>
   `${boardHref(slug, { task: taskId, view: "task" })}#panel`;
 
-/**
- * Three shapes. Stacked on a phone. From `md` the three statuses sit side by
- * side under the project's own line, because at tablet width a fourth and
- * fifth column left each status a hundred and twenty pixels and every title
- * became three words a line. From `xl` everything is one row, under headings
- * drawn once.
- */
-const LANE_ROW = "xl:grid-cols-[11rem_repeat(3,minmax(0,1fr))_4.5rem] xl:gap-x-3";
-const LANE_GRID = `md:grid md:grid-cols-3 md:gap-x-3 md:gap-y-3 ${LANE_ROW}`;
-/** The project's line and the done count: full width until the single row. */
-const LANE_WIDE_CELL = "md:col-span-3 xl:col-span-1";
-
 const LANE_STATUSES = ["todo", "doing", "blocked"] as const satisfies readonly Status[];
 type LaneStatus = (typeof LANE_STATUSES)[number];
+
+/** Tasks a card lists; the bar and the numbers cover the rest. */
+const CARD_TASKS = 4;
+/** In-flight work first: that is what the card is for. */
+const ORDER: Record<LaneStatus, number> = { doing: 0, blocked: 1, todo: 2 };
 
 export interface ProjectLane {
   project: ProjectWithActivity;
@@ -64,155 +54,119 @@ export function ProjectLanes({
   t,
 }: {
   lanes: ProjectLane[];
-  /** Column headings, keyed by status. */
+  /** Status names, keyed by status. */
   titles: Record<LaneStatus, string>;
   t: T;
 }) {
   return (
-    <div className="space-y-2">
-      {/* Headings for the columns, drawn once. Hidden from assistive tech and
-          below `xl`: every cell names its own status, which is what is read
-          out and what a narrower screen shows above each cell. */}
-      <div aria-hidden="true" className={`hidden px-3 xl:grid ${LANE_ROW}`}>
-        <span className="text-meta font-semibold tracking-wide text-muted uppercase">
-          {t("colProject")}
-        </span>
-        {LANE_STATUSES.map((status) => (
-          <span key={status} className="display flex items-center gap-2 text-[15px] font-bold">
-            <StatusDot status={status} t={t} />
-            {titles[status]}
-          </span>
-        ))}
-        <span className="display flex items-center gap-2 text-[15px] font-bold">
-          <StatusDot status="done" t={t} />
-          {t("colDone")}
-        </span>
-      </div>
-
-      <ul className="space-y-2">
-        {lanes.map((lane) => (
-          <Lane key={lane.project.id} lane={lane} titles={titles} t={t} />
-        ))}
-      </ul>
-    </div>
+    <ul className="grid gap-4 md:grid-cols-2">
+      {lanes.map((lane, i) => (
+        <ProjectCard key={lane.project.id} lane={lane} titles={titles} delay={i * 50} t={t} />
+      ))}
+    </ul>
   );
 }
 
-function Lane({
+function ProjectCard({
   lane,
   titles,
+  delay,
   t,
 }: {
   lane: ProjectLane;
   titles: Record<LaneStatus, string>;
+  delay: number;
   t: T;
 }) {
   const { project, counts, teamSize, tasks, leftOff } = lane;
-  const projectHref = `/p/${project.slug}`;
+  const shown = [...tasks]
+    .sort((a, b) => ORDER[a.status as LaneStatus] - ORDER[b.status as LaneStatus])
+    .slice(0, CARD_TASKS);
+  const open = counts.todo + counts.doing + counts.blocked;
   return (
-    <li className={`sticker-flat space-y-3 p-3 md:space-y-0 ${LANE_GRID}`}>
-      <div className={`min-w-0 space-y-1.5 ${LANE_WIDE_CELL}`}>
-        <h3 className="display text-[18px] leading-tight font-bold break-words">
-          <Link href={projectHref} className="inline-flex items-center hover:text-accentInk max-sm:min-h-[44px]">
-            {project.name}
-          </Link>
-        </h3>
-        {slugDiffers(project) && (
-          <p className="mono text-meta break-all text-faint">{project.slug}</p>
-        )}
+    <li className="sticker pop flex min-w-0 flex-col gap-4 p-5" style={{ animationDelay: `${delay}ms` }}>
+      <header className="flex flex-wrap items-start gap-x-3 gap-y-1">
+        <div className="min-w-0 flex-1">
+          <h3 className="display text-[22px] leading-tight break-words">
+            <Link href={`/p/${project.slug}`} className="hover:text-accentInk max-sm:inline-flex max-sm:min-h-[44px] max-sm:items-center">
+              {project.name}
+            </Link>
+          </h3>
+          {slugDiffers(project) && <p className="mono text-meta break-all text-faint">{project.slug}</p>}
+        </div>
         <ShareChip project={project} teamSize={teamSize} t={t} />
-        {leftOff && (
-          <p
-            className="line-clamp-2 border-l-2 pl-2 text-small break-words text-muted"
-            style={{ borderColor: "var(--k-handoff)" }}
-          >
-            <span className="sr-only">{kindLabel(t, "handoff")}: </span>
-            {firstLine(leftOff, 140)}
-          </p>
-        )}
-        <p className="mono text-meta text-faint">
+        <span className="mono w-full text-meta text-faint">
           {t("updated")} {ago(project.activity_at, t)}
+        </span>
+      </header>
+
+      <Progress counts={counts} titles={titles} t={t} />
+
+      {leftOff && (
+        <p className="line-clamp-2 rounded-[10px] border-l-[3px] bg-inset px-3 py-2 text-small break-words text-muted" style={{ borderColor: "var(--k-handoff)" }}>
+          <span className="sr-only">{kindLabel(t, "handoff")}: </span>
+          {firstLine(leftOff, 160)}
         </p>
-      </div>
+      )}
 
-      {LANE_STATUSES.map((status) => (
-        <LaneCell
-          key={status}
-          title={titles[status]}
-          total={counts[status]}
-          tasks={tasks.filter((task) => task.status === status)}
-          slug={project.slug}
-          t={t}
-        />
-      ))}
-
-      <p className={`min-w-0 xl:pt-0.5 ${LANE_WIDE_CELL}`}>
-        <Link
-          href={boardHref(project.slug, { task: null, view: "closed" })}
-          className="inline-flex items-baseline gap-1 hover:text-accentInk max-sm:min-h-[44px] max-sm:items-center"
-        >
-          <span className="mono text-[17px]">{counts.done}</span>{" "}
-          <span className="text-meta text-muted">{t("countDone")}</span>
-        </Link>
-      </p>
-    </li>
-  );
-}
-
-function LaneCell({
-  title,
-  total,
-  tasks,
-  slug,
-  t,
-}: {
-  title: string;
-  /** Every task of this status in the project, shown or not. */
-  total: number;
-  tasks: LaneTask[];
-  slug: string;
-  t: T;
-}) {
-  const omitted = total - tasks.length;
-  return (
-    // An empty cell holds its place in the grid, and is nothing at all where
-    // the lane is stacked: "Blocked · 0" and a dash, per project, was a third
-    // of a phone's screen spent saying nothing is wrong.
-    <div className={`min-w-0 space-y-1.5 ${total === 0 ? "max-md:hidden" : ""}`}>
-      {/* The cell's own name: visible where lanes stack, read out everywhere. */}
-      <p className="text-meta font-semibold text-muted xl:sr-only">
-        {title} · {total}
-      </p>
-      {tasks.length === 0 ? (
-        <p className="text-meta text-faint">
-          <span aria-hidden="true">—</span>
-          <span className="sr-only">{t("columnEmpty")}</span>
-        </p>
-      ) : (
-        <ul className="space-y-1.5">
-          {tasks.map((task) => (
+      {shown.length > 0 && (
+        <ul className="-mx-2 space-y-0.5">
+          {shown.map((task) => (
             <li key={task.id}>
               <Link
-                href={taskHref(slug, task.id)}
-                className="flex items-baseline gap-2 rounded-[9px] border-[1.5px] border-line bg-card px-2.5 py-2 text-small hover:border-lineStrong max-sm:min-h-[44px] max-sm:items-center"
+                href={taskHref(project.slug, task.id)}
+                className="flex items-center gap-2.5 rounded-[10px] px-2 py-1.5 text-[14px] hover:bg-[var(--wash)] max-sm:min-h-[44px]"
               >
-                <span className="mono shrink-0 text-meta text-faint">#{task.id}</span>
-                <span className="line-clamp-2 min-w-0 flex-1 break-words">{task.title}</span>
-                {/* Text, not a filled chip: most open work is p1, and a
-                    yellow block on every row of every lane marked nothing. */}
-                {task.priority === 1 && (
-                  <span className="mono shrink-0 text-meta font-medium text-accentInk">p1</span>
-                )}
+                <StatusDot status={task.status} t={t} />
+                <span className="min-w-0 flex-1 truncate">{task.title}</span>
+                {task.priority === 1 && <span className="mono shrink-0 text-meta font-medium text-accentInk">p1</span>}
               </Link>
             </li>
           ))}
         </ul>
       )}
-      {omitted > 0 && (
-        <Link href={`/p/${slug}`} className="link-more text-meta">
-          {t("laneMore", { n: omitted })}
-        </Link>
-      )}
+
+      <Link href={`/p/${project.slug}`} className="link-more mt-auto self-start text-small">
+        {open > shown.length ? t("laneMore", { n: open - shown.length }) : t("openBoard")} →
+      </Link>
+    </li>
+  );
+}
+
+/** The project's progress: one bar, and the same numbers in words under it. */
+function Progress({
+  counts,
+  titles,
+  t,
+}: {
+  counts: ProjectCountRow;
+  titles: Record<LaneStatus, string>;
+  t: T;
+}) {
+  const parts = [
+    { status: "done" as const, n: counts.done, label: t("colDone"), fill: "var(--ok)" },
+    { status: "doing" as const, n: counts.doing, label: titles.doing, fill: "var(--accent)" },
+    { status: "blocked" as const, n: counts.blocked, label: titles.blocked, fill: "var(--k-dead_end)" },
+    { status: "todo" as const, n: counts.todo, label: titles.todo, fill: "var(--line)" },
+  ];
+  const total = parts.reduce((sum, part) => sum + part.n, 0) || 1;
+  return (
+    <div className="space-y-2.5">
+      <div aria-hidden="true" className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-inset">
+        {parts
+          .filter((part) => part.n > 0)
+          .map((part) => (
+            <span key={part.status} className="h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${(part.n / total) * 100}%`, background: part.fill }} />
+          ))}
+      </div>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-small text-muted">
+        {parts.map((part) => (
+          <li key={part.status} className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="size-2 rounded-full" style={{ background: part.fill }} />
+            <span className="font-medium text-ink">{part.n}</span> {part.label}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -304,6 +304,12 @@ export const en = {
   liveProjectsEmpty: "Nothing in flight in any project.",
   quietEmpty: "Every project has something in flight.",
   colProject: "Project",
+  openBoard: "Open the board",
+  statLive: "projects in flight",
+  statDoing: "tasks being worked on",
+  statBlocked: "tasks blocked",
+  statWaiting: "waiting on you",
+  statSummary: "At a glance",
   laneMore: "+{n} more",
   waitingTitle: "Waiting on you",
   waitingBody:

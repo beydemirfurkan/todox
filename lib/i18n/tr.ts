@@ -296,6 +296,12 @@ export const tr: Record<Key, string> = {
   liveProjectsEmpty: "Hiçbir projede uçuşta iş yok.",
   quietEmpty: "Her projede uçuşta bir iş var.",
   colProject: "Proje",
+  openBoard: "Panoyu aç",
+  statLive: "uçuştaki proje",
+  statDoing: "üzerinde çalışılan görev",
+  statBlocked: "takılı görev",
+  statWaiting: "seni bekliyor",
+  statSummary: "Bir bakışta",
   laneMore: "+{n} tane daha",
   waitingTitle: "Seni bekleyenler",
   waitingBody:
