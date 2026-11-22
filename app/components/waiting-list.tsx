@@ -5,12 +5,14 @@ import { ago } from "@/lib/i18n";
 import { firstLine } from "@/lib/util/headline";
 import { kindLabel, statusLabel } from "../kinds";
 import type { WaitingItem, WaitingKind } from "../waiting";
-import { Chip } from "./chip";
+import { projectColor } from "./project-color";
 
 /**
  * What only a person can move, across every project: open questions, stuck
- * tasks and work left in progress with nothing written. Each card says which
- * in words, so the chip's colour never has to.
+ * tasks and work left in progress with nothing written. One calm list rather
+ * than a grid of cards: the cards put the date on a line of its own and cut
+ * every question to the same two lines. Each row says its kind in words, so
+ * the colour never has to.
  */
 
 const WAITING_COLOR: Record<WaitingKind, string> = {
@@ -41,39 +43,45 @@ export function WaitingList({
 }) {
   return (
     <>
-      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="waiting-list">
         {items.map((item) => {
           const slug = slugOf.get(item.projectId);
           if (!slug) return null;
           return (
-            <li key={`${item.kind}-${item.taskId}`} className="min-w-0">
-              <Link
-                href={`/p/${slug}/t/${item.taskId}`}
-                className="sticker-flat flex h-full flex-col gap-1.5 p-3 hover:border-lineStrong"
-              >
-                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <Chip color={WAITING_COLOR[item.kind]}>{waitingLabel(item, t)}</Chip>
-                  <span className="mono min-w-0 text-meta break-all text-faint">
-                    {slug} · #{item.taskId}
-                  </span>
-                  <span className="mono ml-auto shrink-0 text-meta text-faint">
-                    {ago(item.since, t)}
-                  </span>
+            <li key={`${item.kind}-${item.taskId}`}>
+              <Link href={`/p/${slug}/t/${item.taskId}`} className="waiting-row">
+                <span
+                  className="waiting-kind"
+                  style={{ "--kind": WAITING_COLOR[item.kind] } as React.CSSProperties}
+                >
+                  {waitingLabel(item, t)}
                 </span>
-                <span className="line-clamp-2 text-[14.5px] leading-snug font-medium break-words">
-                  {item.title}
-                </span>
-                {item.detail && (
-                  <span className="line-clamp-2 text-small break-words text-muted">
-                    {firstLine(item.detail, 160)}
+                <span className="flex min-w-[min(14rem,100%)] flex-1 flex-col gap-1">
+                  <span className="line-clamp-2 text-[15px] leading-snug break-words text-ink">
+                    {item.title}
                   </span>
-                )}
+                  {item.detail && (
+                    <span className="line-clamp-1 text-small break-words text-muted">
+                      {firstLine(item.detail, 160)}
+                    </span>
+                  )}
+                </span>
+                <span className="waiting-meta">
+                  <span
+                    aria-hidden="true"
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ background: projectColor(item.projectId) }}
+                  />
+                  <span className="truncate">{slug}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="shrink-0">{ago(item.since, t)}</span>
+                </span>
               </Link>
             </li>
           );
         })}
       </ul>
-      {omitted > 0 && <p className="mt-3 text-small text-muted">{t("waitingMore", { n: omitted })}</p>}
+      {omitted > 0 && <p className="px-4 text-small text-muted">{t("waitingMore", { n: omitted })}</p>}
     </>
   );
 }

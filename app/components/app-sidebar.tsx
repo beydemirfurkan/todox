@@ -84,7 +84,7 @@ async function SidebarProjects({ userId, t }: { userId: number; t: T }) {
     return <p className="px-3 text-meta leading-relaxed text-faint">{t("sidebarNoProjects")}</p>;
   }
   return (
-    <ul className="sidebar-projects flex flex-col gap-0.5">
+    <ul className="sidebar-projects flex min-h-0 flex-1 flex-col gap-0.5">
       {projects.map((project) => {
         const count = counts.map.get(project.id);
         const open = count ? count.todo + count.doing + count.blocked : 0;

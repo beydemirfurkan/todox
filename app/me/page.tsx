@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { DEVELOPER_KINDS, isDeveloperKind, type DeveloperKind } from "@/lib/constants";
 import type { T } from "@/lib/i18n";
@@ -24,10 +25,10 @@ import {
   Panel,
   StatBadges,
 } from "../components";
-import { BRAIN_MAP_NODES } from "../components/brain-map";
+import { BRAIN_MAP_NODES, type BrainNode } from "../components/brain-map";
 import { Picker } from "../features/picker";
 import { SubmitButton } from "../features/submit";
-import { CONTEXT_KIND_COLOR, kindOptions } from "../kinds";
+import { CONTEXT_KIND_COLOR, KIND_COLOR, kindOptions } from "../kinds";
 import { privatePageMetadata } from "../metadata-shared";
 
 export const dynamic = "force-dynamic";
@@ -112,24 +113,7 @@ export default async function BrainPage() {
           ) : (
             <>
               <BrainMap nodes={mapProjects} centre={t("brainYou")} />
-              <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-                {mapProjects.slice(0, BRAIN_MAP_NODES * 2).map((p) => (
-                  <li key={p.slug} className="flex min-w-0 flex-col">
-                    <a href={`/p/${p.slug}`} className="truncate text-[14px] font-medium text-ink hover:underline">
-                      {p.name}
-                    </a>
-                    <span className="mono text-meta text-faint">
-                      {t("brainMapRow", {
-                        entries: p.activity,
-                        open: p.open,
-                        decisions: p.decisions,
-                        deadEnds: p.deadEnds,
-                        questions: p.questions,
-                      })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <BrainProjectList projects={mapProjects} t={t} />
             </>
           )}
         </div>
@@ -172,6 +156,60 @@ export default async function BrainPage() {
         </div>
       </Panel>
     </div>
+  );
+}
+
+const BRAIN_LIST_ROWS = BRAIN_MAP_NODES;
+
+/**
+ * The map's projects as rows: the name, then only the counts that are not
+ * zero, each a word in its kind's colour. It was two columns of mono text
+ * printing five numbers per project, zeros included, and read as a log dump.
+ */
+function BrainProjectList({ projects, t }: { projects: BrainNode[]; t: T }) {
+  const shown = projects.slice(0, BRAIN_LIST_ROWS);
+  return (
+    <>
+      <ul className="flex flex-col">
+        {shown.map((p) => (
+          <li key={p.slug} className="border-t border-rule first:border-t-0">
+            <Link href={`/p/${p.slug}`} className="brain-row">
+              <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{p.name}</span>
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-small">
+                {p.open > 0 && <BrainCount color="var(--accent)" text={countText(t, "Open", p.open)} />}
+                {p.decisions > 0 && (
+                  <BrainCount color={KIND_COLOR.decision} text={countText(t, "Decisions", p.decisions)} />
+                )}
+                {p.deadEnds > 0 && (
+                  <BrainCount color={KIND_COLOR.dead_end} text={countText(t, "DeadEnds", p.deadEnds)} />
+                )}
+                {p.questions > 0 && (
+                  <BrainCount color={KIND_COLOR.question} text={countText(t, "Questions", p.questions)} />
+                )}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {projects.length > shown.length && (
+        <p className="px-3 text-small text-muted">{t("brainMapMore", { n: projects.length - shown.length })}</p>
+      )}
+    </>
+  );
+}
+
+type BrainStat = "Open" | "Decisions" | "DeadEnds" | "Questions";
+
+function countText(t: T, stat: BrainStat, n: number): string {
+  return n === 1 ? t(`brainStat${stat}One`) : t(`brainStat${stat}`, { n });
+}
+
+function BrainCount({ color, text }: { color: string; text: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted">
+      <span aria-hidden="true" className="size-1.5 rounded-full" style={{ background: color }} />
+      {text}
+    </span>
   );
 }
 
