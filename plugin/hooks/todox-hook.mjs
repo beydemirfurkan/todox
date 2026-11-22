@@ -208,7 +208,7 @@ function rotateIfFull(path) {
 var oneLine = (message) => message.replace(/\s+/g, " ").slice(0, 500);
 
 // mcp/hook/post-tool-use.ts
-import { resolve } from "node:path";
+import { posix } from "node:path";
 
 // mcp/hook/state.ts
 import {
@@ -279,8 +279,9 @@ async function postToolUse(ctx) {
 function editsWorkingTree(input) {
   const cwd = input.cwd;
   if (!cwd) return false;
-  return editedPaths(input).some((path) => isInside(resolve(cwd, path), cwd));
+  return editedPaths(input).some((path) => isInside(againstCwd(path, cwd), cwd));
 }
+var againstCwd = (path, cwd) => posix.normalize(normalisePath(isAbsolutePath(path) ? path : `${cwd}/${path}`));
 function editedPaths(input) {
   const given = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
   if (typeof given === "string") return [given];

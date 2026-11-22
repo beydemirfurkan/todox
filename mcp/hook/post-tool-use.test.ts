@@ -29,6 +29,19 @@ describe("PostToolUse", () => {
       await run({ session_id: "s1", cwd: "/repo", tool_name: "apply_patch", tool_input: { command: patch("/elsewhere/a.ts") } }),
     ).toEqual([]);
     expect(await run({ session_id: "s1", cwd: "/repo", tool_name: "apply_patch", tool_input: {} })).toEqual([]);
+    expect(
+      await run({ session_id: "s1", cwd: "/repo", tool_name: "apply_patch", tool_input: { command: patch("../other/a.ts") } }),
+    ).toEqual([]);
+  });
+
+  it("reads Windows paths the same way, whatever machine runs the test", async () => {
+    const patch = (file: string) => `*** Begin Patch\n*** Add File: ${file}\n+x\n*** End Patch`;
+    expect(
+      await run({ session_id: "s1", cwd: "C:\\repo", tool_name: "apply_patch", tool_input: { command: patch("src\\a.ts") } }),
+    ).toEqual(["edit"]);
+    expect(
+      await run({ session_id: "s1", cwd: "C:\\repo", tool_name: "Edit", tool_input: { file_path: "C:\\Repo\\a.ts" } }),
+    ).toEqual(["edit"]);
   });
 
   it("does not count a plan written outside it, or a sibling that shares a prefix", async () => {
