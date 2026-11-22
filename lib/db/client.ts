@@ -44,7 +44,7 @@ function db(): Pool {
     connectionString: connectionString(),
     // 20 rather than 10: one briefing sends eight statements at once, so ten
     // let a single agent hold the whole pool and a second one queue behind it.
-    max: Number(process.env.DATABASE_POOL_MAX ?? 20),
+    max: Number(process.env.DATABASE_POOL_MAX || 20),
     // A statement that has not answered in 25s is not going to; failing the
     // request beats holding a connection that the next one needs.
     //
@@ -151,7 +151,7 @@ export async function metered<T>(work: () => Promise<T>): Promise<{ result: T; m
 export const serverTiming = (meter: QueryMeter): string =>
   `db;dur=${meter.ms.toFixed(1)};desc="${meter.count} queries"`;
 
-const SLOW_MS = Number(process.env.TODOX_SLOW_MS ?? 50);
+const SLOW_MS = Number(process.env.TODOX_SLOW_MS || 50);
 
 const firstLine = (text: string) => text.trim().split("\n")[0].replace(/\s+/g, " ").slice(0, 120);
 

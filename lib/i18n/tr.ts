@@ -230,6 +230,7 @@ export const tr: Record<Key, string> = {
   err_oauthLinkedElsewhere: "Bu hesap zaten başka bir todox hesabına bağlı.",
   err_oauthProviderTaken: "Bu sağlayıcıdan başka bir hesap zaten bağlı. Önce onun bağlantısını kes.",
   err_oauthEmailUnverified: "Bu adresle bir hesap zaten var ve sağlayıcı adresi doğrulamamış. Şifrenle gir, sonra hesap sayfandan bağla.",
+  err_registrationClosed: "Bu sunucu yeni hesap almıyor. Buradaki birinden seni bir projeye davet etmesini iste.",
   err_oauthNoEmail: "Sağlayıcı doğrulanmış bir e-posta adresi paylaşmadı, bu yüzden hesap açılamadı.",
   oauthContinueGoogle: "Google ile devam et",
   oauthContinueGithub: "GitHub ile devam et",

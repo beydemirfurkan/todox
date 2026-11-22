@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getT } from "@/lib/lang";
+import { isRegistrationOpen } from "@/lib/services/registration";
 import { currentUser } from "@/lib/session";
 import { loginAction } from "../auth-actions";
 import { authMessages, isAuthCode } from "../auth-messages";
@@ -46,12 +47,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <Link href="/forgot" className="link-more">
             {t("forgotLink")}
           </Link>
-           <Link
-             href={safeNext ? `/register?next=${encodeURIComponent(safeNext)}` : "/register"}
-             className="link-more"
-           >
-            {t("noAccount")}
-          </Link>
+          {isRegistrationOpen() && (
+            <Link
+              href={safeNext ? `/register?next=${encodeURIComponent(safeNext)}` : "/register"}
+              className="link-more"
+            >
+              {t("noAccount")}
+            </Link>
+          )}
         </>
       }
     >

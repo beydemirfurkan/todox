@@ -13,6 +13,16 @@ claude plugin install todox@todox
 It asks for your agent token once (Account page on todox.dev, or your own
 instance) and keeps it in your Claude Code settings, not in the plugin.
 
+**Your own server.** The plugin points at todox.dev. For your own instance:
+
+- **Claude Code:** set `TODOX_URL=https://your-instance` in your environment so
+  the hooks reach it, and change `url` in the installed `.mcp.json` to
+  `https://your-instance/api/mcp`. A plugin update overwrites that file, so
+  check it after one. `pnpm install:mcp claude-code --url https://your-instance`
+  from a clone writes the MCP entry outside the plugin and survives updates.
+- **Codex:** set `TODOX_URL=https://your-instance` beside `TODOX_TOKEN`; the
+  stdio server and the hooks both read it.
+
 **Codex** reads the same directory through its own manifest,
 `.codex-plugin/plugin.json`. The skill and `hooks/todox-hook.mjs` are shared;
 what differs is the hooks file and the MCP entry:
