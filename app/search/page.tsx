@@ -32,6 +32,14 @@ export const dynamic = "force-dynamic";
  */
 const KINDS: string[] = [...new Set([...ENTRY_KINDS, ...CONTEXT_KINDS])];
 
+/** The search page's address for a query, a kind and a project, empty ones left out. */
+function searchHref(state: { q: string; kind: string; project: string }): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(state)) if (value) query.set(key, value);
+  const search = query.toString();
+  return search ? `/search?${search}` : "/search";
+}
+
 /** The label for a kind that may come from either list. */
 const kindOrContextLabel = (t: (k: Key) => string, kind: string) =>
   (ENTRY_KINDS as readonly string[]).includes(kind)
@@ -106,17 +114,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
             autoComplete="off"
           />
         </Field>
-        <Field label={t("searchKind")}>
-          <Picker
-            name="kind"
-            value={kind}
-            label={t("searchKind")}
-            options={[
-              { value: "", label: t("searchAnyKind") },
-              ...KINDS.map((k) => ({ value: k, label: kindOrContextLabel(t, k) })),
-            ]}
-          />
-        </Field>
+        <input type="hidden" name="kind" value={kind} />
         <Field label={t("searchProject")}>
           <Picker
             name="project"
@@ -132,6 +130,21 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
           {t("apply")}
         </SubmitButton>
       </form>
+
+      {/* Links, not a select: one tap narrows the results, the choice is
+          part of the address, and it works with scripting off. */}
+      <nav aria-label={t("searchKind")} className="flex flex-wrap gap-1.5">
+        {["", ...KINDS].map((k) => (
+          <Link
+            key={k || "any"}
+            href={searchHref({ q: query, kind: k, project: slug })}
+            aria-current={k === kind ? "page" : undefined}
+            className="pill seg"
+          >
+            {k ? kindOrContextLabel(t, k) : t("searchAnyKind")}
+          </Link>
+        ))}
+      </nav>
 
       <Panel delay={60} title={t("searchResultsTitle")} right={<Counter n={hits.length} label={t("resultsCount")} />}>
         <div className="space-y-2.5" aria-live="polite">
