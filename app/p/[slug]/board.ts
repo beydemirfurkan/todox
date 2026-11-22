@@ -1,52 +1,42 @@
 import type { Status } from "@/lib/constants";
 
 /**
- * What the project board's address says, and what it falls back to.
+ * What a project page's address says, and what it falls back to.
  *
- * The board is one page whose side panel shows a task, the standing notes or
- * the closed work. Which of those, and which task, lives in the query string
- * rather than in client state: the choice survives a refresh, can be sent to
- * somebody, and a status change -- a Server Action that re-renders the page --
- * comes back to the same panel without anything having to remember it.
+ * Two choices live in the query string rather than in client state -- which
+ * section (the tasks or the standing notes) and how the tasks are laid out (a
+ * list or the board) -- so the choice survives a refresh, can be sent to
+ * somebody, and a status change, a Server Action that re-renders the page,
+ * comes back to the same view without anything having to remember it.
  */
 
-export const PANEL_VIEWS = ["task", "notes", "closed"] as const;
-export type PanelView = (typeof PANEL_VIEWS)[number];
+export const PROJECT_TABS = ["tasks", "notes"] as const;
+export type ProjectTab = (typeof PROJECT_TABS)[number];
+
+export const TASK_VIEWS = ["list", "board"] as const;
+export type TaskView = (typeof TASK_VIEWS)[number];
 
 type Asked = string | string[] | undefined;
 
 const firstOf = (asked: Asked) => (Array.isArray(asked) ? asked[0] : asked);
 
-/** The asked-for view, or the task view: an unknown value is not an error page. */
-export function panelView(asked: Asked): PanelView {
+/** The asked-for section, or the tasks: an unknown value is not an error page. */
+export function projectTab(asked: Asked): ProjectTab {
   const want = firstOf(asked);
-  return PANEL_VIEWS.find((view) => view === want) ?? "task";
+  return PROJECT_TABS.find((tab) => tab === want) ?? "tasks";
 }
 
-/**
- * The task the panel shows.
- *
- * An id from the address only counts when it is a task of this project --
- * `known` is that set -- so a foreign or deleted id falls through to the same
- * default a bare address gets instead of naming a row the caller cannot see.
- * The fallbacks are tried in order and may be undefined (a project with no
- * handoff has no "where it left off"); null means the project has no tasks.
- */
-export function selectTaskId(
-  asked: Asked,
-  known: ReadonlySet<number>,
-  fallbacks: readonly (number | undefined)[],
-): number | null {
-  const want = Number(firstOf(asked));
-  if (known.has(want)) return want;
-  return fallbacks.find((id): id is number => id !== undefined && known.has(id)) ?? null;
+/** The asked-for layout, or the list. */
+export function taskView(asked: Asked): TaskView {
+  const want = firstOf(asked);
+  return TASK_VIEWS.find((view) => view === want) ?? "list";
 }
 
-/** The board's address for a panel state, with the defaults left out of it. */
-export function boardHref(slug: string, panel: { task: number | null; view: PanelView }): string {
+/** The project's address for a section and a layout, defaults left out. */
+export function projectHref(slug: string, state: { tab: ProjectTab; view: TaskView }): string {
   const query = new URLSearchParams();
-  if (panel.task !== null) query.set("task", String(panel.task));
-  if (panel.view !== "task") query.set("view", panel.view);
+  if (state.tab !== "tasks") query.set("tab", state.tab);
+  if (state.view !== "list") query.set("view", state.view);
   const search = query.toString();
   return search ? `/p/${slug}?${search}` : `/p/${slug}`;
 }

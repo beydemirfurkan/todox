@@ -514,6 +514,46 @@ body:has([data-wide-page]) .page-column {
   transform-origin: top left;
 }
 
+/* A row on a settings page: what it is on the left, its control on the
+   right, wrapping under it on a phone. */
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  min-height: 60px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.settings-row:last-child {
+  border-bottom: 0;
+}
+.danger-zone {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 20px 20px;
+  border: 1px solid color-mix(in srgb, var(--k-dead_end) 35%, var(--line));
+  border-radius: var(--radius-card);
+}
+
+/* A square control with only an icon in it; its label is `aria-label`. */
+.icon-button {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+}
+.icon-button:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
 /* ---------------------------------------------------------- calm lists */
 
 /* A task as a list row: a ring, the title, a quiet second line. Rows are
@@ -614,7 +654,7 @@ body:has([data-wide-page]) .page-column {
 }
 /* The field is the whole bar; the global field frame inside it would be a
    box in a box. */
-.quick-add input {
+.quick-add input[name="title"] {
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -624,6 +664,19 @@ body:has([data-wide-page]) .page-column {
   color: var(--accent);
   font-size: 22px;
   line-height: 1;
+}
+.quick-add-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.quick-add-flag input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 .quick-add-select {
   min-height: 40px;
@@ -1985,7 +2038,20 @@ pre {
   .control-sm,
   .searchbox input,
   .picker-trigger,
-  .quick-add-select {
+  .quick-add-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.quick-add-flag input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+.quick-add-select {
     font-size: 16px;
   }
 

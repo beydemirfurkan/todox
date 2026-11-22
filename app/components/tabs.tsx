@@ -33,7 +33,7 @@ export function Tabs({
   label: string;
 }) {
   return (
-    <nav aria-label={label} className="pop flex flex-wrap gap-1.5">
+    <nav aria-label={label} className="seg-group pop self-start">
       {tabs.map((tab) => (
         <Link
           key={tab.id}

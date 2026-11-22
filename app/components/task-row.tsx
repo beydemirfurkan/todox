@@ -70,3 +70,43 @@ export function TaskRow({
     </li>
   );
 }
+
+/** A titled list of task rows, with how many it is not showing. */
+export function TaskSection({
+  id,
+  title,
+  hint,
+  isAccent = false,
+  shown,
+  total,
+  empty,
+  t,
+  children,
+}: {
+  id: string;
+  title: string;
+  hint?: string;
+  isAccent?: boolean;
+  shown: number;
+  total: number;
+  empty: string;
+  t: T;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-2">
+      <h2 id={id} className="today-heading" data-accent={isAccent ? "true" : undefined}>
+        {title}
+        {hint && <span className="today-hint"> · {hint}</span>}
+      </h2>
+      {shown === 0 ? (
+        <p className="px-4 py-3 text-body text-muted">{empty}</p>
+      ) : (
+        <ul className="flex flex-col">{children}</ul>
+      )}
+      {total > shown && (
+        <p className="px-4 text-small text-muted">{t("todayMore", { n: total - shown })}</p>
+      )}
+    </section>
+  );
+}
