@@ -68,6 +68,9 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      # Unset, anyone who finds the instance can register. `closed` leaves
+      # joining by invitation only.
+      TODOX_REGISTRATION: ${TODOX_REGISTRATION:-}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-}
       TODOX_SLOW_MS: ${TODOX_SLOW_MS:-}
       # How many proxies sit in front of this. Behind one reverse proxy it is 1;

@@ -10,6 +10,7 @@ import { AuthForm } from "../features/auth-form";
 import { AuthShell } from "../features/auth-shell";
 import { OAuthButtons } from "../features/oauth-buttons";
 import { enabledProviders } from "@/lib/services/oauth-providers";
+import { isRegistrationOpen } from "@/lib/services/registration";
 
 import { pageOpenGraph } from "../metadata-shared";
 
@@ -34,6 +35,20 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
   const safeNext = /^\/invite\?token=[A-Za-z0-9_-]{32,}$/.test(next) ? next : "";
   if (await currentUser()) redirect(safeNext || "/");
   const { t } = await getT();
+
+  if (!isRegistrationOpen()) {
+    return (
+      <AuthShell
+        title={t("registerTitle")}
+        intro={t("err_registrationClosed")}
+        footer={
+          <Link href="/login" className="link-more">
+            {t("haveAccount")}
+          </Link>
+        }
+      />
+    );
+  }
 
   return (
     <AuthShell

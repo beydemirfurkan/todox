@@ -235,6 +235,7 @@ export const en = {
   err_oauthLinkedElsewhere: "That account is already connected to a different todox account.",
   err_oauthProviderTaken: "A different account from that provider is already connected here. Disconnect it first.",
   err_oauthEmailUnverified: "An account with this address already exists, and the provider has not verified the address. Sign in with your password, then connect it from your account page.",
+  err_registrationClosed: "This server is not taking new accounts. Ask someone on it to invite you to a project.",
   err_oauthNoEmail: "The provider did not share a verified email address, so no account could be made from it.",
   oauthContinueGoogle: "continue with Google",
   oauthContinueGithub: "continue with GitHub",
