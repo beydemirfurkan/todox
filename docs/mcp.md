@@ -109,7 +109,10 @@ carries the habit, because a connected server nobody reaches for is the failure
 this whole page is about. It also looks in the directory it was run from for
 the per-checkout files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`,
 `opencode.json`) and names a todox entry there for what it is: a memory that
-exists in one repository. Then it reaches the server with every token it saw.
+exists in one repository. Run inside a repository, it also says whether the
+git hook is installed there, and warns about one that would fail silently on
+every commit — a missing script or token. Then it reaches the server with
+every token it saw.
 Exit code 0 when at least one entry is usable, nothing is broken and every
 server answered; 1 otherwise. It changes nothing.
 
@@ -163,6 +166,71 @@ server entry:
 Only `off` disables it — an unset variable means on, because a switch that
 needs setting to work is one nobody remembers. The hosted transport never does
 any of this: it has no filesystem, so it has nothing to look at.
+
+**A second carrier, for the hosted endpoint.** Connected to `/api/mcp`, there is
+no local todox process to do the watching — which is most people. The Claude
+Code plugin's hooks (plugin 0.1.5 and later) run on your machine at a session's
+edges — the Stop hook after every turn, if git changed since the last one it
+sent, and SessionEnd — and send the same row with `source:
+"claude-code-hook"`: the same fields, built by the same function as the stdio
+observer's, the same table, the same two weeks, keyed by Claude Code's own
+session id (`cc:<id>`). `TODOX_OBSERVE=off` turns this carrier off too. Each row in the briefing
+says which carrier saw it. Where the stdio process is already watching the same
+project for your account, a hook's row is skipped (the stdio one sees every
+tool call, the hook only the start and the end), so a session never arrives
+twice. Other clients have no hooks; for them stdio remains the only carrier.
+
+## What the plugin's hooks send
+
+The Claude Code plugin (0.1.5 and later) runs command hooks: plain processes,
+no model call, talking to nothing but your todox server's `/api/rpc` with the
+token you gave the plugin. Every call carries `x-todox-carrier:
+claude-code-hook`, so it is counted under `hook:<method>` and never as your
+agent's call (see below).
+
+| Hook | Sends | When |
+|---|---|---|
+| SessionStart | `getContext` with your `cwd`, the repository's `origin` URL (credentials stripped), `shape: "digest"`, `create_if_missing: false` | startup, resume, `/clear`, after compaction |
+| Stop | `sessionStatus` with your `cwd` and a window of hours | only if this session touched a todox task |
+| Stop, SessionEnd | `recordObservation`: the `origin` URL, branch, two commit ids, commit and dirty-file counts, up to three commit subjects, ids of tasks set to `doing` | only if git changed since the last one sent |
+
+The remote is there so a second checkout of a repository todox already knows,
+at a path it has not seen, finds its project; it only ever resolves one, never
+registers one. Nothing else leaves your machine: no diff, no file path beyond
+the working directory you were already sending, no prompt, no transcript. What the hooks
+remember between calls — which tasks this session touched, whether it edited
+files, whether it was already stopped once — stays in a file per session under
+the plugin's data directory, deleted after seven days. So do their errors, in
+`hook.log` (rotated at 64 KB), which records an event name and an error message
+and never the token or a response body.
+
+`TODOX_HOOKS=off` turns every hook off; `TODOX_STOP=off` only the Stop hook's
+request for a handoff; `TODOX_OBSERVE=off` only the observation.
+
+## What the git hook sends
+
+`todox-mcp hook install` (0.1.6 and later) is the third carrier, for any client
+or none: a block in one repository's `post-commit` and `post-rewrite` hooks that
+runs `~/.todox/git-hook.mjs` detached, after git has already made the commit.
+
+| When | Sends |
+|---|---|
+| After a commit, and once after a rebase or amend | `recordObservation`: the repository's `origin` URL (credentials stripped, so a second checkout finds its project), branch, two commit ids, commit and dirty-file counts, up to three commit subjects, `source: "git-hook"` |
+
+Each machine, branch and day is one row (`session_id` is `git:` + a short hash
+of the host name + branch + date), so a day of commits updates one observation
+rather than adding one per commit. A rebase's replayed commits are not sent one
+by one. The server drops the write while the stdio process or the Claude Code
+plugin has written for the same project in the last 30 minutes, since a commit
+inside an agent's session belongs to that session's row; and it never registers
+a project — a repository todox does not know yet is logged and skipped.
+
+What it keeps between commits — the day's base commit and the last state sent
+— sits in the repository's own git directory (`todox-observe.json`), never in
+the working tree. Its token is in `~/.todox/config.json` (mode 0600) unless
+`TODOX_TOKEN` is set, and its errors in `~/.todox/git-hook/hook.log`. Calls are
+counted as `hook:recordObservation`. `TODOX_OBSERVE=off` or `TODOX_HOOKS=off`
+turns it off; `todox-mcp hook uninstall` removes it.
 
 ## What the server counts
 

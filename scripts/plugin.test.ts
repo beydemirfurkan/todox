@@ -1,8 +1,19 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { expectedSkill, expectedVersion, MANIFEST_PATH, PLUGIN_ROOT, SKILL_PATH } from "./plugin-sync";
 import { join } from "node:path";
+
+import { REMINDER } from "../mcp/hook/session-start";
+import {
+  expectedHookBundle,
+  expectedSkill,
+  expectedVersion,
+  HOOK_BUNDLE_PATH,
+  MANIFEST_PATH,
+  PLUGIN_ROOT,
+  SKILL_PATH,
+} from "./plugin-sync";
+import { importedSpecifiers } from "./bundle-node";
 
 /**
  * The plugin is the agent surface again, for a client that installs plugins.
@@ -49,14 +60,66 @@ describe("the plugin's hand-written files", () => {
     expect(manifest.userConfig.token.sensitive).toBe(true);
   });
 
-  it("reminds a session at start of the two calls, and does not hook the stop", () => {
+  it("runs every hook through run.sh, and starts sessions with the digest after compaction too", () => {
     const hooks = JSON.parse(readFileSync(join(PLUGIN_ROOT, "hooks", "hooks.json"), "utf8")) as {
-      hooks: Record<string, { hooks: { type: string; command?: string }[] }[]>;
+      hooks: Record<string, { matcher?: string; hooks: { type: string; command?: string; timeout?: number }[] }[]>;
     };
-    expect(Object.keys(hooks.hooks)).toEqual(["SessionStart"]);
-    const [start] = hooks.hooks.SessionStart[0].hooks;
-    expect(start.type).toBe("command");
-    expect(start.command).toMatch(/get_context/);
-    expect(start.command).toMatch(/session_status/);
+    const events: Record<string, string> = {
+      SessionStart: "session-start",
+      PostToolUse: "post-tool-use",
+      UserPromptSubmit: "user-prompt-submit",
+      Stop: "stop",
+      SessionEnd: "session-end",
+    };
+    expect(Object.keys(hooks.hooks).sort()).toEqual(Object.keys(events).sort());
+    for (const [event, arg] of Object.entries(events)) {
+      const [hook] = hooks.hooks[event][0].hooks;
+      expect(hook.type).toBe("command");
+      expect(hook.command).toBe(`sh "\${CLAUDE_PLUGIN_ROOT}/hooks/run.sh" ${arg}`);
+      expect(hook.timeout).toBeLessThanOrEqual(10);
+    }
+    expect(hooks.hooks.SessionStart[0].matcher?.split("|").sort()).toEqual(["clear", "compact", "resume", "startup"]);
+  });
+
+  it("only records the tools the Stop hook reads, through either transport's name", () => {
+    const hooks = JSON.parse(readFileSync(join(PLUGIN_ROOT, "hooks", "hooks.json"), "utf8")) as {
+      hooks: { PostToolUse: { matcher: string }[] };
+    };
+    const matcher = new RegExp(`^(?:${hooks.hooks.PostToolUse[0].matcher})$`);
+    for (const tool of ["Edit", "Write", "mcp__todox__create_task", "mcp__plugin_todox_todox__log_entry"])
+      expect(matcher.test(tool)).toBe(true);
+    for (const tool of ["Bash", "Read", "mcp__todox__search", "mcp__todox__get_context"]) expect(matcher.test(tool)).toBe(false);
+  });
+
+  it("still gives the reminder at start on a machine with no node, word for word", () => {
+    const runner = readFileSync(join(PLUGIN_ROOT, "hooks", "run.sh"), "utf8");
+    expect(runner).toContain(`echo "${REMINDER}"`);
+    expect(REMINDER).toMatch(/get_context/);
+    expect(REMINDER).toMatch(/session_status/);
+    expect(runner).toMatch(/exit 0/);
+  });
+});
+
+/**
+ * The hooks are TypeScript in `mcp/hook/` and a single generated file in the
+ * plugin, which is the same drift as the skill: change the source, forget the
+ * sync, and every installed plugin runs the old hook.
+ */
+describe("the hook bundle", () => {
+  const bundle = () => readFileSync(HOOK_BUNDLE_PATH, "utf8").replace(/\r\n/g, "\n");
+
+  it("is mcp/hook/ as it stands, built", () => {
+    expect(bundle()).toBe(expectedHookBundle());
+  });
+
+  it("imports nothing but node's built-ins, because a plugin has no node_modules", () => {
+    const specifiers = importedSpecifiers(bundle());
+    expect(specifiers.length).toBeGreaterThan(0);
+    expect(specifiers.filter((s) => !s.startsWith("node:"))).toEqual([]);
+    expect(bundle()).not.toMatch(/\brequire\(/);
+  });
+
+  it("carries no path from the machine that built it", () => {
+    expect(bundle()).not.toMatch(/\/Users\/|\/home\/|[A-Z]:\\\\/);
   });
 });

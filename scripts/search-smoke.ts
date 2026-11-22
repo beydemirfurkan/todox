@@ -40,6 +40,7 @@ import * as entriesRepo from "../lib/repositories/entries";
 import * as projectsRepo from "../lib/repositories/projects";
 import * as tasksRepo from "../lib/repositories/tasks";
 import * as usersRepo from "../lib/repositories/users";
+import { invoke } from "../lib/services/rpc";
 import { escapeLike, search } from "../lib/services/search";
 import { hashPassword } from "../lib/util/password";
 
@@ -188,6 +189,41 @@ async function main() {
     "and not the middle of an identifier",
     !two.some((h) => h.type === "entry" && h.id === inside.id),
   );
+
+  // ------------------------------------------ 1c. has this been tried?
+  line("create_task offers the dead ends its title is about, and only those");
+
+  await entriesRepo.create({
+    task_id: task.id,
+    kind: "dead_end",
+    body: `Redis${marker} session cache failed: the connection pool ran dry under load`,
+  });
+  await entriesRepo.create({
+    task_id: task.id,
+    kind: "dead_end",
+    body: `Pulling the minio${marker} image was denied, the registry dropped it`,
+  });
+  const otherSlug = `search-smoke-other-${rnd()}`;
+  const other = await projectsRepo.create(user.id, { name: otherSlug, slug: otherSlug, summary: "throwaway" });
+  const otherTask = await tasksRepo.create({ project_id: other.id, title: "elsewhere", body: "" });
+  await entriesRepo.create({
+    task_id: otherTask.id,
+    kind: "dead_end",
+    body: `Redis${marker} session cache in the other repository failed too`,
+  });
+
+  type Created = { related_dead_ends?: { entry_id: number; on_task: string; snippet: string }[] };
+  const create = async (title: string) =>
+    (await invoke({ userId: user.id }, "createTask", { project: slug, title })) as Created;
+
+  const related = (await create(`Add a Redis${marker} session cache`)).related_dead_ends ?? [];
+  expect("a title about a dead end gets it back", related.some((d) => d.snippet.includes("pool ran dry")));
+  expect("and not the unrelated one", !related.some((d) => d.snippet.includes("registry")));
+  expect("and not another project's", !related.some((d) => d.snippet.includes("other repository")));
+  const oneWord = await create(`Document the cache headers`);
+  expect("one shared word is not enough to offer anything", oneWord.related_dead_ends === undefined);
+  const unrelated = await create(`Fix the login redirect loop`);
+  expect("an unrelated title carries no related_dead_ends key at all", unrelated.related_dead_ends === undefined);
 
   // --------------------------------------------------------------- 2. plans
   const trigram = await one("SELECT 1 AS present FROM pg_extension WHERE extname = 'pg_trgm'");

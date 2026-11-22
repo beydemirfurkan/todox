@@ -34,6 +34,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import { readdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
+import { gitHookBundle } from "./bundle-node";
+
 const ROOT = process.cwd();
 const OUT = join(ROOT, "dist-npm");
 const ENTRY = join(OUT, "mcp", "server.js");
@@ -156,6 +158,11 @@ function main() {
     if (existsSync(join(ROOT, file)))
       writeFileSync(join(OUT, file === "docs/mcp.md" ? "README.md" : file), readFileSync(join(ROOT, file)));
   }
+
+  // The git hook, as one dependency-free file `todox-mcp hook install` copies
+  // into ~/.todox. Bundled rather than compiled: it runs from there, where
+  // this package's node_modules are not.
+  writeFileSync(join(OUT, "git-hook.mjs"), gitHookBundle());
 
   // The shebang says `npx tsx` in the repository, because that is how it runs
   // from source. In the package it is plain JavaScript.
