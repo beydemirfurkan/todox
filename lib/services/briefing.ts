@@ -1,6 +1,6 @@
 import * as contexts from "../repositories/contexts";
 import * as entries from "../repositories/entries";
-import { HEAD_CHARS } from "../repositories/entries";
+import { HEAD_CHARS, type BriefingEntry, type BriefingEntryRow } from "../repositories/entries";
 import * as observations from "../repositories/observations";
 import * as projects from "../repositories/projects";
 import * as refs from "../repositories/refs";
@@ -300,6 +300,38 @@ export const IDLE_DAYS = 14;
  */
 const BRIEFING_OBSERVATIONS = 6;
 
+/**
+ * What teammates wrote in the last week, heads only. Eight lines at most: this
+ * is a pointer to go and read, not a second log.
+ */
+const BRIEFING_TEAMMATES = 8;
+const TEAMMATE_DAYS = 7;
+
+/** "Mert Demir" for a person, "Mert Demir's agent (model)" for their agent. */
+export function authorLabel(row: {
+  author: string;
+  model: string | null;
+  author_name: string | null;
+}): string {
+  const who = row.author_name ?? "someone";
+  if (row.author !== "agent") return who;
+  return row.model ? `${who}'s agent (${row.model})` : `${who}'s agent`;
+}
+
+/**
+ * A briefing record, with `by` only when somebody else wrote it.
+ *
+ * In a shared project the briefing said what was decided and never who
+ * decided it, so a lead's agent reported a teammate's week as unattributed
+ * work (dogfood 2026-11-22). The reader's own lines go without: on a solo
+ * project that is every line, and the bytes would buy nothing.
+ */
+function attributed(row: BriefingEntryRow, viewerId: number): BriefingEntry {
+  const { user_id, author, model, author_name, ...entry } = row;
+  if (user_id == null || user_id === viewerId) return entry;
+  return { ...entry, by: authorLabel({ author, model, author_name }) };
+}
+
 export async function briefing(userId: number, project: Project, focus?: string) {
   const notes = focus ? BRIEFING_NOTES_FOCUSED : BRIEFING_NOTES;
   const noteBytes = focus ? BRIEFING_NOTE_BYTES_FOCUSED : BRIEFING_NOTE_BYTES;
@@ -322,7 +354,8 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const liveIds = live.map((t) => t.id);
   const idleIds = idle.map((t) => t.id);
 
-  const [globalContext, projectContext, logs, idleHandoffs, counts, files, observed, sameName, developer] =
+  const teammatesSince = new Date(Date.now() - TEAMMATE_DAYS * 86_400_000).toISOString();
+  const [globalContext, projectContext, logs, idleHandoffs, counts, files, observed, sameName, developer, teammates] =
     await Promise.all([
       contexts.pageByProject(userId, null, notes, noteBytes, focus),
       contexts.pageByProject(userId, project.id, notes, noteBytes, focus),
@@ -353,12 +386,14 @@ export async function briefing(userId: number, project: Project, focus?: string)
     projects.listByName(userId, project.name),
     // Ninth, and the same round trip: who the developer is.
     contexts.developerNotes(userId, BRIEFING_DEVELOPER_BYTES),
+    // Tenth: what other people wrote here lately. Empty on a solo project.
+    entries.recentByOthers(project.id, userId, teammatesSince, BRIEFING_TEAMMATES),
   ]);
 
   const bodies = budgetBodies(live, BRIEFING_TASK_BYTES);
 
   const openTasks = live.map((t) => {
-    const log = logs.rows.get(t.id) ?? [];
+    const log = (logs.rows.get(t.id) ?? []).map((row) => attributed(row, userId));
     // `hash` and `id` go out so the agent can check the file itself and report
     // back — this process has no copy of the repository, so the status here is
     // only ever as fresh as the last thing an agent told us.
@@ -392,7 +427,8 @@ export async function briefing(userId: number, project: Project, focus?: string)
       ? count.decisions -
         decisions.length +
         (count.dead_ends - dead_ends.length) +
-        (count.questions - open_questions.length)
+        (count.questions - open_questions.length) +
+        count.notes
       : 0;
 
     return {
@@ -503,6 +539,19 @@ export async function briefing(userId: number, project: Project, focus?: string)
       handoff_missing: handoffMissing(o, allOpen),
     })),
     observations_omitted: observed.omitted,
+    /**
+     * The newest lines other people wrote in this project this week, heads
+     * only, newest first. A note left for you lands here even though the log
+     * above never carries notes. Absent on a solo project.
+     */
+    ...(teammates.length > 0
+      ? {
+          from_teammates: teammates.map(({ author, model, author_name, ...row }) => ({
+            ...row,
+            by: authorLabel({ author, model, author_name }),
+          })),
+        }
+      : {}),
     stale_refs: stale,
     /**
      * A namesake in the same account, named at the one moment somebody is

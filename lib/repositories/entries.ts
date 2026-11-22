@@ -243,6 +243,8 @@ export type BriefingEntry = {
    */
   head: string;
   body: string | null;
+  /** Who wrote it, when that is somebody other than the reader. */
+  by?: string;
 };
 
 /**
@@ -297,7 +299,7 @@ export const pageByTasksPerKindSql = (
   // promised out loud in the `focus` description an agent reads.
   const relevance = focused ? rank(doc) : "0";
   return `WITH ${focused ? `q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),\n     ` : ""}picked AS (
-       SELECT e.id, e.task_id, e.kind, e.created_at, e.body,
+       SELECT e.id, e.task_id, e.kind, e.created_at, e.body, e.user_id, e.author, e.model,
               -- The first NON-EMPTY line. The btrim above drops leading blank
               -- lines, which log_entry allows and which otherwise produced a
               -- head of "" -- a record with no body and no label, which the
@@ -372,12 +374,25 @@ export const pageByTasksPerKindSql = (
               ) AS spent_before
          FROM kept
      )
-     SELECT id, task_id, kind, created_at, head,
-            CASE WHEN coalesce(spent_before, 0) < ? THEN body END AS body
-       FROM spent
-      ORDER BY task_id, id`;
+     SELECT s.id, s.task_id, s.kind, s.created_at, s.head,
+            CASE WHEN coalesce(s.spent_before, 0) < ? THEN s.body END AS body,
+            s.user_id, s.author, s.model, u.name AS author_name
+       FROM spent s
+       LEFT JOIN users u ON u.id = s.user_id
+      ORDER BY s.task_id, s.id`;
 };
 
+
+/**
+ * A briefing row with who wrote it, for the service to turn into a `by` -- or
+ * to drop, when the reader wrote it themselves and saying so costs bytes.
+ */
+export type BriefingEntryRow = BriefingEntry & {
+  user_id: number | null;
+  author: string;
+  model: string | null;
+  author_name: string | null;
+};
 
 export async function pageByTasksPerKind(
   taskIds: number[],
@@ -385,9 +400,9 @@ export async function pageByTasksPerKind(
   perKind: Partial<Record<EntryKind, number>>,
   budgetBytes: number,
   focus?: string,
-): Promise<{ rows: Map<number, BriefingEntry[]>; bodiesOmitted: number }> {
+): Promise<{ rows: Map<number, BriefingEntryRow[]>; bodiesOmitted: number }> {
   if (!taskIds.length || !kinds.length) return { rows: new Map(), bodiesOmitted: 0 };
-  const rows = await all<BriefingEntry & { task_id: number }>(
+  const rows = await all<BriefingEntryRow & { task_id: number }>(
     pageByTasksPerKindSql(taskIds.length, kinds.length, Boolean(focus)),
     [
       // The focus twice, for the two configurations `TSQUERY` builds, and
@@ -482,12 +497,52 @@ export async function listByTasksBetween(
   );
 }
 
+/** A line a teammate wrote, for the briefing's `from_teammates`. */
+export type TeammateEntry = {
+  id: number;
+  task_id: number;
+  task: string;
+  kind: EntryKind;
+  head: string;
+  created_at: string;
+  author: string;
+  model: string | null;
+  author_name: string | null;
+};
+
+/**
+ * The newest entries other people wrote in this project since `since`, heads
+ * only. A note a teammate left for you used to reach the next session only by
+ * luck: the briefing does not carry notes, and per kind it carries the newest
+ * three, whoever wrote them (dogfood 2026-11-22). Every kind is read here,
+ * because what somebody else wrote is news whatever its kind.
+ */
+export const recentByOthers = (projectId: number, viewerId: number, since: string, limit: number) =>
+  all<TeammateEntry>(
+    `SELECT e.id, e.task_id, t.title AS task, e.kind, e.created_at,
+            left(${FIRST_LINE}, ${HEAD_CHARS}) AS head,
+            e.author, e.model, u.name AS author_name
+       FROM entries e
+       JOIN tasks t ON t.id = e.task_id
+       LEFT JOIN users u ON u.id = e.user_id
+      WHERE t.project_id = ? AND e.user_id IS NOT NULL AND e.user_id <> ? AND e.created_at >= ?
+      ORDER BY e.id DESC
+      LIMIT ?`,
+    [projectId, viewerId, since, limit],
+  );
+
 export type EntryCounts = {
   total: number;
   decisions: number;
   dead_ends: number;
   /** Open questions: nothing answers them yet. */
   questions: number;
+  /**
+   * Notes, which the briefing never carries. Counted so that `log_omitted`
+   * says they exist: a teammate's note reported as "0 omitted" was the one
+   * line of warning an agent had, and it was false (dogfood 2026-11-22).
+   */
+  notes: number;
 };
 
 /**
@@ -505,6 +560,7 @@ export async function countsByTasks(taskIds: number[]): Promise<Map<number, Entr
     decisions: string;
     dead_ends: string;
     questions: string;
+    notes: string;
   }>(
     `SELECT task_id,
        COUNT(*)                                    AS total,
@@ -516,7 +572,8 @@ export async function countsByTasks(taskIds: number[]): Promise<Map<number, Entr
        COUNT(*) FILTER (
          WHERE kind = 'question'
            AND NOT EXISTS (SELECT 1 FROM entries a WHERE a.answers_entry_id = entries.id)
-       )                                           AS questions
+       )                                           AS questions,
+       COUNT(*) FILTER (WHERE kind = 'note')       AS notes
      FROM entries WHERE task_id IN (${taskIds.map(() => "?").join(",")})
      GROUP BY task_id`,
     taskIds,
@@ -530,6 +587,7 @@ export async function countsByTasks(taskIds: number[]): Promise<Map<number, Entr
         decisions: Number(r.decisions),
         dead_ends: Number(r.dead_ends),
         questions: Number(r.questions),
+        notes: Number(r.notes),
       },
     ]),
   );

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   developerNotes: vi.fn(async () => ({ rows: [], omitted: 0 })),
   pageByTasksPerKind: vi.fn(),
   countsByTasks: vi.fn(),
+  recentByOthers: vi.fn(async (..._args: unknown[]): Promise<unknown[]> => []),
   listRefs: vi.fn(),
   freshness: vi.fn(() => "fresh"),
   pageObservations: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("../repositories/contexts", () => ({
 vi.mock("../repositories/entries", () => ({
   pageByTasksPerKind: mocks.pageByTasksPerKind,
   countsByTasks: mocks.countsByTasks,
+  recentByOthers: mocks.recentByOthers,
   HEAD_CHARS: 240,
 }));
 vi.mock("../repositories/refs", () => ({
@@ -110,7 +112,7 @@ const entry = (kind: string, body: string | null, over: Record<string, unknown> 
 /** What `countsByTasks` answers: the real totals, whatever the log above shows. */
 const counts = (over: Partial<Record<string, number>> = {}) =>
   new Map([
-    [1, { total: 0, decisions: 0, dead_ends: 0, questions: 0, ...over }],
+    [1, { total: 0, decisions: 0, dead_ends: 0, questions: 0, notes: 0, ...over }],
   ]);
 
 beforeEach(() => {
@@ -316,6 +318,20 @@ describe("what each task carries", () => {
     const out = await brief();
     // Shown: 1 decision, 1 dead end, 1 question. Held back: 9 + 4 + 0.
     expect(out.open_tasks[0]!.log_omitted).toBe(13);
+  });
+
+  /**
+   * Notes are never carried, so every one of them is hidden. A teammate's note
+   * left on a task was invisible to the next session while `log_omitted` said
+   * 0 -- the agent had no reason to go and look (dogfood 2026-11-22).
+   */
+  it("counts notes as hidden, because the briefing never carries them", async () => {
+    // The log above shows one decision, one dead end and one question.
+    mocks.countsByTasks.mockResolvedValue(
+      counts({ total: 5, decisions: 1, dead_ends: 1, questions: 1, notes: 2 }),
+    );
+    const out = await brief();
+    expect(out.open_tasks[0]!.log_omitted).toBe(2);
   });
 
   it("reports nothing hidden when the cap did not bite", async () => {
@@ -1151,5 +1167,57 @@ describe("a project with no summary", () => {
     const b = await bare("A memory for developers and their agents.");
     expect(b).not.toHaveProperty("summary_missing");
     expect(b.hint).not.toMatch(/no summary/);
+  });
+});
+
+describe("who wrote it", () => {
+  /**
+   * A lead's agent read a teammate's week as unattributed work: the briefing
+   * said what was decided and never who decided it (dogfood 2026-11-22).
+   */
+  it("names somebody else's line, and leaves the reader's own alone", async () => {
+    mocks.pageByTasksPerKind.mockResolvedValue(
+      logPage(
+        new Map([
+          [
+            1,
+            [
+              entry("decision", "mine", { user_id: USER, author: "agent", model: "m", author_name: "Me" }),
+              entry("dead_end", "theirs", {
+                user_id: USER + 1,
+                author: "agent",
+                model: "claude-sonnet-5-5",
+                author_name: "Mert",
+              }),
+            ],
+          ],
+        ]),
+      ),
+    );
+    const out = await brief();
+    expect(out.open_tasks[0]!.decisions[0]).not.toHaveProperty("by");
+    expect(out.open_tasks[0]!.dead_ends[0]!.by).toBe("Mert's agent (claude-sonnet-5-5)");
+    expect(out.open_tasks[0]!.decisions[0]).not.toHaveProperty("user_id");
+  });
+
+  it("carries what teammates wrote this week, and nothing when there is none", async () => {
+    expect(await brief()).not.toHaveProperty("from_teammates");
+    mocks.recentByOthers.mockResolvedValueOnce([
+      {
+        id: 9,
+        task_id: 1,
+        task: "Idempotency",
+        kind: "note",
+        head: "For Mert: two risks",
+        created_at: "2026-11-22T08:00:00.000Z",
+        author: "agent",
+        model: null,
+        author_name: "Ayşe",
+      },
+    ]);
+    const out = await brief();
+    expect(out.from_teammates).toEqual([
+      expect.objectContaining({ id: 9, kind: "note", by: "Ayşe's agent" }),
+    ]);
   });
 });
