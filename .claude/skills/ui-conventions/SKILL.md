@@ -21,12 +21,39 @@ in `app/globals.css` under `@theme inline`.
 | `.row-action` | an action that appears on hover **and on touch** |
 | `.searchbox` | the search field frame |
 | `.on-fill` | dark text on a bright fill |
-| `.display` / `.mono` | the two non-body typefaces |
+| `.display` / `.mono` | Fraunces (SOFT, WONK) for headings and controls; DM Mono for ids and paths. Body is Geist |
+| `.scrawl` / `.scrawl-ink` | the margin-note hand: Fraunces italic, orange or ink — labels and asides only |
+| `.marker` | one phrase under the orange marker, inline in a heading |
+| `.name-label` | the label stuck on an object (the landing's task screenshot) |
+| `.brand-band` | the orange band the page ends on |
 | `.prose` | 68ch measure for body copy |
 
 Components: `app/components/` (`Panel`, `Empty`, `Chip`, `Counter`, `Field`,
-`StatusDot`, `Blob`) via the barrel `app/components/index.ts`. Client-side
-pieces: `app/features/`.
+`StatusDot`, `Blob`, and the decorative stickers — `BoltSticker`,
+`HeartSticker`, `SparkleSticker`, `PencilSticker`, `HandArrow`) via the barrel
+`app/components/index.ts`. Client-side pieces: `app/features/`.
+
+## The look, in five rules
+
+The notebook redesign (task #809): cream paper, charcoal ink, one marker.
+
+- **Orange is the only accent, and it is two tokens.** `--accent` (#ff6f1e) is
+  the marker itself — a fill under dark text, a stroke, a highlight. As
+  *text* on cream it reads under 3:1, so orange text is `--accent-ink`
+  (`text-accentInk`). The same goes for an error said in words:
+  `--danger-ink`, not `--k-dead_end`.
+- **Actions are an outline, never a fill.** `.btn` is cream with a charcoal
+  stroke. Selected is the charcoal pill (`.seg[aria-current]`, the account
+  tabs) — not orange.
+- **Matte.** No `backdrop-filter`, no translucent surfaces: a menu that lets
+  the page read through it is a bug on cream. Shadows come from `--shadow*`
+  and stay soft; no hard offset.
+- **Sticker colours are decoration.** The blue, pink and green in
+  `stickers.tsx` never carry a label, a state or a control. Kind colours
+  (`--k-*`) are fills under dark text, with the word on them.
+- **Both themes.** Light is the default; `prefers-color-scheme: dark` swaps
+  the `:root` tokens for a warm brown version. Anything new uses tokens, so
+  it gets both for free; a literal colour gets neither.
 
 ## Mobile rules
 
@@ -88,25 +115,28 @@ To check a page, on the real thing (the tokens are runtime CSS variables, so
 the dev server is the same):
 
 ```js
-const ch=c=>c.match(/\d+/g).slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});
+const ch=c=>{const v=c.match(/[\d.]+/g).slice(0,3).map(Number);return(c.startsWith('color(')?v:v.map(x=>x/255)).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4)}; // rgb() is 0-255, color(srgb) is 0-1
 const lum=c=>{const[r,g,b]=ch(c);return .2126*r+.7152*g+.0722*b};
 const okL=c=>{const[r,g,b]=ch(c);const l=.4122214708*r+.5363325363*g+.0514459929*b,m=.2119034982*r+.6806995451*g+.1073969566*b,s=.0883024619*r+.2817188376*g+.6299787005*b;return .2104542553*Math.cbrt(l)+.793617785*Math.cbrt(m)-.0040720468*Math.cbrt(s)};
 const cr=(a,b)=>((Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05)).toFixed(2);
 const bg=e=>getComputedStyle(e).backgroundColor, paper=bg(document.body), card=bg(document.querySelector('.sticker')), row=bg(document.querySelector('.sticker-flat')||document.querySelector('.sticker')), line=getComputedStyle(document.querySelector('.sticker')).borderColor;
 const m=new Map();for(const e of document.querySelectorAll('main *')){if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;const s=getComputedStyle(e);const k=s.fontSize+' '+s.color;m.set(k,(m.get(k)||0)+1)}
-({stepCardOverPaper:(okL(card)-okL(paper)).toFixed(3), stepRowUnderCard:(okL(card)-okL(row)).toFixed(3), outlineOnPaper:cr(line,paper), under12px:[...m].filter(([k])=>parseFloat(k)<12), rows:[...m].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>n+'× '+k+' → '+cr(k.match(/rgb.*/)[0],card))})
+({stepCardOverPaper:(okL(card)-okL(paper)).toFixed(3), stepRowUnderCard:(okL(card)-okL(row)).toFixed(3), outlineOnPaper:cr(line,paper), under12px:[...m].filter(([k])=>parseFloat(k)<12), rows:[...m].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>n+'× '+k+' → '+cr(k.slice(k.indexOf(' ')+1),card))})
 ```
 
-The surfaces are near black, and the WCAG ratio is near-useless there (it
-reports 1.17:1 for a step the eye sees fine), so the surface steps are
-measured in OKLab lightness: `stepCardOverPaper` stays at or above 0.08,
-`stepRowUnderCard` at or above 0.05 (a `.sticker-flat` row is a well cut
-into the card, so it sits a step below it), and the sticker outline reads at 2:1 or
-better against the paper, because on this paper the outline is what cuts a
-sticker out — the hard shadow does not show. `under12px` is empty, and any
-row that is a sentence (not `.mono`) reads at 6:1 or better against the
-card. The `--on-fill` rows (dark text on chips) will show a low number
-against the card — they sit on a bright fill, not on the card, and are fine.
+The page is light now, so the WCAG ratio means what it says. What to hold:
+`under12px` is empty; any row that is a sentence (not `.mono`) reads at 6:1 or
+better against the card, metadata in `--faint` at 4.5:1 or better; orange and
+red text never use the fill tokens. The surface steps are deliberately small
+on cream — a card is cut out by its `--line` hairline and its soft shadow,
+not by a lighter fill — so `stepCardOverPaper` is not a target any more.
+
+**Run it twice**, once per theme: in Playwright, `page.emulateMedia({
+colorScheme: "dark" })` and the same script again. The dark tokens are a
+separate set, and a pair that passes on cream can fail on brown.
+
+The `--on-fill` rows (dark text on chips) will show a low number against the
+card — they sit on a bright fill, not on the card, and are fine.
 
 ## Accessibility
 
