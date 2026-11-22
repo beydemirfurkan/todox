@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { DIGEST_CHARS, PREAMBLE, REMINDER, sessionStart } from "./session-start";
+import { STALE_HEADING } from "./linked-files";
+import { DIGEST_CHARS, INJECT_CEILING, PREAMBLE, REMINDER, sessionStart, staleWarning } from "./session-start";
 import { readEvents } from "./state";
 import { hookContext } from "./test-context";
 import type { HookContext } from "./types";
@@ -85,4 +86,41 @@ describe("SessionStart", () => {
     await sessionStart(ctx);
     expect(readEvents(ctx.config.dataDir, "s1")).toEqual([{ t: "start", at: "2026-11-22T10:00:00.000Z" }]);
   });
+  it("adds the linked files that changed on this machine under the digest", async () => {
+    const rpc = vi.fn(async (_method: string, params?: unknown) =>
+      (params as { shape?: string } | undefined)?.shape === "digest"
+        ? { digest: "d" }
+        : { open_tasks: [{ id: 7, title: "Cart", files: [{ id: 70, path: "/repo/a.ts", hash: "aaa" }] }] },
+    );
+    const ctx = hookContext({
+      rpc,
+      checkFiles: (refs) => ({
+        checked: refs.map((r) => ({ ...r, status: "changed" as const })),
+        seen: refs.map((r) => ({ id: r.id, hash: "bbb" })),
+      }),
+    });
+    const text = contextOf(await sessionStart(ctx)).additionalContext;
+    expect(text).toBe(`${PREAMBLE}\n\nd\n\n${STALE_HEADING}\n- task #7 "Cart" -> /repo/a.ts (changed)`);
+    expect(rpc).toHaveBeenCalledWith("reportRefs", { refs: [{ id: 70, hash: "bbb" }] });
+  });
+
+  it("keeps the briefing when the file check fails", async () => {
+    const rpc = vi.fn(async (_method: string, params?: unknown) => {
+      if ((params as { shape?: string } | undefined)?.shape !== "digest") throw new Error("slow");
+      return { digest: "d" };
+    });
+    const ctx = hookContext({ rpc });
+    expect(contextOf(await sessionStart(ctx)).additionalContext).toBe(`${PREAMBLE}\n\nd`);
+    expect(ctx.log).toHaveBeenCalledWith("session-start", expect.stringMatching(/linked files not checked: slow/));
+  });
+
+  it("cuts the warning to the room the digest leaves, and drops it when none is left", () => {
+    const lines = ["- a", "- b", "- c"];
+    const whole = staleWarning(lines, 10_000);
+    expect(whole).toBe(`\n\n${STALE_HEADING}\n- a\n- b\n- c`);
+    expect(staleWarning(lines, whole.length - 1)).toBe(`\n\n${STALE_HEADING}\n- a\n- b`);
+    expect(staleWarning(lines, 20)).toBe("");
+    expect(INJECT_CEILING).toBeLessThan(10_000);
+  });
 });
+

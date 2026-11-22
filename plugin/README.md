@@ -50,7 +50,10 @@ What it adds:
   a project: in a directory todox does not know yet, or with no token, todox
   unreachable or no `node` on the machine, it falls back to one sentence — read
   the log first, and before finishing call `session_status` and write up what
-  it names.
+  it names. It also hashes the files linked to the project's open tasks, here
+  where the code is, and reports them: the hosted server has no copy of the
+  repository, so this is what lets todox say a note describes code that has
+  since changed. Any that did are listed under the briefing.
 
 The hooks are command hooks: one node script with no dependencies
 (`hooks/todox-hook.mjs`, generated from `mcp/hook/` by `pnpm plugin:sync`), no
