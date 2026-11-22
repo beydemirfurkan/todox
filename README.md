@@ -386,7 +386,7 @@ docker compose exec app pnpm db:migrate
 | `DATABASE_URL` | Postgres. |
 | `DATABASE_POOL_MAX` | Optional, default 20. Connections per process. |
 | `TODOX_PUBLIC_URL` | Mail links and the agent setup snippet are built from it. |
-| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional. Without them, mail is printed to the log. Port defaults to 587. |
+| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional. Port defaults to 587. Without them, production sends no mail: no verification and no password reset. `pnpm user:verify <email>` vouches for an address from the server, which is what invites and sharing need. |
 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_ID` · `GITHUB_CLIENT_SECRET` | Optional, in pairs. Each turns on its sign-in button. Callback: `<TODOX_PUBLIC_URL>/api/auth/<google\|github>/callback`. |
 
 `pnpm db:migrate` does not run at startup, so two instances never race on the
