@@ -277,9 +277,9 @@ export const methods = {
     return { tasks: rows, omitted: Math.max(0, total - rows.length) };
   },
 
-  getTask: async ({ userId }, params: { task_id?: number; id?: number }) => {
-    // The schema admits exactly one of the two, so one of them is here.
-    const taskId = (params.task_id ?? params.id) as number;
+  getTask: async ({ userId }, params: { task_id: number }) => {
+    // `parseParams` has already folded an `id` into `task_id`.
+    const taskId = params.task_id;
     await assertTask(userId, taskId);
     const [task, log, refs] = await Promise.all([
       tasksRepo.byId(taskId),
