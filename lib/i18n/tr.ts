@@ -138,6 +138,13 @@ export const tr: Record<Key, string> = {
   settingsDanger: "Tehlikeli",
   settingsMergeTitle: "Başka bir projeyle birleştir",
   settingsMergeBody: "Bu repo iki kez kaydedildiyse agent'ından merge_projects çağırmasını iste: tüm görevleri, notları ve kayıtları tek projede toplar.",
+  taskLeftOff: "Kaldığı yer",
+  taskDetails: "Ayrıntılar",
+  taskProject: "Proje",
+  taskOpened: "Açıldı",
+  taskWorked: "Çalışılan süre",
+  taskWorkedNone: "başlanmadı",
+  logEarlier: "{n} eski kayıt",
   metaTitleBrain: "Beynin — todox",
   brainTitle: "Beynin",
   brainLede:

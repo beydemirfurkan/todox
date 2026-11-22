@@ -514,6 +514,65 @@ body:has([data-wide-page]) .page-column {
   transform-origin: top left;
 }
 
+/* The status of a task as a row of radio-looking buttons. The mark fills
+   for the pressed one; the label is always written out. */
+.status-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.status-choice:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+.status-choice[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: var(--raised);
+  color: var(--ink);
+}
+.status-choice-mark {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--faint);
+  border-radius: 999px;
+}
+.status-choice[aria-pressed="true"] .status-choice-mark {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 4px, transparent 4.5px);
+}
+
+/* Where the last session stopped: the first thing on a task page. */
+.left-off {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--k-handoff);
+  border-radius: var(--radius-inner);
+  background: var(--card);
+}
+
+.task-details {
+  padding: 4px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+@media (min-width: 1024px) {
+  .task-details {
+    position: sticky;
+    top: 24px;
+  }
+}
+
 /* A row on a settings page: what it is on the left, its control on the
    right, wrapping under it on a phone. */
 .settings-row {
