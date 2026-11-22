@@ -17,6 +17,13 @@ A new session calls `get_context` and starts where the last one left off,
 without repeating a mistake somebody already made.
 
 <p align="center">
+  <img src="docs/demo.gif" width="720" alt="Two sessions in a terminal. Yesterday, in Claude Code, the agent creates a task to fix a flaky cart test and logs a dead end (raising the timeout did not help), a decision and a handoff. The next morning a fresh Codex session calls get_context, and the first thing it reads is that handoff, the dead end and the decision.">
+</p>
+
+The second session shows the real `get_context` output, trimmed, for the
+entries the first one wrote. The same log in the browser:
+
+<p align="center">
   <img src="public/screenshots/task-log.jpg" width="720" alt="A task in todox: its status as a row of choices, where the last session left off, then the log of a decision, a dead end and a handoff, with the task's details beside it">
 </p>
 
