@@ -28,6 +28,7 @@ export default async function PrivacyPage() {
       <h2 className="display mt-6 text-[20px] font-bold">{t("privacyWhatWeStore")}</h2>
       <ul className="mt-2 list-disc space-y-1 pl-6 text-[15px] leading-relaxed">
         <li>{t("privacyStore1")}</li>
+        <li>{t("privacyStoreOAuth")}</li>
         <li>{t("privacyStore2")}</li>
         <li>{t("privacyStore3")}</li>
         <li>{t("privacyStore4")}</li>
@@ -46,6 +47,7 @@ export default async function PrivacyPage() {
       <p className="mt-2 text-[15.5px] leading-relaxed">{t("privacySubprocessorsBody")}</p>
       <ul className="mt-2 list-disc space-y-1 pl-6 text-[15px] leading-relaxed">
         <li>{t("privacySub1")}</li>
+        <li>{t("privacySubOAuth")}</li>
         <li>{t("privacySub2")}</li>
       </ul>
 

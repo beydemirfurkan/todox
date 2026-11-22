@@ -53,7 +53,9 @@ export const tr: Record<Key, string> = {
   forAgents: "Agent mısın? /llms.txt dosyasını oku.",
   privacyLastUpdated: "Son güncelleme: 22 Kasım 2026.",
   privacyWhatWeStore: "Neleri saklıyoruz",
-  privacyStore1: "Hesabın: e-posta, kullanıcı adı, görünür ad ve şifrenin hash'i. Hash scrypt'tir; şifreni okuyamayız.",
+  privacyStore1: "Hesabın: e-posta, kullanıcı adı, görünür ad ve şifre belirlediysen şifrenin hash'i. Hash scrypt'tir; şifreni okuyamayız.",
+  privacyStoreOAuth:
+    "Google ya da GitHub ile giriyorsan: hangi sağlayıcı olduğu, onun bize verdiği hesap kimliği ve doğruladığı e-posta adresi. Yalnızca adını ve e-postanı isteriz, verilen erişimi bunları okumak için bir kez kullanırız ve sağlayıcıdan hiçbir anahtar saklamayız.",
   privacyStore2: "Projelerin, görevlerin, günlük girdilerin, bağlam notların ve proje üyeliklerin — todox'a sen koyarsın.",
   privacyStore3: "Oturumunu açık tutan çerezler. HTTP-only, imzalı; çıkış yaptığında ya da 30 gün hareketsizlikten sonra süreleri dolar.",
   privacyStore4: "IP adresini ve istek yolunu içeren sunucu logları; kötüye kullanım tespiti ve hata ayıklama için 30 gün saklanır.",
@@ -65,6 +67,8 @@ export const tr: Record<Key, string> = {
   privacySubprocessorsBody:
     "Verilerinin tek işlemcisi todox'un kendisidir. Hizmeti çalıştırmak için küçük bir altyapı alt işlemci listesi kullanıyoruz:",
   privacySub1: "Hostinger — Frankfurt, Almanya'daki bir sanal sunucu. Uygulama da PostgreSQL veritabanı da orada çalışır; projelerin, görevlerin ve notların o tek makineden çıkmaz.",
+  privacySubOAuth:
+    "Google ve GitHub — yalnızca onlarla girmeyi seçersen. todox'a giriş yaptığını görürler ve bize kim olduğunu söylerler; projelerinle ilgili hiçbir şey onlara gitmez.",
   privacySub2: "Resend — doğrulama ve şifre sıfırlama e-postaları. Yalnızca alıcı adresi ve mesajın kendisi aktarılır; Resend bunları Tokyo (ap-northeast-1) bölgesinde işler.",
   privacyRetention: "Verileri ne kadar süre saklıyoruz",
   privacyRetentionBody:
