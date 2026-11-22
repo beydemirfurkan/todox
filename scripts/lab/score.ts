@@ -72,6 +72,8 @@ interface Meta {
   project: string;
   startedAt: string;
   durationMs: number;
+  /** Absent in runs made before `--habit` existed, which all ran without it. */
+  habit?: boolean;
   exitCode: number | null;
   timedOut: boolean;
 }
@@ -245,6 +247,7 @@ function scoreSession(runDir: string, p: Persona, n: number) {
     session: n,
     agent: meta.agent,
     model: meta.model,
+    habit: meta.habit ?? false,
     project: session.project,
     ok: meta.exitCode === 0 && !meta.timedOut,
     minutes: Math.round(meta.durationMs / 6000) / 10,
@@ -371,8 +374,11 @@ function scoreRun(runDir: string, runId: string): { totals: Totals; md: string }
   const leaks = contamination();
   writeFileSync(join(runDir, "scores.json"), JSON.stringify({ run: runId, totals, leaks, scores }, null, 2));
   const refusals = scores.flatMap((s) => s.cost.refusals.map((r) => `- ${s.persona} s${s.session}: ${r}`));
+  const withHabit = scores.filter((s) => s.habit).length;
   const md = [
     `# Lab run ${runId}`,
+    "",
+    `Habit installed: ${withHabit === 0 ? "no" : withHabit === scores.length ? "yes" : `${withHabit} of ${scores.length} sessions`}.`,
     "",
     "```json",
     JSON.stringify(totals, null, 2),

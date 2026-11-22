@@ -5,6 +5,7 @@
  *
  *   pnpm lab:setup            create what is missing, keep what is there
  *   pnpm lab:setup --reset    delete the lab accounts and folder first (runs/ is kept)
+ *   pnpm lab:setup --habit    also write the habit, as `install:mcp` now does by default
  *
  * Refuses a remote database (scripts/local-only.ts): the accounts are created
  * through the repositories, which follow DATABASE_URL, and a lab that wrote
@@ -33,6 +34,7 @@ import { createApiToken } from "../../lib/services/auth";
 import * as invitations from "../../lib/services/project-invitations";
 import { invoke } from "../../lib/services/rpc";
 import { hashPassword } from "../../lib/util/password";
+import { writeMemoryFile } from "../install-mcp/memory";
 import { FIXTURES } from "./fixtures";
 import {
   claudeConfig,
@@ -238,6 +240,30 @@ async function ensureSharedLedger(owner: { id: number }, member: Persona): Promi
   if (!accepted) throw new Error(`${member.key} could not accept the ledger-api invitation`);
 }
 
+/**
+ * The four lines `install:mcp` writes into a client's user-level memory file,
+ * written where each lab agent and its stdio server will look.
+ *
+ * - OpenCode reads `$XDG_CONFIG_HOME/opencode/AGENTS.md`, and the lab gives it
+ *   a private XDG home, so that file is exactly what an installed OpenCode
+ *   reads.
+ * - Claude Code runs with project settings only, so it never reads a user
+ *   CLAUDE.md; `lab:run --habit` appends the same block to its prompt instead
+ *   (see run.ts). Pointing it at another home would need a second login.
+ * - The stdio server checks for the habit under HOME before it decides to send
+ *   setup notes, so the persona's own home gets both files: an installed user
+ *   would not be nagged for a habit they have.
+ *
+ * Written by the installer's own function, so the lab measures the text a
+ * real install leaves and not a copy of it.
+ */
+async function writeHabit(persona: PersonaKey): Promise<void> {
+  const home = join(secretsDir(persona), "home");
+  await writeMemoryFile(join(openCodeHome(persona), "opencode", "AGENTS.md"));
+  await writeMemoryFile(join(home, ".config", "opencode", "AGENTS.md"));
+  await writeMemoryFile(join(home, ".claude", "CLAUDE.md"));
+}
+
 async function reset(): Promise<void> {
   for (const p of PERSONAS) {
     const user = await usersRepo.byUsername(p.username);
@@ -264,6 +290,7 @@ async function main(): Promise<void> {
     mkdirSync(secretsDir(p.key), { recursive: true, mode: 0o700 });
     writeClaudeConfig(p.key, token);
     writeOpenCodeConfig(p.key, token);
+    if (process.argv.includes("--habit")) await writeHabit(p.key);
     ensureRepos(p);
   }
   const ayse = PERSONAS.find((p) => p.key === "ayse");
