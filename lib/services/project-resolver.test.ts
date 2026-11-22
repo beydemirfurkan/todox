@@ -395,6 +395,17 @@ describe("registering needs evidence that the path is a repository", () => {
     expect((err as Error).message).toContain("Known slugs: p1, p2.");
   });
 
+  /** Lab v2: a fresh clone of one repo opened under another's slug from this list. */
+  it("says repo_url comes before the list, and when a slug is right", async () => {
+    repo.list.mockResolvedValue([project(1, "/a"), project(2, "/b")]);
+    const message = ((await resolveOrCreate(1, "/scratch/thing").catch((e: Error) => e)) as Error)
+      .message;
+    const condition = message.indexOf("only when this directory is a clone of that same repository");
+    expect(condition).toBeGreaterThan(-1);
+    expect(condition).toBeLessThan(message.indexOf("Known slugs"));
+    expect(message.indexOf("`repo_url` is the answer")).toBeLessThan(message.indexOf("Known slugs"));
+  });
+
   it("does not invent a slug list for an account with no projects", async () => {
     const err = await resolveOrCreate(1, "/scratch/thing").catch((e: Error) => e);
     expect((err as Error).message).not.toContain("Known slugs");

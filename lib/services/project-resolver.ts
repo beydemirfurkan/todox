@@ -415,8 +415,26 @@ const noEvidence = (ref: string) =>
  */
 async function refuseNoEvidence(userId: number, ref: string): Promise<BadRequest> {
   const known = await knownSlugs(userId);
-  return new BadRequest(known ? `${noEvidence(ref)} ${known}` : noEvidence(ref), "no_evidence");
+  return new BadRequest(
+    known ? `${noEvidence(ref)} ${slugCondition} ${known}` : noEvidence(ref),
+    "no_evidence",
+  );
 }
+
+/**
+ * Said before the slugs, because a list on the end of a refusal reads as the
+ * menu to pick from.
+ *
+ * Lab v2 (2026-11-22): an agent in a fresh clone of a mobile app was refused
+ * here, skipped `repo_url`, and named the web app's slug from the list -- so
+ * the mobile repository opened with another repository's briefing, the one
+ * merge a duplicate can never cause. A teammate's clone of a shared repo is
+ * the case the list is for, and it is named as such.
+ */
+const slugCondition =
+  "If this directory is a git checkout, its `repo_url` is the answer, not a slug. " +
+  "Name one of these only when this directory is a clone of that same repository, " +
+  "or a scratch directory working in it; a different repository is a different project.";
 
 /**
  * Registered by its path, because there was no remote to register it by.
