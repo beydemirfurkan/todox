@@ -19,6 +19,7 @@ import {
   ShareBars,
   StatBadges,
 } from "../components";
+import { RevealCurrent } from "../features/reveal-current";
 import { Daily } from "./daily";
 import { privatePageMetadata } from "../metadata-shared";
 import { CopyMarkdown } from "../features/copy-markdown";
@@ -83,7 +84,12 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
         )}
       </div>
 
-      <nav aria-label={t("reportTitle")} className="pop flex flex-wrap gap-2">
+      {/* One row that scrolls sideways on a phone, like a segmented filter
+          in an app; it wraps from `sm` where there is room. */}
+      <nav
+        aria-label={t("reportTitle")}
+        className="pop no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>a]:shrink-0"
+      >
         {PERIODS.map((p) => (
           <Link
             key={p}
@@ -100,6 +106,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
             {periodLabel(p, t)}
           </Link>
         ))}
+        <RevealCurrent />
       </nav>
 
       {report.totals.touched === 0 ? (

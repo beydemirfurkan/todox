@@ -11,6 +11,7 @@ import { LogoMark } from "./components";
 import { LangSwitcher } from "./features/lang-switcher";
 import { Notifications } from "./features/notifications";
 import { SearchBox } from "./features/search-box";
+import { TabBar } from "./features/tab-bar";
 import { TzProbe } from "./features/tz-probe";
 import { UserMenu } from "./features/user-menu";
 import { defaultOpenGraphImage } from "./metadata-shared";
@@ -68,6 +69,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   themeColor: "#09090b",
   colorScheme: "dark",
+  // Edge to edge on a phone with a notch or a home indicator; the bars pad
+  // themselves with env(safe-area-inset-*) so nothing sits under either.
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
@@ -79,14 +83,17 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang={lang}
       className={`${geist.variable} ${dmMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" data-signed-in={user ? "true" : undefined}>
         <TzProbe />
 
         <a href="#main" className="skip-link display">
           {t("skipToContent")}
         </a>
 
-        <header className="relative z-20 mx-auto flex w-full page-column flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
+        {/* On a phone this is an app bar: one row, pinned, the wordmark and
+            the two things you reach for from anywhere -- search and what is
+            new. Everything else lives in the tab bar at the bottom. */}
+        <header className="app-bar relative z-20 mx-auto flex w-full page-column flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
           {/* "/" for everyone now: signed out it is the page that explains what
               this is, which used to be nowhere. */}
           <Link href="/" className="brand flex items-center gap-2.5">
@@ -101,18 +108,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
           {user ? (
             <>
-              {/* The tools take the second row on a phone. A 320px screen fits
-                  the wordmark and one control, so all four beside it is what
-                  used to drag the page sideways; sign-out and the report link
-                  moved into the user menu rather than being wrapped onto a
-                  third row. On larger screens this group pushes itself and the
-                  profile menu right, while the profile remains the last item. */}
-              <div className="order-2 flex w-full items-center gap-2 sm:order-none sm:ml-auto sm:w-auto">
-                {/* `min-w` and not just `flex-1`: a basis of zero let the box
-                    squeeze to 22px rather than push anything onto a new line.
-                    The fixed width, and the widening on focus that used to
-                    shove the row off-screen, wait until there is room. */}
-                <div className="min-w-[6.5rem] flex-1 transition-[width] duration-200 sm:w-[210px] sm:flex-none sm:focus-within:w-[280px]">
+              {/* One row of tools for both sizes, so the bell is rendered (and
+                  its feed fetched) once. On a phone it is the only one: search,
+                  the report, the brain and the account are tabs at the bottom,
+                  and the language is under Account. From `md` the search box,
+                  the language and the user menu come back here. */}
+              <div className="ml-auto flex items-center gap-2">
+                <div className="hidden w-[210px] transition-[width] duration-200 focus-within:w-[280px] md:block">
                   <Suspense>
                     <SearchBox
                       placeholder={t("searchPlaceholder")}
@@ -121,7 +123,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     />
                   </Suspense>
                 </div>
-                <LangSwitcher lang={lang} t={t} />
+                <div className="hidden md:block">
+                  <LangSwitcher lang={lang} t={t} />
+                </div>
                 {/* Its own boundary: the feed can only be fetched once the
                     session is known, so awaiting it here would put a second
                     sequential query in front of every page. */}
@@ -130,17 +134,20 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 </Suspense>
               </div>
 
-              <UserMenu
-                user={user}
-                labels={{
-                  navAccount: t("navAccount"),
-                  navReport: t("navReport"),
-                  navBrain: t("navBrain"),
-                  signOut: t("signOut"),
-                  working: t("working"),
-                }}
-                className="ml-auto shrink-0 sm:ml-0"
-              />
+              {/* The wrapper carries the breakpoint: `.user-menu` sets its own
+                  display, and unlayered CSS outranks a Tailwind utility. */}
+              <div className="hidden shrink-0 md:block">
+                <UserMenu
+                  user={user}
+                  labels={{
+                    navAccount: t("navAccount"),
+                    navReport: t("navReport"),
+                    navBrain: t("navBrain"),
+                    signOut: t("signOut"),
+                    working: t("working"),
+                  }}
+                />
+              </div>
             </>
           ) : (
             <div className="ml-auto flex items-center gap-2">
@@ -160,6 +167,18 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </main>
 
         <SiteFooter t={t} />
+        {user && (
+          <TabBar
+            label={t("tabBarLabel")}
+            tabs={[
+              { href: "/", label: t("tabProjects"), icon: "home" },
+              { href: "/search", label: t("tabSearch"), icon: "search" },
+              { href: "/report", label: t("tabReport"), icon: "chart" },
+              { href: "/me", label: t("tabBrain"), icon: "brain" },
+              { href: "/account", label: t("tabAccount"), icon: "user" },
+            ]}
+          />
+        )}
       </body>
     </html>
   );
@@ -194,7 +213,7 @@ function SiteFooter({ t }: { t: T }) {
     },
   ];
   return (
-    <footer className="site-band mt-20">
+    <footer className="site-band site-footer mt-20">
       <div className="mx-auto grid w-full page-column grid-cols-2 gap-10 px-5 pt-14 pb-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div className="col-span-2 flex flex-col gap-3 md:col-span-1">
           <span className="flex items-center gap-2.5">

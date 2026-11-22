@@ -109,6 +109,13 @@ describe("what stays reachable without a session", () => {
     expect(redirected(proxy(request("/s/abc123")))).toBe(false);
   });
 
+  it("serves the app manifest and the home-screen icon to somebody signed out", () => {
+    // A phone fetches both before anyone has signed in; redirected, "Add to
+    // Home Screen" saves a login page's HTML as the app.
+    expect(redirected(proxy(request("/manifest.webmanifest")))).toBe(false);
+    expect(redirected(proxy(request("/apple-icon")))).toBe(false);
+  });
+
   it("serves a public profile to somebody signed out", () => {
     // The page answers 404 itself until its owner turns it on; the gate must
     // not answer first with a login page, which would say the path is real.

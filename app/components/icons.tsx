@@ -18,7 +18,16 @@ const STROKE = {
   focusable: "false" as const,
 };
 
-export type IconName = "inbox" | "alert" | "terminal" | "doc" | "user" | "brain";
+export type IconName =
+  | "inbox"
+  | "alert"
+  | "terminal"
+  | "doc"
+  | "user"
+  | "brain"
+  | "home"
+  | "search"
+  | "chart";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   inbox: (
@@ -62,7 +71,37 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M4 21c1-4 4.2-6 8-6s7 2 8 6" />
     </>
   ),
+  // Projects: four tiles, the dashboard's lanes.
+  home: (
+    <>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+    </>
+  ),
+  chart: (
+    <>
+      <path d="M4 20h16" />
+      <path d="M7 16v-5M12 16V7M17 16v-8" />
+    </>
+  ),
 };
+
+/** The bare line icon, for a control that already has its own frame. */
+export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  return (
+    <svg {...STROKE} width={size} height={size}>
+      {PATHS[name]}
+    </svg>
+  );
+}
 
 /** An icon on an inset tile with a hairline edge; `color` tints the stroke. */
 export function IconTile({

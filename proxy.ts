@@ -42,6 +42,8 @@ const PUBLIC = [
   // and every social link preview, which is the sort of thing nobody notices
   // until somebody pastes the URL into Slack.
   "/icon.svg",
+  "/apple-icon",
+  "/manifest.webmanifest",
   "/opengraph-image.png",
   "/robots.txt",
   "/sitemap.xml",

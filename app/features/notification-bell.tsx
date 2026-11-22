@@ -61,7 +61,9 @@ export function NotificationBell({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      // The root itself is the dim behind a sheet on a phone (its ::after),
+      // so a tap that lands on it is a tap outside the menu.
+      if (e.target === rootRef.current || !rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {

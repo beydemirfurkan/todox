@@ -1,5 +1,5 @@
 export { LogoMark } from "./logo-mark";
-export { IconTile, type IconName } from "./icons";
+export { Icon, IconTile, type IconName } from "./icons";
 export { StatBadges, type Stat } from "./stat-badges";
 export { Chip, Counter } from "./chip";
 export { EntryBody } from "./entry-body";
