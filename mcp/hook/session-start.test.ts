@@ -32,6 +32,15 @@ describe("SessionStart", () => {
     expect(DIGEST_CHARS + PREAMBLE.length + 2).toBeLessThan(10_000);
   });
 
+  it("names the remote, so a second checkout at a new path still gets its briefing", async () => {
+    const rpc = vi.fn().mockResolvedValue({ digest: "d" });
+    await sessionStart(hookContext({ rpc, git: { root: () => "/repo", remote: () => "https://github.com/acme/repo.git" } }));
+    expect(rpc).toHaveBeenCalledWith("getContext", expect.objectContaining({
+      repo_url: "https://github.com/acme/repo.git",
+      create_if_missing: false,
+    }));
+  });
+
   it("falls back to the reminder, and logs why, when the briefing cannot be had", async () => {
     const ctx = context(vi.fn().mockRejectedValue(new Error("invalid or revoked token")));
     expect(contextOf(await sessionStart(ctx)).additionalContext).toBe(REMINDER);

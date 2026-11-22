@@ -109,7 +109,10 @@ carries the habit, because a connected server nobody reaches for is the failure
 this whole page is about. It also looks in the directory it was run from for
 the per-checkout files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`,
 `opencode.json`) and names a todox entry there for what it is: a memory that
-exists in one repository. Then it reaches the server with every token it saw.
+exists in one repository. Run inside a repository, it also says whether the
+git hook is installed there, and warns about one that would fail silently on
+every commit — a missing script or token. Then it reaches the server with
+every token it saw.
 Exit code 0 when at least one entry is usable, nothing is broken and every
 server answered; 1 otherwise. It changes nothing.
 
@@ -187,12 +190,14 @@ agent's call (see below).
 
 | Hook | Sends | When |
 |---|---|---|
-| SessionStart | `getContext` with your `cwd`, `shape: "digest"`, `create_if_missing: false` | startup, resume, `/clear`, after compaction |
+| SessionStart | `getContext` with your `cwd`, the repository's `origin` URL (credentials stripped), `shape: "digest"`, `create_if_missing: false` | startup, resume, `/clear`, after compaction |
 | Stop | `sessionStatus` with your `cwd` and a window of hours | only if this session touched a todox task |
-| Stop, SessionEnd | `recordObservation`: branch, two commit ids, commit and dirty-file counts, up to three commit subjects, ids of tasks set to `doing` | only if git changed since the last one sent |
+| Stop, SessionEnd | `recordObservation`: the `origin` URL, branch, two commit ids, commit and dirty-file counts, up to three commit subjects, ids of tasks set to `doing` | only if git changed since the last one sent |
 
-Nothing else leaves your machine: no diff, no file path beyond the working
-directory you were already sending, no prompt, no transcript. What the hooks
+The remote is there so a second checkout of a repository todox already knows,
+at a path it has not seen, finds its project; it only ever resolves one, never
+registers one. Nothing else leaves your machine: no diff, no file path beyond
+the working directory you were already sending, no prompt, no transcript. What the hooks
 remember between calls — which tasks this session touched, whether it edited
 files, whether it was already stopped once — stays in a file per session under
 the plugin's data directory, deleted after seven days. So do their errors, in
