@@ -71,7 +71,7 @@ describe("the parameters it takes", () => {
 
   it("asks for every task in one statement", () => {
     expect(pageByTasksPerKindSql(50, 4, false)).toContain("e.task_id IN (?,?,");
-    expect(pageByTasksPerKindSql(50, 4, false).match(/SELECT id, task_id/g)).toHaveLength(1);
+    expect(pageByTasksPerKindSql(50, 4, false).match(/SELECT s\.id, s\.task_id/g)).toHaveLength(1);
   });
 });
 
@@ -154,7 +154,7 @@ describe("the byte budget", () => {
   });
 
   it("binds the budget rather than writing it into the text", () => {
-    expect(SQL).toContain("coalesce(spent_before, 0) < ?");
+    expect(SQL).toContain("coalesce(s.spent_before, 0) < ?");
   });
 });
 
