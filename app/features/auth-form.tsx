@@ -115,7 +115,7 @@ export function AuthForm({
               <p
                 id={errId}
                 className="mt-1 text-[13px]"
-                style={{ color: "var(--k-dead_end)" }}
+                style={{ color: "var(--danger-ink)" }}
               >
                 {message(err)}
               </p>

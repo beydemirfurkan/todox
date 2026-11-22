@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Mono, Instrument_Sans, Shantell_Sans } from "next/font/google";
+import { DM_Mono, Fraunces, Geist } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
 import "./globals.css";
@@ -14,8 +14,14 @@ import { TzProbe } from "./features/tz-probe";
 import { UserMenu } from "./features/user-menu";
 import { defaultOpenGraphImage } from "./metadata-shared";
 
-const shantell = Shantell_Sans({ variable: "--font-shantell", subsets: ["latin"] });
-const instrument = Instrument_Sans({ variable: "--font-instrument", subsets: ["latin"] });
+// Fraunces is variable: the SOFT and WONK axes are what make it the rounded,
+// hand-cut display face rather than a book serif, so they are loaded too.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin", "latin-ext"],
+  axes: ["SOFT", "WONK", "opsz"],
+});
+const geist = Geist({ variable: "--font-geist", subsets: ["latin", "latin-ext"] });
 const dmMono = DM_Mono({
   variable: "--font-dm-mono",
   subsets: ["latin"],
@@ -71,7 +77,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang={lang}
-      className={`${shantell.variable} ${instrument.variable} ${dmMono.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${geist.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <TzProbe />
