@@ -93,7 +93,7 @@ const rowId = z.union([
  * project note is for. The bare "Invalid input at task_id" left the agent to
  * guess that; in the lab it guessed right, one refused call later.
  */
-const entryTaskId = z.union([z.number().int(), z.string().regex(/^\d{1,15}$/)], {
+const entryTaskId = z.union([z.number().int(), z.string().regex(/^\d{1,15}$/, "expected a numeric task id")], {
   error: (issue) =>
     issue.input === undefined
       ? "log_entry needs the task_id it belongs to. Finished work with no task: add_context (kind 'decision' or 'gotcha', with cwd) records the why instead; work that will go on: create_task first"
