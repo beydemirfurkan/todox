@@ -97,13 +97,17 @@ function Stage({ t }: { t: T }) {
   );
 }
 
+const NOTE_TONE = { dead_end: "tone-apricot", handoff: "tone-lilac", question: "tone-butter" } as const;
+
+/** A sticky note taped to the desk: a pastel square, a strip of tape across
+ *  its top, the kind in a chip and one line in the reader's language. */
 function PinnedNote({
   kind,
   text,
   t,
   className,
 }: {
-  kind: "dead_end" | "handoff" | "question";
+  kind: keyof typeof NOTE_TONE;
   text: string;
   t: T;
   className: string;
@@ -111,10 +115,11 @@ function PinnedNote({
   return (
     <div
       aria-hidden="true"
-      className={`absolute z-10 hidden w-[240px] flex-col items-start gap-2 rounded-[14px] border border-line bg-card p-3.5 shadow-[var(--shadow-pop)] md:flex ${className}`}
+      className={`tone-panel ${NOTE_TONE[kind]} absolute z-10 hidden w-[220px] flex-col items-start gap-2 !rounded-[4px] !p-4 !pt-5 md:flex ${className}`}
     >
+      <span className="tape" />
       <Chip color={KIND_COLOR[kind]}>{kindLabel(t, kind)}</Chip>
-      <p className="text-[13.5px] leading-snug text-ink">{text}</p>
+      <p className="text-[14px] leading-snug text-ink">{text}</p>
     </div>
   );
 }
