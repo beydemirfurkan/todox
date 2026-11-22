@@ -13,13 +13,21 @@
  * actually reads.
  */
 
+/**
+ * The app's light palette (task #809). A mail client has no dark-mode token
+ * to follow, and cream with charcoal reads in both: clients that invert
+ * colours invert a light message cleanly, which they never did for the old
+ * near-black one. `accent` is the orange pressed hard enough to be link text
+ * (5:1 on the paper); the button is an outline, as in the app.
+ */
 const BRAND = {
-  paper: "#191b22",
-  ink: "#f1eee5",
-  muted: "#a5a196",
-  accent: "#ffd84d",
-  onAccent: "#191b22",
-  rule: "#2e313a",
+  paper: "#f7efe9",
+  card: "#fdfbf9",
+  ink: "#171717",
+  head: "#2b1a07",
+  muted: "#574b42",
+  accent: "#b84508",
+  rule: "#e5d9cd",
 } as const;
 
 /**
@@ -59,7 +67,7 @@ function layout(title: string, blocks: Block[], footer: string) {
         case "text":
           return `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BRAND.ink}">${b.body}</p>`;
         case "button":
-          return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px"><tr><td style="border-radius:8px;background:${BRAND.accent}"><a href="${esc(b.href)}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:700;color:${BRAND.onAccent};text-decoration:none;border-radius:8px">${b.label}</a></td></tr></table>`;
+          return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px"><tr><td style="border-radius:20px;background:${BRAND.card};border:1.5px solid ${BRAND.ink}"><a href="${esc(b.href)}" style="display:inline-block;padding:11px 24px;font-size:15px;font-weight:700;color:${BRAND.ink};text-decoration:none;border-radius:20px">${b.label}</a></td></tr></table>`;
         // The same URL as plain text under the button. A button is a link a
         // client can mangle, block, or rewrite for tracking; this is the copy
         // somebody can still paste into a browser.
@@ -76,10 +84,10 @@ function layout(title: string, blocks: Block[], footer: string) {
 <body style="margin:0;padding:0;background:${BRAND.paper}">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.paper};padding:32px 16px">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${BRAND.paper};border:1px solid ${BRAND.rule};border-radius:14px;padding:28px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${BRAND.card};border:1px solid ${BRAND.rule};border-radius:12px;padding:28px">
 <tr><td>
 <p style="margin:0 0 22px;font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.accent}">todox</p>
-<h1 style="margin:0 0 18px;font-size:21px;line-height:1.3;font-weight:700;color:${BRAND.ink}">${title}</h1>
+<h1 style="margin:0 0 18px;font-size:21px;line-height:1.3;font-weight:700;color:${BRAND.head}">${title}</h1>
 ${content}
 <hr style="border:0;border-top:1px solid ${BRAND.rule};margin:22px 0 14px">
 <p style="margin:0;font-size:12.5px;line-height:1.5;color:${BRAND.muted}">${footer}</p>
