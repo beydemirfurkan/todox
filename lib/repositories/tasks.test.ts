@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { OPEN_STATUSES } from "../constants";
-import { openByProjectsSql, stalledByProjectsSql } from "./tasks";
+import { openAcrossSql, openByProjectsSql, stalledByProjectsSql } from "./tasks";
 
 /**
  * The dashboard's two task queries, asserted as text.
@@ -47,5 +47,25 @@ describe("stalledByProjectsSql", () => {
 
   it("returns the longest wait first", () => {
     expect(SQL).toMatch(/ORDER BY updated_at\s+LIMIT \?/);
+  });
+});
+
+describe("openAcrossSql", () => {
+  it("binds the projects, the status and the limit, nothing else", () => {
+    for (const status of ["doing", "todo", "blocked"] as const) {
+      const SQL = openAcrossSql(3, status);
+      expect(placeholders(SQL)).toBe(3 + 1 + 1);
+      for (const literal of literals(SQL)) expect(literal).not.toContain("?");
+    }
+  });
+
+  it("is restricted to the projects it is given", () => {
+    expect(openAcrossSql(2, "doing")).toMatch(/WHERE project_id IN \(\?,\?\)\s+AND status = \?/);
+  });
+
+  it("puts the important ones first in up next, and the newest first elsewhere", () => {
+    expect(openAcrossSql(1, "todo")).toContain("ORDER BY priority, updated_at DESC, id DESC");
+    expect(openAcrossSql(1, "doing")).toContain("ORDER BY updated_at DESC, id DESC");
+    expect(openAcrossSql(1, "blocked")).toContain("ORDER BY updated_at DESC, id DESC");
   });
 });

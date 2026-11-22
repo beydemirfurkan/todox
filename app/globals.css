@@ -514,6 +514,155 @@ body:has([data-wide-page]) .page-column {
   transform-origin: top left;
 }
 
+/* ---------------------------------------------------------- calm lists */
+
+/* A task as a list row: a ring, the title, a quiet second line. Rows are
+   separated by space and a hover wash, not by boxes. */
+.task-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 14px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 0.12s ease;
+}
+.task-row:hover {
+  background: var(--card);
+}
+.task-row[data-align="center"] {
+  align-items: center;
+}
+@media (max-width: 640px) {
+  .task-row {
+    flex-wrap: wrap;
+    padding-inline: 12px;
+  }
+}
+
+/* The ring is the status at a glance; the words beside it are in the
+   markup for anyone not looking. */
+.status-ring {
+  margin-top: 2px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #52525b;
+}
+.status-ring[data-status="doing"] {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 3.5px, transparent 4px);
+}
+.status-ring[data-status="blocked"] {
+  border-style: dashed;
+  border-color: var(--k-dead_end);
+}
+.status-ring[data-status="done"] {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+.status-ring[data-status="dropped"] {
+  border-color: #3a3a40;
+}
+
+.important-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.today-heading {
+  margin: 0;
+  padding-inline: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.today-heading[data-accent] {
+  color: var(--accent-ink);
+}
+.today-hint {
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.quick-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  min-height: 60px;
+  box-sizing: border-box;
+  padding: 10px 12px 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+.quick-add:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+}
+/* The field is the whole bar; the global field frame inside it would be a
+   box in a box. */
+.quick-add input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+.quick-add-plus {
+  color: var(--accent);
+  font-size: 22px;
+  line-height: 1;
+}
+.quick-add-select {
+  min-height: 40px;
+  max-width: 12rem;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--inset);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.first-step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--card);
+}
+.first-step-mark {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+.first-step[data-done] .first-step-mark {
+  background: var(--accent);
+  color: var(--on-fill);
+}
+
 /* The scrollers inside a board: a column of cards, and the panel beside
    them. A full-width system scrollbar in each was four grey bars across one
    screen; thin and the colour of a rule, they read as an edge. */
@@ -1835,7 +1984,8 @@ pre {
   select,
   .control-sm,
   .searchbox input,
-  .picker-trigger {
+  .picker-trigger,
+  .quick-add-select {
     font-size: 16px;
   }
 
