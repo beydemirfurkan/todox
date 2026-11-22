@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { maskToken, promptForToken, type TokenInput } from "./prompt";
+import { confirm, maskToken, promptForToken, type TokenInput } from "./prompt";
 
 /**
  * A stand-in for `process.stdin` that records what was done to it. The
@@ -218,5 +218,48 @@ describe("promptForToken", () => {
     );
     // And it must not have touched the stream: CI has no terminal to restore.
     expect(input.calls).toEqual([]);
+  });
+});
+
+describe("confirm", () => {
+  const answering = (text: string | null, isTTY = true) => {
+    let listener: ((chunk: Buffer) => void) | undefined;
+    const input = {
+      isTTY,
+      resume: () => {
+        if (text !== null) listener?.(Buffer.from(text));
+      },
+      pause: () => undefined,
+      once: (_event: "data", l: (chunk: Buffer) => void) => {
+        listener = l;
+      },
+    };
+    const written: string[] = [];
+    return { input, output: { write: (t: string) => written.push(t) }, written };
+  };
+
+  it("defaults to yes on a bare Enter", async () => {
+    const t = answering("\n");
+    expect(await confirm("Add it?", t.input, t.output)).toBe(true);
+    expect(t.written.join("")).toBe("Add it? [Y/n] ");
+  });
+
+  it("reads y and yes in any case as yes, anything else as no", async () => {
+    for (const [answer, expected] of [
+      ["Y\n", true],
+      ["yes\r\n", true],
+      ["n\n", false],
+      ["no\n", false],
+      ["later\n", false],
+    ] as const) {
+      const t = answering(answer);
+      expect(await confirm("q", t.input, t.output)).toBe(expected);
+    }
+  });
+
+  it("answers no without asking when there is no terminal", async () => {
+    const t = answering(null, false);
+    expect(await confirm("q", t.input, t.output)).toBe(false);
+    expect(t.written).toEqual([]);
   });
 });

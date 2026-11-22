@@ -19,6 +19,7 @@ import { z } from "zod";
 
 import { translator, type Lang } from "../lib/i18n";
 import { clientFamily, type ClientInfo } from "../lib/client-identity";
+import type { McpClientId } from "../lib/mcp-clients";
 import { logError } from "../lib/server/log";
 import { renderMarkdown } from "../lib/services/report-markdown";
 import type { ActivityReport } from "../lib/services/reports";
@@ -49,6 +50,12 @@ export type Workspace = {
    *  knows its own client from the environment that launched it; the hosted
    *  route reads the row. Same answer, each side asked the way it can. */
   clientInfo(): Promise<ClientInfo | null>;
+  /** Whether the client's user-level memory file already carries the todox
+   *  habit. null when this side has no disk -- the hosted route -- so the
+   *  setup notes fall back to its own rule (only while the token is new).
+   *  Asked because the same 600-700 bytes of setup advice opened every stdio
+   *  briefing, to agents that had followed it long ago (dogfood 2026-11-22). */
+  hasHabit(client: McpClientId): Promise<boolean | null>;
 };
 
 /** Calls a todox RPC method: over HTTP from the laptop, in-process on the server. */
@@ -311,11 +318,20 @@ async function appendClientNotes(ws: Workspace, result: unknown): Promise<unknow
     return result;
   }
   if (!info) return result;
-  return {
-    ...(result as Record<string, unknown>),
-    client: info.name,
-    notes: notesFor(clientFamily(info.name)),
-  };
+  const family = clientFamily(info.name);
+  const withClient = { ...(result as Record<string, unknown>), client: info.name };
+  if (family !== "unknown" && (await habitInstalled(ws, family))) return withClient;
+  return { ...withClient, notes: notesFor(family) };
+}
+
+/** `ws.hasHabit`, with a failed read counted as "not known" rather than thrown. */
+async function habitInstalled(ws: Workspace, client: McpClientId): Promise<boolean> {
+  try {
+    return (await ws.hasHabit(client)) === true;
+  } catch (e) {
+    logError("mcp.hasHabit", e);
+    return false;
+  }
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

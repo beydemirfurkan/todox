@@ -53,6 +53,7 @@ const localWs: Workspace = {
     seen: refs.map((r) => ({ id: r.id, hash: r.hash })),
   }),
   clientInfo: async () => null,
+  hasHabit: async () => null,
 };
 
 const remoteWs: Workspace = {
@@ -62,6 +63,7 @@ const remoteWs: Workspace = {
   hash: () => null,
   checkRefs: () => null,
   clientInfo: async () => null,
+  hasHabit: async () => null,
 };
 
 describe("argument filtering", () => {
@@ -934,5 +936,37 @@ describe("the search tool's description", () => {
     // if it ever does, the agent surface has stopped being defined once.
     const local = harness(localWs).tools.get("search")!.config.description;
     expect(local).toBe(searchDescription());
+  });
+});
+
+/**
+ * The same setup advice opened every stdio briefing, to agents that had
+ * followed it long ago: 600-700 bytes a session (dogfood 2026-11-22, B9).
+ */
+describe("setup notes in the briefing", () => {
+  const briefingOf = async (habit: boolean | null | "throws") => {
+    const ws: Workspace = {
+      ...localWs,
+      clientInfo: async () => ({ name: "claude-code", version: "1", capturedAt: 0 }),
+      hasHabit: async () => {
+        if (habit === "throws") throw new Error("EACCES");
+        return habit;
+      },
+    };
+    const { tools } = harness(ws, { project: { slug: "p" }, open_tasks: [] });
+    const out = await tools.get("get_context")!.handler({ cwd: "/repo/src" });
+    return JSON.stringify(out);
+  };
+
+  it("are left out once the habit is in the memory file", async () => {
+    const text = await briefingOf(true);
+    expect(text).not.toContain("four-line");
+    expect(text).toContain("claude-code");
+  });
+
+  it("are sent while it is missing, or when this side cannot tell", async () => {
+    expect(await briefingOf(false)).toContain("four-line");
+    expect(await briefingOf(null)).toContain("four-line");
+    expect(await briefingOf("throws")).toContain("four-line");
   });
 });

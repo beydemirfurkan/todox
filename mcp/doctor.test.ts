@@ -105,7 +105,7 @@ describe("a good entry", () => {
   it("is followed by the memory file's verdict, and only then", async () => {
     await writeJson(claudeCodeContract().current.file, { mcpServers: { todox: httpEntry("http") } });
     expect(about((await inspectInstalls(state.home)).findings, "claude-code")[1]).toMatchObject({
-      level: "warn",
+      level: "fail",
       detail: expect.stringMatching(/CLAUDE\.md does not exist/),
     });
 
@@ -273,12 +273,25 @@ describe("the exit code", () => {
     expect(state.reports).toEqual([]);
   });
 
-  it("is 0 when an entry is usable and the server answers", async () => {
+  it("is 0 when an entry is usable, the habit is written and the server answers", async () => {
     await writeJson(claudeCodeContract().current.file, { mcpServers: { todox: httpEntry("http") } });
+    const memory = memoryFileFor("claude-code");
+    await fs.mkdir(path.dirname(memory), { recursive: true });
+    await fs.writeFile(memory, `${memoryBlock()}\n`);
     expect(await runInstallDoctor(state.home, write)).toBe(0);
     expect(state.reports).toEqual([{ url: URL, token: TOKEN }]);
     expect(lines.at(-1)).toMatch(/server\s+: ok/);
     expect(lines.join("\n")).not.toContain(TOKEN);
+  });
+
+  /**
+   * A working connection with no habit is not a working install: the small
+   * model in the first dogfood run never called todox at all (B6).
+   */
+  it("is 1 when the entry works but the habit is missing", async () => {
+    await writeJson(claudeCodeContract().current.file, { mcpServers: { todox: httpEntry("http") } });
+    expect(await runInstallDoctor(state.home, write)).toBe(1);
+    expect(lines.join("\n")).toMatch(/CLAUDE\.md does not exist/);
   });
 
   it("is 1 when the server refuses the token", async () => {

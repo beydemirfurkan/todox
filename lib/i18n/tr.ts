@@ -210,6 +210,10 @@ export const tr: Record<Key, string> = {
   inviteEmailMismatch: "Bu davetin gönderildiği e-posta adresiyle giriş yap.",
   inviteInvalidTitle: "Bu davet artık kullanılamıyor",
   inviteInvalidBody: "Süresi dolmuş, iptal edilmiş veya daha önce kabul edilmiş olabilir.",
+  habitTitle: "Ajanının edinmesi gereken alışkanlık",
+  habitIntro:
+    "Token araçları ajanına tanıtır; onları kullanmasını sağlayan bu dört satırdır. Satırları ajanının kullanıcı düzeyindeki hafıza dosyasına yapıştır: bir reponun içindekine değil, her projede okuduğu dosyaya. pnpm install:mcp bunu senin yerine yapmayı önerir.",
+  habitWhere: "Her ajanın okuduğu dosya:",
   apiTokensIntro:
     "Agent bunlardan biriyle giriş yapar. Bir tane oluştur; hangi agent'ı kullanıyorsan ona olduğu gibi yapıştırabileceğin bir kurulum metni çıkar. Agent yalnızca senin hesabına erişir.",
   tokenName: "ne için",

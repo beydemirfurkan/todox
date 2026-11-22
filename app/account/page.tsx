@@ -31,8 +31,10 @@ import { AuthForm } from "../features/auth-form";
 import { SubmitButton } from "../features/submit";
 import { RevealCurrent } from "../features/reveal-current";
 import { TokenForm } from "../features/token-form";
+import { CopyMarkdown } from "../features/copy-markdown";
 import { acceptProjectInviteAction, setLangAction, updatePublicProfileAction } from "../actions";
 import { PROFILE_BIO_MAX } from "@/lib/constants";
+import { MCP_CLIENT_NAMES, MEMORY_SNIPPET, userMemoryPath, type McpClientId } from "@/lib/mcp-clients";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getT();
@@ -452,6 +454,31 @@ export default async function AccountPage({
               <Empty>{t("noTokens")}</Empty>
             </div>
           )}
+
+          {/* Always here, not only after a token is made: a connected agent
+              with no habit is how todox goes unused (dogfood 2026-11-22, B6).
+              Holds no credential, so it is safe to show any time. */}
+          <section aria-labelledby="habit-title" className="mt-5 border-t border-dashed border-rule pt-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <h3 id="habit-title" className="display min-w-[12rem] flex-1 font-bold">
+                {t("habitTitle")}
+              </h3>
+              <CopyMarkdown markdown={MEMORY_SNIPPET} label={t("copySnippet")} copiedLabel={t("shareCopied")} />
+            </div>
+            <p className="mt-2 text-small text-muted">{t("habitIntro")}</p>
+            <pre className="sticker-flat mono mt-3 overflow-x-auto whitespace-pre-wrap break-words p-3 text-meta">
+              {MEMORY_SNIPPET}
+            </pre>
+            <p className="mt-3 text-small text-muted">{t("habitWhere")}</p>
+            <ul className="mt-1 space-y-1">
+              {(Object.keys(MCP_CLIENT_NAMES) as McpClientId[]).map((id) => (
+                <li key={id} className="flex flex-wrap gap-x-2 text-small">
+                  <span className="font-bold">{MCP_CLIENT_NAMES[id]}</span>
+                  <code className="mono min-w-0 break-all text-faint">{userMemoryPath(id)}</code>
+                </li>
+              ))}
+            </ul>
+          </section>
         </Panel>
       )}
 
