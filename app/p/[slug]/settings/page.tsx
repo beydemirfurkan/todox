@@ -134,15 +134,19 @@ async function TeamSettings({ project, user, t }: { project: Project; user: Publ
   ]);
   return (
     <div className="flex flex-col gap-6">
-      <form action={inviteProjectAction} className="flex flex-wrap items-end gap-2.5">
-        <input type="hidden" name="project_id" value={project.id} />
-        <Field label={t("inviteEmail")} className="min-w-[14rem] flex-1">
-          <input name="email" type="email" autoComplete="email" required />
-        </Field>
-        <SubmitButton className="btn" pendingLabel={t("working")}>
-          {t("inviteSend")}
-        </SubmitButton>
-      </form>
+      {!user.email_verified_at ? (
+        <p className="text-small text-muted">{t("inviteNeedsVerifiedEmail")}</p>
+      ) : (
+        <form action={inviteProjectAction} className="flex flex-wrap items-end gap-2.5">
+          <input type="hidden" name="project_id" value={project.id} />
+          <Field label={t("inviteEmail")} className="min-w-[14rem] flex-1">
+            <input name="email" type="email" autoComplete="email" required />
+          </Field>
+          <SubmitButton className="btn" pendingLabel={t("working")}>
+            {t("inviteSend")}
+          </SubmitButton>
+        </form>
+      )}
 
       <ul className="flex flex-col">
         <li className="settings-row">

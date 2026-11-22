@@ -92,6 +92,24 @@ export const ownsContext = (userId: number, id: number) =>
   );
 
 /**
+ * Changing or removing a note: its author, or the project's owner -- not every
+ * member. A project's notes are the standing rules its owner's agents are
+ * briefed with, so a member who could rewrite them could put instructions in
+ * somebody else's agent. The same narrowing `canDeleteEntry` made for the log;
+ * reading stays with `ownsContext`. Anyone else gets the 404 a stranger gets.
+ */
+export const canModifyContext = (userId: number, id: number) =>
+  owns(
+    `SELECT 1 AS n FROM contexts c
+      LEFT JOIN projects p ON p.id = c.project_id
+     WHERE c.id = ? AND (
+       c.project_id IS NULL AND c.user_id = ?
+       OR c.project_id IS NOT NULL AND (p.user_id = ? OR c.user_id = ?)
+     )`,
+    [id, userId, userId, userId],
+  );
+
+/**
  * Members pass, not only the owner.
  *
  * An observation is about a repository rather than about a person: two people
@@ -136,6 +154,9 @@ export async function assertRef(userId: number, id: number) {
 }
 export async function assertContext(userId: number, id: number) {
   if (!(await ownsContext(userId, id))) throw new NotYours("context", id);
+}
+export async function assertCanModifyContext(userId: number, id: number) {
+  if (!(await canModifyContext(userId, id))) throw new NotYours("context", id);
 }
 export async function assertObservation(userId: number, id: number) {
   if (!(await ownsObservation(userId, id))) throw new NotYours("observation", id);

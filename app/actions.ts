@@ -25,6 +25,7 @@ import * as notificationService from "@/lib/services/notifications";
 import * as refs from "@/lib/repositories/refs";
 import {
   assertCanDeleteEntry,
+  assertCanModifyContext,
   assertContext,
   assertProject,
   assertRef,
@@ -428,7 +429,7 @@ export async function addContextAction(fd: FormData) {
 export async function updateContextAction(fd: FormData) {
   const user = await writingUser();
   const id = num(fd, "context_id");
-  await assertContext(user.id, id);
+  await assertCanModifyContext(user.id, id);
   const title = str(fd, "title");
   const body = str(fd, "body");
   const kind = str(fd, "kind");
@@ -451,7 +452,7 @@ export async function setContextPublicAction(fd: FormData) {
 export async function deleteContextAction(fd: FormData) {
   const user = await writingUser();
   const id = num(fd, "context_id");
-  await assertContext(user.id, id);
+  await assertCanModifyContext(user.id, id);
   await contexts.remove(id);
   revalidatePath("/", "layout");
 }

@@ -18,7 +18,13 @@ import { now } from "../util/time";
 const INVITE_DAYS = 7;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export type InviteResult = "sent" | "invalid" | "exists" | "limited" | "not-owner";
+export type InviteResult = "sent" | "invalid" | "exists" | "limited" | "not-owner" | "unverified";
+
+/** Long enough to recognise the project, short enough not to carry a message. */
+const SUBJECT_NAME_MAX = 40;
+
+const clip = (text: string, max: number) =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 
 export async function invite(input: {
   userId: number;
@@ -31,6 +37,9 @@ export async function invite(input: {
   if (!(await ownsProject(input.userId, input.projectId))) return "not-owner";
   const inviter = await users.byId(input.userId);
   if (!inviter || inviter.email.toLowerCase() === email) return "exists";
+  // Mail from this domain to an address somebody names: an account that has
+  // not proved its own address must not be able to send it.
+  if (!inviter.email_verified_at) return "unverified";
   if (await memberships.byProjectAndEmail(input.projectId, email)) return "exists";
 
   const [userGate, recipientGate] = await Promise.all([
@@ -68,7 +77,9 @@ export async function invite(input: {
   await send({
     to: email,
     ...templates.projectInvitation({
-      projectName: project.name,
+      // The name is chosen by the inviter and lands in a subject line from
+      // this domain; clipped so it reads as a name, not as a message.
+      projectName: clip(project.name, SUBJECT_NAME_MAX),
       link,
       days: INVITE_DAYS,
       lang: input.lang,

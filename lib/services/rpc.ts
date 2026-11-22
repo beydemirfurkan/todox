@@ -14,6 +14,7 @@ import { fileContext } from "./file-context";
 import { BadRequest } from "./errors";
 import { addContext } from "./context-service";
 import {
+  assertCanModifyContext,
   assertContext,
   assertObservation,
   assertProject,
@@ -169,8 +170,13 @@ export const methods = {
     // the twin got the next free slug and the history split from then on.
     const existing = await existingFor(userId, { rootPath, repoUrl });
     if (existing) {
+      // The project may be somebody else's that this caller is a member of, so
+      // only what any member may see: the row also carries the owner's share
+      // token and profile settings, which the settings page keeps from members.
+      const { share_token: _shareToken, share_log: _shareLog, on_profile: _onProfile, ...visible } =
+        existing;
       return {
-        ...existing,
+        ...visible,
         created: false,
         warning:
           `"${existing.slug}" is already this repository, so nothing was created. ` +
@@ -543,7 +549,7 @@ export const methods = {
     const { context_id: id, ...patch } = p;
     // `contexts.update` takes no user id -- this is the only thing standing
     // between a context id off the wire and somebody else's note.
-    await assertContext(userId, id);
+    await assertCanModifyContext(userId, id);
     if (isDeveloperKind(patch.kind) && (await contextsRepo.byId(id))?.project_id != null)
       throw developerKindInProject(patch.kind);
     await contextsRepo.update(id, patch);
@@ -551,7 +557,7 @@ export const methods = {
   },
 
   deleteContext: async ({ userId }, p: { context_id: number }) => {
-    await assertContext(userId, p.context_id);
+    await assertCanModifyContext(userId, p.context_id);
     const removed = await contextsRepo.remove(p.context_id);
     return { deleted: removed > 0 };
   },
