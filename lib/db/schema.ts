@@ -284,8 +284,6 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
 -- Which of the owner's projects the profile names. Name, summary and counts
 -- only: a task, a log line or a path never leaves through it.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS on_profile BOOLEAN NOT NULL DEFAULT false;
--- The profile's year of activity is one person's entries by day.
-CREATE INDEX IF NOT EXISTS idx_entries_user_created ON entries (user_id, created_at);
 
 -- Files in play, hashed at link time so we can tell the agent when a note it
 -- is about to trust describes code that has since moved on.
@@ -365,6 +363,9 @@ ALTER TABLE refs ADD COLUMN IF NOT EXISTS checked_at TEXT;
 -- take the project's log with them. The signature goes, the entry stays, and
 -- the row falls back to the author column it already had.
 ALTER TABLE entries     ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+-- The profile's year of activity is one person's entries by day. After the
+-- column, which a fresh database only has from the line above.
+CREATE INDEX IF NOT EXISTS idx_entries_user_created ON entries (user_id, created_at);
 ALTER TABLE task_events ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
 -- Last MCP client to use this token. The stdio path reads the parent's
