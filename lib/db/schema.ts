@@ -443,7 +443,8 @@ CREATE TABLE IF NOT EXISTS observations (
   -- it would carry is what this row already carries.
   session_id      TEXT NOT NULL,
   -- Which carrier saw this: 'stdio' (the local process, every tool call),
-  -- 'claude-code-hook' (the plugin's hooks, a session's edges -- the carrier
+  -- 'plugin-hook' (the plugin's hooks in any agent, 'claude-code-hook' before
+  -- 0.1.7, a session's edges -- the carrier
   -- for everyone connected to the hosted endpoint, where no local process
   -- runs) or 'git-hook' (a git hook, commits only, any client). recordObservation's source parameter and the briefing's field
   -- arrived together, as this comment used to ask.

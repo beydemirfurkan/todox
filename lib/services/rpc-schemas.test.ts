@@ -703,9 +703,9 @@ describe("getContext's digest shape", () => {
 describe("recordObservation's carrier", () => {
   const base = { cwd: "/tmp", session_id: "s", commits: 0, files_changed: 0 };
 
-  it("accepts the three carriers that exist, and none", () => {
+  it("accepts the three carriers that exist, the plugin's older name, and none", () => {
     expect(() => parseParams("recordObservation", base)).not.toThrow();
-    for (const source of ["stdio", "claude-code-hook", "git-hook"])
+    for (const source of ["stdio", "plugin-hook", "claude-code-hook", "git-hook"])
       expect(() => parseParams("recordObservation", { ...base, source })).not.toThrow();
   });
 

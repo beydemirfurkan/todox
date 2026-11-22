@@ -419,7 +419,7 @@ async function observe({ ctx, rpc, sessionId, cwd }) {
   const send = (f) => rpc("recordObservation", {
     ...observationPayload(f),
     ...remote ? { repo_url: remote } : {},
-    source: "claude-code-hook"
+    source: "plugin-hook"
   });
   const reply = await send(facts);
   let sentBase = base;
