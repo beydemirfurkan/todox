@@ -27,6 +27,7 @@ import { kindOptions } from "./kinds";
 import {
   Blob,
   Composer,
+  Counter,
   Empty,
   Field,
   Group,
@@ -197,6 +198,10 @@ export default async function Home() {
     new Set(emptyProjects.map((p) => p.id)),
   );
   const countsOf = (id: number) => counts.map.get(id) ?? counts.empty;
+  const totals = allProjects.reduce(
+    (sum, p) => ({ doing: sum.doing + countsOf(p.id).doing, blocked: sum.blocked + countsOf(p.id).blocked }),
+    { doing: 0, blocked: 0 },
+  );
   const teamOf = (id: number) => teamSizes.get(id) ?? 0;
 
   const newGlobalNote = (
@@ -250,9 +255,18 @@ export default async function Home() {
         // The page is a list of projects, so that is its heading. Promoted from
         // h2 rather than left behind a headline that is no longer the subject:
         // a document has one h1, and this is now it.
-        <h1 className="display pop text-[28px] leading-[1.1] font-bold sm:text-[36px]">
-          {t("projects")}
-        </h1>
+        <>
+          <h1 className="display pop text-[32px] leading-[1.1] sm:text-[44px]">{t("projects")}</h1>
+          <StatTiles
+            tiles={[
+              { tone: "tone-sky", n: live.length, label: t("statLive"), href: "#live" },
+              { tone: "tone-apricot", n: totals.doing, label: t("statDoing"), href: "#live" },
+              { tone: "tone-lilac", n: totals.blocked, label: t("statBlocked"), href: "#live" },
+              { tone: "tone-butter", n: waiting.items.length + waiting.omitted, label: t("statWaiting"), href: waiting.items.length > 0 ? "#waiting" : undefined },
+            ]}
+            label={t("statSummary")}
+          />
+        </>
       )}
 
       {/* First, and absent when nothing waits: the one list on this page that
@@ -274,14 +288,13 @@ export default async function Home() {
       )}
 
       {!beforeFirstProject && (
-        <Group
-          id="live"
-          title={t("inFlight")}
-          count={live.length}
-          countLabel={t("projectsCount")}
-          open
-          delay={60}
-        >
+        // Cards on the canvas, not cards inside a group card: a card in a
+        // card is two edges and two shadows for one thing.
+        <section id="live" aria-labelledby="live-title" className="scroll-mt-4 space-y-4 pt-2">
+          <h2 id="live-title" className="display flex items-center gap-2.5 text-[24px]">
+            {t("inFlight")}
+            <Counter n={live.length} label={t("projectsCount")} />
+          </h2>
           {live.length === 0 ? (
             <Empty mood="happy">{t("liveProjectsEmpty")}</Empty>
           ) : (
@@ -297,7 +310,7 @@ export default async function Home() {
               t={t}
             />
           )}
-        </Group>
+        </section>
       )}
 
       {/* Above the quiet projects, not below every project: these are the
@@ -423,5 +436,42 @@ export default async function Home() {
       </section>
       )}
     </div>
+  );
+}
+
+/**
+ * The account in four numbers, each on its own pastel tile: how much is
+ * moving and how much needs a person. A number with its words beside it,
+ * never a colour alone; a tile with somewhere to go is a link to it.
+ */
+function StatTiles({
+  tiles,
+  label,
+}: {
+  tiles: { tone: string; n: number; label: string; href?: string }[];
+  label: string;
+}) {
+  return (
+    <ul aria-label={label} className="pop grid grid-cols-2 gap-3 lg:grid-cols-4" style={{ animationDelay: "30ms" }}>
+      {tiles.map((tile) => {
+        const body = (
+          <>
+            <span className="display block text-[40px] leading-none">{tile.n}</span>
+            <span className="mt-2 block text-small text-muted">{tile.label}</span>
+          </>
+        );
+        return (
+          <li key={tile.label} className={`tone-panel ${tile.tone} min-w-0 !p-0`}>
+            {tile.href ? (
+              <a href={tile.href} className="lift block rounded-[inherit] p-5">
+                {body}
+              </a>
+            ) : (
+              <div className="p-5">{body}</div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
