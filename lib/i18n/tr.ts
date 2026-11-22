@@ -196,6 +196,8 @@ export const tr: Record<Key, string> = {
   signIn: "Giriş yap",
   signUp: "Hesap oluştur",
   signOut: "Çıkış yap",
+  signingOut: "Çıkış yapılıyor…",
+  accountMenuOpen: "Hesap menüsü",
 
   loginTitle: "Tekrar hoş geldin",
   loginIntro: "Projelerine ve arkalarındaki kayda ulaşmak için giriş yap.",
@@ -666,6 +668,7 @@ export const tr: Record<Key, string> = {
   imp_normal: "normal",
   imp_low: "düşük",
   modelLabel: "model",
+  reportPreview: "Önizleme",
   partialNote:
     "~ ile işaretli süreler ölçüm değil, alt sınır: görev hiç `doing` yapılmadan kapatılmış ya da geçiş kaydından önceye ait. Sayıyı gerçek yapan şey, işe başlarken görevi `doing` yapmak.",
   totalsUnmeasured: "{n} tanesi ölçülemedi",

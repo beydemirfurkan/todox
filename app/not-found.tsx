@@ -17,6 +17,7 @@ export default async function NotFound() {
   return (
     <AuthShell
       fill="var(--k-question)"
+      mood="puzzled"
       title={t("notFoundTitle")}
       intro={t("notFoundBody")}
     >

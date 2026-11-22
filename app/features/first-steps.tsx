@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { T } from "@/lib/i18n";
 
 import { createProjectAction } from "../actions";
-import { ProjectFields } from "../components";
+import { Mascot, ProjectFields } from "../components";
 
 /**
  * Today before the first project: three steps instead of an empty page.
@@ -22,11 +22,14 @@ export function FirstSteps({
 }) {
   return (
     <section aria-labelledby="first-steps" className="flex flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <h1 id="first-steps" className="display text-[34px] leading-tight">
-          {name ? t("firstStepsTitle", { name }) : t("firstStepsTitleNoName")}
-        </h1>
-        <p className="text-body text-muted">{t("firstStepsBody")}</p>
+      <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <Mascot size={84} className="shrink-0" />
+        <div className="flex min-w-[min(18rem,100%)] flex-1 flex-col gap-2">
+          <h1 id="first-steps" className="display text-[34px] leading-tight">
+            {name ? t("firstStepsTitle", { name }) : t("firstStepsTitleNoName")}
+          </h1>
+          <p className="text-body text-muted">{t("firstStepsBody")}</p>
+        </div>
       </header>
 
       <ol className="flex flex-col gap-3">

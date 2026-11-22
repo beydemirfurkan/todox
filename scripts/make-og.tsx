@@ -7,7 +7,7 @@
  * upload to GitHub's social preview setting.
  */
 import { ImageResponse } from "next/og";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
@@ -47,16 +47,20 @@ async function googleTtf(family: string): Promise<ArrayBuffer | null> {
   }
 }
 
-/** The mark: the same tile, prompt and cursor as app/icon.svg. */
+/** The mark: Tod's face on the tile, the same as app/icon.svg. */
 function Mark({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32">
       <rect width="32" height="32" rx="8" fill={ACCENT} />
-      <path d="M9 11l5 5-5 5" fill="none" stroke={ON_FILL} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M17 21h6" stroke={ON_FILL} strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M8.6 10.6l3.9 3.4-3.9 3.4" fill="none" stroke={ON_FILL} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="21.6" cy="14" r="2.3" fill={ON_FILL} />
+      <path d="M12.9 21.4q3.1 2.3 6.2 0" fill="none" stroke={ON_FILL} strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   );
 }
+
+/** Tod, as docs/mascot.svg draws it; read from there so the two never drift. */
+const MASCOT_SRC = `data:image/svg+xml;base64,${readFileSync(join(ROOT, "docs", "mascot.svg")).toString("base64")}`;
 
 /** One of the kinds the log keeps: a dot in its colour and the word. */
 function Kind({ label, color }: { label: string; color: string }) {
@@ -109,8 +113,11 @@ async function main() {
           backgroundSize: "48px 48px",
           fontFamily: "Geist",
           color: INK,
+          position: "relative",
         }}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element -- satori, not a page */}
+        <img src={MASCOT_SRC} width={330} height={330} style={{ position: "absolute", right: 60, top: 118 }} alt="" />
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <Mark size={56} />
           <div style={{ display: "flex", fontSize: 44, fontWeight: 600, letterSpacing: -1.5 }}>todox</div>

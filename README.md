@@ -1,4 +1,4 @@
-<img src="docs/logo.svg" width="60" alt="">
+<img src="docs/mascot.svg" width="96" alt="Tod, the todox mascot: an orange tile with a winking > for an eye and a cursor for a smile">
 
 # todox
 
@@ -22,7 +22,7 @@ every record comes back named and dated with its first line, and a `body` of
 null means the budget was spent, not that the record is empty.
 
 <p align="center">
-  <img src="public/screenshots/task-log.jpg" width="720" alt="A task in todox: its status, and a log of a decision, a dead end and a handoff, newest last">
+  <img src="public/screenshots/task-log.jpg" width="720" alt="A task in todox: its status as a row of choices, where the last session left off, then the log of a decision, a dead end and a handoff, with the task's details beside it">
 </p>
 
 ## How it works
@@ -32,9 +32,9 @@ null means the budget was spent, not that the record is empty.
 Your agent does the writing; you read over its shoulder. One log per
 repository, whichever machine or agent touched it last:
 
-| Projects | One project |
+| Today | One project |
 | --- | --- |
-| <img src="public/screenshots/dashboard.jpg" width="420" alt="The projects page: the totals, what is waiting on you, and each project in flight with its progress and where the last session left off"> | <img src="public/screenshots/project.jpg" width="420" alt="A project board: queued, doing and blocked columns, a strip to drop finished work on, and the open task's log beside them"> |
+| <img src="public/screenshots/dashboard.jpg" width="420" alt="Today: a quick-add field, then everything in progress across every project with the last note under each, then what is up next, important first"> | <img src="public/screenshots/project.jpg" width="420" alt="A project: its tasks as a list grouped into in progress and up next, a switch to a board, and the project menu behind the three dots"> |
 
 ## What goes in a log
 
@@ -104,8 +104,21 @@ work in a repository, and for not repeating what already failed there.
 
 ## Try it
 
-**[todox.dev](https://www.todox.dev)** — anyone can register. Small personal
-deployment, no uptime promise. Self-host if the log matters to you.
+**[todox.dev](https://www.todox.dev)** — anyone can register, with an email
+and password or with Google or GitHub. Small personal deployment, no uptime
+promise. Self-host if the log matters to you.
+
+### Meet Tod
+
+<img src="docs/mascot.svg" width="72" align="left" alt="">
+
+Tod is the prompt tile grown a body: the `>` of the old mark is the winking
+eye and the cursor is the smile, so the favicon in your tab and the creature
+on an empty page are the same thing. The yellow ribbon is a bookmark — the
+place the last session stopped. Source: [`docs/mascot.svg`](docs/mascot.svg)
+and [`app/components/mascot.tsx`](app/components/mascot.tsx); `pnpm og` and
+`pnpm favicon` rebuild the share image and `favicon.ico` from it.
+<br clear="left">
 
 ## Run your own
 

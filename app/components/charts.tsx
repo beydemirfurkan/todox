@@ -94,7 +94,9 @@ export function DayBars({
 
       <div className="relative h-4" aria-hidden="true">
         {days.map((day, i) =>
-          i % every === 0 || i === days.length - 1 ? (
+          // The last day always gets its label, so a regular tick right
+          // before it would print "2122".
+          (i % every === 0 && days.length - 1 - i >= Math.ceil(every / 2)) || i === days.length - 1 ? (
             <span
               key={day}
               className="mono absolute top-0 -translate-x-1/2 text-meta text-faint"
@@ -149,12 +151,12 @@ export interface Share {
 export function ShareBars({ rows, color }: { rows: Share[]; color: string }) {
   const max = Math.max(...rows.map((r) => r.value), 0);
   return (
-    <ul className="space-y-2.5">
+    <ul className="space-y-3.5">
       {rows.map((r) => (
-        <li key={r.key} className="flex flex-col gap-1">
+        <li key={r.key} className="flex flex-col gap-1.5">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
             <span className="max-w-full min-w-[8rem] flex-1 truncate text-[14px] text-ink">{r.label}</span>
-            <span className="mono text-meta text-muted">{r.text}</span>
+            <span className="text-small text-faint">{r.text}</span>
           </div>
           <span className="block h-1.5 overflow-hidden rounded-full bg-inset" aria-hidden="true">
             <span

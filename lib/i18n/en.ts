@@ -200,6 +200,8 @@ export const en = {
   signIn: "Sign in",
   signUp: "Create account",
   signOut: "Sign out",
+  signingOut: "Signing out…",
+  accountMenuOpen: "Account menu",
 
   /* auth */
   loginTitle: "Welcome back",
@@ -678,6 +680,7 @@ export const en = {
   imp_normal: "normal",
   imp_low: "low",
   modelLabel: "model",
+  reportPreview: "Preview",
   partialNote:
     "Timings marked ~ are a lower bound, not a measurement: the task was closed without ever being set to `doing`, or it predates transition tracking. Setting a task to `doing` when work starts is what makes the number real.",
   totalsUnmeasured: "{n} not measured",
