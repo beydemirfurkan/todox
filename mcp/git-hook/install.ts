@@ -163,22 +163,40 @@ export function uninstall(cwd: string, env: Env): Report {
   return { ok: true, lines };
 }
 
-export function status(cwd: string, env: Env): Report {
+/** What is installed for one repository: read only, never the token itself. */
+export interface HookState {
+  root: string;
+  installed: (typeof HOOKS)[number][];
+  script: string | undefined;
+  token: "env" | "saved" | "none";
+}
+
+export function hookState(cwd: string, env: Env): HookState | { refused: string } {
   const target = locate(cwd);
-  if ("refused" in target) return { ok: false, lines: [target.refused] };
-  const home = todoxHome(env);
-  const installed = HOOKS.map((event) => {
-    const path = join(target.hooksDir, event);
-    return `${event}: ${existsSync(path) && readFileSync(path, "utf8").includes(BEGIN) ? "installed" : "not installed"}`;
-  });
-  const saved = existsSync(configPath(env));
+  if ("refused" in target) return target;
+  const script = join(todoxHome(env), "git-hook.mjs");
+  return {
+    root: target.root,
+    installed: HOOKS.filter((event) => {
+      const path = join(target.hooksDir, event);
+      return existsSync(path) && readFileSync(path, "utf8").includes(BEGIN);
+    }),
+    script: existsSync(script) ? script : undefined,
+    token: env.TODOX_TOKEN ? "env" : existsSync(configPath(env)) ? "saved" : "none",
+  };
+}
+
+export function status(cwd: string, env: Env): Report {
+  const state = hookState(cwd, env);
+  if ("refused" in state) return { ok: false, lines: [state.refused] };
+  const token = { env: "from TODOX_TOKEN", saved: `saved in ${configPath(env)}`, none: "none" }[state.token];
   return {
     ok: true,
     lines: [
-      ...installed,
-      `hook script: ${existsSync(join(home, "git-hook.mjs")) ? join(home, "git-hook.mjs") : "missing -- run install"}`,
-      `token: ${env.TODOX_TOKEN ? "from TODOX_TOKEN" : saved ? `saved in ${configPath(env)}` : "none"}`,
-      `log: ${join(home, "git-hook", "hook.log")}`,
+      ...HOOKS.map((event) => `${event}: ${state.installed.includes(event) ? "installed" : "not installed"}`),
+      `hook script: ${state.script ?? "missing -- run install"}`,
+      `token: ${token}`,
+      `log: ${join(todoxHome(env), "git-hook", "hook.log")}`,
     ],
   };
 }

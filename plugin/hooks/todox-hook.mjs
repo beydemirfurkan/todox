@@ -71,6 +71,18 @@ function urlFromMcpJson(pluginRoot, warn) {
 var isWindowsPath = (p) => /^[a-zA-Z]:[\\/]/.test(p);
 var isAbsolutePath = (p) => p.startsWith("/") || isWindowsPath(p);
 var normalisePath = (p) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+function scrubRemote(raw) {
+  const s = raw.trim();
+  try {
+    const url = new URL(s);
+    if (!url.username && !url.password) return s;
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return s;
+  }
+}
 function isInside(child, root) {
   const fold = isWindowsPath(root);
   const norm = (p) => {
@@ -125,6 +137,10 @@ function git(dir, args) {
     return void 0;
   }
 }
+function gitRemote(dir) {
+  const url = git(dir, ["remote", "get-url", "origin"])?.split("\n")[0] ?? "";
+  return url ? scrubRemote(url) : void 0;
+}
 var gitBranch = (dir) => git(dir, ["branch", "--show-current"]) || void 0;
 var gitHead = (dir) => git(dir, ["rev-parse", "HEAD"]) || void 0;
 function gitDirtyCount(dir) {
@@ -154,7 +170,8 @@ var workspaceGit = {
   head: gitHead,
   branch: gitBranch,
   dirty: gitDirtyCount,
-  since: gitCommitsSince
+  since: gitCommitsSince,
+  remote: gitRemote
 };
 
 // mcp/hook/log.ts
@@ -322,7 +339,12 @@ async function observe({ ctx, rpc, sessionId, cwd }) {
     taskIds,
     startedAt: start?.at ?? ctx.now().toISOString()
   };
-  const send = (f) => rpc("recordObservation", { ...observationPayload(f), source: "claude-code-hook" });
+  const remote = git2.remote(dir);
+  const send = (f) => rpc("recordObservation", {
+    ...observationPayload(f),
+    ...remote ? { repo_url: remote } : {},
+    source: "claude-code-hook"
+  });
   const reply = await send(facts);
   let sentBase = base;
   const previous = reply.last_head_sha;
@@ -363,6 +385,7 @@ async function sessionStart(ctx) {
   try {
     const result = await ctx.rpc("getContext", {
       cwd: ctx.input.cwd,
+      ...remoteOf(ctx, ctx.input.cwd),
       shape: "digest",
       max_chars: DIGEST_CHARS,
       create_if_missing: false
@@ -390,6 +413,11 @@ function baseline(ctx) {
   const dir = ctx.input.cwd ? ctx.git.root(ctx.input.cwd) : void 0;
   const head = dir ? ctx.git.head(dir) : void 0;
   return head ? { head } : {};
+}
+function remoteOf(ctx, cwd) {
+  const dir = ctx.git.root(cwd);
+  const remote = dir ? ctx.git.remote(dir) : void 0;
+  return remote ? { repo_url: remote } : {};
 }
 function inject(text) {
   return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } };

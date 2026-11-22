@@ -42,6 +42,8 @@ import { hasMemoryBlock } from "../scripts/install-mcp/memory";
 import { maskToken } from "../scripts/install-mcp/prompt";
 import { runDoctor } from "../scripts/install-mcp/reachability";
 import { isCurrentSkill } from "../scripts/install-mcp/skill";
+import { HOOKS, hookState } from "./git-hook/install";
+import { findProjectRoot, gitDir } from "./workspace";
 
 /**
  * One line of the report. `fail` is something the client will not read or
@@ -49,7 +51,7 @@ import { isCurrentSkill } from "../scripts/install-mcp/skill";
  * working, or works less than it could; `info` is a fact.
  */
 export type Finding = {
-  readonly subject: McpClientId | "checkout" | "server";
+  readonly subject: McpClientId | "checkout" | "git-hook" | "server";
   readonly level: "ok" | "warn" | "fail" | "info";
   readonly detail: string;
 };
@@ -300,8 +302,34 @@ async function inspectCheckout(cwd: string): Promise<Finding[]> {
   return findings;
 }
 
+/**
+ * The git hook in the repository the doctor was run from. Optional, so its
+ * absence is a fact rather than a warning; a half-installed one -- a hook
+ * whose script or token is gone -- is a warning, because it fails silently
+ * on every commit by design.
+ */
+export function inspectGitHook(cwd: string, env: Record<string, string | undefined>): Finding[] {
+  if (!gitDir(findProjectRoot(cwd))) return [];
+  const state = hookState(cwd, env);
+  if ("refused" in state)
+    return [finding("git-hook", "info", "this repository keeps its hooks under core.hooksPath; `todox-mcp hook status` says what to add")];
+  if (state.installed.length === 0)
+    return [finding("git-hook", "info", "not installed here (optional: `todox-mcp hook install` records commits from any client)")];
+  const missing = [
+    ...HOOKS.filter((event) => !state.installed.includes(event)).map((event) => `the ${event} hook`),
+    ...(state.script ? [] : ["its script (re-run `todox-mcp hook install`)"]),
+    ...(state.token === "none" ? ["a token (`todox-mcp hook install --token …`)"] : []),
+  ];
+  if (missing.length > 0) return [finding("git-hook", "warn", `installed in ${state.root} but missing ${missing.join(", ")}`)];
+  const token = state.token === "env" ? "token from TODOX_TOKEN" : "token saved";
+  return [finding("git-hook", "ok", `installed in ${state.root} (${HOOKS.join(", ")}; ${token})`)];
+}
+
 /** Everything the doctor can learn without a network. */
-export async function inspectInstalls(cwd: string): Promise<Inspection> {
+export async function inspectInstalls(
+  cwd: string,
+  env: Record<string, string | undefined> = process.env,
+): Promise<Inspection> {
   const findings: Finding[] = [];
   const reachable: Reachable[] = [];
   const seen = new Set<string>();
@@ -321,6 +349,7 @@ export async function inspectInstalls(cwd: string): Promise<Inspection> {
     else take(await inspectCodex());
   }
   findings.push(...(await inspectCheckout(cwd)));
+  findings.push(...inspectGitHook(cwd, env));
   return { findings, reachable };
 }
 
@@ -331,6 +360,7 @@ const LABEL: Record<Finding["subject"], string> = {
   vscode: "vscode     ",
   opencode: "opencode   ",
   checkout: "checkout   ",
+  "git-hook": "git-hook   ",
   server: "server     ",
 };
 
