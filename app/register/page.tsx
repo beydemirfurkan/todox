@@ -65,6 +65,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
     >
       <OAuthButtons providers={enabledProviders()} next={safeNext || undefined} t={t} />
       <AuthForm
+          submitClassName="btn w-full"
         action={registerAction}
         submitLabel={t("signUp")}
         pendingLabel={t("signingUp")}

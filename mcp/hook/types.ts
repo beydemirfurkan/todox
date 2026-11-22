@@ -1,4 +1,5 @@
 import type { ObserverGit } from "../observer";
+import type { Checked, RefLike } from "../workspace";
 import type { RpcClient } from "../rpc-client";
 import type { HookConfig } from "./config";
 import type { Logger } from "./log";
@@ -38,6 +39,8 @@ export interface HookContext {
   now: () => Date;
   /** Git on this machine; a fake in tests. */
   git: HookGit;
+  /** Hashes linked files on this machine (`checkRefs`); a fake in tests. */
+  checkFiles: (refs: RefLike[]) => { checked: Checked[]; seen: { id: number; hash: string | null }[] };
 }
 
 /**

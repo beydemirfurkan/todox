@@ -65,6 +65,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       )}
       <OAuthButtons providers={enabledProviders()} next={safeNext || undefined} t={t} />
       <AuthForm
+          submitClassName="btn w-full"
         action={loginAction}
         submitLabel={t("signIn")}
         pendingLabel={t("signingIn")}

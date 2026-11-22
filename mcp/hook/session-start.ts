@@ -1,3 +1,4 @@
+import { checkLinkedFiles, STALE_HEADING } from "./linked-files";
 import { appendEvent, pruneSessions } from "./state";
 import type { HookContext, HookOutput } from "./types";
 
@@ -22,6 +23,9 @@ export const PREAMBLE =
  */
 export const DIGEST_CHARS = 9_200;
 
+/** What Claude Code injects whole, less a margin; the stale warning fits under it or is cut. */
+export const INJECT_CEILING = 9_900;
+
 /**
  * Fires on startup, resume, /clear and after compaction. The last is the one
  * that earns its keep: compaction is where a long session forgets the
@@ -34,16 +38,23 @@ export async function sessionStart(ctx: HookContext): Promise<HookOutput> {
     return inject(reminderFor(ctx));
   }
   if (!ctx.input.cwd) return inject(REMINDER);
+  const where = { cwd: ctx.input.cwd, ...remoteOf(ctx, ctx.input.cwd) };
+  // In parallel with the briefing, not before it: the check is worth a second
+  // round trip, never the briefing itself.
+  const stale = checkLinkedFiles(ctx, where).catch((e: Error) => {
+    ctx.log("session-start", `linked files not checked: ${e.message}`);
+    return [] as string[];
+  });
   try {
     const result = (await ctx.rpc("getContext", {
-      cwd: ctx.input.cwd,
-      ...remoteOf(ctx, ctx.input.cwd),
+      ...where,
       shape: "digest",
       max_chars: DIGEST_CHARS,
       create_if_missing: false,
     })) as { digest?: unknown };
     if (typeof result.digest !== "string") throw new Error("getContext answered without a digest");
-    return inject(`${PREAMBLE}\n\n${result.digest}`);
+    const head = `${PREAMBLE}\n\n${result.digest}`;
+    return inject(head + staleWarning(await stale, INJECT_CEILING - head.length));
   } catch (e) {
     ctx.log("session-start", `briefing not fetched, reminder only: ${(e as Error).message}`);
     return inject(reminderFor(ctx));
@@ -102,6 +113,21 @@ function remoteOf(ctx: HookContext, cwd: string): { repo_url?: string } {
   const dir = ctx.git.root(cwd);
   const remote = dir ? ctx.git.remote(dir) : undefined;
   return remote ? { repo_url: remote } : {};
+}
+
+/**
+ * The changed files under their heading, as many lines as fit in `room`. A
+ * digest near its ceiling leaves little: the heading and the first file are
+ * worth more than a briefing Claude Code spills to a file nobody opens.
+ */
+export function staleWarning(lines: string[], room: number): string {
+  let text = "";
+  for (const line of lines) {
+    const next = `${text || `\n\n${STALE_HEADING}`}\n${line}`;
+    if (next.length > room) break;
+    text = next;
+  }
+  return text;
 }
 
 function inject(text: string): HookOutput {

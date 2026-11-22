@@ -48,6 +48,7 @@ export default async function ForgotPage({ searchParams }: PageProps<"/forgot">)
         </>
       ) : (
         <AuthForm
+          submitClassName="btn w-full"
           action={requestResetAction}
           submitLabel={t("forgotSend")}
           pendingLabel={t("sendingLink")}
