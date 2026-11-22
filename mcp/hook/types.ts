@@ -3,6 +3,12 @@ import type { RpcClient } from "../rpc-client";
 import type { HookConfig } from "./config";
 import type { Logger } from "./log";
 
+/**
+ * Which agent ran the hook. Claude Code and Codex send the same shapes; Cursor
+ * is translated at the door (`clients.ts`) so no handler has to know.
+ */
+export type HookClient = "claude-code" | "codex" | "cursor";
+
 /** What Claude Code sends a hook on stdin; only the fields read here. */
 export interface HookInput {
   session_id?: string;
@@ -26,6 +32,7 @@ export interface HookInput {
 export type HookGit = ObserverGit & { remote(dir: string): string | undefined };
 
 export interface HookContext {
+  client: HookClient;
   config: HookConfig;
   log: Logger;
   input: HookInput;

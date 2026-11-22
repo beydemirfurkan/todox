@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { isInside } from "../../lib/util/paths";
 import { appendEvent } from "./state";
 import type { HookContext, HookInput, HookOutput } from "./types";
@@ -13,6 +15,12 @@ import type { HookContext, HookInput, HookOutput } from "./types";
  * session that only planned owes the repository nothing.
  */
 const EDIT_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+/**
+ * Codex edits through one tool, `apply_patch`, whose `tool_input.command` is
+ * the patch; the paths are its `*** Add/Update/Delete File:` headers.
+ */
+const PATCH_TOOL = "apply_patch";
+const PATCH_FILE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
 const TODOX_TASK_TOOL = /^mcp__.*todox.*__(create_task|update_task|log_entry)$/;
 
 export async function postToolUse(ctx: HookContext): Promise<HookOutput> {
@@ -20,7 +28,7 @@ export async function postToolUse(ctx: HookContext): Promise<HookOutput> {
   if (!sessionId || !tool) return null;
   const at = ctx.now().toISOString();
 
-  if (EDIT_TOOLS.has(tool)) {
+  if (EDIT_TOOLS.has(tool) || tool === PATCH_TOOL) {
     if (editsWorkingTree(ctx.input)) appendEvent(ctx.config.dataDir, sessionId, { t: "edit", at });
     return null;
   }
@@ -38,9 +46,17 @@ export async function postToolUse(ctx: HookContext): Promise<HookOutput> {
 }
 
 function editsWorkingTree(input: HookInput): boolean {
-  const path = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
-  if (typeof path !== "string" || !input.cwd) return false;
-  return isInside(path, input.cwd);
+  const cwd = input.cwd;
+  if (!cwd) return false;
+  return editedPaths(input).some((path) => isInside(resolve(cwd, path), cwd));
+}
+
+export function editedPaths(input: HookInput): string[] {
+  const given = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+  if (typeof given === "string") return [given];
+  const patch = input.tool_input?.command;
+  if (input.tool_name !== PATCH_TOOL || typeof patch !== "string") return [];
+  return [...patch.matchAll(PATCH_FILE)].map((m) => m[1]!.trim());
 }
 
 /**

@@ -13,6 +13,24 @@ claude plugin install todox@todox
 It asks for your agent token once (Account page on todox.dev, or your own
 instance) and keeps it in your Claude Code settings, not in the plugin.
 
+**Codex and Cursor** read the same directory through their own manifests,
+`.codex-plugin/plugin.json` and `.cursor-plugin/plugin.json`. The skill and
+`hooks/todox-hook.mjs` are shared; what differs is the hooks file each agent
+reads and its MCP entry:
+
+| | Codex | Cursor |
+| --- | --- | --- |
+| Install | `codex plugin marketplace add beydemirfurkan/todox` | add the repo as a plugin marketplace, install **todox** |
+| Token | `TODOX_TOKEN` in your environment (Codex plugins cannot prompt) | asked for at install (`variables.token`) |
+| MCP | the stdio server from the release tarball (`codex-mcp.json`), so files are hashed and git is observed locally | the hosted endpoint (`cursor-mcp.json`) |
+| Hooks | `hooks/codex-hooks.json`: SessionStart, PostToolUse (`apply_patch` and the todox task tools), UserPromptSubmit, Stop | `hooks/cursor-hooks.json`: sessionStart, postToolUse, afterFileEdit, beforeSubmitPrompt, stop, sessionEnd |
+| Not there | PreCompact: Codex ignores a PreCompact hook's text | PreCompact: Cursor's is observational and cannot reach the summary; stop has no message for you, so the "edited without a task" note is Claude Code and Codex only |
+
+Codex runs a plugin's hooks only after you review and trust them. The Cursor
+side follows Cursor's hooks reference as read on 2026-11-22 and the shape of a
+shipping Cursor plugin; Cursor's plugin reference page was unavailable, so the
+`variables` block is the one part taken from practice rather than the docs.
+
 What it adds:
 
 - **MCP server** — `https://www.todox.dev/api/mcp` with your token. Self-hosting?

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "todox": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz"
+      ],
+      "env_vars": [
+        "TODOX_TOKEN",
+        "TODOX_URL"
+      ]
+    }
+  }
+}

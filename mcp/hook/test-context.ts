@@ -31,6 +31,7 @@ export function hookContext(
   const rpc = overrides.rpc ?? null;
   const now = overrides.now ?? new Date("2026-11-22T10:00:00Z");
   return {
+    client: "claude-code",
     config: {
       token: rpc ? "todox_t" : undefined,
       url: "http://todox.test",

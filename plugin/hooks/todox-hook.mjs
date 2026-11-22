@@ -36,23 +36,87 @@ function createClient(baseUrl, token, options = {}) {
   };
 }
 
+// mcp/hook/clients.ts
+var CLIENTS = ["claude-code", "codex", "cursor"];
+function hookClientFrom(arg) {
+  return CLIENTS.find((c) => c === arg) ?? "claude-code";
+}
+function normalizeInput(client, raw) {
+  return client === "cursor" ? fromCursor(raw) : raw;
+}
+function shapeOutput(client, event, output) {
+  return client === "cursor" ? toCursor(event, output) : output;
+}
+function fromCursor(raw) {
+  const roots = Array.isArray(raw.workspace_roots) ? raw.workspace_roots : [];
+  const input = {
+    session_id: stringOr(raw.session_id) ?? stringOr(raw.conversation_id),
+    cwd: stringOr(raw.cwd) ?? stringOr(roots[0]),
+    hook_event_name: stringOr(raw.hook_event_name),
+    prompt: stringOr(raw.prompt),
+    trigger: stringOr(raw.trigger),
+    stop_hook_active: typeof raw.loop_count === "number" && raw.loop_count > 0
+  };
+  if (raw.hook_event_name === "afterFileEdit" && typeof raw.file_path === "string")
+    return { ...input, tool_name: "Write", tool_input: { file_path: raw.file_path } };
+  if (typeof raw.tool_name === "string")
+    return {
+      ...input,
+      tool_name: cursorToolName(raw.tool_name),
+      tool_input: objectFrom(raw.tool_input),
+      tool_response: parsedOr(raw.tool_output)
+    };
+  return input;
+}
+function cursorToolName(name) {
+  const mcp = /^MCP:(.+)$/.exec(name);
+  return mcp ? `mcp__todox__${mcp[1]}` : name;
+}
+function toCursor(event, output) {
+  if (event === "user-prompt-submit") return { continue: true };
+  if (!output || typeof output === "string") return null;
+  if (event === "session-start") {
+    const context = output.hookSpecificOutput?.additionalContext;
+    return typeof context === "string" ? { additional_context: context } : null;
+  }
+  if (event === "stop" && output.decision === "block" && typeof output.reason === "string")
+    return { followup_message: output.reason };
+  return null;
+}
+var stringOr = (value) => typeof value === "string" ? value : void 0;
+function parsedOr(value) {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+function objectFrom(value) {
+  const parsed = parsedOr(value);
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : void 0;
+}
+
 // mcp/hook/config.ts
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 var HOSTED_URL = "https://www.todox.dev";
-function hookConfig(env, pluginRoot, warn) {
+function hookConfig(env, pluginRoot, warn, client = "claude-code") {
   return {
     token: env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || void 0,
     url: env.TODOX_URL || pluginRoot && urlFromMcpJson(pluginRoot, warn) || HOSTED_URL,
-    dataDir: dataDirFrom(env),
+    dataDir: dataDirFrom(env, client),
     disabled: env.TODOX_HOOKS === "off",
     stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default",
     observe: env.TODOX_OBSERVE !== "off"
   };
 }
-function dataDirFrom(env) {
-  return env.CLAUDE_PLUGIN_DATA || join(homedir(), ".claude", "plugins", "data", "todox");
+function dataDirFrom(env, client = "claude-code") {
+  const given = env.CLAUDE_PLUGIN_DATA || env.PLUGIN_DATA;
+  if (given) return given;
+  const home = client === "cursor" ? ".cursor" : client === "codex" ? ".codex" : ".claude";
+  return join(homedir(), home, "plugins", "data", "todox");
 }
 function urlFromMcpJson(pluginRoot, warn) {
   const path = join(pluginRoot, ".mcp.json");
@@ -197,6 +261,9 @@ function rotateIfFull(path) {
 }
 var oneLine = (message) => message.replace(/\s+/g, " ").slice(0, 500);
 
+// mcp/hook/post-tool-use.ts
+import { resolve } from "node:path";
+
 // mcp/hook/state.ts
 import {
   appendFileSync as appendFileSync2,
@@ -240,12 +307,14 @@ function pruneSessions(dataDir, nowMs = Date.now()) {
 
 // mcp/hook/post-tool-use.ts
 var EDIT_TOOLS = /* @__PURE__ */ new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+var PATCH_TOOL = "apply_patch";
+var PATCH_FILE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
 var TODOX_TASK_TOOL = /^mcp__.*todox.*__(create_task|update_task|log_entry)$/;
 async function postToolUse(ctx) {
   const { session_id: sessionId, tool_name: tool } = ctx.input;
   if (!sessionId || !tool) return null;
   const at = ctx.now().toISOString();
-  if (EDIT_TOOLS.has(tool)) {
+  if (EDIT_TOOLS.has(tool) || tool === PATCH_TOOL) {
     if (editsWorkingTree(ctx.input)) appendEvent(ctx.config.dataDir, sessionId, { t: "edit", at });
     return null;
   }
@@ -262,9 +331,16 @@ async function postToolUse(ctx) {
   return null;
 }
 function editsWorkingTree(input) {
-  const path = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
-  if (typeof path !== "string" || !input.cwd) return false;
-  return isInside(path, input.cwd);
+  const cwd = input.cwd;
+  if (!cwd) return false;
+  return editedPaths(input).some((path) => isInside(resolve(cwd, path), cwd));
+}
+function editedPaths(input) {
+  const given = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+  if (typeof given === "string") return [given];
+  const patch = input.tool_input?.command;
+  if (input.tool_name !== PATCH_TOOL || typeof patch !== "string") return [];
+  return [...patch.matchAll(PATCH_FILE)].map((m) => m[1].trim());
 }
 function taskIdOf(input) {
   const fromArgs = input.tool_input?.task_id;
@@ -300,7 +376,7 @@ function observationPayload(f) {
 var MAX_TASK_IDS = 50;
 
 // mcp/hook/observe.ts
-var HOOK_CLIENT = "claude-code-plugin";
+var hookClientLabel = (ctx) => `${ctx.client}-plugin`;
 async function observeSession(ctx) {
   const { session_id: sessionId, cwd } = ctx.input;
   if (!ctx.config.observe || !ctx.rpc || !sessionId || !cwd) return;
@@ -329,7 +405,7 @@ async function observe({ ctx, rpc, sessionId, cwd }) {
   const facts = {
     dir,
     sessionId: `cc:${sessionId}`,
-    client: HOOK_CLIENT,
+    client: hookClientLabel(ctx),
     branch: git2.branch(dir),
     base,
     head,
@@ -536,25 +612,27 @@ var HANDLERS = {
   "pre-compact": preCompact,
   "session-end": sessionEnd
 };
-async function runHook(event, rawInput, env) {
-  const log = fileLogger(dataDirFrom(env));
+async function runHook(event, rawInput, env, client = "claude-code") {
+  const log = fileLogger(dataDirFrom(env, client));
   const handler = HANDLERS[event];
   if (!handler) {
     log(event, "unknown hook event");
     return null;
   }
   try {
-    const config = hookConfig(env, env.CLAUDE_PLUGIN_ROOT, (m) => log(event, m));
+    const config = hookConfig(env, pluginRootFrom(env), (m) => log(event, m), client);
     if (config.disabled) return null;
-    return await handler(contextFor(config, log, parseInput(rawInput)));
+    const input = normalizeInput(client, parseInput(rawInput));
+    return shapeOutput(client, event, await handler(contextFor({ client, config, log, input })));
   } catch (e) {
     log(event, `failed: ${e.message}`);
     return null;
   }
 }
-function contextFor(config, log, input) {
-  const rpc = config.token ? createClient(config.url, config.token, { headers: CARRIER, timeoutMs: RPC_TIMEOUT_MS }) : null;
-  return { config, log, input, rpc, now: () => /* @__PURE__ */ new Date(), git: workspaceGit };
+var pluginRootFrom = (env) => env.CLAUDE_PLUGIN_ROOT || env.PLUGIN_ROOT || env.CURSOR_PLUGIN_ROOT || void 0;
+function contextFor(parts) {
+  const rpc = parts.config.token ? createClient(parts.config.url, parts.config.token, { headers: CARRIER, timeoutMs: RPC_TIMEOUT_MS }) : null;
+  return { ...parts, rpc, now: () => /* @__PURE__ */ new Date(), git: workspaceGit };
 }
 function parseInput(raw) {
   if (!raw.trim()) return {};
@@ -574,7 +652,7 @@ async function readStdin() {
 }
 async function main() {
   const event = process.argv[2] ?? "";
-  const output = await runHook(event, await readStdin(), process.env);
+  const output = await runHook(event, await readStdin(), process.env, hookClientFrom(process.argv[3]));
   if (output) process.stdout.write(typeof output === "string" ? output : JSON.stringify(output));
 }
 if (process.argv[1]?.endsWith("todox-hook.mjs")) {

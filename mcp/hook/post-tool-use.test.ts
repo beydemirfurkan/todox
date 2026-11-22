@@ -19,6 +19,18 @@ describe("PostToolUse", () => {
     ).toEqual(["edit"]);
   });
 
+  it("counts a Codex apply_patch by the files its headers name", async () => {
+    const patch = (file: string) =>
+      `*** Begin Patch\n*** Update File: ${file}\n@@\n-a\n+b\n*** End Patch`;
+    expect(
+      await run({ session_id: "s1", cwd: "/repo", tool_name: "apply_patch", tool_input: { command: patch("src/a.ts") } }),
+    ).toEqual(["edit"]);
+    expect(
+      await run({ session_id: "s1", cwd: "/repo", tool_name: "apply_patch", tool_input: { command: patch("/elsewhere/a.ts") } }),
+    ).toEqual([]);
+    expect(await run({ session_id: "s1", cwd: "/repo", tool_name: "apply_patch", tool_input: {} })).toEqual([]);
+  });
+
   it("does not count a plan written outside it, or a sibling that shares a prefix", async () => {
     expect(
       await run({ session_id: "s1", cwd: "/repo", tool_name: "Write", tool_input: { file_path: "/home/u/.claude/plans/p.md" } }),

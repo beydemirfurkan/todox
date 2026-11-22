@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "todox": {
+      "url": "https://www.todox.dev/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${token}"
+      }
+    }
+  }
+}
