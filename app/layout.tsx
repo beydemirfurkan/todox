@@ -3,6 +3,7 @@ import { DM_Mono, Fraunces, Geist } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
 import "./globals.css";
+import type { T } from "@/lib/i18n";
 import { getLang, getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import { publicUrl } from "@/lib/public-url";
@@ -159,30 +160,66 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
 
-        <footer className="brand-band mt-16">
-          <div className="mx-auto flex w-full page-column flex-col gap-6 px-5 pt-10 pb-12 sm:flex-row sm:items-end sm:justify-between">
-            <p className="display max-w-[16ch] text-[30px] leading-[1.05] sm:text-[40px]">{t("tagline")}</p>
-            <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px]">
-              <Link href="/about" className="link-more">
-                {t("footerAbout")}
-              </Link>
-              <Link href="/privacy" className="link-more">
-                {t("footerPrivacy")}
-              </Link>
-              <Link href="/contact" className="link-more">
-                {t("footerContact")}
-              </Link>
-              <a
-                href="https://github.com/beydemirfurkan/todox"
-                className="link-more"
-                rel="noreferrer"
-              >
-                GitHub
-              </a>
-            </nav>
-          </div>
-        </footer>
+        <SiteFooter t={t} />
       </body>
     </html>
+  );
+}
+
+const REPO = "https://github.com/beydemirfurkan/todox";
+
+/** The graphite band every page ends on: the name and what it does, then
+ *  the links in three short columns. */
+function SiteFooter({ t }: { t: T }) {
+  const columns: { title: string; links: { href: string; label: string; external?: boolean }[] }[] = [
+    {
+      title: t("footerColProduct"),
+      links: [
+        { href: "/about", label: t("footerAbout") },
+        { href: "/blog", label: t("footerBlog") },
+      ],
+    },
+    {
+      title: t("footerColOpen"),
+      links: [
+        { href: REPO, label: t("footerSource"), external: true },
+        { href: `${REPO}/blob/main/docs/mcp.md`, label: t("footerMcpGuide"), external: true },
+      ],
+    },
+    {
+      title: t("footerColHelp"),
+      links: [
+        { href: "/privacy", label: t("footerPrivacy") },
+        { href: "/contact", label: t("footerContact") },
+      ],
+    },
+  ];
+  return (
+    <footer className="site-band mt-20">
+      <div className="mx-auto grid w-full page-column gap-10 px-5 pt-14 pb-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="flex flex-col gap-3">
+          <span className="display text-[26px] leading-none">todox</span>
+          <p className="display max-w-[18ch] text-[22px] leading-[1.2] text-[var(--band-muted)]">
+            {t("tagline")}
+          </p>
+        </div>
+        {columns.map((column) => (
+          <nav key={column.title} aria-label={column.title} className="flex flex-col gap-3 text-[14px]">
+            <h2 className="band-label text-meta font-medium">{column.title}</h2>
+            {column.links.map((link) =>
+              link.external ? (
+                <a key={link.href} href={link.href} rel="noreferrer" className="band-link">
+                  {link.label}
+                </a>
+              ) : (
+                <Link key={link.href} href={link.href} className="band-link">
+                  {link.label}
+                </Link>
+              ),
+            )}
+          </nav>
+        ))}
+      </div>
+    </footer>
   );
 }
