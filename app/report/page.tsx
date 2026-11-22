@@ -2,18 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { duration, translator, type T } from "@/lib/i18n";
-import { getT, getTz } from "@/lib/lang";
+import { duration, type T } from "@/lib/i18n";
+import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
-import { resolve } from "@/lib/services/project-resolver";
-import { periodLabel, renderMarkdown } from "@/lib/services/report-markdown";
+import { periodLabel } from "@/lib/services/report-markdown";
 import { activityReport, type ReportEntry, type TaskReport } from "@/lib/services/reports";
-import { resolvePeriod, type PeriodName } from "@/lib/util/time";
 import {
   Counter,
   Empty,
   IconTile,
-  MarkdownPreview,
   Panel,
   ShareBars,
   StatBadges,
@@ -22,6 +19,8 @@ import { RevealCurrent } from "../features/reveal-current";
 import { Daily } from "./daily";
 import { privatePageMetadata } from "../metadata-shared";
 import { CopyMarkdown } from "../features/copy-markdown";
+import { MarkdownOnDemand } from "../features/markdown-on-demand";
+import { markdownHref, readReportInput, REPORT_PERIODS } from "./report-input";
 import { KIND_COLOR, statusLabel } from "../kinds";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,45 +28,20 @@ export async function generateMetadata(): Promise<Metadata> {
   return privatePageMetadata(t("metaTitleReport"));
 }
 
-
 export const dynamic = "force-dynamic";
-
-const PERIODS: PeriodName[] = ["today", "yesterday", "week", "last_week", "month", "last_30_days"];
-
-/**
- * The pills, and nothing else.
- *
- * `"all"` used to be accepted here while being left out of `PERIODS`, so it had
- * no button and was still one URL edit away. `resolvePeriod` turns it into
- * `new Date(0)`, and the read behind it is a four-way join with no LIMIT whose
- * every decision, dead end and question body then goes into the response --
- * an account's entire history, on a `force-dynamic` page, out of a pool of ten.
- *
- * Not capped instead, deliberately: a report's numbers have to be right, and a
- * truncated input makes "you closed five tasks" a guess. The window is the
- * thing to bound, so an unbounded one is simply not offered. `activity_report`
- * still takes `all` for an agent that asks for it on purpose.
- */
-const isPeriod = (v: unknown): v is PeriodName =>
-  typeof v === "string" && (PERIODS as string[]).includes(v);
 
 export default async function ReportPage({ searchParams }: PageProps<"/report">) {
   const user = await requireUser();
-  const { lang, t } = await getT();
+  const { t } = await getT();
   const sp = await searchParams;
-  const raw = Array.isArray(sp.period) ? sp.period[0] : sp.period;
-  const period: PeriodName = isPeriod(raw) ? raw : "today";
-  const projectRef = Array.isArray(sp.project) ? sp.project[0] : sp.project;
-
-  const window = resolvePeriod(period, { tz: await getTz() });
-  // `mustResolve` throws for an unknown reference, which is the right answer to
-  // an agent and the wrong one to a browser: a bookmark pointing at a renamed
-  // project rendered "Application error: a server-side exception has occurred".
-  // The sibling pages have always answered 404 here.
-  const projectId = projectRef ? (await resolve(user.id, projectRef))?.id : undefined;
-  if (projectRef && projectId === undefined) notFound();
-  const report = await activityReport(user.id, window, { projectId });
-  const markdown = renderMarkdown(report, translator(lang));
+  const input = await readReportInput(user.id, {
+    period: Array.isArray(sp.period) ? sp.period[0] : sp.period,
+    project: Array.isArray(sp.project) ? sp.project[0] : sp.project,
+  });
+  if (!input) notFound();
+  const { period, projectRef } = input;
+  const report = await activityReport(user.id, input.window, { projectId: input.projectId });
+  const markdownUrl = markdownHref(input);
 
   return (
     <div className="space-y-6">
@@ -89,7 +63,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
         aria-label={t("reportTitle")}
         className="pop no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>a]:shrink-0"
       >
-        {PERIODS.map((p) => (
+        {REPORT_PERIODS.map((p) => (
           <Link
             key={p}
             // Carry the project through: switching period used to silently
@@ -246,16 +220,17 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
               <div className="min-w-0 flex-1 space-y-3">
                 <p className="text-[14px] text-muted">{t("reportForManager")}</p>
                 <CopyMarkdown
-                  markdown={markdown}
+                  href={markdownUrl}
                   label={t("copyReport")}
                   copiedLabel={t("reportCopied")}
+                  failedLabel={t("reportCopyFailed")}
                 />
-                <details className="disclosure">
-                  <summary className="text-small text-muted">{t("reportPreview")}</summary>
-                  <div className="mt-3">
-                    <MarkdownPreview markdown={markdown} />
-                  </div>
-                </details>
+                <MarkdownOnDemand
+                  href={markdownUrl}
+                  summary={t("reportPreview")}
+                  loadingLabel={t("loadingPage")}
+                  failedLabel={t("reportPreviewFailed")}
+                />
               </div>
             </div>
           </Panel>

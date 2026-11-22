@@ -689,6 +689,8 @@ export const en = {
     "Time marked unattended was spent in `doing` with nothing else in the log to show anyone was there: a task set in flight and left. It is left out of every figure here. A stretch under a day counts whole; past that, four hours either side of each entry or status change still count. Setting a task back to `todo` or `blocked` when you stop is what keeps the number honest.",
   copyReport: "copy as markdown",
   reportCopied: "copied",
+  reportCopyFailed: "could not copy",
+  reportPreviewFailed: "The preview could not be loaded. Close it and try again.",
   reportForManager: "The markdown copy is written to be pasted straight into an update.",
 
   /* durations */
