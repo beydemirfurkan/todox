@@ -71,8 +71,17 @@ type Transport = "http" | "stdio";
 const transportFor = (persona: PersonaKey, agent: AgentKind): Transport =>
   persona === "jonas" || agent === "opencode" ? "stdio" : "http";
 
-function stdioEnv(token: string, agent: AgentKind): Record<string, string> {
+/**
+ * HOME is the persona's own, empty one. The stdio server reads the client's
+ * user-level memory file to decide whether to send setup notes, and a lab
+ * agent has none -- it runs with project settings only, or a private XDG
+ * home -- so the developer's own file must not answer for it.
+ */
+function stdioEnv(persona: PersonaKey, token: string, agent: AgentKind): Record<string, string> {
+  const home = join(secretsDir(persona), "home");
+  mkdirSync(home, { recursive: true, mode: 0o700 });
   return {
+    HOME: home,
     TODOX_TOKEN: token,
     TODOX_URL: LAB_URL,
     TODOX_CLIENT_NAME: agent === "claude" ? "claude-code" : "opencode",
@@ -90,7 +99,7 @@ function writeClaudeConfig(persona: PersonaKey, token: string): void {
   const server =
     transportFor(persona, "claude") === "http"
       ? { type: "http", url: `${LAB_URL}/api/mcp`, headers: { Authorization: `Bearer ${token}` } }
-      : { type: "stdio", command: TSX, args: [MCP_SERVER], env: stdioEnv(token, "claude") };
+      : { type: "stdio", command: TSX, args: [MCP_SERVER], env: stdioEnv(persona, token, "claude") };
   writeSecret(claudeConfig(persona), JSON.stringify({ mcpServers: { todox: server } }, null, 2));
 }
 
@@ -113,7 +122,7 @@ function writeOpenCodeConfig(persona: PersonaKey, token: string): void {
         todox: {
           type: "local",
           command: [TSX, MCP_SERVER],
-          environment: stdioEnv(token, "opencode"),
+          environment: stdioEnv(persona, token, "opencode"),
           enabled: true,
         },
       },
