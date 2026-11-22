@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   assertRef: vi.fn(),
   assertProject: vi.fn(),
   assertContext: vi.fn(),
+  assertCanModifyContext: vi.fn(),
   deleteEntry: vi.fn(),
   refsUnlink: vi.fn(),
   refsAcceptSeen: vi.fn(),
@@ -55,6 +56,7 @@ vi.mock("@/lib/services/ownership", () => ({
   assertRef: mocks.assertRef,
   assertProject: mocks.assertProject,
   assertContext: mocks.assertContext,
+  assertCanModifyContext: mocks.assertCanModifyContext,
 }));
 vi.mock("@/lib/services/entry-deletion", () => ({ deleteEntry: mocks.deleteEntry }));
 vi.mock("@/lib/repositories/refs", () => ({
@@ -132,7 +134,9 @@ const GUARDED = [
   {
     action: "deleteContextAction",
     field: "context_id",
-    guard: mocks.assertContext,
+    // Not `assertContext`: a member may read a note but only its author or the
+    // owner may remove it, because notes brief the owner's agents.
+    guard: mocks.assertCanModifyContext,
     write: mocks.contextsRemove,
   },
   { action: "setStatusAction", field: "task_id", guard: mocks.assertTask, write: mocks.taskUpdate },
