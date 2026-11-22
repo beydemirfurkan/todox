@@ -87,6 +87,19 @@ const rowId = z.union([
   z.string().regex(/^\d{1,15}$/, "expected a numeric id"),
 ]);
 
+/**
+ * A log entry always belongs to a task, and the call that leaves one out is
+ * nearly always a decision about work already finished -- which is what a
+ * project note is for. The bare "Invalid input at task_id" left the agent to
+ * guess that; in the lab it guessed right, one refused call later.
+ */
+const entryTaskId = z.union([z.number().int(), z.string().regex(/^\d{1,15}$/)], {
+  error: (issue) =>
+    issue.input === undefined
+      ? "log_entry needs the task_id it belongs to. Finished work with no task: add_context (kind 'decision' or 'gotcha', with cwd) records the why instead; work that will go on: create_task first"
+      : "expected a numeric task id",
+});
+
 /** The keys `parseParams` folds from digits to a number. */
 const ROW_ID_KEYS = [
   "task_id",
@@ -403,7 +416,7 @@ export const SHAPES = {
   },
 
   logEntry: {
-    task_id: rowId,
+    task_id: entryTaskId,
     kind: z
       .enum(ENTRY_KINDS)
       .describe(
