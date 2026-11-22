@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { cache, Fragment } from "react";
 
@@ -117,7 +118,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
 
   const owner = project.access_role === "owner";
   const [all, projectContext, members, invitations] = await Promise.all([
-    tasksRepo.listByProject(project.id, "all"),
+    tasksRepo.listForBoard(project.id),
     contexts.listByProject(user.id, project.id),
     // Everyone with access sees who else has it. This used to be owner-only,
     // which meant the person who had just been invited into a project could
@@ -620,7 +621,10 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           <div className="p-4">
             {view === "task" &&
               (selected ? (
-                <TaskPanel task={selected} slug={slug} t={t} />
+                // Streamed: the board does not wait for the one task's log.
+                <Suspense fallback={<p className="text-small text-faint">{t("working")}</p>}>
+                  <TaskPanel task={selected} slug={slug} t={t} />
+                </Suspense>
               ) : (
                 <Empty>{t("noTaskSelected")}</Empty>
               ))}

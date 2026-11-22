@@ -4,6 +4,7 @@ import { ENTRY_KINDS, STATUSES } from "@/lib/constants";
 import { ago, type T } from "@/lib/i18n";
 import * as entriesRepo from "@/lib/repositories/entries";
 import * as refsRepo from "@/lib/repositories/refs";
+import * as tasksRepo from "@/lib/repositories/tasks";
 import type { Task } from "@/lib/types";
 
 import { addEntryAction, setStatusAction } from "../../actions";
@@ -32,9 +33,12 @@ const PANEL_ENTRIES = 4;
  */
 export async function TaskPanel({ task, slug, t }: { task: Task; slug: string; t: T }) {
   const taskHref = `/p/${slug}/t/${task.id}`;
-  const [log, refRows] = await Promise.all([
+  // The board's rows carry no bodies, so the one open task's brief is read
+  // here, beside its log -- the same round trip, not another one.
+  const [log, refRows, body] = await Promise.all([
     entriesRepo.pageByTask(task.id, PANEL_ENTRIES),
     refsRepo.listByTask(task.id),
+    task.body ?? tasksRepo.bodyOf(task.id),
   ]);
   const earlier = log.total - log.rows.length;
 
@@ -95,9 +99,9 @@ export async function TaskPanel({ task, slug, t }: { task: Task; slug: string; t
         </fieldset>
       </form>
 
-      {task.body && (
+      {body && (
         <ExpandableText
-          text={task.body}
+          text={body}
           more={t("showMore")}
           less={t("showLess")}
           className="text-small leading-relaxed text-muted"

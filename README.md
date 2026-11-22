@@ -467,7 +467,7 @@ section. todox.dev itself runs the same two containers on one host.
 | variable | why |
 | --- | --- |
 | `DATABASE_URL` | Postgres. When the database is a neighbour on the same network this is its service name, and no certificate or public port is involved. |
-| `DATABASE_POOL_MAX` | Optional, default 10. Connections this process may hold. Raise it only after checking the server's own `max_connections`, which every replica shares. |
+| `DATABASE_POOL_MAX` | Optional, default 20. Connections this process may hold. Raise it only after checking the server's own `max_connections`, which every replica shares. |
 | `TODOX_PUBLIC_URL` | Verification links, reset links and the agent setup snippet are built from it — get it wrong and people, and their agents, land on the wrong host. |
 | `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional, but the first four together. Without them mail is printed to the server log rather than sent. Port defaults to 587 (STARTTLS). What `MAIL_FROM` may be depends on the provider: a mailbox provider usually wants the address that authenticated, while an API-key provider wants any address on a domain verified with it. If a sending limit is hit, messages are dropped and the failure shows up only in the log. |
 

@@ -1,4 +1,5 @@
 import { all, one, run, runStmt, type Statement } from "../db/client";
+import { logError } from "../server/log";
 import type { ApiToken, User } from "../types";
 import { hashToken } from "../util/tokens";
 import { now } from "../util/time";
@@ -84,6 +85,8 @@ type TokenRow = User & {
   last_client_seen_at: string | null;
 };
 
+const LAST_USED_GRAIN_MS = 60 * 60 * 1000;
+
 export async function userForToken(token: string): Promise<TokenIdentity | undefined> {
   const row = await one<TokenRow>(
     `SELECT u.*, t.id AS token_id, t.created_at AS token_created_at, t.last_used_at,
@@ -103,7 +106,12 @@ export async function userForToken(token: string): Promise<TokenIdentity | undef
   const use: TokenUse =
     previous === null ? "first" : previous.slice(0, 10) === at.slice(0, 10) ? "same-day" : "return";
 
-  await run("UPDATE api_tokens SET last_used_at = ? WHERE id = ?", [at, row.token_id]);
+  // Not awaited, and at most once an hour: it was a second sequential round
+  // trip in front of every agent call, for a column read at day precision.
+  if (use !== "same-day" || Date.parse(at) - Date.parse(previous ?? at) >= LAST_USED_GRAIN_MS)
+    void run("UPDATE api_tokens SET last_used_at = ? WHERE id = ?", [at, row.token_id]).catch(
+      (error: unknown) => logError("api_tokens.lastUsedFailed", error),
+    );
 
   const {
     token_id,

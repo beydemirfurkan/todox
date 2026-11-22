@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import { userForSession } from "./services/auth";
@@ -10,11 +11,15 @@ import { SESSION_COOKIE, SESSION_DAYS } from "./util/tokens";
  * redirects on a missing cookie for the sake of UX -- it runs before the
  * database is reachable and must never be treated as the gate.
  */
-export async function currentUser(): Promise<PublicUser | null> {
+/**
+ * Once per request. The layout asks, then the page, then its metadata, and
+ * each used to send the same session lookup; `cache` hands them one answer.
+ */
+export const currentUser = cache(async (): Promise<PublicUser | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   return (await userForSession(token)) ?? null;
-}
+});
 
 export async function requireUser(): Promise<PublicUser> {
   const user = await currentUser();

@@ -185,6 +185,13 @@ CREATE TABLE IF NOT EXISTS entries (
 CREATE INDEX IF NOT EXISTS idx_entries_task ON entries (task_id, id);
 CREATE INDEX IF NOT EXISTS idx_entries_created ON entries (created_at);
 
+-- The newest handoff of each task, and the open questions, are read on every
+-- dashboard and board load. Without these they walked every entry of every
+-- open task through idx_entries_task and threw away all but one kind. The
+-- partial indexes hold only the rows those reads want, newest first.
+CREATE INDEX IF NOT EXISTS idx_entries_handoff ON entries (task_id, id DESC) WHERE kind = 'handoff';
+CREATE INDEX IF NOT EXISTS idx_entries_question ON entries (task_id, id) WHERE kind = 'question';
+
 -- How a question stops being open.
 --
 -- \`question\` had no way to close. It came back in every briefing and every
