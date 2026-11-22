@@ -8,6 +8,9 @@ import * as auth from "@/lib/services/auth";
 import { resolveSignIn } from "@/lib/services/oauth";
 import { decodePending, stateMatches } from "@/lib/services/oauth-flow";
 import { OAuthExchangeError, profileFromCode } from "@/lib/services/oauth-providers";
+import { getLang } from "@/lib/lang";
+import * as users from "@/lib/repositories/users";
+import { sendProviderLinked } from "@/lib/services/account-recovery";
 import { setSessionCookie } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +20,10 @@ export const dynamic = "force-dynamic";
  * address -- that is what makes this a reply to a trip this browser started,
  * not a link somebody else crafted -- and the cookie is spent either way.
  *
- * Success always opens a new session and ends the one before it. That is what
- * lets an account without a password prove itself again from the account
- * page: the fresh session is the recent sign-in `auth.ts` asks for.
+ * A sign-in opens a new session and ends the one before it. So does a trip
+ * through an identity already linked to the signed-in account, which is how an
+ * account without a password proves itself again: the fresh session is the
+ * recent sign-in `auth.ts` asks for. Linking a new identity does not.
  */
 export async function GET(
   request: Request,
@@ -58,11 +62,35 @@ export async function GET(
     provider: pending.provider,
     profile,
     currentUserId: current?.id ?? null,
+    linkGrant: pending.linkGrant,
   });
   if (!outcome.ok) return fail(outcome.code);
 
-  if (sessionToken) await auth.endSession(sessionToken);
-  await setSessionCookie(await auth.issueSession(outcome.userId, (await headers()).get("user-agent")));
+  if (outcome.isNewLink) await notifyLinked(outcome.userId, pending.provider);
+
+  // A link keeps the session it was made from. Issuing a fresh one here made
+  // the link itself count as the "recent sign-in" that lets an account without
+  // a password set one, change its address or delete itself -- so whoever
+  // linked could then do all three. Only a sign-in, or a trip through an
+  // identity that was already this account's, opens a new session.
+  if (outcome.how !== "linked") {
+    if (sessionToken) await auth.endSession(sessionToken);
+    await setSessionCookie(
+      await auth.issueSession(outcome.userId, (await headers()).get("user-agent")),
+    );
+  }
   const next = outcome.how === "linked" && pending.next === "/" ? "/account?tab=connections" : pending.next;
   return NextResponse.redirect(`${publicUrl()}${next}`);
+}
+
+const PROVIDER_NAME = { google: "Google", github: "GitHub" } as const;
+
+/** Best effort: a mail that fails must not undo a link that succeeded. */
+async function notifyLinked(userId: number, provider: keyof typeof PROVIDER_NAME) {
+  try {
+    const user = await users.byId(userId);
+    if (user) await sendProviderLinked(user, PROVIDER_NAME[provider], await getLang());
+  } catch (error) {
+    logError("auth.oauth_link_mail", error);
+  }
 }

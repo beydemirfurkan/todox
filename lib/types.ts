@@ -19,7 +19,13 @@ export type User = {
   bio: string | null;
 };
 
-export const AUTH_TOKEN_PURPOSES = ["reset", "verify"] as const;
+/**
+ * `oauth_link` is the permission, minted by re-entering the password, to attach
+ * a Google or GitHub identity to the signed-in account. Without it a stolen
+ * session cookie could link the thief's own identity: a way back in that
+ * outlives every password change.
+ */
+export const AUTH_TOKEN_PURPOSES = ["reset", "verify", "oauth_link"] as const;
 export type AuthTokenPurpose = (typeof AUTH_TOKEN_PURPOSES)[number];
 
 export type AuthTokenRow = {

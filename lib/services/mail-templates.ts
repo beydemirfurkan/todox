@@ -301,6 +301,81 @@ export function emailChanged(input: {
   };
 }
 
+/**
+ * A Google or GitHub identity was attached to the account. Sent every time,
+ * because a linked identity is a way in that survives a password change: if
+ * the owner did not do it, this message is how they find out.
+ */
+export function providerLinked(input: {
+  name: string;
+  username: string;
+  provider: string;
+  forgotUrl: string;
+  lang: Lang;
+}): Template {
+  const { name, username, provider, forgotUrl, lang } = input;
+  if (lang === "tr") {
+    return {
+      subject: `todox hesabına ${provider} bağlandı`,
+      text: [
+        `Merhaba ${name},`,
+        "",
+        `@${username} hesabına ${provider} ile giriş bağlandı.`,
+        "Artık bu hesapla da giriş yapılabilir.",
+        "",
+        "Bunu sen yaptıysan yapman gereken bir şey yok.",
+        "Yapmadıysan hemen şifreni sıfırla: sıfırlama bağlı hesapları da kaldırır",
+        `(${forgotUrl}).`,
+      ].join("\n"),
+      html: layout(
+        `hesabına ${esc(provider)} bağlandı`,
+        [
+          { kind: "text", body: `Merhaba ${esc(name)},` },
+          {
+            kind: "text",
+            body: `<strong>@${esc(username)}</strong> hesabına ${esc(provider)} ile giriş bağlandı. Artık bu hesapla da giriş yapılabilir.`,
+          },
+          { kind: "text", body: "Bunu sen yaptıysan yapman gereken bir şey yok." },
+          {
+            kind: "note",
+            body: `Yapmadıysan hemen <a href="${esc(forgotUrl)}" style="color:${BRAND.accent}">şifreni sıfırla</a>: sıfırlama bağlı hesapları da kaldırır.`,
+          },
+        ],
+        FOOTER.tr,
+      ),
+    };
+  }
+  return {
+    subject: `${provider} was connected to your todox account`,
+    text: [
+      `Hi ${name},`,
+      "",
+      `A ${provider} sign-in was connected to @${username}.`,
+      "It can now be used to sign in to this account.",
+      "",
+      "If that was you, there is nothing to do.",
+      "If it was not, reset your password now; a reset also removes connected sign-ins",
+      `(${forgotUrl}).`,
+    ].join("\n"),
+    html: layout(
+      `${esc(provider)} was connected to your account`,
+      [
+        { kind: "text", body: `Hi ${esc(name)},` },
+        {
+          kind: "text",
+          body: `A ${esc(provider)} sign-in was connected to <strong>@${esc(username)}</strong>. It can now be used to sign in to this account.`,
+        },
+        { kind: "text", body: "If that was you, there is nothing to do." },
+        {
+          kind: "note",
+          body: `If it was not, <a href="${esc(forgotUrl)}" style="color:${BRAND.accent}">reset your password</a> now; a reset also removes connected sign-ins.`,
+        },
+      ],
+      FOOTER.en,
+    ),
+  };
+}
+
 export function projectInvitation(input: {
   projectName: string;
   link: string;

@@ -28,6 +28,8 @@ export interface PendingSignIn {
   state: string;
   codeVerifier: string;
   next: string;
+  /** Set only when a signed-in account is linking a new identity. */
+  linkGrant?: string;
 }
 
 export const encodePending = (pending: PendingSignIn) =>
@@ -38,10 +40,16 @@ export function decodePending(cookie: string | undefined): PendingSignIn | null 
   try {
     const value: unknown = JSON.parse(Buffer.from(cookie, "base64url").toString("utf8"));
     if (typeof value !== "object" || value === null) return null;
-    const { provider, state, codeVerifier, next } = value as Record<string, unknown>;
+    const { provider, state, codeVerifier, next, linkGrant } = value as Record<string, unknown>;
     if (typeof provider !== "string" || !isProvider(provider)) return null;
     if (typeof state !== "string" || typeof codeVerifier !== "string") return null;
-    return { provider, state, codeVerifier, next: safeNext(typeof next === "string" ? next : "") };
+    return {
+      provider,
+      state,
+      codeVerifier,
+      next: safeNext(typeof next === "string" ? next : ""),
+      ...(typeof linkGrant === "string" ? { linkGrant } : {}),
+    };
   } catch {
     // A cookie that is not ours, or was cut short, is the same as no cookie.
     return null;

@@ -25,7 +25,7 @@ import {
 } from "../lib/services/account-recovery";
 import { changeEmail, changePassword, issueSession, login, register } from "../lib/services/auth";
 import * as oauthAccountsRepo from "../lib/repositories/oauth-accounts";
-import { resolveSignIn, unlink } from "../lib/services/oauth";
+import { issueLinkGrant, resolveSignIn, unlink } from "../lib/services/oauth";
 import * as limit from "../lib/services/rate-limit";
 import { hashToken } from "../lib/util/tokens";
 
@@ -228,7 +228,26 @@ async function main() {
   const badFormat = await changeEmail(user.id, "another-good-password", "not-an-address");
   expect("refused a malformed address", badFormat.ok === false);
 
-  const moved = await changeEmail(user.id, "another-good-password", "moved@todox.local");
+  // A reset link mailed to the old address, and two sessions: the one making
+  // the change and one somebody else holds.
+  await requestPasswordReset(USER.email, "en");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const keep = await issueSession(user.id);
+  const other = await issueSession(user.id);
+  const moved = await changeEmail(user.id, "another-good-password", "moved@todox.local", keep);
+  expect(
+    "the reset link sent before the change is retired with it",
+    Number(
+      (
+        await one<{ n: number }>(
+          "SELECT count(*)::int AS n FROM auth_tokens WHERE user_id = ? AND purpose = 'reset' AND used_at IS NULL",
+          [user.id],
+        )
+      )?.n,
+    ) === 0,
+  );
+  expect("this session survives the change", Boolean(await sessionsRepo.userForToken(keep)));
+  expect("every other session ends", !(await sessionsRepo.userForToken(other)));
   expect("accepted with the current password", moved.ok === true);
   expect(
     "verification cleared",
@@ -310,6 +329,43 @@ async function oauthCases() {
       "and links nothing to it",
       (await oauthAccountsRepo.listForUser(victim.value.user.id)).length === 0,
     );
+
+    line("an unverified account the provider's verified owner arrives at");
+    // The squatter registered first and holds a password and a session.
+    const squatterSession = await issueSession(victim.value.user.id);
+    const owner = await resolveSignIn({
+      provider: "google",
+      profile: { ...profile, providerUserId: "smoke-g-10", email: "oauth-victim@todox.local", isEmailVerified: true },
+      currentUserId: null,
+    });
+    expect("the owner gets the account", owner.ok && owner.userId === victim.value.user.id);
+    const taken = await usersRepo.byId(victim.value.user.id);
+    expect("the squatter's password is gone", taken?.password_hash === null);
+    expect("the address is now verified", Boolean(taken?.email_verified_at));
+    expect("the squatter's session is gone", !(await sessionsRepo.userForToken(squatterSession)));
+
+    line("connecting a provider from a signed-in account");
+    const noGrant = await resolveSignIn({
+      provider: "github",
+      profile: { ...profile, providerUserId: "smoke-gh-11", email: null },
+      currentUserId: victim.value.user.id,
+    });
+    expect("a session alone cannot connect one", !noGrant.ok && noGrant.code === "oauthLinkExpired");
+    const grant = await issueLinkGrant(victim.value.user.id);
+    const linked = await resolveSignIn({
+      provider: "github",
+      profile: { ...profile, providerUserId: "smoke-gh-11", email: null },
+      currentUserId: victim.value.user.id,
+      linkGrant: grant,
+    });
+    expect("a grant connects it", linked.ok && linked.how === "linked");
+    const replay = await resolveSignIn({
+      provider: "github",
+      profile: { ...profile, providerUserId: "smoke-gh-12", email: null },
+      currentUserId: victim.value.user.id,
+      linkGrant: grant,
+    });
+    expect("and is spent doing so", !replay.ok && replay.code === "oauthLinkExpired");
   }
 
   await run("DELETE FROM users WHERE lower(email) IN (lower(?), lower(?))", [

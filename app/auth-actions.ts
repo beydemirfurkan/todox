@@ -14,7 +14,8 @@ import {
   sessionAfterReset,
 } from "@/lib/services/account-recovery";
 import * as auth from "@/lib/services/auth";
-import { unlink } from "@/lib/services/oauth";
+import { beginOAuth } from "@/lib/oauth-begin";
+import { issueLinkGrant, unlink } from "@/lib/services/oauth";
 import { isProvider } from "@/lib/services/oauth-flow";
 import * as limit from "@/lib/services/rate-limit";
 import { clientIp as addressOf } from "@/lib/server/client-ip";
@@ -113,24 +114,25 @@ export async function loginAction(_prev: AuthState, fd: FormData): Promise<AuthS
   const identifier = str(fd, "identifier");
   const ip = await clientIp();
 
-  // Only failures count, so signing in successfully all day never locks you
-  // out. Both buckets are checked before any hashing happens.
+  // Every attempt is counted before the password is checked, and a success
+  // gives its count back. Counting only failures, after the slow hash, let a
+  // burst of parallel attempts all pass the gate before any of them was
+  // counted -- as many guesses as the server could take at once.
+  const identity = identifier.trim().toLowerCase();
   for (const [policy, subject] of [
-    ["loginPerIdentity", identifier],
+    ["loginPerIdentity", identity],
     ["loginPerIp", ip],
   ] as const) {
-    const gate = await limit.check(policy, subject);
+    const gate = await limit.consume(policy, subject);
     if (!gate.allowed) return tooMany(gate.retryAfterSec);
   }
 
   const result = await auth.login({ identifier, password: raw(fd, "password") });
-  if (!result.ok) {
-    await limit.penalise("loginPerIdentity", identifier);
-    await limit.penalise("loginPerIp", ip);
-    return { errors: result.errors };
-  }
+  if (!result.ok) return { errors: result.errors };
 
-  await limit.forgive("loginPerIdentity", identifier);
+  // The identity's count only: forgiving the address too would let anyone with
+  // one working account reset the per-address bucket between guesses at others.
+  await limit.forgive("loginPerIdentity", identity);
   await startSession(result.value.id);
   redirect(inviteNext(fd));
 }
@@ -209,6 +211,11 @@ export async function changePasswordAction(
   fd: FormData,
 ): Promise<AuthState> {
   const user = await requireUser();
+  // The current password is a gate, and a gate you can guess at without limit
+  // is not one. Counted up front for the reason login is.
+  const gate = await limit.consume("emailChangePerUser", String(user.id));
+  if (!gate.allowed) return tooMany(gate.retryAfterSec);
+
   const result = await auth.changePassword(
     user.id,
     raw(fd, "current"),
@@ -251,7 +258,12 @@ export async function changeEmailAction(
   const gate = await limit.consume("emailChangePerUser", String(user.id));
   if (!gate.allowed) return tooMany(gate.retryAfterSec);
 
-  const result = await auth.changeEmail(user.id, raw(fd, "current"), str(fd, "email"));
+  const result = await auth.changeEmail(
+    user.id,
+    raw(fd, "current"),
+    str(fd, "email"),
+    await currentSessionToken(),
+  );
   if (!result.ok) return { errors: result.errors };
 
   const { user: updated, previousEmail } = result.value;
@@ -277,10 +289,15 @@ export async function deleteAccountAction(
 ): Promise<AuthState> {
   const user = await requireUser();
 
-  // Only failures count. Consuming up front meant five mistyped confirmations
-  // locked you out of deleting the account *and* changing the address for an
-  // hour, having succeeded at neither.
-  const gate = await limit.check("emailChangePerUser", String(user.id));
+  // The typed username first, for free: it guards against a slip, not an
+  // attacker, and charging it meant five slips locked the account's address
+  // and its deletion for an hour. The service checks it again.
+  if (str(fd, "confirm").trim().toLowerCase() !== user.username.toLowerCase())
+    return { errors: [{ field: "confirm", code: "confirmMismatch" }] };
+
+  // Counted before the password is checked, as login is: checking first and
+  // counting failures after let parallel guesses all pass the gate.
+  const gate = await limit.consume("emailChangePerUser", String(user.id));
   if (!gate.allowed) return tooMany(gate.retryAfterSec);
 
   const result = await auth.deleteAccount(
@@ -289,10 +306,7 @@ export async function deleteAccountAction(
     str(fd, "confirm"),
     await currentSessionToken(),
   );
-  if (!result.ok) {
-    await limit.penalise("emailChangePerUser", String(user.id));
-    return { errors: result.errors };
-  }
+  if (!result.ok) return { errors: result.errors };
 
   // The session row went with the account; the cookie pointing at it has to go
   // too, or the next request spends a query proving it is dead.
@@ -354,6 +368,36 @@ export async function revokeAllTokensAction() {
 }
 
 /* ------------------------------------------------- sign-in providers */
+
+export type LinkState = { errors: auth.FieldError[]; url?: string } | null;
+
+/**
+ * Connect Google or GitHub to the signed-in account. Costs the password, or
+ * for an account without one a recent sign-in, because a linked identity is a
+ * way in that survives a password change: a session cookie alone must not be
+ * able to add one. Answers with the provider's address for the page to go to;
+ * the permission to link travels in the httpOnly OAuth cookie, not the URL.
+ */
+export async function startProviderLinkAction(_prev: LinkState, fd: FormData): Promise<LinkState> {
+  const user = await requireUser();
+  const provider = str(fd, "provider");
+  if (!isProvider(provider)) return { errors: [{ field: "form", code: "oauthFailed" }] };
+
+  // The password is a gate, so it is metered like the others that ask for it.
+  const gate = await limit.consume("emailChangePerUser", String(user.id));
+  if (!gate.allowed) return tooMany(gate.retryAfterSec);
+
+  const refusal = await auth.confirmIdentity(user.id, raw(fd, "password"), await currentSessionToken());
+  if (refusal) return { errors: [refusal] };
+
+  const url = await beginOAuth({
+    provider,
+    next: "/account?tab=connections",
+    linkGrant: await issueLinkGrant(user.id),
+  });
+  if (!url) return { errors: [{ field: "form", code: "oauthFailed" }] };
+  return { errors: [], url };
+}
 
 /**
  * Disconnect Google or GitHub. Refused when it is the account's last way in
