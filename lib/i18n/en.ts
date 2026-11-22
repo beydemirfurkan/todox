@@ -381,7 +381,7 @@ export const en = {
   tokenColumnActions: "actions",
   exportTitle: "export your data",
   exportBody:
-    "Every project you own, with its tasks, log, context notes and linked-file hashes, as one JSON file. Nothing about anybody else: projects shared with you belong to whoever made them, and no collaborator, invitation or credential is in the file.",
+    "Every project you own, with its tasks, log, context notes and linked-file hashes, as one JSON file. Projects shared with you belong to whoever made them, so of those only what you wrote yourself comes along. No collaborator, invitation or credential is in the file.",
   exportCta: "download my data",
   deleteAccount: "delete account",
   deleteAccountNote:

@@ -374,7 +374,7 @@ export const tr: Record<Key, string> = {
   tokenColumnActions: "işlemler",
   exportTitle: "verilerini dışa aktar",
   exportBody:
-    "Sahibi olduğun her proje; görevleri, kaydı, bağlam notları ve bağlı dosya hash'leriyle birlikte tek bir JSON dosyası. Başkasına ait hiçbir şey yok: seninle paylaşılan projeler onları açan kişinindir, ve dosyada hiçbir ekip arkadaşı, davet ya da kimlik bilgisi bulunmaz.",
+    "Sahibi olduğun her proje; görevleri, kaydı, bağlam notları ve bağlı dosya hash'leriyle birlikte tek bir JSON dosyası. Seninle paylaşılan projeler onları açan kişinindir; onlardan yalnızca kendi yazdıkların gelir. Dosyada hiçbir ekip arkadaşı, davet ya da kimlik bilgisi bulunmaz.",
   exportCta: "verilerimi indir",
   deleteAccount: "hesabı sil",
   deleteAccountNote:

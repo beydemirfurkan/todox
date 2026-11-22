@@ -403,8 +403,9 @@ docker exec <container> pnpm db:migrate
 ## Your data
 
 **Download my data** on the Account page, or `/api/export` with a token, gives
-you every project you own: tasks, log, notes and file hashes. Nothing about
-anyone else.
+you every project you own: tasks, log, notes and file hashes. From projects
+shared with you, only the entries you wrote yourself, under `written_elsewhere`,
+which import leaves alone.
 
 ```bash
 pnpm db:import ./todox-export-2026-08-18.json your-username
