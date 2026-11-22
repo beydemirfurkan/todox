@@ -31,7 +31,8 @@ describe("hook install", () => {
     expect(report.ok).toBe(true);
     for (const event of ["post-commit", "post-rewrite"]) {
       expect(readFileSync(hook(s.dir, event), "utf8")).toBe(`#!/bin/sh\n${blockFor(s.home, event)}\n`);
-      expect(statSync(hook(s.dir, event)).mode & 0o111).not.toBe(0);
+      // Windows has no executable bit; git there runs a hook by its name.
+      if (process.platform !== "win32") expect(statSync(hook(s.dir, event)).mode & 0o111).not.toBe(0);
     }
     expect(existsSync(join(s.home, "git-hook.mjs"))).toBe(true);
     expect(JSON.parse(readFileSync(join(s.home, "config.json"), "utf8"))).toEqual({ token: "todox_t", url: "http://x" });
