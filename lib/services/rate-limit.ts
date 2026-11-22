@@ -87,6 +87,12 @@ export const POLICIES = {
    * of these is a different proposition from 600 `get_context` calls.
    */
   exportPerUser: { limit: 6, windowMs: HOUR },
+  /**
+   * Trips to Google or GitHub and back, per address. Each one is a token
+   * exchange and two API calls made on the caller's behalf, and a sign-in
+   * needs one; the ceiling only stops a loop.
+   */
+  oauthPerIp: { limit: 30, windowMs: 15 * MINUTE },
 } as const;
 
 export type PolicyName = keyof typeof POLICIES;

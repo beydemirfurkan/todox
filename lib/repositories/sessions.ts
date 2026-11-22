@@ -32,6 +32,14 @@ export const userForToken = (token: string) =>
     [hashToken(token), now()],
   );
 
+/** When this account's live session behind the cookie was opened. */
+export const openedAt = (token: string, userId: number) =>
+  one<{ created_at: string }>(
+    `SELECT created_at FROM sessions
+     WHERE token_hash = ? AND user_id = ? AND expires_at > ?`,
+    [hashToken(token), userId, now()],
+  );
+
 export const destroy = (token: string) =>
   run("DELETE FROM sessions WHERE token_hash = ?", [hashToken(token)]);
 

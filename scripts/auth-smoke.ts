@@ -23,7 +23,9 @@ import {
   sendEmailChanged,
   sendVerification,
 } from "../lib/services/account-recovery";
-import { changeEmail, issueSession, login, register } from "../lib/services/auth";
+import { changeEmail, changePassword, issueSession, login, register } from "../lib/services/auth";
+import * as oauthAccountsRepo from "../lib/repositories/oauth-accounts";
+import { resolveSignIn, unlink } from "../lib/services/oauth";
 import * as limit from "../lib/services/rate-limit";
 import { hashToken } from "../lib/util/tokens";
 
@@ -239,10 +241,81 @@ async function main() {
   }
 
   await run("DELETE FROM users WHERE id = ?", [user.id]);
+  await oauthCases();
   await limit.sweep();
 
   console.log(failures === 0 ? "\nOK (cleaned up)" : `\n${failures} FAILURE(S)`);
   if (failures) process.exit(1);
+}
+
+/**
+ * Google and GitHub sign-in against the real schema: the CTE that makes an
+ * account and its identity together, the unique constraints the service
+ * reads refusals from, and the statement that refuses to unlink the last way
+ * in. The provider itself is not called; a profile stands in for what it said.
+ */
+async function oauthCases() {
+  line("signing in with a provider");
+  const profile = {
+    providerUserId: "smoke-gh-1",
+    email: "oauth-smoke@todox.local",
+    isEmailVerified: true,
+    name: "OAuth Smoke",
+    usernameHint: "oauth-smoke",
+  };
+  await run("DELETE FROM users WHERE lower(email) IN (lower(?), lower(?))", [
+    profile.email,
+    "oauth-victim@todox.local",
+  ]);
+
+  const created = await resolveSignIn({ provider: "github", profile, currentUserId: null });
+  expect("a new identity makes an account", created.ok && created.how === "created");
+  if (!created.ok) return;
+  const made = await usersRepo.byId(created.userId);
+  expect("with no password", made?.password_hash === null);
+  expect("and the address marked verified", Boolean(made?.email_verified_at));
+  expect(
+    "the identity row was written with it",
+    (await oauthAccountsRepo.listForUser(created.userId)).length === 1,
+  );
+
+  const again = await resolveSignIn({ provider: "github", profile, currentUserId: null });
+  expect("the same identity lands on the same account", again.ok && again.userId === created.userId);
+
+  const noPassword = await login({ identifier: profile.email, password: "" });
+  expect("an empty password does not sign it in", noPassword.ok === false);
+
+  expect("its only way in cannot be unlinked", (await unlink(created.userId, "github")) === false);
+
+  const session = await issueSession(created.userId);
+  const setFirst = await changePassword(created.userId, "", "a-first-password", session);
+  expect("a fresh session sets a first password", setFirst.ok === true);
+  expect("then the identity can be unlinked", (await unlink(created.userId, "github")) === true);
+
+  line("an address a provider has not verified");
+  const victim = await register({
+    username: "oauth-victim",
+    email: "oauth-victim@todox.local",
+    name: "Victim",
+    password: "victim-password",
+  });
+  if (victim.ok) {
+    const claim = await resolveSignIn({
+      provider: "google",
+      profile: { ...profile, providerUserId: "smoke-g-9", email: "oauth-victim@todox.local", isEmailVerified: false },
+      currentUserId: null,
+    });
+    expect("does not reach the existing account", claim.ok === false);
+    expect(
+      "and links nothing to it",
+      (await oauthAccountsRepo.listForUser(victim.value.user.id)).length === 0,
+    );
+  }
+
+  await run("DELETE FROM users WHERE lower(email) IN (lower(?), lower(?))", [
+    profile.email,
+    "oauth-victim@todox.local",
+  ]);
 }
 
 main().catch((e) => {

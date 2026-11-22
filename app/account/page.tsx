@@ -27,6 +27,7 @@ import {
 } from "../components";
 import { privatePageMetadata } from "../metadata-shared";
 import { authMessages } from "../auth-messages";
+import { Connections } from "./connections";
 import { AuthForm } from "../features/auth-form";
 import { SubmitButton } from "../features/submit";
 import { RevealCurrent } from "../features/reveal-current";
@@ -44,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const tabIds = ["profile", "public", "email", "password", "tokens", "invites"] as const;
+const tabIds = ["profile", "public", "email", "password", "connections", "tokens", "invites"] as const;
 type TabId = (typeof tabIds)[number];
 
 function isTabId(value: string | undefined): value is TabId {
@@ -75,6 +76,12 @@ function TabIcon({ tab }: { tab: TabId }) {
       <>
         <rect x="4" y="10" width="16" height="10" rx="2.5" />
         <path d="M8 10V7.5a4 4 0 0 1 8 0V10M12 14v2.5" />
+      </>
+    ),
+    connections: (
+      <>
+        <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+        <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
       </>
     ),
     tokens: (
@@ -112,7 +119,7 @@ function TabIcon({ tab }: { tab: TabId }) {
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; error?: string | string[] }>;
 }) {
   const user = await requireUser();
   const { t, lang } = await getT();
@@ -129,14 +136,17 @@ export default async function AccountPage({
       : Promise.resolve([]),
     membershipsRepo.listByUser(user.id),
   ]);
-  const requestedTab = (await searchParams).tab;
+  const asked = await searchParams;
+  const requestedTab = asked.tab;
+  const askedError = Array.isArray(asked.error) ? asked.error[0] : asked.error;
   const tabValue = Array.isArray(requestedTab) ? requestedTab[0] : requestedTab;
   const activeTab: TabId = isTabId(tabValue) ? tabValue : "profile";
   const tabs: Array<{ id: TabId; label: string }> = [
     { id: "profile", label: t("profile") },
     { id: "public", label: t("pubTitle") },
     { id: "email", label: t("changeEmail") },
-    { id: "password", label: t("changePassword") },
+    { id: "password", label: user.has_password ? t("changePassword") : t("setPassword") },
+    { id: "connections", label: t("tabConnections") },
     { id: "tokens", label: t("apiTokens") },
     { id: "invites", label: t("invites") },
   ];
@@ -334,21 +344,27 @@ export default async function AccountPage({
       )}
 
       {activeTab === "password" && (
-        <Panel delay={40} title={t("changePassword")}>
+        <Panel delay={40} title={user.has_password ? t("changePassword") : t("setPassword")}>
           <div className="max-w-xl">
-            <p className="mb-3 text-[13.5px] text-muted">{t("changePasswordNote")}</p>
+            <p className="mb-3 text-[13.5px] text-muted">
+              {user.has_password ? t("changePasswordNote") : t("setPasswordNote")}
+            </p>
             <AuthForm
               action={changePasswordAction}
-              submitLabel={t("changePassword")}
+              submitLabel={user.has_password ? t("changePassword") : t("setPassword")}
               pendingLabel={t("saving")}
               messages={authMessages(t)}
               fields={[
-                {
-                  name: "current",
-                  label: t("currentPassword"),
-                  type: "password",
-                  autoComplete: "current-password",
-                },
+                ...(user.has_password
+                  ? [
+                      {
+                        name: "current",
+                        label: t("currentPassword"),
+                        type: "password" as const,
+                        autoComplete: "current-password",
+                      },
+                    ]
+                  : []),
                 {
                   name: "password",
                   label: t("newPassword"),
@@ -358,6 +374,12 @@ export default async function AccountPage({
               ]}
             />
           </div>
+        </Panel>
+      )}
+
+      {activeTab === "connections" && (
+        <Panel delay={40} title={t("tabConnections")}>
+          <Connections userId={user.id} errorCode={askedError ?? ""} t={t} />
         </Panel>
       )}
 
@@ -573,6 +595,9 @@ export default async function AccountPage({
         </summary>
         <div className="max-w-xl border-t border-dashed border-rule p-4">
           <p className="mb-3 text-[14px] text-muted">{t("deleteAccountNote")}</p>
+          {!user.has_password && (
+            <p className="mb-3 text-[14px] text-muted">{t("deleteAccountReauthNote")}</p>
+          )}
           <AuthForm
             action={deleteAccountAction}
             submitLabel={t("deleteAccountSubmit")}
@@ -580,12 +605,16 @@ export default async function AccountPage({
             submitClassName="btn btn-danger"
             messages={authMessages(t)}
             fields={[
-              {
-                name: "password",
-                label: t("currentPassword"),
-                type: "password",
-                autoComplete: "current-password",
-              },
+              ...(user.has_password
+                ? [
+                    {
+                      name: "password",
+                      label: t("currentPassword"),
+                      type: "password" as const,
+                      autoComplete: "current-password",
+                    },
+                  ]
+                : []),
               {
                 name: "confirm",
                 label: t("deleteAccountConfirm"),

@@ -21,6 +21,11 @@ export const currentUser = cache(async (): Promise<PublicUser | null> => {
   return (await userForSession(token)) ?? null;
 });
 
+/** The raw session cookie, for the checks that need to know how old it is. */
+export async function currentSessionToken(): Promise<string | undefined> {
+  return (await cookies()).get(SESSION_COOKIE)?.value;
+}
+
 export async function requireUser(): Promise<PublicUser> {
   const user = await currentUser();
   if (!user) redirect("/login");

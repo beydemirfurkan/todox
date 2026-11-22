@@ -27,6 +27,7 @@ const sessionsRepo = vi.hoisted(() => ({
   userForToken: vi.fn(),
   purgeExpired: vi.fn(),
   destroyAllForStmt: vi.fn(() => ({ text: "DELETE FROM sessions", params: [] })),
+  openedAt: vi.fn(),
 }));
 const apiTokensRepo = vi.hoisted(() => ({
   create: vi.fn(),
@@ -430,3 +431,73 @@ describe("api tokens", () => {
     expect(apiTokensRepo.remove).toHaveBeenCalledWith(11, USER.id);
   });
 });
+
+/**
+ * An account made through Google or GitHub has no password. What stands in
+ * for one is a sign-in from the last few minutes -- never the cookie alone,
+ * which is exactly what the password gates exist to refuse.
+ */
+describe("an account without a password", () => {
+  const NO_PASSWORD = { ...USER, password_hash: null } as User;
+  const openedMinutesAgo = (minutes: number) =>
+    sessionsRepo.openedAt.mockResolvedValue({
+      created_at: new Date(Date.now() - minutes * 60_000).toISOString(),
+    });
+
+  it("says it has no password, without saying anything else", () => {
+    expect(auth.publicUser(NO_PASSWORD).has_password).toBe(false);
+    expect(auth.publicUser(USER).has_password).toBe(true);
+  });
+
+  it("cannot be signed in to with any password", async () => {
+    usersRepo.byLogin.mockResolvedValue(NO_PASSWORD);
+    pw.verifyPassword.mockResolvedValue(false);
+    const result = await auth.login({ identifier: "bob", password: "" });
+    expect(result.ok).toBe(false);
+    // Checked against the dummy, so it costs what a wrong password costs.
+    expect(pw.verifyPassword).toHaveBeenCalledWith("", auth.NO_SUCH_USER_HASH);
+  });
+
+  it("sets a first password after a recent sign-in", async () => {
+    usersRepo.byId.mockResolvedValue(NO_PASSWORD);
+    openedMinutesAgo(2);
+    const result = await auth.changePassword(3, "", "a-long-new-password", "token");
+    expect(result.ok).toBe(true);
+    expect(sessionsRepo.openedAt).toHaveBeenCalledWith("token", 3);
+  });
+
+  it("asks for a fresh sign-in when the session is old", async () => {
+    usersRepo.byId.mockResolvedValue(NO_PASSWORD);
+    openedMinutesAgo(16);
+    const result = await auth.changePassword(3, "", "a-long-new-password", "token");
+    expect(result).toEqual({ ok: false, errors: [{ field: "form", code: "reauthRequired" }] });
+    expect(db.tx).not.toHaveBeenCalled();
+  });
+
+  it("asks for a fresh sign-in when there is no session to measure", async () => {
+    usersRepo.byId.mockResolvedValue(NO_PASSWORD);
+    const result = await auth.changePassword(3, "", "a-long-new-password");
+    expect(result.ok).toBe(false);
+    expect(sessionsRepo.openedAt).not.toHaveBeenCalled();
+  });
+
+  it("sets a password before it may move its address", async () => {
+    usersRepo.byId.mockResolvedValue(NO_PASSWORD);
+    openedMinutesAgo(1);
+    const result = await auth.changeEmail(3, "", "new@example.com");
+    expect(result).toEqual({ ok: false, errors: [{ field: "current", code: "passwordNotSet" }] });
+    expect(usersRepo.updateEmail).not.toHaveBeenCalled();
+  });
+
+  it("is deleted only after a recent sign-in", async () => {
+    usersRepo.byId.mockResolvedValue(NO_PASSWORD);
+    openedMinutesAgo(30);
+    expect((await auth.deleteAccount(3, "", "bob", "token")).ok).toBe(false);
+    expect(usersRepo.remove).not.toHaveBeenCalled();
+
+    openedMinutesAgo(1);
+    expect((await auth.deleteAccount(3, "", "bob", "token")).ok).toBe(true);
+    expect(usersRepo.remove).toHaveBeenCalledWith(3);
+  });
+});
+

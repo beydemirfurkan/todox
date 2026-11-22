@@ -6,6 +6,9 @@ import * as invitations from "@/lib/repositories/project-invitations";
 import { currentUser } from "@/lib/session";
 import { acceptNewAccountInviteAction, acceptProjectInviteAction } from "../actions";
 import { AuthShell } from "../features/auth-shell";
+import { OAuthButtons } from "../features/oauth-buttons";
+import { enabledProviders } from "@/lib/services/oauth-providers";
+
 import { SubmitButton } from "../features/submit";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +43,7 @@ export default async function InvitePage({
         title={t("inviteTitle")}
         intro={t("inviteDescription", { project: invitation.project_name })}
       >
+        <OAuthButtons providers={enabledProviders()} next={next} t={t} />
         <form action={acceptNewAccountInviteAction}>
           <input type="hidden" name="token" value={token} />
           <SubmitButton className="btn w-full" pendingLabel={t("working")}>
