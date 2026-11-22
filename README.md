@@ -409,6 +409,23 @@ docker exec <container> pnpm db:migrate
 `docker inspect <container> --format '{{.Config.Image}}'` with
 `git rev-parse origin/main` to see what is really running.
 
+### Backups and upgrades
+
+The database is the whole instance; the app container holds nothing. Back it
+up from the host, on a schedule:
+
+```bash
+docker compose exec -T db pg_dump -U todox -Fc todox > todox-$(date +%F).dump
+# restore into an empty database:
+docker compose exec -T db pg_restore -U todox -d todox --clean < todox-2026-11-22.dump
+```
+
+To upgrade: pull, `docker compose up -d --build`, then
+`docker compose exec app pnpm db:migrate`. After restoring a dump taken on an
+older version, run `db:migrate` again to bring its schema up. A Postgres major version (the `postgres:18`
+image) does not upgrade in place: dump, start the new image on an empty
+volume, restore.
+
 ## Your data
 
 **Download my data** on the Account page, or `/api/export` with a token, gives
