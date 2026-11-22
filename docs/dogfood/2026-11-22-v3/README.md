@@ -11,7 +11,7 @@ v2'nin üç aday düzeltmesi uygulandıktan sonra iki ölçüm yapıldı.
 - Sonuç: `~/todox-lab/runs/2026-11-22-habit/r{1,2,3}/scores.md`
 - Alışkanlık, `install:mcp`'nin yazdığı dört satırdır ve kurulumun kendi fonksiyonuyla yazıldı.
 - OpenCode bunu `$XDG_CONFIG_HOME/opencode/AGENTS.md`'den okur.
-- Claude Code bu koşuda kullanıcı CLAUDE.md'sini okumadığı için aynı blok prompt'a eklendi.
+- Claude Code bu koşuda kullanıcı CLAUDE.md'sini okumadığı için aynı blok prompt'a eklendi. Jonas, aşağıda anlatılan yeniden ölçümde reponun kendi CLAUDE.md'sinden okudu (`a13e1e0`).
 
 Uygulanan düzeltmeler:
 - `555d242` id'nin rakamları id sayılır; `update_task` `id` kabul eder.
@@ -59,10 +59,32 @@ Jonas'ta alışkanlık işe yaramadı. r1'de ilk iki oturum `get_context`'i hiç
 - Claude için alışkanlık CLAUDE.md değil, prompt'a eklenmiş metin; gerçek kurulumu birebir temsil etmiyor.
 - Alışkanlık kuruluyken sunucu kurulum notlarını göndermiyor; briefing 2.9 KB'tan 2.5 KB'a iniyor.
 
-Örnek küçük ve Jonas'ın kendi gürültüsü de büyük. Bunu kesin bir gerileme olarak değil, ayrı ölçülmesi gereken bir soru olarak bırakıyorum.
+Örnek küçük ve Jonas'ın kendi gürültüsü de büyük.
 
-## Açık kalanlar
+### Jonas, alışkanlık CLAUDE.md'den okunarak
 
-- **`get_context {}`:** Claude Code'un şemasız ilk çağrısı. Yerel modda stdio süreci `cwd`'yi bildiği için boş çağrıyı kendisi doldurabilir. id düzeltmesinin bir sonraki adımı bu.
-- **Hosted modda yeni checkout'un kaydı:** agent'lar `repo_url` göndermek yerine görevle devam ediyor. Codex ve Cursor eklentileri stdio ile `repo_root` ve `repo_url`'yi kendisi dolduruyor; Claude Code'un hosted bağlantısında bu hâlâ agent'a kalıyor.
-- **İşaretli soru oturumları temel koşulda 0/2.** Ayşe s1 seçimi sohbette bırakmaya devam ediyor. Can, alışkanlıklı r2 koşusunda s2'de soru açtı ve s3'te cevabı `answers_entry_id` ile yazarak kapattı. Senaryodaki soru-cevap döngüsü, lab'da ilk kez baştan sona işledi.
+İlk nedeni ayıklamak için Jonas yeniden üç tekrar koşuldu: `~/todox-lab/runs/2026-11-22-habit-claudemd/r{1,2,3}`.
+
+- Lab, Claude'u yalnızca proje ayarlarıyla koşuyor ve kullanıcı CLAUDE.md'sine ikinci bir oturum açmadan ulaşamıyor.
+- Ama reponun kendi CLAUDE.md'si aynı bellek yolundan yükleniyor. Not: Claude Code `/private/tmp` altındaki bir CLAUDE.md'yi okumuyor; lab repolarında okuyor, bu ayrıca denendi.
+- `--habit` dört satırı oraya yazıyor ve `.git/info/exclude` ile `git status`'tan gizliyor.
+
+| Jonas | v2 (alışkanlık yok) | prompt'a eklenmiş | CLAUDE.md'den |
+|---|---|---|---|
+| ctx first | 6/6 | 7/9 | **9/9** |
+| s2/s3 hatırlama | 3/4 | 2/6 | **4/6** |
+| görevsiz "neden" notu | 1 / tekrar | 0 | **3** (r1: 1, r3: 2) |
+| entry ve handoff | 1 kayıt | 0 | 0 |
+| ret | | | 2 |
+
+Alışkanlık gerçek yerinden okunduğunda Jonas her oturuma `get_context` ile başladı. Bitmiş işin nedenini de üç kez proje notu olarak yazdı. İlk koşudaki düşüş, alışkanlığın kendisinden değil, prompt'a eklenmesinden geliyordu.
+
+İki ret aynı desen: Jonas bitmiş bir işin kararını görevsiz ve `cwd` ile `log_entry`'ye yazmaya çalıştı, "Invalid input at task_id" aldı ve bir çağrı sonra `add_context`'i buldu. Ret mesajı artık doğrudan bunu söylüyor (`c4c6031`): kayıt bir göreve aittir; görevsiz bitmiş iş için `add_context(kind decision/gotcha, cwd)`, sürecek iş için önce `create_task`.
+
+Handoff 0/3: Jonas görev açmadan bitirdiği için kapatılacak görevi yok. Bu, "bitirdiğin iş için görev açma" talimatının beklenen sonucu.
+
+## Açık kalanlar, ve nasıl kapandılar
+
+- **`get_context {}`** — `2f11256`. Yerel modda stdio süreci, başlatıldığı dizini `cwd` olarak kullanıyor ve şema ikisinden birini zorunlu tutmuyor. `smoke:mcp` boş çağrının aynı projeye düştüğünü stdio üzerinden doğruluyor. Hosted modda boş çağrı hâlâ reddediliyor, çünkü sunucunun dizini yok. Mesaj artık slug yerine önce `cwd`'yi ve `pwd`'yi istiyor.
+- **Hosted modda yeni checkout'un kaydı** — `825a0ea`. Plugin'in SessionStart hook'u kodun durduğu makinede çalışıyor. Briefing alınamadığında agent'a bu checkout'un tam `repo_url` ve `repo_root` değerlerini veriyor; ilk `get_context` kaydı bununla yapıyor. Codex'te canlı denendi: kayıtsız mobil repoda bu satır, kayıtlı repoda briefing enjekte edildi.
+- **İşaretli soru oturumları temel koşulda 0/2.** Ayşe s1 seçimi sohbette bırakmaya devam ediyor. Can, alışkanlıklı r2 koşusunda s2'de soru açtı ve s3'te cevabı `answers_entry_id` ile yazarak kapattı. Senaryodaki soru-cevap döngüsü, lab'da ilk kez baştan sona işledi. Alışkanlık kurulu kullanıcıda döngü çalışıyor; kurulu olmayan Claude oturumunda sunucu talimatı tek başına yetmiyor. Bu bir ölçüm sonucu, açık bir hata değil. Kurulumun alışkanlığı varsayılan olarak yazması (B6) buna verilen cevap.
