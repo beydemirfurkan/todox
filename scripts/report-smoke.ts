@@ -72,7 +72,18 @@ console.log("closed_at set:", Boolean(timing.closed_at));
 console.log("active_ms is a number:", typeof timing.active_ms === "number");
 console.log("lead_ms is a number:", typeof timing.lead_ms === "number");
 
-const report = await activityReport(user.id, resolvePeriod("today"));
+/**
+ * Today's window, opened after the writes above have their timestamps.
+ * "today" ends at now and the window is half-open, so a task closed in the
+ * same millisecond the window was taken sits exactly on `to` and is left out
+ * -- which is what made this check fail about half the time (#810).
+ */
+const todayAfterWrites = async () => {
+  const written = Date.now();
+  while (Date.now() === written) await new Promise((r) => setTimeout(r, 1));
+  return resolvePeriod("today");
+};
+const report = await activityReport(user.id, await todayAfterWrites());
 const row = report.completed.find((r) => r.id === task.id);
 console.log("\nappears in today's completed:", Boolean(row));
 console.log("importance:", row?.importance);
@@ -99,7 +110,7 @@ const bornDone = await taskService.create({
   model: MODEL,
 });
 assert(Boolean(bornDone.closed_at), "closed_at is set at creation, not left null");
-const withBornDone = await activityReport(user.id, resolvePeriod("today"));
+const withBornDone = await activityReport(user.id, await todayAfterWrites());
 assert(
   withBornDone.completed.some((r) => r.id === bornDone.id),
   "and it reaches today's completed list",
@@ -120,7 +131,13 @@ console.log("\n--- the headline says how much of the time it could not measure -
 // `renderMarkdown` cannot see it. Counting `active_ms === 0` instead of
 // `partial` reads like the same thing and is not -- a task really can spend no
 // time in a window -- and the two tasks below are what tells them apart.
-const unmeasuredBefore = (await activityReport(user.id, resolvePeriod("today"))).totals.unmeasured;
+// Counted over this run's own tasks: the demo account keeps whatever earlier
+// runs left, and a before/after delta over all of it moved with them (#810).
+// The total itself is checked against its definition instead.
+const partialAmong = (report: Awaited<ReturnType<typeof activityReport>>, ids: number[]) =>
+  report.completed.filter((r) => ids.includes(r.id) && r.partial).length;
+const totalFollowsPartial = (report: Awaited<ReturnType<typeof activityReport>>) =>
+  report.totals.unmeasured === report.completed.filter((r) => r.partial).length;
 
 const neverStarted = await taskService.create({
   project_id: project.id,
@@ -128,9 +145,9 @@ const neverStarted = await taskService.create({
   status: "done",
   model: MODEL,
 });
-const afterNeverStarted = await activityReport(user.id, resolvePeriod("today"));
+const afterNeverStarted = await activityReport(user.id, await todayAfterWrites());
 assert(
-  afterNeverStarted.totals.unmeasured === unmeasuredBefore + 1,
+  partialAmong(afterNeverStarted, [neverStarted.id]) === 1 && totalFollowsPartial(afterNeverStarted),
   "a task closed without ever being set to doing counts as unmeasured",
 );
 assert(
@@ -150,11 +167,14 @@ const backfilled = await taskService.create({
   model: MODEL,
 });
 await taskService.update(backfilled.id, { status: "done" }, { model: MODEL });
+// Two seconds back as well: created 'doing' and closed in the same millisecond,
+// the task accrued nothing, and "it did take time" below failed whenever the
+// clock did not tick between the two writes.
 await run(
-  "UPDATE task_events SET actor = ? WHERE task_id = ? AND to_status = ?",
-  ["backfill", backfilled.id, "doing"],
+  "UPDATE task_events SET actor = ?, at = ? WHERE task_id = ? AND to_status = ?",
+  ["backfill", new Date(Date.now() - 2_000).toISOString(), backfilled.id, "doing"],
 );
-const afterBoth = await activityReport(user.id, resolvePeriod("today"));
+const afterBoth = await activityReport(user.id, await todayAfterWrites());
 const marked = afterBoth.completed.find((r) => r.id === backfilled.id);
 assert(marked?.partial === true, "a backfilled task is partial even though it accrued time");
 assert(
@@ -162,7 +182,7 @@ assert(
   "and it really did accrue time, so active_ms === 0 would not have found it",
 );
 assert(
-  afterBoth.totals.unmeasured === unmeasuredBefore + 2,
+  partialAmong(afterBoth, [neverStarted.id, backfilled.id]) === 2 && totalFollowsPartial(afterBoth),
   "the count follows partial, not a zero reading",
 );
 
