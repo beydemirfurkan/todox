@@ -16,6 +16,7 @@ import { localDatabaseOnly } from "../local-only";
 
 import { execFileSync } from "node:child_process";
 import {
+  appendFileSync,
   chmodSync,
   existsSync,
   mkdirSync,
@@ -32,6 +33,7 @@ import * as projectsRepo from "../../lib/repositories/projects";
 import * as usersRepo from "../../lib/repositories/users";
 import { createApiToken } from "../../lib/services/auth";
 import * as invitations from "../../lib/services/project-invitations";
+import { forgive } from "../../lib/services/rate-limit";
 import { invoke } from "../../lib/services/rpc";
 import { hashPassword } from "../../lib/util/password";
 import { writeMemoryFile } from "../install-mcp/memory";
@@ -248,8 +250,12 @@ async function ensureSharedLedger(owner: { id: number }, member: Persona): Promi
  *   a private XDG home, so that file is exactly what an installed OpenCode
  *   reads.
  * - Claude Code runs with project settings only, so it never reads a user
- *   CLAUDE.md; `lab:run --habit` appends the same block to its prompt instead
- *   (see run.ts). Pointing it at another home would need a second login.
+ *   CLAUDE.md, and pointing it at another home would need a second login. It
+ *   does read the checkout's own CLAUDE.md, through the same memory path, so
+ *   the block goes there, kept out of `git status` by `.git/info/exclude` so
+ *   the agent does not see an untracked file it might commit. The first habit
+ *   run appended the block to the system prompt instead, which is not where a
+ *   real install puts it (docs/dogfood/2026-11-22-v3).
  * - The stdio server checks for the habit under HOME before it decides to send
  *   setup notes, so the persona's own home gets both files: an installed user
  *   would not be nagged for a habit they have.
@@ -257,17 +263,32 @@ async function ensureSharedLedger(owner: { id: number }, member: Persona): Promi
  * Written by the installer's own function, so the lab measures the text a
  * real install leaves and not a copy of it.
  */
-async function writeHabit(persona: PersonaKey): Promise<void> {
-  const home = join(secretsDir(persona), "home");
-  await writeMemoryFile(join(openCodeHome(persona), "opencode", "AGENTS.md"));
+async function writeHabit(persona: Persona): Promise<void> {
+  const home = join(secretsDir(persona.key), "home");
+  await writeMemoryFile(join(openCodeHome(persona.key), "opencode", "AGENTS.md"));
   await writeMemoryFile(join(home, ".config", "opencode", "AGENTS.md"));
   await writeMemoryFile(join(home, ".claude", "CLAUDE.md"));
+  const claudeRepos = new Set(persona.sessions.filter((s) => s.agent === "claude").map((s) => s.project));
+  for (const project of claudeRepos) await writeRepoHabit(repoDir(persona.key, project));
+}
+
+async function writeRepoHabit(dir: string): Promise<void> {
+  await writeMemoryFile(join(dir, "CLAUDE.md"));
+  const exclude = join(dir, ".git", "info", "exclude");
+  const listed = existsSync(exclude) ? readFileSync(exclude, "utf8").split("\n") : [];
+  if (!listed.includes("CLAUDE.md")) {
+    mkdirSync(dirname(exclude), { recursive: true });
+    appendFileSync(exclude, "CLAUDE.md\n");
+  }
 }
 
 async function reset(): Promise<void> {
   for (const p of PERSONAS) {
     const user = await usersRepo.byUsername(p.username);
     if (user) await usersRepo.remove(user.id);
+    // Every reset re-invites Ayşe to ledger-api, and the limit is five an
+    // hour per recipient: a repeated lab hit it on its sixth setup.
+    await forgive("invitePerRecipient", emailFor(p));
   }
   // Everything but the runs. A repeated lab resets before each repetition,
   // and the earlier runs are what the new one is compared against.
@@ -290,8 +311,8 @@ async function main(): Promise<void> {
     mkdirSync(secretsDir(p.key), { recursive: true, mode: 0o700 });
     writeClaudeConfig(p.key, token);
     writeOpenCodeConfig(p.key, token);
-    if (process.argv.includes("--habit")) await writeHabit(p.key);
     ensureRepos(p);
+    if (process.argv.includes("--habit")) await writeHabit(p);
   }
   const ayse = PERSONAS.find((p) => p.key === "ayse");
   const mert = accounts.get("mert");

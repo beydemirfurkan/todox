@@ -37,7 +37,6 @@ import {
   RUNS,
   TSX,
 } from "./paths";
-import { memoryBlock } from "../install-mcp/memory";
 import { PERSONAS, personaByKey, type Persona, type PersonaKey, type Session } from "./personas";
 
 localDatabaseOnly("lab:run");
@@ -91,9 +90,6 @@ function claudeCommand(persona: PersonaKey, prompt: string): Command {
     args: [
       "-p",
       prompt,
-      // The user CLAUDE.md this run cannot read (project settings only),
-      // appended instead: see `writeHabit` in setup.ts.
-      ...(HAS_HABIT ? ["--append-system-prompt", memoryBlock()] : []),
       "--setting-sources",
       "project",
       "--settings",
