@@ -4,7 +4,7 @@
  * reach that local server and nothing else.
  *
  *   pnpm lab:setup            create what is missing, keep what is there
- *   pnpm lab:setup --reset    delete the lab accounts and folder first
+ *   pnpm lab:setup --reset    delete the lab accounts and folder first (runs/ is kept)
  *
  * Refuses a remote database (scripts/local-only.ts): the accounts are created
  * through the repositories, which follow DATABASE_URL, and a lab that wrote
@@ -14,7 +14,15 @@ import "../env";
 import { localDatabaseOnly } from "../local-only";
 
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 
 import { disconnect } from "../../lib/db/client";
@@ -226,7 +234,11 @@ async function reset(): Promise<void> {
     const user = await usersRepo.byUsername(p.username);
     if (user) await usersRepo.remove(user.id);
   }
-  rmSync(LAB, { recursive: true, force: true });
+  // Everything but the runs. A repeated lab resets before each repetition,
+  // and the earlier runs are what the new one is compared against.
+  if (!existsSync(LAB)) return;
+  for (const entry of readdirSync(LAB))
+    if (entry !== "runs") rmSync(join(LAB, entry), { recursive: true, force: true });
 }
 
 async function main(): Promise<void> {
