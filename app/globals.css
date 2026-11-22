@@ -327,6 +327,71 @@ summary:focus-visible,
   opacity: 1;
 }
 
+/* --------------------------------------------------------- the marker */
+
+/* A note scrawled in the margin: the display face in italic, the marker's
+   colour pressed hard enough to read (--accent-ink), a degree or two off
+   the line. For labels and asides, never for something a person must act on. */
+.scrawl {
+  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-style: italic;
+  font-weight: 450;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+  color: var(--accent-ink);
+  transform: rotate(-2deg);
+  transform-origin: left center;
+}
+/* The same hand, in ink: what is written *on* a label rather than about it. */
+.scrawl-ink {
+  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+  color: var(--ink);
+}
+
+/* One phrase under the marker: orange ink with a rough stroke drawn beneath
+   it. The stroke is a background image so it wraps with the line. */
+.marker {
+  color: var(--accent-ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 12' preserveAspectRatio='none'%3E%3Cpath d='M2 8.5C40 4 80 3.5 120 5.5s58 3 76-1' fill='none' stroke='%23ff6f1e' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 100% 0.2em;
+  background-position: 0 96%;
+  padding-bottom: 0.06em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* The name label stuck on a notebook's cover. */
+.name-label {
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 8px 12px 6px;
+  box-shadow: var(--shadow-lg);
+}
+
+/* The orange band the page ends on. */
+.brand-band {
+  background: var(--accent);
+  color: var(--on-fill);
+  border-radius: 56px 56px 0 0;
+}
+.brand-band .link-more {
+  color: var(--on-fill);
+  text-decoration-color: var(--on-fill);
+}
+.brand-band ::selection {
+  background: var(--on-fill);
+  color: var(--accent);
+}
+@media (max-width: 640px) {
+  .brand-band {
+    border-radius: 32px 32px 0 0;
+  }
+}
+
 /* ------------------------------------------------------------- stickers */
 
 .sticker {

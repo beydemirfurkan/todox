@@ -12,3 +12,4 @@ export { ProjectLanes, WaitingList, type ProjectLane } from "./project-lanes";
 export { ProjectFields, ProjectRow, type ProjectCountRow } from "./project-list";
 export { Tabs, currentTab, type Tab } from "./tabs";
 export { RefBadge, StatusDot } from "./status";
+export { BoltSticker, HandArrow, HeartSticker, PencilSticker, SparkleSticker } from "./stickers";

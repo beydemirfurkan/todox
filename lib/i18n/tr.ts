@@ -567,6 +567,14 @@ export const tr: Record<Key, string> = {
     "Agentın her oturuma bir öncekinden hiçbir şey bilmeden başlıyor. Bunun bedelini iki kez ödüyorsun — bir kez projeyi baştan anlatırken, bir kez de önceki oturumun çoktan tosladığı duvara yeniden toslarken.",
   landingCta: "Hesap oluştur",
   landingSecondary: "Zaten hesabım var",
+  landingScrawl: "geliştiriciler ve birlikte çalıştıkları agent'lar için —",
+  landingHeadline: "agentının {mark} defter",
+  landingHeadlineMark: "gerçekten tuttuğu",
+  landingCtaNote: "Açık kaynak. Hepsini istediğin an dışa aktar.",
+  landingArrowNote: "sonraki oturumun okuduğu şey",
+  landingLabelProject: "proje",
+  landingLabelTask: "görev",
+  landingLabelState: "durum",
   landingConnectTitle: "Hâlihazırda kullandığın agent'la çalışır",
   landingConnectBody:
     "Tek bir adres ve bir token. Kurulacak paket yok, ayakta tutulacak yerel süreç yok — MCP konuşan her şey bağlanır: Claude Code, Codex, Cursor, VS Code.",
@@ -593,7 +601,6 @@ export const tr: Record<Key, string> = {
   briefingBody:
     "Bu, `get_context`'in şekli — her oturumun yaptığı ilk çağrı. Ürünün özeti değil: yükün kendisi.",
   briefingCaption: "Ekrana sığsın diye kısaltıldı. Gerçeği açık olan her görevi taşır.",
-  landingShotTitle: "Agentın omzunun üstünden okuduğun şey",
   landingShotAlt:
     "todox'ta bir görev: durumu ve bir karar, bir çıkmaz ile bir devir notu taşıyan günlüğü",
   landingShotCaption:
