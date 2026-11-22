@@ -133,7 +133,7 @@ function ProjectCard({
 }
 
 /** The project's progress: one bar, and the same numbers in words under it. */
-function Progress({
+export function Progress({
   counts,
   titles,
   t,

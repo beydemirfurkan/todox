@@ -8,7 +8,7 @@ export { Group } from "./group";
 export { MarkdownPreview } from "./markdown-preview";
 export { NoteGroups } from "./note-list";
 export { Empty, Panel } from "./panel";
-export { ProjectLanes, WaitingList, type ProjectLane } from "./project-lanes";
+export { Progress, ProjectLanes, WaitingList, type ProjectLane } from "./project-lanes";
 export { ProjectFields, ProjectRow, type ProjectCountRow } from "./project-list";
 export { Tabs, currentTab, type Tab } from "./tabs";
 export { RefBadge, StatusDot } from "./status";

@@ -34,7 +34,7 @@ export function Field({
     <label className={`block ${className}`}>
       <span
         className={
-          hidden ? "sr-only" : "display mb-1 block text-small font-bold text-muted"
+          hidden ? "sr-only" : "mb-1.5 block text-small font-medium text-muted"
         }
       >
         {label}
