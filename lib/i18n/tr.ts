@@ -233,6 +233,7 @@ export const tr: Record<Key, string> = {
   err_oauthProviderTaken: "Bu sağlayıcıdan başka bir hesap zaten bağlı. Önce onun bağlantısını kes.",
   err_oauthEmailUnverified: "Bu adresle bir hesap zaten var ve sağlayıcı adresi doğrulamamış. Şifrenle gir, sonra hesap sayfandan bağla.",
   err_hasSharedProjects: "Başkalarının da çalıştığı projelerin sahibisin. Önce birini sahip yap ya da projeyi sil: hesabını silmek onların emeğini de götürür.",
+  err_registrationClosed: "Bu sunucu yeni hesap almıyor. Buradaki birinden seni bir projeye davet etmesini iste.",
   err_oauthNoEmail: "Sağlayıcı doğrulanmış bir e-posta adresi paylaşmadı, bu yüzden hesap açılamadı.",
   oauthContinueGoogle: "Google ile devam et",
   oauthContinueGithub: "GitHub ile devam et",

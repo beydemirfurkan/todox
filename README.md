@@ -385,9 +385,18 @@ docker compose exec app pnpm db:migrate
 | --- | --- |
 | `DATABASE_URL` | Postgres. |
 | `DATABASE_POOL_MAX` | Optional, default 20. Connections per process. |
+| `TODOX_SLOW_MS` | Optional, default 50. A statement slower than this is logged as `db.slow`. |
+| `TRUSTED_PROXY_HOPS` | Optional, default 1. Proxies between the internet and the app; the rate limits read the client address from it. 0 if nothing forwards to the app. |
 | `TODOX_PUBLIC_URL` | Mail links and the agent setup snippet are built from it. |
-| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional. Without them, mail is printed to the log. Port defaults to 587. |
+| `TODOX_REGISTRATION` | Optional. `closed` stops new accounts, by password and by Google or GitHub; an invitation to a project still works. Unset, anyone can register. |
+| `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional. Port defaults to 587. Without them, production sends no mail: no verification and no password reset. `pnpm user:verify <email>` vouches for an address from the server, which is what invites and sharing need. |
 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_ID` · `GITHUB_CLIENT_SECRET` | Optional, in pairs. Each turns on its sign-in button. Callback: `<TODOX_PUBLIC_URL>/api/auth/<google\|github>/callback`. |
+
+**Serve it over HTTPS.** In production the session cookie is `Secure` and the
+app sends HSTS, so over plain HTTP — a LAN address, say — the browser drops the
+cookie and sign-in appears to do nothing. Put a reverse proxy with a
+certificate in front (Caddy, Traefik, nginx), and count it in
+`TRUSTED_PROXY_HOPS`.
 
 `pnpm db:migrate` does not run at startup, so two instances never race on the
 schema. Run it after a deploy that changes the schema:
@@ -399,6 +408,23 @@ docker exec <container> pnpm db:migrate
 **A merge is not a deploy.** The image tag is the git sha. Compare
 `docker inspect <container> --format '{{.Config.Image}}'` with
 `git rev-parse origin/main` to see what is really running.
+
+### Backups and upgrades
+
+The database is the whole instance; the app container holds nothing. Back it
+up from the host, on a schedule:
+
+```bash
+docker compose exec -T db pg_dump -U todox -Fc todox > todox-$(date +%F).dump
+# restore into an empty database:
+docker compose exec -T db pg_restore -U todox -d todox --clean < todox-2026-11-22.dump
+```
+
+To upgrade: pull, `docker compose up -d --build`, then
+`docker compose exec app pnpm db:migrate`. After restoring a dump taken on an
+older version, run `db:migrate` again to bring its schema up. A Postgres major version (the `postgres:18`
+image) does not upgrade in place: dump, start the new image on an empty
+volume, restore.
 
 ## Your data
 

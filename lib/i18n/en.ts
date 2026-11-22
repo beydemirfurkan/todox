@@ -238,6 +238,7 @@ export const en = {
   err_oauthProviderTaken: "A different account from that provider is already connected here. Disconnect it first.",
   err_oauthEmailUnverified: "An account with this address already exists, and the provider has not verified the address. Sign in with your password, then connect it from your account page.",
   err_hasSharedProjects: "You own projects other people work in. Make one of them the owner, or delete the project, first: deleting your account would take their work with it.",
+  err_registrationClosed: "This server is not taking new accounts. Ask someone on it to invite you to a project.",
   err_oauthNoEmail: "The provider did not share a verified email address, so no account could be made from it.",
   oauthContinueGoogle: "continue with Google",
   oauthContinueGithub: "continue with GitHub",

@@ -109,6 +109,8 @@ async function main() {
     console.log(`  ${(c.client ?? "unreported").padEnd(24)} ${String(c.n).padStart(5)}`);
   }
 
+  await printTeamSignal(since);
+
   // What the accounts that stayed actually did. A log nobody writes to is the
   // failure mode this product is trying to avoid, so it is worth seeing.
   const written = await one<{ tasks: string; entries: string; handoffs: string; deadEnds: string }>(
@@ -126,6 +128,43 @@ async function main() {
   console.log(`  of those, dead ends ${String(Number(written?.deadEnds ?? 0)).padStart(2)}\n`);
 
   process.exit(0);
+}
+
+/**
+ * The signal a paid team plan waits on: people staying across weeks, and
+ * people bringing somebody else into a project. Counts only, like the rest.
+ *
+ * "Weeks active" reads `tool_usage`, whose `day` is the server's date, so a
+ * week is an ISO week of server time. Three separate weeks inside the window
+ * is a habit; three calls on one afternoon is not.
+ */
+async function printTeamSignal(since: string): Promise<void> {
+  const sinceDay = since.slice(0, 10);
+
+  const weeklyActive = await count(
+    `SELECT COUNT(*) AS n FROM (
+       SELECT user_id FROM tool_usage
+        WHERE day >= ?
+        GROUP BY user_id
+       HAVING COUNT(DISTINCT to_char(day::date, 'IYYY-IW')) >= 3
+     ) AS stayed`,
+    [sinceDay],
+  );
+
+  const sharedProjects = await count(
+    `SELECT COUNT(DISTINCT project_id) AS n FROM project_memberships WHERE created_at >= ?`,
+    [since],
+  );
+
+  const acceptedInvites = await count(
+    `SELECT COUNT(*) AS n FROM project_invitations WHERE accepted_at >= ?`,
+    [since],
+  );
+
+  console.log(`\nteam signal in the window\n`);
+  console.log(`  active in 3+ weeks   ${String(weeklyActive).padStart(5)}   used tools in three separate weeks`);
+  console.log(`  projects shared      ${String(sharedProjects).padStart(5)}   gained a member`);
+  console.log(`  invites accepted     ${String(acceptedInvites).padStart(5)}`);
 }
 
 main().catch((e) => {

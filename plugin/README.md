@@ -13,6 +13,16 @@ claude plugin install todox@todox
 It asks for your agent token once (Account page on todox.dev, or your own
 instance) and keeps it in your Claude Code settings, not in the plugin.
 
+**Your own server.** The plugin points at todox.dev. For your own instance:
+
+- **Claude Code:** set `TODOX_URL=https://your-instance` in your environment so
+  the hooks reach it, and change `url` in the installed `.mcp.json` to
+  `https://your-instance/api/mcp`. A plugin update overwrites that file, so
+  check it after one. `pnpm install:mcp claude-code --url https://your-instance`
+  from a clone writes the MCP entry outside the plugin and survives updates.
+- **Codex:** set `TODOX_URL=https://your-instance` beside `TODOX_TOKEN`; the
+  stdio server and the hooks both read it.
+
 **Codex** reads the same directory through its own manifest,
 `.codex-plugin/plugin.json`. The skill and `hooks/todox-hook.mjs` are shared;
 what differs is the hooks file and the MCP entry:
@@ -50,7 +60,10 @@ What it adds:
   a project: in a directory todox does not know yet, or with no token, todox
   unreachable or no `node` on the machine, it falls back to one sentence — read
   the log first, and before finishing call `session_status` and write up what
-  it names.
+  it names. It also hashes the files linked to the project's open tasks, here
+  where the code is, and reports them: the hosted server has no copy of the
+  repository, so this is what lets todox say a note describes code that has
+  since changed. Any that did are listed under the briefing.
 
 The hooks are command hooks: one node script with no dependencies
 (`hooks/todox-hook.mjs`, generated from `mcp/hook/` by `pnpm plugin:sync`), no

@@ -411,6 +411,19 @@ describe("register", () => {
     expect(usersRepo.byUsername).not.toHaveBeenCalled();
     expect(usersRepo.create).not.toHaveBeenCalled();
   });
+
+  it("refuses everyone when the instance is closed to new accounts", async () => {
+    vi.stubEnv("TODOX_REGISTRATION", "closed");
+    try {
+      await expect(auth.register(valid)).resolves.toEqual({
+        ok: false,
+        errors: [{ field: "form", code: "registrationClosed" }],
+      });
+      expect(usersRepo.create).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe("validateRegistration", () => {

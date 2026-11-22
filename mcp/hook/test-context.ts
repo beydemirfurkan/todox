@@ -26,6 +26,7 @@ export function hookContext(
     config?: Partial<HookConfig>;
     now?: Date;
     git?: Partial<HookGit>;
+    checkFiles?: HookContext["checkFiles"];
   } = {},
 ) {
   const rpc = overrides.rpc ?? null;
@@ -46,5 +47,6 @@ export function hookContext(
     rpc,
     now: () => now,
     git: { ...NO_GIT, ...overrides.git },
+    checkFiles: overrides.checkFiles ?? (() => ({ checked: [], seen: [] })),
   } satisfies HookContext;
 }

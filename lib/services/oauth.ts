@@ -11,6 +11,7 @@ import { logInfo } from "../server/log";
 import { newSessionToken } from "../util/tokens";
 import { now } from "../util/time";
 import type { OAuthProfile } from "./oauth-providers";
+import { isRegistrationOpen } from "./registration";
 
 /**
  * What a sign-in through Google or GitHub turns into.
@@ -47,6 +48,7 @@ export type OAuthErrorCode =
   | "oauthEmailUnverified"
   | "oauthNoEmail"
   | "oauthLinkExpired"
+  | "registrationClosed"
   | "oauthFailed";
 
 /** Ten minutes from typing the password to finishing at the provider. */
@@ -146,6 +148,7 @@ async function link(input: {
 const CREATE_ATTEMPTS = 5;
 
 async function create(provider: OAuthProvider, profile: OAuthProfile): Promise<SignInOutcome> {
+  if (!isRegistrationOpen()) return { ok: false, code: "registrationClosed" };
   const email = profile.email;
   if (!email) return { ok: false, code: "oauthNoEmail" };
   const base = usernameBase(profile.usernameHint);
