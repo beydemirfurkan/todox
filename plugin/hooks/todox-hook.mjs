@@ -547,7 +547,7 @@ async function sessionStart(ctx) {
   recordStart(ctx);
   if (!ctx.rpc) {
     ctx.log("session-start", "no token (CLAUDE_PLUGIN_OPTION_TOKEN): reminder only");
-    return inject(REMINDER);
+    return inject(reminderFor(ctx));
   }
   if (!ctx.input.cwd) return inject(REMINDER);
   try {
@@ -564,8 +564,16 @@ async function sessionStart(ctx) {
 ${result.digest}`);
   } catch (e) {
     ctx.log("session-start", `briefing not fetched, reminder only: ${e.message}`);
-    return inject(REMINDER);
+    return inject(reminderFor(ctx));
   }
+}
+function reminderFor(ctx) {
+  const cwd = ctx.input.cwd;
+  const root = cwd ? ctx.git.root(cwd) : void 0;
+  if (!root) return REMINDER;
+  const remote = ctx.git.remote(root);
+  const identity = remote ? `repo_url ${JSON.stringify(remote)} and repo_root ${JSON.stringify(root)}` : `repo_root ${JSON.stringify(root)}`;
+  return `${REMINDER} This directory is a git checkout: pass ${identity} with cwd on the first get_context, so a repository todox has not seen yet is registered rather than refused.`;
 }
 function recordStart(ctx) {
   const sessionId = ctx.input.session_id;

@@ -54,6 +54,7 @@ describe("the hook entry point", () => {
     const out = (await runHook("session-start", input, env({ CLAUDE_PLUGIN_OPTION_TOKEN: "t" }))) as {
       hookSpecificOutput: { additionalContext: string };
     };
-    expect(out.hookSpecificOutput.additionalContext).toBe(REMINDER);
+    // The real git runs here, so a checkout's identity may follow the reminder.
+    expect(out.hookSpecificOutput.additionalContext.startsWith(REMINDER)).toBe(true);
   });
 });

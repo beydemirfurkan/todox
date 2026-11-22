@@ -47,6 +47,17 @@ describe("SessionStart", () => {
     expect(ctx.log).toHaveBeenCalledWith("session-start", expect.stringMatching(/revoked token/));
   });
 
+  it("hands over the checkout's identity when the project cannot be had, so the agent can register it", async () => {
+    const git = { root: () => "/work/mobile", remote: () => "git@github.com:acme/mobile.git" };
+    const refused = hookContext({ rpc: vi.fn().mockRejectedValue(new Error("no repository at /work/mobile")), git });
+    const text = contextOf(await sessionStart(refused)).additionalContext;
+    expect(text.startsWith(REMINDER)).toBe(true);
+    expect(text).toContain('repo_url "git@github.com:acme/mobile.git" and repo_root "/work/mobile"');
+
+    const noRemote = hookContext({ rpc: null, git: { root: () => "/work/scratch", remote: () => undefined } });
+    expect(contextOf(await sessionStart(noRemote)).additionalContext).toContain('pass repo_root "/work/scratch" with cwd');
+  });
+
   it("falls back when the server answers without a digest (an older server)", async () => {
     const ctx = context(vi.fn().mockResolvedValue({ project: { slug: "repo" } }));
     expect(contextOf(await sessionStart(ctx)).additionalContext).toBe(REMINDER);

@@ -31,7 +31,7 @@ export async function sessionStart(ctx: HookContext): Promise<HookOutput> {
   recordStart(ctx);
   if (!ctx.rpc) {
     ctx.log("session-start", "no token (CLAUDE_PLUGIN_OPTION_TOKEN): reminder only");
-    return inject(REMINDER);
+    return inject(reminderFor(ctx));
   }
   if (!ctx.input.cwd) return inject(REMINDER);
   try {
@@ -46,8 +46,28 @@ export async function sessionStart(ctx: HookContext): Promise<HookOutput> {
     return inject(`${PREAMBLE}\n\n${result.digest}`);
   } catch (e) {
     ctx.log("session-start", `briefing not fetched, reminder only: ${(e as Error).message}`);
-    return inject(REMINDER);
+    return inject(reminderFor(ctx));
   }
+}
+
+/**
+ * The reminder, plus this checkout's identity when the hook can see one.
+ *
+ * Over the hosted endpoint the server has no disk, so a checkout it has not
+ * seen is refused until the agent sends `repo_url` -- and in the lab the
+ * agents carried on with a task instead, leaving the repository unregistered.
+ * The hook runs where the code is: it can read the remote, so it hands the
+ * agent the exact arguments rather than asking it to go and find them.
+ */
+export function reminderFor(ctx: HookContext): string {
+  const cwd = ctx.input.cwd;
+  const root = cwd ? ctx.git.root(cwd) : undefined;
+  if (!root) return REMINDER;
+  const remote = ctx.git.remote(root);
+  const identity = remote
+    ? `repo_url ${JSON.stringify(remote)} and repo_root ${JSON.stringify(root)}`
+    : `repo_root ${JSON.stringify(root)}`;
+  return `${REMINDER} This directory is a git checkout: pass ${identity} with cwd on the first get_context, so a repository todox has not seen yet is registered rather than refused.`;
 }
 
 function recordStart(ctx: HookContext): void {
