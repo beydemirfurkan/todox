@@ -1,0 +1,3 @@
+# Run by sh on every platform, Git Bash included: a checkout with autocrlf
+# would otherwise give it CRLF line endings, and `then\r` is not a keyword.
+*.sh text eol=lf

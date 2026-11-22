@@ -1,6 +1,6 @@
 {
   "name": "todox",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -48,6 +48,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19.2.5",
     "@vitest/coverage-v8": "^4.1.11",
+    "esbuild": "0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",

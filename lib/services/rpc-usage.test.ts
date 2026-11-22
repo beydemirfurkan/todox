@@ -67,6 +67,15 @@ describe("counting what an agent called", () => {
     expect(usage.record).toHaveBeenCalledWith(7, "hook:listProjects", true);
   });
 
+  it("counts a git hook's call under the same hook name", async () => {
+    db.all.mockResolvedValue([]);
+    db.one.mockResolvedValue(undefined);
+
+    await invoke({ ...CTX, carrier: "git-hook" }, "listProjects", {});
+
+    expect(usage.record).toHaveBeenCalledWith(7, "hook:listProjects", true);
+  });
+
   it("counts a call the schema refused, and still refuses it", async () => {
     await expect(invoke(CTX, "createTask", { title: "" })).rejects.toThrow();
 
