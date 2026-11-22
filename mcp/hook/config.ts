@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import type { HookClient } from "./types";
+
 /**
  * Where the plugin's hooks find the server, the token and their own state.
  *
@@ -39,19 +41,28 @@ export function hookConfig(
   env: Env,
   pluginRoot: string | undefined,
   warn: (message: string) => void,
+  client: HookClient = "claude-code",
 ): HookConfig {
   return {
     token: env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || undefined,
     url: env.TODOX_URL || (pluginRoot && urlFromMcpJson(pluginRoot, warn)) || HOSTED_URL,
-    dataDir: dataDirFrom(env),
+    dataDir: dataDirFrom(env, client),
     disabled: env.TODOX_HOOKS === "off",
     stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default",
     observe: env.TODOX_OBSERVE !== "off",
   };
 }
 
-export function dataDirFrom(env: Env): string {
-  return env.CLAUDE_PLUGIN_DATA || join(homedir(), ".claude", "plugins", "data", "todox");
+/**
+ * Claude Code and Codex hand a plugin its data directory as
+ * `CLAUDE_PLUGIN_DATA` (Codex sets `PLUGIN_DATA` as well). Cursor documents
+ * none, so its plugin keeps its state beside Cursor's own.
+ */
+export function dataDirFrom(env: Env, client: HookClient = "claude-code"): string {
+  const given = env.CLAUDE_PLUGIN_DATA || env.PLUGIN_DATA;
+  if (given) return given;
+  const home = client === "cursor" ? ".cursor" : client === "codex" ? ".codex" : ".claude";
+  return join(homedir(), home, "plugins", "data", "todox");
 }
 
 /** The server the plugin's MCP entry reaches, without its `/api/mcp` path. */

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { HOOK_CLIENT, observeSession } from "./observe";
+import { observeSession } from "./observe";
 import { appendEvent, readEvents } from "./state";
 import { hookContext } from "./test-context";
 import type { HookGit } from "./types";
@@ -44,7 +44,7 @@ describe("the hook as an observation carrier", () => {
     expect(rpc).toHaveBeenCalledWith("recordObservation", {
       cwd: "/repo",
       session_id: "cc:s1",
-      client: HOOK_CLIENT,
+      client: "claude-code-plugin",
       branch: "feat/x",
       base_sha: BASE,
       head_sha: HEAD,

@@ -1,0 +1,51 @@
+{
+  "description": "todox's command hooks for Codex: the same script as the Claude Code plugin's. SessionStart puts the project's briefing digest in front of the session, after compaction too; Stop asks once for the handoff on tasks this session left unwritten. The stdio MCP server records what git did. No model call, nothing sent but todox's own RPC, every failure exits 0.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/hooks/run.sh\" session-start codex",
+            "timeout": 8
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch|mcp__.*todox.*__(create_task|update_task|log_entry)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/hooks/run.sh\" post-tool-use codex",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/hooks/run.sh\" user-prompt-submit codex",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/hooks/run.sh\" stop codex",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

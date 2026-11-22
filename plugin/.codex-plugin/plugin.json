@@ -1,0 +1,22 @@
+{
+  "name": "todox",
+  "version": "0.1.6",
+  "description": "The log your next session resumes from: decisions, dead ends, handoffs and open tasks, shared across machines, agents and people over the todox MCP server. Briefs a session with the log at start, and asks once for its handoff before it finishes.",
+  "author": {
+    "name": "Furkan Beydemir",
+    "url": "https://github.com/beydemirfurkan"
+  },
+  "homepage": "https://www.todox.dev",
+  "repository": "https://github.com/beydemirfurkan/todox",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "handoff",
+    "mcp",
+    "todox",
+    "engineering-log"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/codex-hooks.json",
+  "mcpServers": "./codex-mcp.json"
+}

@@ -20,7 +20,7 @@ import type { HookContext } from "./types";
  * The window widens backwards once, to the last HEAD the server recorded,
  * which is what recovers the work of a session that died unreported.
  */
-export const HOOK_CLIENT = "claude-code-plugin";
+export const hookClientLabel = (ctx: HookContext): string => `${ctx.client}-plugin`;
 
 interface Observing {
   ctx: HookContext;
@@ -61,7 +61,7 @@ async function observe({ ctx, rpc, sessionId, cwd }: Observing): Promise<void> {
   const facts = {
     dir,
     sessionId: `cc:${sessionId}`,
-    client: HOOK_CLIENT,
+    client: hookClientLabel(ctx),
     branch: git.branch(dir),
     base,
     head,
