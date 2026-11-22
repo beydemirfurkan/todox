@@ -1,3 +1,4 @@
+import type { ObserverGit } from "../observer";
 import type { RpcClient } from "../rpc-client";
 import type { HookConfig } from "./config";
 import type { Logger } from "./log";
@@ -22,6 +23,8 @@ export interface HookContext {
   /** Null when there is no token: a hook can still remind, but not ask. */
   rpc: RpcClient | null;
   now: () => Date;
+  /** Git on this machine; a fake in tests. */
+  git: ObserverGit;
 }
 
 /** Printed to stdout as JSON; null prints nothing. */

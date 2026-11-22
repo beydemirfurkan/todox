@@ -1,7 +1,9 @@
 import { createClient } from "../rpc-client";
 import { dataDirFrom, hookConfig, type HookConfig } from "./config";
+import { workspaceGit } from "./git";
 import { fileLogger, type Logger } from "./log";
 import { postToolUse } from "./post-tool-use";
+import { sessionEnd } from "./session-end";
 import { sessionStart } from "./session-start";
 import { stop } from "./stop";
 import type { HookContext, HookInput, HookOutput } from "./types";
@@ -34,6 +36,7 @@ const HANDLERS: Record<string, Handler> = {
   "post-tool-use": postToolUse,
   "user-prompt-submit": userPromptSubmit,
   stop,
+  "session-end": sessionEnd,
 };
 
 export async function runHook(
@@ -61,7 +64,7 @@ function contextFor(config: HookConfig, log: Logger, input: HookInput): HookCont
   const rpc = config.token
     ? createClient(config.url, config.token, { headers: CARRIER, timeoutMs: RPC_TIMEOUT_MS })
     : null;
-  return { config, log, input, rpc, now: () => new Date() };
+  return { config, log, input, rpc, now: () => new Date(), git: workspaceGit };
 }
 
 function parseInput(raw: string): HookInput {

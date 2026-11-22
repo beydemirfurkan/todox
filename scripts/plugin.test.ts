@@ -68,6 +68,7 @@ describe("the plugin's hand-written files", () => {
       PostToolUse: "post-tool-use",
       UserPromptSubmit: "user-prompt-submit",
       Stop: "stop",
+      SessionEnd: "session-end",
     };
     expect(Object.keys(hooks.hooks).sort()).toEqual(Object.keys(events).sort());
     for (const [event, arg] of Object.entries(events)) {

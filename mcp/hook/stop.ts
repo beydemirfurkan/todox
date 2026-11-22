@@ -1,3 +1,4 @@
+import { observeSession } from "./observe";
 import { appendEvent, readEvents, type SessionEvent } from "./state";
 import type { HookContext, HookOutput } from "./types";
 
@@ -34,7 +35,17 @@ interface Owed {
   handoff_missing: boolean;
 }
 
+/**
+ * The decision and the git observation run side by side: both are one round
+ * trip, and the hook's ten seconds should hold two of them, not wait on each.
+ * The observation never decides anything and never throws.
+ */
 export async function stop(ctx: HookContext): Promise<HookOutput> {
+  const [decision] = await Promise.all([decide(ctx), observeSession(ctx)]);
+  return decision;
+}
+
+async function decide(ctx: HookContext): Promise<HookOutput> {
   const { session_id: sessionId, cwd } = ctx.input;
   if (!sessionId || !cwd || ctx.input.stop_hook_active || ctx.config.stopMode === "off") return null;
 

@@ -3,13 +3,29 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
 
+import type { ObserverGit } from "../observer";
 import type { HookConfig } from "./config";
 import type { Logger } from "./log";
 import type { HookContext, HookInput } from "./types";
 
+/** A directory that is not a checkout: every read answers "I do not know". */
+const NO_GIT: ObserverGit = {
+  root: () => undefined,
+  head: () => undefined,
+  branch: () => undefined,
+  dirty: () => undefined,
+  since: () => undefined,
+};
+
 /** A hook context over a fresh data directory, for the handler tests. */
 export function hookContext(
-  overrides: { rpc?: HookContext["rpc"]; input?: HookInput; config?: Partial<HookConfig>; now?: Date } = {},
+  overrides: {
+    rpc?: HookContext["rpc"];
+    input?: HookInput;
+    config?: Partial<HookConfig>;
+    now?: Date;
+    git?: Partial<ObserverGit>;
+  } = {},
 ) {
   const rpc = overrides.rpc ?? null;
   const now = overrides.now ?? new Date("2026-11-22T10:00:00Z");
@@ -20,11 +36,13 @@ export function hookContext(
       dataDir: mkdtempSync(join(tmpdir(), "todox-hook-")),
       disabled: false,
       stopMode: "default",
+      observe: true,
       ...overrides.config,
     },
     log: vi.fn<Logger>(),
     input: overrides.input ?? { session_id: "s1", cwd: "/repo" },
     rpc,
     now: () => now,
+    git: { ...NO_GIT, ...overrides.git },
   } satisfies HookContext;
 }

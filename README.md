@@ -547,12 +547,12 @@ Details, and an honest list of what is **not** covered, in
   budgets fixed — one project went from 143 KB to about 55 KB on the log
   alone — but it is not bounded in bytes, and `pnpm bench:memory` prints it
   so the next reader does not have to discover it.
-- **Observations are captured by the local process only.** Watching git means
-  running on the machine that holds the checkout, and the hosted endpoint has
-  none — so connected that way, the `observations` section of every briefing
-  stays empty and nothing anywhere fills it. The Try-it path in this README is
-  the hosted one, so that is most people. `npx todox-mcp` is the transport that
-  captures. Everything else works identically either way.
+- **Observations need a process on your machine.** Watching git means running
+  where the checkout is, and the hosted endpoint does not. Two things do: the
+  Claude Code plugin's hooks (at Stop and SessionEnd — counts and three commit
+  subjects, never a diff) and `npx todox-mcp`. Connected to `/api/mcp` from any
+  other client, the `observations` section stays empty. Everything else works
+  identically either way.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
 - No keyboard navigation beyond `/` for search.

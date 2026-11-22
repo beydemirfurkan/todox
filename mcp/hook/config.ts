@@ -25,6 +25,8 @@ export interface HookConfig {
    * stop once for a task this session left unwritten.
    */
   stopMode: StopMode;
+  /** `TODOX_OBSERVE=off`, the stdio observer's switch, turns this carrier off too. */
+  observe: boolean;
 }
 
 export type StopMode = "default" | "off" | "strict";
@@ -44,6 +46,7 @@ export function hookConfig(
     dataDir: dataDirFrom(env),
     disabled: env.TODOX_HOOKS === "off",
     stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default",
+    observe: env.TODOX_OBSERVE !== "off",
   };
 }
 

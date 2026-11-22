@@ -49,6 +49,17 @@ describe("SessionStart", () => {
     expect(ctx.log).toHaveBeenCalledWith("session-start", expect.stringMatching(/no token/));
   });
 
+  it("records where HEAD was at a fresh start, and not again on resume", async () => {
+    const git = { root: () => "/repo", head: () => "abc123" };
+    const fresh = hookContext({ git, input: { session_id: "s1", cwd: "/repo", source: "startup" } });
+    await sessionStart(fresh);
+    expect(readEvents(fresh.config.dataDir, "s1")[0]).toMatchObject({ head: "abc123" });
+
+    const resumed = hookContext({ git, input: { session_id: "s1", cwd: "/repo", source: "compact" } });
+    await sessionStart(resumed);
+    expect(readEvents(resumed.config.dataDir, "s1")[0]).not.toHaveProperty("head");
+  });
+
   it("records the session's start for the hooks that run later", async () => {
     const ctx = context(null);
     await sessionStart(ctx);
