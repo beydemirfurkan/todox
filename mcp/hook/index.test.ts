@@ -45,7 +45,7 @@ describe("the hook entry point", () => {
 
   it("ignores an event it does not know, rather than guessing", async () => {
     const e = env();
-    expect(await runHook("pre-compact", input, e)).toBeNull();
+    expect(await runHook("post-compact", input, e)).toBeNull();
     expect(readFileSync(join(e.CLAUDE_PLUGIN_DATA, "hook.log"), "utf8")).toMatch(/unknown hook event/);
   });
 

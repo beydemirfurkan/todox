@@ -3,6 +3,7 @@ import { dataDirFrom, hookConfig, type HookConfig } from "./config";
 import { workspaceGit } from "./git";
 import { fileLogger, type Logger } from "./log";
 import { postToolUse } from "./post-tool-use";
+import { preCompact } from "./pre-compact";
 import { sessionEnd } from "./session-end";
 import { sessionStart } from "./session-start";
 import { stop } from "./stop";
@@ -36,6 +37,7 @@ const HANDLERS: Record<string, Handler> = {
   "post-tool-use": postToolUse,
   "user-prompt-submit": userPromptSubmit,
   stop,
+  "pre-compact": preCompact,
   "session-end": sessionEnd,
 };
 
@@ -88,7 +90,7 @@ async function readStdin(): Promise<string> {
 async function main(): Promise<void> {
   const event = process.argv[2] ?? "";
   const output = await runHook(event, await readStdin(), process.env);
-  if (output) process.stdout.write(JSON.stringify(output));
+  if (output) process.stdout.write(typeof output === "string" ? output : JSON.stringify(output));
 }
 
 // Only when run as the bundle, never when a test imports this module.

@@ -52,6 +52,16 @@ overwritten by an update.
   `TODOX_STOP=off` turns the Stop hook off; "no-handoff" or "todox off" in a
   prompt turns it off for that session.
 
+- **PreCompact hook** — compaction is where a long session loses the detail
+  its handoff would have been written from. Claude Code reads this hook's
+  output as instructions for the compaction summary, so it names the tasks
+  this session touched that still owe a write-up (the same `session_status`
+  question the Stop hook asks), asks the summary to keep each one's status,
+  decisions, failed approaches and next step, and to carry the instruction to
+  write them up right after compaction. It never blocks a compaction, says
+  nothing for a session that is written up or only read, and honours the same
+  `TODOX_STOP=off` and "no-handoff".
+
 An earlier version of this README argued against a Stop hook: a prompt hook at
 stop sees only the last message, so it blocks every chat or none, and an agent
 hook that reads the transcript is a model call on every stop. Both are true and

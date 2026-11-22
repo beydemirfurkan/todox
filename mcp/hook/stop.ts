@@ -28,7 +28,7 @@ import type { HookContext, HookOutput } from "./types";
 /** How far back session_status may look, and how far it must. */
 const MAX_WINDOW_HOURS = 168;
 
-interface Owed {
+export interface Owed {
   id: number;
   title: string;
   status: string;
@@ -62,7 +62,7 @@ async function decide(ctx: HookContext): Promise<HookOutput> {
   return { decision: "block", reason: handoffReason(owed) };
 }
 
-async function owedTasks(ctx: HookContext, cwd: string, taskIds: Set<number>, hours: number): Promise<Owed[]> {
+export async function owedTasks(ctx: HookContext, cwd: string, taskIds: Set<number>, hours: number): Promise<Owed[]> {
   if (!ctx.rpc) {
     ctx.log("stop", "no token: cannot ask what this session still owes");
     return [];
