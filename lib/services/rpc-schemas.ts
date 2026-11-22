@@ -364,7 +364,7 @@ export const SHAPES = {
     kind: z
       .enum(ENTRY_KINDS)
       .describe(
-        "decision: why it is this way. dead_end: what was tried and failed, and why. handoff: the state you are leaving, enough to continue without asking. question: something only the developer can settle, left open on purpose. note: anything else worth keeping.",
+        "decision: why it is this way. dead_end: what was tried and failed, and why. handoff: the state you are leaving, enough to continue without asking. question: a choice you hand back to the developer, or one they will ask somebody about -- close it later with answers_entry_id. note: anything else worth keeping.",
       ),
     body: z
       .string()

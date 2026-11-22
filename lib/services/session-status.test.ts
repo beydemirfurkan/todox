@@ -187,11 +187,12 @@ describe("what is yours", () => {
     expect(yours[0]!.handoff_missing).toBe(false);
   });
 
-  it("is empty when the repository found nothing, and so is the hint", async () => {
+  it("asks for the why when the session touched no task", async () => {
     const status = await sessionStatus(ME, PROJECT);
     expect(status.yours).toEqual([]);
     expect(status.stale).toEqual([]);
-    expect(status.hint).toBe("");
+    expect(status.hint).toMatch(/No task touched this session/);
+    expect(status.hint).toMatch(/add_context/);
   });
 });
 
