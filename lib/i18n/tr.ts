@@ -330,6 +330,13 @@ export const tr: Record<Key, string> = {
   jumpToColumn: "Şuraya git",
   showAllCards: "{n} görevin hepsini göster",
   columnEmpty: "Burada bir şey yok.",
+  boardMoveMenu: "#{id} görevinin durumunu değiştir",
+  boardMoveTo: "Şuraya taşı",
+  boardDoneZone: "Bitti",
+  boardDoneHint: "Kapatmak için kartı buraya bırak",
+  boardDropped: "Vazgeç",
+  boardMoving: "#{id}, {status} durumuna taşınıyor…",
+  boardDragHint: "Kartı başka bir sütuna sürükle ya da ⋯ menüsünü kullan.",
   boardLabel: "Pano",
   panelLabel: "Ayrıntı",
   panelSections: "Panel bölümleri",
@@ -611,9 +618,9 @@ export const tr: Record<Key, string> = {
     "Bu, `get_context`'in şekli — her oturumun yaptığı ilk çağrı. Ürünün özeti değil: yükün kendisi.",
   briefingCaption: "Ekrana sığsın diye kısaltıldı. Gerçeği açık olan her görevi taşır.",
   landingShotAlt:
-    "todox'ta bir görev: durumu ve bir karar, bir çıkmaz ile bir devir notu taşıyan günlüğü",
+    "Bir todox proje panosu: sırada, yapılıyor ve takıldı sütunlarında görev kartları, yanında da bir karar ile bir çıkmaz taşıyan günlüğüyle açık bir görev",
   landingShotCaption:
-    "Demo hesabından bir görev: alınan karar, bariz yolu eleyen çıkmaz ve bir sonraki oturumun kaldığı yerden devam edeceği devir notu.",
+    "Demo proje: kartlar sütunlar arasında taşınır, açık görev de arkasındaki kararı ve bariz yolu eleyen çıkmazı gösterir.",
 
   landingOpenSource: "Açık kaynak, MIT. Kodu oku, ya da kendi kurulumunu çalıştır.",
   landingHonest:

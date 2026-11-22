@@ -76,10 +76,10 @@ function Stage({ t }: { t: T }) {
 
         <div className="frame relative mx-auto max-w-[860px] !rounded-b-none">
           <Image
-            src="/screenshots/task-log.jpg"
+            src="/screenshots/board.jpg"
             alt={t("landingShotAlt")}
-            width={1054}
-            height={910}
+            width={1920}
+            height={885}
             sizes="(max-width: 1024px) 100vw, 860px"
             priority
             className="h-auto w-full"

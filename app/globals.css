@@ -544,6 +544,75 @@ body:has([data-wide-page]) .page-column {
   box-shadow: var(--shadow);
 }
 
+/* ------------------------------------------------------------ the board */
+
+/* A column's wash comes from its status, faintly: enough to tell the three
+   apart at a glance, never enough to read as a warning. */
+.board-col {
+  background: color-mix(in srgb, var(--col-tone, var(--inset)) 45%, var(--paper));
+  border-radius: var(--radius-card);
+  transition: box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.board-col[data-drop-status="todo"] { --col-tone: var(--tone-sand); }
+.board-col[data-drop-status="doing"] { --col-tone: var(--tone-apricot); }
+.board-col[data-drop-status="blocked"] { --col-tone: var(--tone-lilac); }
+.board-col[data-drop-status="done"] { --col-tone: var(--tone-mint); }
+
+/* While a card is in the air every column says it can take it, and the
+   one under the pointer says so louder. */
+.board-dnd[data-dragging] .board-col {
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+.board-dnd[data-over="todo"] .board-col[data-drop-status="todo"],
+.board-dnd[data-over="doing"] .board-col[data-drop-status="doing"],
+.board-dnd[data-over="blocked"] .board-col[data-drop-status="blocked"],
+.board-dnd[data-over="done"] .board-col[data-drop-status="done"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.board-card {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+.board-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+[data-lifted] .board-card,
+.board-card[data-lifted] {
+  opacity: 0.45;
+}
+[data-pending] {
+  opacity: 0.55;
+  animation: pulse-soft 1s ease-in-out infinite alternate;
+}
+@keyframes pulse-soft {
+  to { opacity: 0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-pending] { animation: none; }
+}
+
+/* The card's status menu: a <details> so it opens without a script. */
+.status-menu > summary {
+  cursor: pointer;
+}
+.status-menu[open] > .status-menu-panel {
+  display: flex;
+}
+.status-menu-panel {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 11rem;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-pop);
+}
+
 /* ------------------------------------------------------------- controls */
 
 /* The action is a graphite capsule: filled, compact, decisive -- a
