@@ -1,4 +1,5 @@
 import type { T } from "@/lib/i18n";
+import { Differences } from "./explainer";
 
 /**
  * What `get_context` actually answers with.
@@ -22,21 +23,35 @@ import type { T } from "@/lib/i18n";
  */
 export function BriefingPreview({ t }: { t: T }) {
   return (
-    <section className="sticker pop p-4 sm:p-5" style={{ animationDelay: "220ms" }}>
-      <h2 className="display text-[18px] font-bold">{t("briefingTitle")}</h2>
-      <p className="mt-1 max-w-[62ch] text-[14.5px] leading-relaxed text-muted">
-        {t("briefingBody")}
-      </p>
-
-      {/* The one wide element on the page, so it scrolls inside its own box
-          rather than making the page scroll sideways. */}
-      <div className="mt-3 overflow-x-auto">
-        <pre className="mono sticker-flat min-w-0 p-3 text-[12.5px] leading-relaxed">
-          <code>{SAMPLE}</code>
-        </pre>
+    <section className="grid items-start gap-10 lg:grid-cols-[0.85fr_1.15fr]">
+      <div className="pop space-y-6">
+        <div>
+          <h2 className="display text-[clamp(28px,4vw,40px)] leading-[1.1]">{t("briefingTitle")}</h2>
+          <p className="mt-3 max-w-[46ch] text-[15.5px] leading-relaxed text-muted">{t("briefingBody")}</p>
+        </div>
+        <h3 className="display text-[19px]">{t("diffTitle")}</h3>
+        <Differences t={t} />
       </div>
 
-      <p className="mt-2 text-small text-muted">{t("briefingCaption")}</p>
+      <figure className="pop min-w-0" style={{ animationDelay: "80ms" }}>
+        {/* The one wide element on the page, so it scrolls inside its own box
+            rather than making the page scroll sideways. Graphite, like a
+            terminal, because that is where an agent reads it. */}
+        <div className="overflow-hidden rounded-[var(--radius-card)] bg-[var(--band)] shadow-[var(--shadow-lg)]">
+          <div className="flex items-center gap-1.5 border-b border-[var(--band-rule)] px-4 py-3" aria-hidden="true">
+            <span className="size-2.5 rounded-full bg-[var(--k-dead_end)]" />
+            <span className="size-2.5 rounded-full bg-[var(--k-question)]" />
+            <span className="size-2.5 rounded-full bg-[var(--ok)]" />
+            <span className="mono ml-3 text-meta text-[var(--band-muted)]">get_context</span>
+          </div>
+          <div className="board-scroll max-h-[520px] overflow-auto">
+            <pre className="mono p-4 text-[12.5px] leading-relaxed text-[var(--band-ink)]">
+              <code>{SAMPLE}</code>
+            </pre>
+          </div>
+        </div>
+        <figcaption className="mt-3 text-small text-muted">{t("briefingCaption")}</figcaption>
+      </figure>
     </section>
   );
 }

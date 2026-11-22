@@ -585,6 +585,13 @@ export const en = {
   deleteProjectSubmit: "Delete it and everything in it",
 
   /* the page a visitor who is not signed in sees */
+  landingHowTitle: "How it works",
+  landingSampleDecision: "Capped per kind, not per task.",
+  landingSampleDeadEnd: "A 1 MB body ceiling refused legal calls.",
+  landingSampleHandoff: "Byte budget landed. Next: trim the heads.",
+  landingSampleQuestion: "Keep closed tasks in the briefing?",
+  landingNewSession: "a fresh session",
+  landingKnowsNow: "knows, before it starts:",
   landingLede:
     "Your agent starts every session knowing nothing about the last one. You pay for that twice — once explaining the project again, and once when it walks into a wall a previous session already found.",
   landingCta: "Create an account",
@@ -595,10 +602,6 @@ export const en = {
   landingHeadline: "the notebook your agent {mark}",
   landingHeadlineMark: "actually keeps",
   landingCtaNote: "Open source. Export all of it, whenever you like.",
-  landingArrowNote: "what the next session reads",
-  landingLabelProject: "project",
-  landingLabelTask: "task",
-  landingLabelState: "state",
   landingConnectTitle: "Works with the agent you already use",
   landingConnectBody:
     "One URL and a token. No package to install, no local process to keep running — anything that speaks MCP can connect: Claude Code, Codex, Cursor, VS Code.",
