@@ -148,6 +148,13 @@ const datetime = z
   })
   .describe("ISO datetime; overrides `period`");
 
+/**
+ * The processes that may write an observation, richest first: stdio sees every
+ * tool call, the plugin's hooks a session's edges, a git hook only commits.
+ */
+export const OBSERVATION_SOURCES = ["stdio", "claude-code-hook", "git-hook"] as const;
+export type ObservationSource = (typeof OBSERVATION_SOURCES)[number];
+
 export const SHAPES = {
   listProjects: { model },
 
@@ -249,6 +256,25 @@ export const SHAPES = {
       ),
     repo_root: repoRoot,
     repo_url: repoIdentity,
+    /**
+     * `digest` answers with plain text under `max_chars` instead of the JSON:
+     * the shape a Claude Code SessionStart hook can inject (10,000 characters,
+     * spilled to an unread file above that) and an agent on a large project
+     * can actually read. See `briefing-digest.ts`.
+     */
+    shape: z
+      .enum(["full", "digest"])
+      .optional()
+      .describe(
+        "'digest' returns the briefing as an indexed text under max_chars (default 9500): rules, live tasks with their last handoff, open questions, dead ends and decisions by headline only. Default 'full'.",
+      ),
+    max_chars: z
+      .number()
+      .int()
+      .min(2000)
+      .max(40000)
+      .optional()
+      .describe("Ceiling for shape:'digest', in characters. Ignored for 'full'."),
     model,
   },
 
@@ -653,6 +679,13 @@ export const SHAPES = {
         "Tasks this session set to 'doing', so the next briefing can name the ones that got no handoff",
       ),
     started_at: z.string().max(MAX.line).optional(),
+    repo_url: repoIdentity,
+    source: z
+      .enum(OBSERVATION_SOURCES)
+      .optional()
+      .describe(
+        "Which carrier saw this: the stdio process (default), the Claude Code plugin's hooks, or a git hook. A poorer carrier's write is skipped while a richer one is already observing the same project for this account.",
+      ),
     model,
   },
 } satisfies Record<string, z.ZodRawShape>;

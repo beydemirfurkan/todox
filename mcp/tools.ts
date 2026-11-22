@@ -132,8 +132,8 @@ const LOCAL_NOTE = [
   "FILES: link_files and create_task's `files` take plain paths; this process",
   "hashes them, so todox can later warn that a note describes changed code.",
   "OBSERVATIONS: this process is the one that writes them -- it watches the",
-  "checkout it was started in while you work. Over the hosted endpoint that",
-  "section is always empty, which is why the two notes differ.",
+  "checkout it was started in while you work. Over the hosted endpoint only",
+  "the Claude Code plugin's hooks can, which is why the two notes differ.",
 ];
 
 const REMOTE_NOTE = [
@@ -154,9 +154,9 @@ const REMOTE_NOTE = [
   "  re-hash them and send report_file_hashes: that turns a stale note into a",
   "  warning.",
   "",
-  "`observations` is always empty on this transport: only a process on the",
-  "developer's machine can watch git. Nothing is wrong when it is empty and no",
-  "call fills it; the stdio server (todox-mcp) is the one that captures.",
+  "`observations` comes from a process on the developer's machine, never from",
+  "this server: the Claude Code plugin's hooks, a git hook, or the stdio",
+  "server (todox-mcp). Nothing is wrong when it is empty and no call fills it.",
 ];
 
 /**
@@ -225,7 +225,7 @@ export function skillDocument(): string {
  * `server.json` there. Three files, one release, one test that fails when
  * somebody bumps only two of them.
  */
-export const SERVER_INFO = { name: "todox", version: "0.1.4" } as const;
+export const SERVER_INFO = { name: "todox", version: "0.1.6" } as const;
 
 const ok = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
@@ -345,6 +345,16 @@ function withoutEmptyLists(value: unknown): unknown {
  */
 export function compactBriefing(result: unknown): string {
   return JSON.stringify(withoutEmptyLists(result));
+}
+
+/**
+ * A digest briefing (`shape: 'digest'`) is already the text the agent reads,
+ * so it goes out as itself rather than as a JSON string with escaped newlines.
+ * A registration warning is the one thing from the envelope worth keeping.
+ */
+function digestText(result: unknown): string | null {
+  if (!isRecord(result) || typeof result.digest !== "string") return null;
+  return typeof result.warning === "string" ? `Warning: ${result.warning}\n${result.digest}` : result.digest;
 }
 
 /** Keep the receipt useful without echoing the body the caller just sent. */
@@ -749,7 +759,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       // looks. What is here is what changes how the payload is read -- the
       // caps, what null means, which counts mean what -- not the pitch.
       description:
-        "The session-start briefing: standing rules, decisions, dead ends, open questions, open tasks with their linked files and the last handoff. Call it first, with `cwd`. Capped: fifty open tasks, three entries per kind per task (one handoff), and a byte budget on every body -- notes, task bodies and log entries -- smaller with a `focus`. Nothing is truncated: every record keeps its `id` and `head` (first line), and a `body` of null means the budget was already spent, never that the record is empty -- `get_task` and `get_context_note` read the rest. `open_tasks_omitted`/`log_omitted` count records NOT here; `context_omitted`/`task_bodies_omitted`/`log_bodies_omitted` count records here without a body. `focus` (one sentence on what this session is for) spends the budget on what is relevant instead of what is newest; `context_ranked_by`/`log_ranked_by` say which you got. Open tasks untouched for 14+ days come back head-only in `idle_tasks` -- title, status, days idle, last handoff head -- and cost no budget. `summary_missing: true` means nobody has said what this repository is: update_project with one or two sentences once you know. A list with nothing in it is left out rather than sent empty.",
+        "The session-start briefing: standing rules, decisions, dead ends, open questions, open tasks with their linked files and the last handoff. Call it first, with `cwd`. Capped: fifty open tasks, three entries per kind per task (one handoff), and a byte budget on every body -- notes, task bodies and log entries -- smaller with a `focus`. Nothing is truncated: every record keeps its `id` and `head` (first line), and a `body` of null means the budget was already spent, never that the record is empty -- `get_task` and `get_context_note` read the rest. `open_tasks_omitted`/`log_omitted` count records NOT here; `context_omitted`/`task_bodies_omitted`/`log_bodies_omitted` count records here without a body. `focus` (one sentence on what this session is for) spends the budget on what is relevant instead of what is newest; `context_ranked_by`/`log_ranked_by` say which you got. Open tasks untouched for 14+ days come back head-only in `idle_tasks` -- title, status, days idle, last handoff head -- and cost no budget. `summary_missing: true` means nobody has said what this repository is: update_project with one or two sentences once you know. A list with nothing in it is left out rather than sent empty. `shape:'digest'` answers with a plain-text index under `max_chars` instead -- headlines and ids only, for when the full briefing is too large to read.",
       annotations: READ_ONLY,
     },
     {
@@ -758,7 +768,8 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       // becomes this project's identity for good. So locally it is not asked.
       localInternal: ["repo_url"],
       after: checkLinkedFiles,
-      transform: async (result, _args) => compactBriefing(await appendClientNotes(ws, result)),
+      transform: async (result, _args) =>
+        digestText(result) ?? compactBriefing(await appendClientNotes(ws, result)),
       referenceRequirement: "project-or-cwd",
     },
   );
@@ -821,7 +832,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Create task",
       description:
-        "Capture work that will not finish this session. Pass `cwd` and todox picks the project; registering a new one needs `repo_root` or `repo_url` too. Put the goal and the definition of done in `body`.",
+        "Capture work that will not finish this session. Pass `cwd` and todox picks the project; registering a new one needs `repo_root` or `repo_url` too. Put the goal and the definition of done in `body`. If dead ends in this project share its title's terms, they come back as `related_dead_ends` -- read them before starting.",
     },
     // Local only. A process sitting next to the code can hash it, so the model
     // is asked for paths and nothing else -- asking it for a sha256 would be
