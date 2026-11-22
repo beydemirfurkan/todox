@@ -47,7 +47,8 @@ function hookConfig(env, pluginRoot, warn) {
     url: env.TODOX_URL || pluginRoot && urlFromMcpJson(pluginRoot, warn) || HOSTED_URL,
     dataDir: dataDirFrom(env),
     disabled: env.TODOX_HOOKS === "off",
-    stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default"
+    stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default",
+    observe: env.TODOX_OBSERVE !== "off"
   };
 }
 function dataDirFrom(env) {
@@ -66,12 +67,119 @@ function urlFromMcpJson(pluginRoot, warn) {
   }
 }
 
+// lib/util/paths.ts
+var isWindowsPath = (p) => /^[a-zA-Z]:[\\/]/.test(p);
+var isAbsolutePath = (p) => p.startsWith("/") || isWindowsPath(p);
+var normalisePath = (p) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+function scrubRemote(raw) {
+  const s = raw.trim();
+  try {
+    const url = new URL(s);
+    if (!url.username && !url.password) return s;
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return s;
+  }
+}
+function isInside(child, root) {
+  const fold = isWindowsPath(root);
+  const norm = (p) => {
+    const s = normalisePath(p);
+    return fold ? s.toLowerCase() : s;
+  };
+  const c = norm(child);
+  const r = norm(root);
+  return c === r || c.startsWith(`${r}/`);
+}
+
+// mcp/workspace.ts
+import { execFileSync } from "node:child_process";
+import { existsSync as existsSync2, readFileSync as readFileSync2, statSync } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { dirname, join as join2 } from "node:path";
+var ROOT_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod"];
+function asDirectory(p) {
+  try {
+    return statSync(p).isDirectory() ? p : dirname(p);
+  } catch {
+    return dirname(p);
+  }
+}
+function projectRootOf(start, stopAt) {
+  const home = homedir2();
+  let dir = asDirectory(start);
+  for (let i = 0; i < 40; i++) {
+    if (isHome(dir, home)) break;
+    if (ROOT_MARKERS.some((m) => existsSync2(join2(dir, m)))) return dir;
+    const up = dirname(dir);
+    if (up === dir || stopAt && !isInside(up, stopAt)) break;
+    dir = up;
+  }
+  return void 0;
+}
+var isHome = (dir, home) => isInside(dir, home) && isInside(home, dir);
+function findProjectRoot(start, stopAt) {
+  return projectRootOf(start, stopAt) ?? asDirectory(start);
+}
+function git(dir, args) {
+  if (!existsSync2(join2(dir, ".git"))) return void 0;
+  try {
+    return execFileSync("git", ["-C", dir, ...args], {
+      encoding: "utf8",
+      timeout: 2e3,
+      maxBuffer: 1024 * 1024,
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true
+    }).trim();
+  } catch {
+    return void 0;
+  }
+}
+function gitRemote(dir) {
+  const url = git(dir, ["remote", "get-url", "origin"])?.split("\n")[0] ?? "";
+  return url ? scrubRemote(url) : void 0;
+}
+var gitBranch = (dir) => git(dir, ["branch", "--show-current"]) || void 0;
+var gitHead = (dir) => git(dir, ["rev-parse", "HEAD"]) || void 0;
+function gitDirtyCount(dir) {
+  const out = git(dir, ["status", "--porcelain"]);
+  if (out === void 0) return void 0;
+  return out ? out.split("\n").length : 0;
+}
+var SUBJECTS = 3;
+var SUBJECT_CHARS = 200;
+var COMMIT_ID = /^[0-9a-f]{4,64}$/i;
+function gitCommitsSince(dir, base) {
+  if (!COMMIT_ID.test(base)) return void 0;
+  const counted = git(dir, ["rev-list", "--count", `${base}..HEAD`]);
+  if (counted === void 0) return void 0;
+  const count = Number.parseInt(counted, 10);
+  if (!Number.isFinite(count)) return void 0;
+  const log = git(dir, ["log", "--format=%s", `--max-count=${SUBJECTS}`, `${base}..HEAD`]) ?? "";
+  return {
+    count,
+    subjects: log ? log.split("\n").map((s) => s.slice(0, SUBJECT_CHARS)) : []
+  };
+}
+
+// mcp/hook/git.ts
+var workspaceGit = {
+  root: (path) => isAbsolutePath(path) ? findProjectRoot(path) : void 0,
+  head: gitHead,
+  branch: gitBranch,
+  dirty: gitDirtyCount,
+  since: gitCommitsSince,
+  remote: gitRemote
+};
+
 // mcp/hook/log.ts
-import { appendFileSync, existsSync as existsSync2, mkdirSync, renameSync, statSync } from "node:fs";
-import { join as join2 } from "node:path";
+import { appendFileSync, existsSync as existsSync3, mkdirSync, renameSync, statSync as statSync2 } from "node:fs";
+import { join as join3 } from "node:path";
 var MAX_BYTES = 64 * 1024;
 function fileLogger(dataDir) {
-  const path = join2(dataDir, "hook.log");
+  const path = join3(dataDir, "hook.log");
   return (event, message) => {
     try {
       mkdirSync(dataDir, { recursive: true });
@@ -85,59 +193,45 @@ function fileLogger(dataDir) {
   };
 }
 function rotateIfFull(path) {
-  if (existsSync2(path) && statSync(path).size >= MAX_BYTES) renameSync(path, `${path}.1`);
+  if (existsSync3(path) && statSync2(path).size >= MAX_BYTES) renameSync(path, `${path}.1`);
 }
 var oneLine = (message) => message.replace(/\s+/g, " ").slice(0, 500);
-
-// lib/util/paths.ts
-var isWindowsPath = (p) => /^[a-zA-Z]:[\\/]/.test(p);
-var normalisePath = (p) => p.replace(/\\/g, "/").replace(/\/+$/, "");
-function isInside(child, root) {
-  const fold = isWindowsPath(root);
-  const norm = (p) => {
-    const s = normalisePath(p);
-    return fold ? s.toLowerCase() : s;
-  };
-  const c = norm(child);
-  const r = norm(root);
-  return c === r || c.startsWith(`${r}/`);
-}
 
 // mcp/hook/state.ts
 import {
   appendFileSync as appendFileSync2,
-  existsSync as existsSync3,
+  existsSync as existsSync4,
   mkdirSync as mkdirSync2,
   readdirSync,
-  readFileSync as readFileSync2,
-  statSync as statSync2,
+  readFileSync as readFileSync3,
+  statSync as statSync3,
   unlinkSync
 } from "node:fs";
-import { join as join3 } from "node:path";
+import { join as join4 } from "node:path";
 var KEEP_DAYS = 7;
 function sessionPath(dataDir, sessionId) {
   const safe = sessionId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 128) || "unknown";
-  return join3(dataDir, "sessions", `${safe}.jsonl`);
+  return join4(dataDir, "sessions", `${safe}.jsonl`);
 }
 function appendEvent(dataDir, sessionId, event) {
   const path = sessionPath(dataDir, sessionId);
-  mkdirSync2(join3(dataDir, "sessions"), { recursive: true });
+  mkdirSync2(join4(dataDir, "sessions"), { recursive: true });
   appendFileSync2(path, `${JSON.stringify(event)}
 `);
 }
 function readEvents(dataDir, sessionId) {
   const path = sessionPath(dataDir, sessionId);
-  if (!existsSync3(path)) return [];
-  return readFileSync2(path, "utf8").split("\n").filter((line) => line.startsWith("{") && line.endsWith("}")).map((line) => JSON.parse(line));
+  if (!existsSync4(path)) return [];
+  return readFileSync3(path, "utf8").split("\n").filter((line) => line.startsWith("{") && line.endsWith("}")).map((line) => JSON.parse(line));
 }
 function pruneSessions(dataDir, nowMs = Date.now()) {
-  const dir = join3(dataDir, "sessions");
-  if (!existsSync3(dir)) return 0;
+  const dir = join4(dataDir, "sessions");
+  if (!existsSync4(dir)) return 0;
   const cutoff = nowMs - KEEP_DAYS * 864e5;
   let removed = 0;
   for (const name of readdirSync(dir)) {
-    const path = join3(dir, name);
-    if (statSync2(path).mtimeMs >= cutoff) continue;
+    const path = join4(dir, name);
+    if (statSync3(path).mtimeMs >= cutoff) continue;
     unlinkSync(path);
     removed++;
   }
@@ -157,8 +251,13 @@ async function postToolUse(ctx) {
   }
   if (TODOX_TASK_TOOL.test(tool)) {
     const id = taskIdOf(ctx.input);
-    if (id) appendEvent(ctx.config.dataDir, sessionId, { t: "task", at, id });
-    else ctx.log("post-tool-use", `${tool}: no task id in the call or its answer`);
+    if (!id) {
+      ctx.log("post-tool-use", `${tool}: no task id in the call or its answer`);
+      return null;
+    }
+    appendEvent(ctx.config.dataDir, sessionId, { t: "task", at, id });
+    if (ctx.input.tool_input?.status === "doing" && !/__log_entry$/.test(tool))
+      appendEvent(ctx.config.dataDir, sessionId, { t: "doing", at, id });
   }
   return null;
 }
@@ -176,6 +275,102 @@ function taskIdOf(input) {
   return match ? Number(match[1]) : null;
 }
 
+// mcp/observer.ts
+function observationPayload(f) {
+  return {
+    cwd: f.dir,
+    session_id: f.sessionId,
+    client: f.client,
+    branch: f.branch,
+    base_sha: f.base,
+    head_sha: f.head,
+    commits: f.commits,
+    files_changed: f.dirty,
+    commit_subjects: f.subjects.length ? f.subjects.join("\n") : void 0,
+    // Absent rather than empty when there is nothing to say. The schemas
+    // are strict, so a self-hosted server that predates this field refuses
+    // the whole call -- and the observer swallows the refusal, which would
+    // lose every observation of every session against that server. Sending
+    // the key only when it carries something keeps the old server working
+    // for the sessions that never take a task on, which is most of them.
+    ...f.taskIds.length ? { task_ids: [...f.taskIds] } : {},
+    started_at: f.startedAt
+  };
+}
+var MAX_TASK_IDS = 50;
+
+// mcp/hook/observe.ts
+var HOOK_CLIENT = "claude-code-plugin";
+async function observeSession(ctx) {
+  const { session_id: sessionId, cwd } = ctx.input;
+  if (!ctx.config.observe || !ctx.rpc || !sessionId || !cwd) return;
+  try {
+    await observe({ ctx, rpc: ctx.rpc, sessionId, cwd });
+  } catch (e) {
+    ctx.log("observe", `not recorded: ${e.message}`);
+  }
+}
+async function observe({ ctx, rpc, sessionId, cwd }) {
+  const { git: git2 } = ctx;
+  const dir = git2.root(cwd);
+  const head = dir ? git2.head(dir) : void 0;
+  if (!dir || !head) return;
+  const events = readEvents(ctx.config.dataDir, sessionId);
+  const start = events.find((e) => e.t === "start");
+  const observed = events.filter((e) => e.t === "observed");
+  const last = observed.at(-1);
+  const base = last?.base ?? start?.head ?? head;
+  const taskIds = [...new Set(events.flatMap((e) => e.t === "doing" ? [e.id] : []))].slice(0, MAX_TASK_IDS);
+  const dirty = git2.dirty(dir) ?? 0;
+  const since = git2.since(dir, base);
+  const commits = since?.count ?? 0;
+  if (commits === 0 && dirty === 0 && taskIds.length === 0) return;
+  if (last && last.head === head && last.dirty === dirty && last.tasks === taskIds.length) return;
+  const facts = {
+    dir,
+    sessionId: `cc:${sessionId}`,
+    client: HOOK_CLIENT,
+    branch: git2.branch(dir),
+    base,
+    head,
+    commits,
+    subjects: since?.subjects ?? [],
+    dirty,
+    taskIds,
+    startedAt: start?.at ?? ctx.now().toISOString()
+  };
+  const remote = git2.remote(dir);
+  const send = (f) => rpc("recordObservation", {
+    ...observationPayload(f),
+    ...remote ? { repo_url: remote } : {},
+    source: "claude-code-hook"
+  });
+  const reply = await send(facts);
+  let sentBase = base;
+  const previous = reply.last_head_sha;
+  if (!reply.skipped && !last && previous && previous !== base) {
+    const wider = git2.since(dir, previous);
+    if (wider) {
+      await send({ ...facts, base: previous, commits: wider.count, subjects: wider.subjects });
+      sentBase = previous;
+    }
+  }
+  appendEvent(ctx.config.dataDir, sessionId, {
+    t: "observed",
+    at: ctx.now().toISOString(),
+    base: sentBase,
+    head,
+    dirty,
+    tasks: taskIds.length
+  });
+}
+
+// mcp/hook/session-end.ts
+async function sessionEnd(ctx) {
+  await observeSession(ctx);
+  return null;
+}
+
 // mcp/hook/session-start.ts
 var REMINDER = "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on every task it names.";
 var PREAMBLE = "todox fetched this project's briefing for you (digest; get_context with a focus has the bodies). Before finishing: session_status with cwd, then a handoff on every task it names.";
@@ -190,6 +385,7 @@ async function sessionStart(ctx) {
   try {
     const result = await ctx.rpc("getContext", {
       cwd: ctx.input.cwd,
+      ...remoteOf(ctx, ctx.input.cwd),
       shape: "digest",
       max_chars: DIGEST_CHARS,
       create_if_missing: false
@@ -207,10 +403,21 @@ function recordStart(ctx) {
   const sessionId = ctx.input.session_id;
   try {
     pruneSessions(ctx.config.dataDir);
-    if (sessionId) appendEvent(ctx.config.dataDir, sessionId, { t: "start", at: ctx.now().toISOString() });
+    if (sessionId) appendEvent(ctx.config.dataDir, sessionId, { t: "start", at: ctx.now().toISOString(), ...baseline(ctx) });
   } catch (e) {
     ctx.log("session-start", `state not written: ${e.message}`);
   }
+}
+function baseline(ctx) {
+  if (ctx.input.source && ctx.input.source !== "startup" && ctx.input.source !== "clear") return {};
+  const dir = ctx.input.cwd ? ctx.git.root(ctx.input.cwd) : void 0;
+  const head = dir ? ctx.git.head(dir) : void 0;
+  return head ? { head } : {};
+}
+function remoteOf(ctx, cwd) {
+  const dir = ctx.git.root(cwd);
+  const remote = dir ? ctx.git.remote(dir) : void 0;
+  return remote ? { repo_url: remote } : {};
 }
 function inject(text) {
   return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } };
@@ -219,6 +426,10 @@ function inject(text) {
 // mcp/hook/stop.ts
 var MAX_WINDOW_HOURS = 168;
 async function stop(ctx) {
+  const [decision] = await Promise.all([decide(ctx), observeSession(ctx)]);
+  return decision;
+}
+async function decide(ctx) {
   const { session_id: sessionId, cwd } = ctx.input;
   if (!sessionId || !cwd || ctx.input.stop_hook_active || ctx.config.stopMode === "off") return null;
   const events = readEvents(ctx.config.dataDir, sessionId);
@@ -293,7 +504,8 @@ var HANDLERS = {
   "session-start": sessionStart,
   "post-tool-use": postToolUse,
   "user-prompt-submit": userPromptSubmit,
-  stop
+  stop,
+  "session-end": sessionEnd
 };
 async function runHook(event, rawInput, env) {
   const log = fileLogger(dataDirFrom(env));
@@ -313,7 +525,7 @@ async function runHook(event, rawInput, env) {
 }
 function contextFor(config, log, input) {
   const rpc = config.token ? createClient(config.url, config.token, { headers: CARRIER, timeoutMs: RPC_TIMEOUT_MS }) : null;
-  return { config, log, input, rpc, now: () => /* @__PURE__ */ new Date() };
+  return { config, log, input, rpc, now: () => /* @__PURE__ */ new Date(), git: workspaceGit };
 }
 function parseInput(raw) {
   if (!raw.trim()) return {};

@@ -26,8 +26,13 @@ export async function postToolUse(ctx: HookContext): Promise<HookOutput> {
   }
   if (TODOX_TASK_TOOL.test(tool)) {
     const id = taskIdOf(ctx.input);
-    if (id) appendEvent(ctx.config.dataDir, sessionId, { t: "task", at, id });
-    else ctx.log("post-tool-use", `${tool}: no task id in the call or its answer`);
+    if (!id) {
+      ctx.log("post-tool-use", `${tool}: no task id in the call or its answer`);
+      return null;
+    }
+    appendEvent(ctx.config.dataDir, sessionId, { t: "task", at, id });
+    if (ctx.input.tool_input?.status === "doing" && !/__log_entry$/.test(tool))
+      appendEvent(ctx.config.dataDir, sessionId, { t: "doing", at, id });
   }
   return null;
 }

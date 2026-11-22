@@ -155,8 +155,8 @@ const REMOTE_NOTE = [
   "  warning.",
   "",
   "`observations` comes from a process on the developer's machine, never from",
-  "this server: the Claude Code plugin's hooks, or the stdio server",
-  "(todox-mcp). Nothing is wrong when it is empty and no call fills it.",
+  "this server: the Claude Code plugin's hooks, a git hook, or the stdio",
+  "server (todox-mcp). Nothing is wrong when it is empty and no call fills it.",
 ];
 
 /**
@@ -225,7 +225,7 @@ export function skillDocument(): string {
  * `server.json` there. Three files, one release, one test that fails when
  * somebody bumps only two of them.
  */
-export const SERVER_INFO = { name: "todox", version: "0.1.4" } as const;
+export const SERVER_INFO = { name: "todox", version: "0.1.6" } as const;
 
 const ok = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],

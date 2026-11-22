@@ -32,6 +32,15 @@ describe("SessionStart", () => {
     expect(DIGEST_CHARS + PREAMBLE.length + 2).toBeLessThan(10_000);
   });
 
+  it("names the remote, so a second checkout at a new path still gets its briefing", async () => {
+    const rpc = vi.fn().mockResolvedValue({ digest: "d" });
+    await sessionStart(hookContext({ rpc, git: { root: () => "/repo", remote: () => "https://github.com/acme/repo.git" } }));
+    expect(rpc).toHaveBeenCalledWith("getContext", expect.objectContaining({
+      repo_url: "https://github.com/acme/repo.git",
+      create_if_missing: false,
+    }));
+  });
+
   it("falls back to the reminder, and logs why, when the briefing cannot be had", async () => {
     const ctx = context(vi.fn().mockRejectedValue(new Error("invalid or revoked token")));
     expect(contextOf(await sessionStart(ctx)).additionalContext).toBe(REMINDER);
@@ -47,6 +56,17 @@ describe("SessionStart", () => {
     const ctx = context(null);
     expect(contextOf(await sessionStart(ctx)).additionalContext).toBe(REMINDER);
     expect(ctx.log).toHaveBeenCalledWith("session-start", expect.stringMatching(/no token/));
+  });
+
+  it("records where HEAD was at a fresh start, and not again on resume", async () => {
+    const git = { root: () => "/repo", head: () => "abc123" };
+    const fresh = hookContext({ git, input: { session_id: "s1", cwd: "/repo", source: "startup" } });
+    await sessionStart(fresh);
+    expect(readEvents(fresh.config.dataDir, "s1")[0]).toMatchObject({ head: "abc123" });
+
+    const resumed = hookContext({ git, input: { session_id: "s1", cwd: "/repo", source: "compact" } });
+    await sessionStart(resumed);
+    expect(readEvents(resumed.config.dataDir, "s1")[0]).not.toHaveProperty("head");
   });
 
   it("records the session's start for the hooks that run later", async () => {

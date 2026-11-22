@@ -40,6 +40,12 @@ describe("PostToolUse", () => {
     ).toEqual(["task:8"]);
   });
 
+  it("marks a task taken on, which is what an observation's task_ids carry", async () => {
+    expect(
+      await run({ session_id: "s1", cwd: "/repo", tool_name: "mcp__todox__update_task", tool_input: { task_id: 7, status: "doing" } }),
+    ).toEqual(["task:7", "doing:7"]);
+  });
+
   it("ignores every other tool", async () => {
     expect(await run({ session_id: "s1", cwd: "/repo", tool_name: "mcp__todox__search", tool_input: { query: "x" } })).toEqual([]);
     expect(await run({ session_id: "s1", cwd: "/repo", tool_name: "Bash", tool_input: { command: "ls" } })).toEqual([]);

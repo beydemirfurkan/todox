@@ -23,10 +23,13 @@ export type SessionEvent =
   | { t: "start"; at: string; head?: string }
   | { t: "edit"; at: string }
   | { t: "task"; at: string; id: number }
+  /** A task this session set to 'doing': what an observation's task_ids carry. */
+  | { t: "doing"; at: string; id: number }
   | { t: "blocked"; at: string }
   | { t: "nudged"; at: string }
   | { t: "optout"; at: string }
-  | { t: "observed"; at: string; head?: string; dirty?: number };
+  /** An observation the server took, or stood down from because stdio had it. */
+  | { t: "observed"; at: string; base: string; head: string; dirty: number; tasks: number };
 
 /** Kept a week: long enough for a resumed session, short enough to never matter. */
 const KEEP_DAYS = 7;
