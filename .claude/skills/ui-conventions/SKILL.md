@@ -12,8 +12,8 @@ in `app/globals.css` under `@theme inline`.
 
 | Helper | For |
 | --- | --- |
-| `.sticker` / `.sticker-flat` | the card, and the quieter card inside it |
-| `.btn` / `.btn-quiet` | buttons |
+| `.sticker` / `.sticker-flat` | the white card on its layered shadow, and the quieter well inside it |
+| `.btn` / `.btn-quiet` | the graphite capsule (the action), and its outline twin (the second action) |
 | `.pill` | nav, report period and language pills |
 | `.link-more` | the wavy-underline text button |
 | `.lift` | hover raise |
@@ -21,39 +21,47 @@ in `app/globals.css` under `@theme inline`.
 | `.row-action` | an action that appears on hover **and on touch** |
 | `.searchbox` | the search field frame |
 | `.on-fill` | dark text on a bright fill |
-| `.display` / `.mono` | Fraunces (SOFT, WONK) for headings and controls; DM Mono for ids and paths. Body is Geist |
-| `.scrawl` / `.scrawl-ink` | the margin-note hand: Fraunces italic, orange or ink — labels and asides only |
+| `.display` / `.mono` | Fraunces for headlines only; DM Mono for ids and paths. Body, controls and labels are Geist |
 | `.marker` | one phrase under the orange marker, inline in a heading |
-| `.name-label` | the label stuck on an object (the landing's task screenshot) |
-| `.brand-band` | the orange band the page ends on |
+| `.tone-panel` + `.tone-mint` / `-butter` / `-sky` / `-apricot` / `-lilac` / `-sand` | a pastel surface: a panel behind a picture of the product, a stat tile |
+| `.frame` | a screenshot or a drawing of a screen set into a panel |
+| `.dot-grid` / `.scrap` | graph-paper background and a torn-edge scrap, for a collage |
+| `.site-band` (+ `.band-link`, `.band-label`) | the graphite band every page ends on |
+| `.board-col` + `data-drop-status` | a board column, washed by its status, and a drop target |
 | `.prose` | 68ch measure for body copy |
 
 Components: `app/components/` (`Panel`, `Empty`, `Chip`, `Counter`, `Field`,
-`StatusDot`, `Blob`, and the decorative stickers — `BoltSticker`,
-`HeartSticker`, `SparkleSticker`, `PencilSticker`, `HandArrow`) via the barrel
-`app/components/index.ts`. Client-side pieces: `app/features/`.
+`StatusDot`, `Blob`, and the decorative stickers) via the barrel
+`app/components/index.ts`. Client-side pieces: `app/features/`. The board's
+drag-and-drop is `app/p/[slug]/board-dnd.tsx`.
 
-## The look, in five rules
+## The look, in six rules
 
-The notebook redesign (task #809): cream paper, charcoal ink, one marker.
+A calm reading room with a scrapbook on the desk (tasks #809 and #811): a
+warm canvas, white cards that float, graphite ink, colour only where it means
+"look here".
 
-- **Orange is the only accent, and it is two tokens.** `--accent` (#ff6f1e) is
-  the marker itself — a fill under dark text, a stroke, a highlight. As
-  *text* on cream it reads under 3:1, so orange text is `--accent-ink`
-  (`text-accentInk`). The same goes for an error said in words:
-  `--danger-ink`, not `--k-dead_end`.
-- **Actions are an outline, never a fill.** `.btn` is cream with a charcoal
-  stroke. Selected is the charcoal pill (`.seg[aria-current]`, the account
-  tabs) — not orange.
-- **Matte.** No `backdrop-filter`, no translucent surfaces: a menu that lets
-  the page read through it is a bug on cream. Shadows come from `--shadow*`
-  and stay soft; no hard offset.
-- **Sticker colours are decoration.** The blue, pink and green in
-  `stickers.tsx` never carry a label, a state or a control. Kind colours
-  (`--k-*`) are fills under dark text, with the word on them.
+- **Pictures before paragraphs.** On a page somebody reads to decide -- the
+  landing, an empty state, the dashboard summary -- say it with a drawing of
+  the screen (markup in a `.frame`, so it follows theme and language) or a
+  number on a tile, and keep the sentence under it short.
+- **The panel is for people.** Agents never look at it. Every state a
+  person needs to act on is visible without opening anything, and everything
+  an agent can do to a task a person can do too -- the board's cards move by
+  drag *and* by a menu of plain forms.
+- **Orange is the one accent, and it is two tokens.** `--accent` is the
+  marker: a fill, a stroke, a highlight. Orange *text* is `--accent-ink`
+  (`text-accentInk`); an error in words is `--danger-ink`.
+- **Pastels are surfaces, never signals.** `--tone-*` colour a panel or a
+  tile with ink on it. A status or kind is a `Chip` (a dot and a pale wash,
+  ink text) or a `StatusDot` with its word -- colour never alone.
+- **Actions are a graphite capsule.** `.btn` is filled; the second action
+  beside it is `.btn-quiet`. Selected is the graphite pill
+  (`.seg[aria-current]`). Matte: no `backdrop-filter`, shadows from
+  `--shadow*` only, never a hard offset.
 - **Both themes.** Light is the default; `prefers-color-scheme: dark` swaps
-  the `:root` tokens for a warm brown version. Anything new uses tokens, so
-  it gets both for free; a literal colour gets neither.
+  the `:root` tokens, the pastels included (they go deep, so the cream ink
+  still reads). A literal colour gets neither theme.
 
 ## Mobile rules
 
