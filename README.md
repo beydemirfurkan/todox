@@ -385,10 +385,18 @@ docker compose exec app pnpm db:migrate
 | --- | --- |
 | `DATABASE_URL` | Postgres. |
 | `DATABASE_POOL_MAX` | Optional, default 20. Connections per process. |
+| `TODOX_SLOW_MS` | Optional, default 50. A statement slower than this is logged as `db.slow`. |
+| `TRUSTED_PROXY_HOPS` | Optional, default 1. Proxies between the internet and the app; the rate limits read the client address from it. 0 if nothing forwards to the app. |
 | `TODOX_PUBLIC_URL` | Mail links and the agent setup snippet are built from it. |
 | `TODOX_REGISTRATION` | Optional. `closed` stops new accounts, by password and by Google or GitHub; an invitation to a project still works. Unset, anyone can register. |
 | `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` · `MAIL_FROM` (· `SMTP_PORT`) | Optional. Port defaults to 587. Without them, production sends no mail: no verification and no password reset. `pnpm user:verify <email>` vouches for an address from the server, which is what invites and sharing need. |
 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_ID` · `GITHUB_CLIENT_SECRET` | Optional, in pairs. Each turns on its sign-in button. Callback: `<TODOX_PUBLIC_URL>/api/auth/<google\|github>/callback`. |
+
+**Serve it over HTTPS.** In production the session cookie is `Secure` and the
+app sends HSTS, so over plain HTTP — a LAN address, say — the browser drops the
+cookie and sign-in appears to do nothing. Put a reverse proxy with a
+certificate in front (Caddy, Traefik, nginx), and count it in
+`TRUSTED_PROXY_HOPS`.
 
 `pnpm db:migrate` does not run at startup, so two instances never race on the
 schema. Run it after a deploy that changes the schema:
