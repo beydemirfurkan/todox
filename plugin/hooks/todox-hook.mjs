@@ -36,51 +36,18 @@ function createClient(baseUrl, token, options = {}) {
   };
 }
 
-// mcp/hook/clients.ts
-var CLIENTS = ["claude-code", "codex"];
-function hookClientFrom(arg) {
-  return CLIENTS.find((c) => c === arg) ?? "claude-code";
-}
-
-// mcp/hook/config.ts
-import { existsSync, readFileSync } from "node:fs";
+// mcp/workspace.ts
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
-var HOSTED_URL = "https://www.todox.dev";
-var tokenFrom = (env) => env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || void 0;
-function hookConfig(env, pluginRoot, warn, client = "claude-code") {
-  return {
-    token: tokenFrom(env),
-    url: env.TODOX_URL || pluginRoot && urlFromMcpJson(pluginRoot, warn) || HOSTED_URL,
-    dataDir: dataDirFrom(env, client),
-    disabled: env.TODOX_HOOKS === "off",
-    stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default",
-    observe: env.TODOX_OBSERVE !== "off"
-  };
-}
-function dataDirFrom(env, client = "claude-code") {
-  const given = env.CLAUDE_PLUGIN_DATA || env.PLUGIN_DATA;
-  if (given) return given;
-  const home = client === "codex" ? ".codex" : ".claude";
-  return join(homedir(), home, "plugins", "data", "todox");
-}
-function urlFromMcpJson(pluginRoot, warn) {
-  const path = join(pluginRoot, ".mcp.json");
-  if (!existsSync(path)) return void 0;
-  try {
-    const parsed = JSON.parse(readFileSync(path, "utf8"));
-    const url = parsed.mcpServers?.todox?.url;
-    return typeof url === "string" ? url.replace(/\/api\/mcp\/?$/, "") : void 0;
-  } catch (e) {
-    warn(`.mcp.json unreadable, using the default server: ${e.message}`);
-    return void 0;
-  }
-}
+import { dirname, join } from "node:path";
 
 // lib/util/paths.ts
 var isWindowsPath = (p) => /^[a-zA-Z]:[\\/]/.test(p);
 var isAbsolutePath = (p) => p.startsWith("/") || isWindowsPath(p);
 var normalisePath = (p) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+var isUrl = (p) => /^[a-z][a-z0-9+.-]*:\/\//i.test(p);
 function scrubRemote(raw) {
   const s = raw.trim();
   try {
@@ -105,12 +72,17 @@ function isInside(child, root) {
 }
 
 // mcp/workspace.ts
-import { execFileSync } from "node:child_process";
-import { existsSync as existsSync2, readFileSync as readFileSync2, statSync } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { dirname, join as join2 } from "node:path";
 var ROOT_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod"];
 var MAX_HASH_BYTES = 20 * 1024 * 1024;
+function hashFile(path) {
+  try {
+    const stat = statSync(path);
+    if (!stat.isFile() || stat.size > MAX_HASH_BYTES) return null;
+    return createHash("sha256").update(readFileSync(path)).digest("hex");
+  } catch {
+    return null;
+  }
+}
 function asDirectory(p) {
   try {
     return statSync(p).isDirectory() ? p : dirname(p);
@@ -119,11 +91,11 @@ function asDirectory(p) {
   }
 }
 function projectRootOf(start, stopAt) {
-  const home = homedir2();
+  const home = homedir();
   let dir = asDirectory(start);
   for (let i = 0; i < 40; i++) {
     if (isHome(dir, home)) break;
-    if (ROOT_MARKERS.some((m) => existsSync2(join2(dir, m)))) return dir;
+    if (ROOT_MARKERS.some((m) => existsSync(join(dir, m)))) return dir;
     const up = dirname(dir);
     if (up === dir || stopAt && !isInside(up, stopAt)) break;
     dir = up;
@@ -135,7 +107,7 @@ function findProjectRoot(start, stopAt) {
   return projectRootOf(start, stopAt) ?? asDirectory(start);
 }
 function git(dir, args) {
-  if (!existsSync2(join2(dir, ".git"))) return void 0;
+  if (!existsSync(join(dir, ".git"))) return void 0;
   try {
     return execFileSync("git", ["-C", dir, ...args], {
       encoding: "utf8",
@@ -173,6 +145,76 @@ function gitCommitsSince(dir, base) {
     count,
     subjects: log ? log.split("\n").map((s) => s.slice(0, SUBJECT_CHARS)) : []
   };
+}
+var onAnotherMachine = (path) => isWindowsPath(path) !== (process.platform === "win32");
+var AGENT_DIRS = /* @__PURE__ */ new Set([".claude", ".codex", ".cursor", ".agents", ".copilot", ".todox"]);
+var EXAMPLE_FILE = /\.(example|sample|template|dist)$/i;
+var SECRET_FILE = /^(\.env(\..*)?|.*\.(pem|key|p12|pfx|kdbx)|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|credentials(\.json)?|\.netrc|\.npmrc|\.pgpass)$/i;
+function isPrivatePath(path, home = homedir()) {
+  const name = path.split(/[\\/]/).pop() ?? "";
+  if (SECRET_FILE.test(name) && !EXAMPLE_FILE.test(name)) return true;
+  if (!isInside(path, home)) return false;
+  const below = path.slice(home.length).split(/[\\/]/).filter(Boolean);
+  const first = below[0] ?? "";
+  return first.startsWith(".") && !AGENT_DIRS.has(first);
+}
+function checkRefs(refs) {
+  const checked = [];
+  const seen = [];
+  for (const r of refs) {
+    if (onAnotherMachine(r.path) || isUrl(r.path) || isPrivatePath(r.path)) {
+      checked.push({ ...r, status: "unknown" });
+      continue;
+    }
+    const hash = hashFile(r.path);
+    seen.push({ id: r.id, hash });
+    checked.push({
+      ...r,
+      status: !r.hash ? "unknown" : hash === null ? "missing" : hash === r.hash ? "fresh" : "changed"
+    });
+  }
+  return { checked, seen };
+}
+
+// mcp/hook/clients.ts
+var CLIENTS = ["claude-code", "codex"];
+function hookClientFrom(arg) {
+  return CLIENTS.find((c) => c === arg) ?? "claude-code";
+}
+
+// mcp/hook/config.ts
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
+var HOSTED_URL = "https://www.todox.dev";
+var tokenFrom = (env) => env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || void 0;
+function hookConfig(env, pluginRoot, warn, client = "claude-code") {
+  return {
+    token: tokenFrom(env),
+    url: env.TODOX_URL || pluginRoot && urlFromMcpJson(pluginRoot, warn) || HOSTED_URL,
+    dataDir: dataDirFrom(env, client),
+    disabled: env.TODOX_HOOKS === "off",
+    stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default",
+    observe: env.TODOX_OBSERVE !== "off"
+  };
+}
+function dataDirFrom(env, client = "claude-code") {
+  const given = env.CLAUDE_PLUGIN_DATA || env.PLUGIN_DATA;
+  if (given) return given;
+  const home = client === "codex" ? ".codex" : ".claude";
+  return join2(homedir2(), home, "plugins", "data", "todox");
+}
+function urlFromMcpJson(pluginRoot, warn) {
+  const path = join2(pluginRoot, ".mcp.json");
+  if (!existsSync2(path)) return void 0;
+  try {
+    const parsed = JSON.parse(readFileSync2(path, "utf8"));
+    const url = parsed.mcpServers?.todox?.url;
+    return typeof url === "string" ? url.replace(/\/api\/mcp\/?$/, "") : void 0;
+  } catch (e) {
+    warn(`.mcp.json unreadable, using the default server: ${e.message}`);
+    return void 0;
+  }
 }
 
 // mcp/hook/git.ts
@@ -487,10 +529,51 @@ async function sessionEnd(ctx) {
   return null;
 }
 
+// mcp/hook/linked-files.ts
+var REPORT_BUDGET_MS = 3e3;
+var NAMED = 8;
+function linkedTasks(brief) {
+  const open = brief?.open_tasks;
+  if (!Array.isArray(open)) return [];
+  return open.flatMap((t) => {
+    if (typeof t?.id !== "number" || !Array.isArray(t.files)) return [];
+    const refs = t.files.filter((f) => typeof f?.id === "number" && typeof f?.path === "string").map((f) => ({
+      id: f.id,
+      path: f.path,
+      hash: typeof f.hash === "string" ? f.hash : null
+    }));
+    return refs.length ? [{ id: t.id, title: typeof t.title === "string" ? t.title : "", refs }] : [];
+  });
+}
+async function checkLinkedFiles(ctx, args) {
+  if (!ctx.rpc) return [];
+  const started = Date.now();
+  const tasks = linkedTasks(await ctx.rpc("getContext", { ...args, create_if_missing: false }));
+  if (!tasks.length) return [];
+  const result = ctx.checkFiles(tasks.flatMap((t) => t.refs));
+  if (result.seen.length && Date.now() - started < REPORT_BUDGET_MS) {
+    try {
+      await ctx.rpc("reportRefs", { refs: result.seen });
+    } catch (e) {
+      ctx.log("session-start", `linked files hashed but not reported: ${e.message}`);
+    }
+  }
+  return staleLines(tasks, result.checked);
+}
+function staleLines(tasks, checked) {
+  const status = new Map(checked.map((c) => [c.id, c.status]));
+  const lines = tasks.flatMap(
+    (t) => t.refs.filter((r) => status.get(r.id) === "changed" || status.get(r.id) === "missing").map((r) => `- task #${t.id} "${t.title}" -> ${r.path} (${status.get(r.id)})`)
+  );
+  return lines.length > NAMED ? [...lines.slice(0, NAMED), `- +${lines.length - NAMED} more`] : lines;
+}
+var STALE_HEADING = "Checked on this machine just now: these linked files changed or went missing after their note was written. Read the change before trusting the note (get_file_context with the path), then accept_file_change if the note still holds.";
+
 // mcp/hook/session-start.ts
 var REMINDER = "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on every task it names.";
 var PREAMBLE = "todox fetched this project's briefing for you (digest; get_context with a focus has the bodies). Before finishing: session_status with cwd, then a handoff on every task it names.";
 var DIGEST_CHARS = 9200;
+var INJECT_CEILING = 9900;
 async function sessionStart(ctx) {
   recordStart(ctx);
   if (!ctx.rpc) {
@@ -498,18 +581,23 @@ async function sessionStart(ctx) {
     return inject(reminderFor(ctx));
   }
   if (!ctx.input.cwd) return inject(REMINDER);
+  const where = { cwd: ctx.input.cwd, ...remoteOf(ctx, ctx.input.cwd) };
+  const stale = checkLinkedFiles(ctx, where).catch((e) => {
+    ctx.log("session-start", `linked files not checked: ${e.message}`);
+    return [];
+  });
   try {
     const result = await ctx.rpc("getContext", {
-      cwd: ctx.input.cwd,
-      ...remoteOf(ctx, ctx.input.cwd),
+      ...where,
       shape: "digest",
       max_chars: DIGEST_CHARS,
       create_if_missing: false
     });
     if (typeof result.digest !== "string") throw new Error("getContext answered without a digest");
-    return inject(`${PREAMBLE}
+    const head = `${PREAMBLE}
 
-${result.digest}`);
+${result.digest}`;
+    return inject(head + staleWarning(await stale, INJECT_CEILING - head.length));
   } catch (e) {
     ctx.log("session-start", `briefing not fetched, reminder only: ${e.message}`);
     return inject(reminderFor(ctx));
@@ -542,6 +630,18 @@ function remoteOf(ctx, cwd) {
   const dir = ctx.git.root(cwd);
   const remote = dir ? ctx.git.remote(dir) : void 0;
   return remote ? { repo_url: remote } : {};
+}
+function staleWarning(lines, room) {
+  let text = "";
+  for (const line of lines) {
+    const next = `${text || `
+
+${STALE_HEADING}`}
+${line}`;
+    if (next.length > room) break;
+    text = next;
+  }
+  return text;
 }
 function inject(text) {
   return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } };
@@ -588,7 +688,7 @@ async function runHook(event, rawInput, env, client = "claude-code") {
 var pluginRootFrom = (env) => env.CLAUDE_PLUGIN_ROOT || env.PLUGIN_ROOT || void 0;
 function contextFor(parts) {
   const rpc = parts.config.token ? createClient(parts.config.url, parts.config.token, { headers: CARRIER, timeoutMs: RPC_TIMEOUT_MS }) : null;
-  return { ...parts, rpc, now: () => /* @__PURE__ */ new Date(), git: workspaceGit };
+  return { ...parts, rpc, now: () => /* @__PURE__ */ new Date(), git: workspaceGit, checkFiles: checkRefs };
 }
 function parseInput(raw) {
   if (!raw.trim()) return {};

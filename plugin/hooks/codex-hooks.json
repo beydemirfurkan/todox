@@ -1,5 +1,5 @@
 {
-  "description": "todox's command hooks for Codex: the same script as the Claude Code plugin's. SessionStart puts the project's briefing digest in front of the session, after compaction too; Stop asks once for the handoff on tasks this session left unwritten. The stdio MCP server records what git did. No model call, nothing sent but todox's own RPC, every failure exits 0.",
+  "description": "todox's command hooks for Codex: the same script as the Claude Code plugin's. SessionStart puts the project's briefing digest in front of the session, after compaction too, and hashes the files linked to open tasks so a note about changed code is flagged; Stop asks once for the handoff on tasks this session left unwritten. The stdio MCP server records what git did. No model call, nothing sent but todox's own RPC, every failure exits 0.",
   "hooks": {
     "SessionStart": [
       {
