@@ -145,8 +145,21 @@ describe("authentication", () => {
 });
 
 describe("rate limiting", () => {
-  it("answers 429 with retry-after when the bad-token gate is shut", async () => {
+  it("refuses a JSON-RPC batch, which would multiply one paid call", async () => {
+    const res = await post({
+      body: [
+        { jsonrpc: "2.0", id: 1, method: "tools/list" },
+        { jsonrpc: "2.0", id: 2, method: "tools/list" },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect(await jsonRpcError(res)).toMatchObject({ code: -32600 });
+    expect(mocks.registerTools).not.toHaveBeenCalled();
+  });
+
+  it("answers 429 with retry-after to a bad token once the gate is shut", async () => {
     mocks.check.mockResolvedValue({ allowed: false, retryAfterSec: 42 });
+    mocks.agentForToken.mockResolvedValue(undefined);
     const res = await post();
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).toBe("42");

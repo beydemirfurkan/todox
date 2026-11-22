@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import {
   checkRefs,
+  isPrivatePath,
   findProjectRoot,
   gitBranch,
   gitCommitsSince,
@@ -404,3 +405,23 @@ describe("reading the session's git state", () => {
     rmSync(repo, { recursive: true, force: true });
   });
 });
+
+describe("isPrivatePath", () => {
+  const home = "/Users/dev";
+  it("keeps a member from reading the owner's keys through a link", () => {
+    expect(isPrivatePath("/Users/dev/.aws/credentials", home)).toBe(true);
+    expect(isPrivatePath("/Users/dev/.ssh/id_ed25519", home)).toBe(true);
+    expect(isPrivatePath("/Users/dev/work/api/.env", home)).toBe(true);
+    expect(isPrivatePath("/Users/dev/work/api/.env.production", home)).toBe(true);
+    expect(isPrivatePath("/srv/app/certs/server.pem", home)).toBe(true);
+  });
+
+  it("still reads code, committed examples and the agents' plans", () => {
+    expect(isPrivatePath("/Users/dev/work/api/src/index.ts", home)).toBe(false);
+    expect(isPrivatePath("/Users/dev/work/api/.github/workflows/ci.yml", home)).toBe(false);
+    expect(isPrivatePath("/Users/dev/work/api/.env.example", home)).toBe(false);
+    expect(isPrivatePath("/Users/dev/.claude/plans/next.md", home)).toBe(false);
+    expect(isPrivatePath("/opt/src/api/main.go", home)).toBe(false);
+  });
+});
+

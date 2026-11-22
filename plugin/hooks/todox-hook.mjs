@@ -110,6 +110,7 @@ import { existsSync as existsSync2, readFileSync as readFileSync2, statSync } fr
 import { homedir as homedir2 } from "node:os";
 import { dirname, join as join2 } from "node:path";
 var ROOT_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod"];
+var MAX_HASH_BYTES = 20 * 1024 * 1024;
 function asDirectory(p) {
   try {
     return statSync(p).isDirectory() ? p : dirname(p);

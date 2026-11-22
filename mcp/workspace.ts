@@ -18,13 +18,19 @@ import { isInside, isUrl, isWindowsPath, scrubRemote } from "../lib/util/paths";
 
 const ROOT_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod"];
 
+/**
+ * Larger than any source file or plan worth a staleness warning. A link to a
+ * disk image or a database dump would otherwise be read whole into memory.
+ */
+const MAX_HASH_BYTES = 20 * 1024 * 1024;
+
 /** null means unreadable, which for our purposes means gone. */
 export function hashFile(path: string): string | null {
   try {
     const stat = statSync(path);
     // Directories and device files are not notes about code. /dev/zero would
     // otherwise read until the process dies.
-    if (!stat.isFile()) return null;
+    if (!stat.isFile() || stat.size > MAX_HASH_BYTES) return null;
     return createHash("sha256").update(readFileSync(path)).digest("hex");
   } catch {
     return null;
@@ -252,6 +258,34 @@ export type Checked = RefLike & { status: "fresh" | "changed" | "missing" | "unk
  */
 const onAnotherMachine = (path: string) => isWindowsPath(path) !== (process.platform === "win32");
 
+/** Where agents keep plans and settings; linking a plan from here is the point. */
+const AGENT_DIRS = new Set([".claude", ".codex", ".cursor", ".agents", ".copilot", ".todox"]);
+
+/** `.env.example` and its kind are committed on purpose and hold no secret. */
+const EXAMPLE_FILE = /\.(example|sample|template|dist)$/i;
+
+const SECRET_FILE = /^(\.env(\..*)?|.*\.(pem|key|p12|pfx|kdbx)|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|credentials(\.json)?|\.netrc|\.npmrc|\.pgpass)$/i;
+
+/**
+ * A path this process will not read on behalf of a shared project.
+ *
+ * Links are written by anybody in the project, and the hash of what this
+ * machine has at that path goes back to the server, where every member can
+ * read it. So a member could link `~/.aws/credentials` and learn, from the
+ * owner's own process, whether it exists and whether a guess at its content is
+ * right. Hidden directories in the home folder and files that hold keys are
+ * left alone; the agents' own folders are not hidden in that sense, because a
+ * plan in `~/.claude/plans` is exactly what a link is for.
+ */
+export function isPrivatePath(path: string, home = homedir()): boolean {
+  const name = path.split(/[\\/]/).pop() ?? "";
+  if (SECRET_FILE.test(name) && !EXAMPLE_FILE.test(name)) return true;
+  if (!isInside(path, home)) return false;
+  const below = path.slice(home.length).split(/[\\/]/).filter(Boolean);
+  const first = below[0] ?? "";
+  return first.startsWith(".") && !AGENT_DIRS.has(first);
+}
+
 /** Compare what was recorded when the note was written against what is there now. */
 export function checkRefs(refs: RefLike[]): { checked: Checked[]; seen: { id: number; hash: string | null }[] } {
   const checked: Checked[] = [];
@@ -262,7 +296,7 @@ export function checkRefs(refs: RefLike[]): { checked: Checked[]; seen: { id: nu
     // would overwrite what the machine that *can* read the file last saw. A
     // URL is the same case for a different reason: nothing can read it, and
     // "missing" would be a lie about a plan that is right there in a browser.
-    if (onAnotherMachine(r.path) || isUrl(r.path)) {
+    if (onAnotherMachine(r.path) || isUrl(r.path) || isPrivatePath(r.path)) {
       checked.push({ ...r, status: "unknown" });
       continue;
     }

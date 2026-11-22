@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
 import { instructions, registerTools, SERVER_INFO, type Workspace } from "@/mcp/tools";
-import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
+import { bodyTooLarge, BodyTooLarge, MAX_BODY_BYTES, readJsonWithin } from "@/lib/server/body-size";
 import { bearerToken } from "@/lib/server/bearer";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, logWarn, newRequestId } from "@/lib/server/log";
@@ -171,15 +171,16 @@ async function answer(req: Request, requestId: string): Promise<Response> {
   // gate and the lookup go out together -- the lookup's answer is only used
   // once the gate has said yes, so asking in parallel changes nothing a caller
   // can see and saves a round trip on every call.
+  // The gate only holds back a token that failed: a valid one is never
+  // locked out by somebody else's bad guesses from the same address.
   const [gate, agent] = await Promise.all([limit.check("badTokenPerIp", ip), agentForToken(token)]);
-  if (!gate.allowed)
-    return json(
-      { jsonrpc: "2.0", error: { code: -32001, message: "too many failed authentications" } },
-      429,
-      { "retry-after": String(gate.retryAfterSec) },
-    );
-
   if (!agent) {
+    if (!gate.allowed)
+      return json(
+        { jsonrpc: "2.0", error: { code: -32001, message: "too many failed authentications" } },
+        429,
+        { "retry-after": String(gate.retryAfterSec) },
+      );
     await limit.penalise("badTokenPerIp", ip);
     return unauthorised("invalid or revoked token");
   }
@@ -209,13 +210,31 @@ async function answer(req: Request, requestId: string): Promise<Response> {
 
   let body: unknown;
   try {
-    body = await req.json();
-  } catch {
+    body = await readJsonWithin(req);
+  } catch (error) {
+    if (error instanceof BodyTooLarge)
+      return json(
+        {
+          jsonrpc: "2.0",
+          error: { code: -32600, message: `body must be under ${MAX_BODY_BYTES} bytes` },
+        },
+        413,
+      );
     return json(
       { jsonrpc: "2.0", error: { code: -32700, message: "body must be JSON" } },
       400,
     );
   }
+
+  // One message per request. The SDK would dispatch a batch of up to a hundred,
+  // all paid for by the single `agentPerToken` charge above -- a hundred
+  // searches for the price of one. The protocol dropped batching in 2025-06-18,
+  // so no client this serves sends one.
+  if (Array.isArray(body))
+    return json(
+      { jsonrpc: "2.0", error: { code: -32600, message: "batches are not supported" } },
+      400,
+    );
 
   // Fires-and-forgets the clientInfo capture, then awaits it before the MCP
   // server processes the body. Awaiting (not just calling) keeps the request

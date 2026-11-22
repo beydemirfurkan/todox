@@ -20,13 +20,31 @@ There is no bounty. There will be a quick, honest answer.
 - **Nothing sensitive is stored in the clear.** Passwords are scrypt; sessions,
   agent tokens and email links are stored as SHA-256 hashes only.
 - **Password reset does not reveal whether an address is registered.** The
-  response is identical either way, and a delivery failure never changes it.
-- **A password reset destroys every session and every agent token.** It is the
-  recovery path, so it assumes you lost control of the account; a token that
-  never expires and carries full permissions is what an intruder would keep.
-- **Changing the email costs the current password**, and the previous address
-  is told. Without that gate a stolen session cookie was permanent ownership:
-  point the account at an address you control, then run the reset flow.
+  response is identical either way, a delivery failure never changes it, and
+  the link and the mail are prepared after the answer so the timing is the
+  same too. Registration does say when an address is taken; see below.
+- **A password reset destroys every session, every agent token and every
+  connected Google or GitHub sign-in.** It is the recovery path, so it assumes
+  you lost control of the account; anything an intruder could have added to
+  get back in goes with it.
+- **Changing the email costs the current password**, ends every other session,
+  retires any reset or verification link already sent, and the previous
+  address is told. Without the password a stolen session cookie was permanent
+  ownership; without retiring the links, a reset sent to the old address
+  would mark the new one verified.
+- **Connecting Google or GitHub costs the password** (or, for an account
+  without one, a sign-in in the last fifteen minutes), and the account's
+  address is told every time. A connected sign-in is a way in that survives a
+  password change, so a session cookie alone must not be able to add one.
+  Connecting does not open a new session, so it cannot stand in for a recent
+  sign-in either.
+- **Signing in with Google or GitHub never joins an account whose address was
+  not verified while somebody else may still hold its password.** If the
+  provider has verified the address and the account never did, the account is
+  handed over clean: its password, sessions and agent tokens are removed.
+- **Invitations need a verified address**, and the project name is clipped in
+  the subject, so mail from this domain cannot be sent by an unproved account
+  or used to carry a message.
 - **Deleting the account costs the current password too**, and the username as
   a second, deliberate step. It is irreversible and takes every project, task,
   entry, ref, context, session and agent token with it, by cascade from the
@@ -40,7 +58,16 @@ There is no bounty. There will be a quick, honest answer.
   and repositories build `SET` clauses from a column allow-list, never from the
   caller's own keys.
 - **Rate limits live in the database**, so they hold across instances rather
-  than per process. Login counts failures only.
+  than per process. Password checks are counted before the hash runs, so a
+  burst of parallel guesses cannot all slip under the limit; a successful login
+  gives back its own count.
+- **A project's notes can be changed only by their author or the project's
+  owner.** They are the standing rules the owner's agents are briefed with.
+- **The local MCP process will not hash private files for a shared project:**
+  hidden directories in the home folder (other than the agents' own), key and
+  `.env` files, and anything over 20 MB are reported as unknown instead.
+- **Agent endpoints read at most 4 MB of body, chunked or not, and take one
+  JSON-RPC message per request.**
 - **The proxy is not the gate.** `proxy.ts` redirects on a missing cookie for
   UX; the real check is `requireUser()` at the data boundary.
 
@@ -50,6 +77,9 @@ There is no bounty. There will be a quick, honest answer.
 
 These are known and documented, not oversights:
 
+- Registration says when a username or an address is already taken. That
+  answers whether an address has an account, limited to five attempts an hour
+  per network address; a sign-up that never says so is a worse sign-up.
 - No two-factor authentication.
 - No per-session revocation list — changing your password ends all sessions,
   but you cannot end one device from another.
