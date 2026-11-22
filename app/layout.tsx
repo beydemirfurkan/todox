@@ -20,6 +20,7 @@ const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin", "latin-ext"],
   axes: ["SOFT", "WONK", "opsz"],
+  style: ["normal", "italic"],
 });
 const geist = Geist({ variable: "--font-geist", subsets: ["latin", "latin-ext"] });
 const dmMono = DM_Mono({
@@ -158,25 +159,28 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
 
-        <footer className="mx-auto w-full page-column px-5 pb-8 text-[13px] text-faint">
-          <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-            <Link href="/about" className="link-more">
-              {t("footerAbout")}
-            </Link>
-            <Link href="/privacy" className="link-more">
-              {t("footerPrivacy")}
-            </Link>
-            <Link href="/contact" className="link-more">
-              {t("footerContact")}
-            </Link>
-            <a
-              href="https://github.com/beydemirfurkan/todox"
-              className="link-more"
-              rel="noreferrer"
-            >
-              GitHub
-            </a>
-          </nav>
+        <footer className="brand-band mt-16">
+          <div className="mx-auto flex w-full page-column flex-col gap-6 px-5 pt-10 pb-12 sm:flex-row sm:items-end sm:justify-between">
+            <p className="display max-w-[16ch] text-[30px] leading-[1.05] sm:text-[40px]">{t("tagline")}</p>
+            <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px]">
+              <Link href="/about" className="link-more">
+                {t("footerAbout")}
+              </Link>
+              <Link href="/privacy" className="link-more">
+                {t("footerPrivacy")}
+              </Link>
+              <Link href="/contact" className="link-more">
+                {t("footerContact")}
+              </Link>
+              <a
+                href="https://github.com/beydemirfurkan/todox"
+                className="link-more"
+                rel="noreferrer"
+              >
+                GitHub
+              </a>
+            </nav>
+          </div>
         </footer>
       </body>
     </html>

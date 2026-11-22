@@ -583,6 +583,16 @@ export const en = {
     "Your agent starts every session knowing nothing about the last one. You pay for that twice — once explaining the project again, and once when it walks into a wall a previous session already found.",
   landingCta: "Create an account",
   landingSecondary: "I already have one",
+  /* the hero: one sentence with one word under the marker, written in lower
+     case on purpose -- the type is the voice, not the capitals */
+  landingScrawl: "for developers, and the agents they work with —",
+  landingHeadline: "the notebook your agent {mark}",
+  landingHeadlineMark: "actually keeps",
+  landingCtaNote: "Open source. Export all of it, whenever you like.",
+  landingArrowNote: "what the next session reads",
+  landingLabelProject: "project",
+  landingLabelTask: "task",
+  landingLabelState: "state",
   landingConnectTitle: "Works with the agent you already use",
   landingConnectBody:
     "One URL and a token. No package to install, no local process to keep running — anything that speaks MCP can connect: Claude Code, Codex, Cursor, VS Code.",
@@ -609,7 +619,6 @@ export const en = {
   briefingBody:
     "This is the shape of `get_context` — the first call every session makes. Not a summary of the product: the payload.",
   briefingCaption: "Trimmed for width. The real one carries every open task.",
-  landingShotTitle: "What you read over its shoulder",
   landingShotAlt:
     "A task in todox: its status, and a log holding a decision, a dead end and a handoff",
   landingShotCaption:
