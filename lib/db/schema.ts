@@ -216,6 +216,32 @@ ALTER TABLE entries ADD COLUMN IF NOT EXISTS answers_entry_id INTEGER
 CREATE INDEX IF NOT EXISTS idx_entries_answers ON entries (answers_entry_id)
   WHERE answers_entry_id IS NOT NULL;
 
+-- That an entry was deleted, and by whom -- never what it said.
+--
+-- Entries are deleted for real: a line somebody regrets writing should be
+-- gone. But on a shared project the log is several people's, and a deletion
+-- that left nothing behind let a member remove the owner's decision with no
+-- one the wiser (dogfood 2026-11-22). The row keeps the kind and the two
+-- people, so the task page can say "Mert deleted a decision" in its place.
+-- No body column on purpose: a tombstone that kept the text would make delete
+-- a lie.
+--
+-- The two people are plain ids, not foreign keys. With ON DELETE SET NULL,
+-- deleting an account that owns the project fired the SET NULL on a row the
+-- same delete was cascading away through tasks, and the update failed the
+-- task_id check. A departed person's id simply finds no user, and the page
+-- says "someone".
+CREATE TABLE IF NOT EXISTS entry_deletions (
+  id         SERIAL PRIMARY KEY,
+  task_id    INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL,
+  author_id  INTEGER,
+  deleted_by INTEGER,
+  created_at TEXT NOT NULL,
+  deleted_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_entry_deletions_task ON entry_deletions (task_id, deleted_at);
+
 -- Every status transition, so reports can answer "how long did this take"
 -- without guessing from updated_at.
 CREATE TABLE IF NOT EXISTS task_events (

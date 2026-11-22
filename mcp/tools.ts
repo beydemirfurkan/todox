@@ -892,7 +892,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
   tool("delete_entry", "deleteEntry", {
     title: "Remove a log entry",
     description:
-      "For an entry that was wrong when written (wrong task, a decision never made). An entry overtaken by later work is history, not wrong: append instead. Not for tidying.",
+      "For an entry that was wrong when written (wrong task, a decision never made). An entry overtaken by later work is history, not wrong: append instead. Not for tidying. Only your own entries, or any in a project you own; the log keeps a line saying one was deleted.",
   });
 
   tool(

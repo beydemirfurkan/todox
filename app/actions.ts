@@ -16,7 +16,6 @@ import {
 import { isLang } from "@/lib/i18n";
 import { LANG_COOKIE } from "@/lib/lang";
 import * as contexts from "@/lib/repositories/contexts";
-import * as entries from "@/lib/repositories/entries";
 import * as projects from "@/lib/repositories/projects";
 import * as users from "@/lib/repositories/users";
 import type { TaskPatch } from "@/lib/repositories/tasks";
@@ -25,14 +24,15 @@ import * as collaboration from "@/lib/services/collaboration";
 import * as notificationService from "@/lib/services/notifications";
 import * as refs from "@/lib/repositories/refs";
 import {
+  assertCanDeleteEntry,
   assertContext,
-  assertEntry,
   assertProject,
   assertRef,
   assertTask,
 } from "@/lib/services/ownership";
 import * as limit from "@/lib/services/rate-limit";
 import * as sharing from "@/lib/services/sharing";
+import { deleteEntry } from "@/lib/services/entry-deletion";
 import * as taskService from "@/lib/services/task-service";
 import { accept, acceptWithNewAccount, invite } from "@/lib/services/project-invitations";
 import { getLang } from "@/lib/lang";
@@ -388,8 +388,10 @@ export async function addEntryAction(fd: FormData) {
 export async function deleteEntryAction(fd: FormData) {
   const user = await writingUser();
   const id = num(fd, "entry_id");
-  await assertEntry(user.id, id);
-  await entries.remove(id);
+  // The service asks the same question; asking it here too keeps every
+  // id-taking action's guard visible in its own body.
+  await assertCanDeleteEntry(user.id, id);
+  await deleteEntry(user.id, id);
   revalidatePath("/", "layout");
 }
 

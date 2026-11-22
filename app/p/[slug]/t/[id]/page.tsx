@@ -8,6 +8,7 @@ import { ago, type T } from "@/lib/i18n";
 import { byline } from "./byline";
 import { getT } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
+import * as entryDeletions from "@/lib/repositories/entry-deletions";
 import * as entriesRepo from "@/lib/repositories/entries";
 import * as projects from "@/lib/repositories/projects";
 import * as refsRepo from "@/lib/repositories/refs";
@@ -102,10 +103,19 @@ export default async function TaskPage({
   ]);
   if (!project || !task || task.project_id !== project.id) notFound();
 
-  const [entries, refRows] = await Promise.all([
+  const [entries, refRows, deletions] = await Promise.all([
     entriesRepo.listByTask(task.id),
     refsRepo.listByTask(task.id),
+    entryDeletions.listByTask(task.id),
   ]);
+  // Who may delete is decided in lib/services/ownership.ts; this only hides
+  // a control that would answer 404, it guards nothing.
+  const isOwner = project.user_id === user.id;
+  const canDelete = (e: { user_id?: number | null }) => isOwner || e.user_id === user.id;
+  const timeline = [
+    ...entries.map((e) => ({ type: "entry" as const, at: e.created_at, e })),
+    ...deletions.map((d) => ({ type: "deleted" as const, at: d.created_at, d })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
   const refs = refRows.map((r) => ({ ...r, state: refsRepo.freshness(r) }));
 
   const kindStrings = Object.fromEntries(
@@ -245,35 +255,60 @@ export default async function TaskPage({
           >
             {entries.length === 0 && <Empty>{t("logEmpty")}</Empty>}
             <ol>
-              {entries.map((e, i) => (
-                <li key={e.id} className="group relative flex gap-3">
+              {timeline.map((item, i) =>
+                item.type === "deleted" ? (
+                  <li key={`deleted-${item.d.id}`} className="relative flex gap-3">
+                    <div className="flex w-3 flex-col items-center" aria-hidden="true">
+                      <span className="mt-1.5 size-3 shrink-0 rounded-full border border-dashed border-rule" />
+                      {i < timeline.length - 1 && <span className="mt-1 w-0 flex-1 border-l border-rule" />}
+                    </div>
+                    <p className="min-w-0 flex-1 pb-6 text-meta text-faint italic">
+                      {item.d.author_name && item.d.author_name === item.d.deleted_by_name
+                        ? t("entryDeletedOwn", {
+                            who: item.d.deleted_by_name,
+                            kind: kindLabel(t, item.d.kind as EntryKind),
+                          })
+                        : t("entryDeleted", {
+                            who: item.d.deleted_by_name ?? t("unknownPerson"),
+                            author: item.d.author_name ?? t("unknownPerson"),
+                            kind: kindLabel(t, item.d.kind as EntryKind),
+                          })}
+                      {" · "}
+                      {ago(item.d.deleted_at, t)}
+                    </p>
+                  </li>
+                ) : (
+                <li key={item.e.id} className="group relative flex gap-3">
                   <div className="flex w-3 flex-col items-center" aria-hidden="true">
-                    <span className="mt-1.5 size-3 shrink-0 rounded-full" style={{ background: KIND_COLOR[e.kind] }} />
-                    {i < entries.length - 1 && <span className="mt-1 w-0 flex-1 border-l border-rule" />}
+                    <span className="mt-1.5 size-3 shrink-0 rounded-full" style={{ background: KIND_COLOR[item.e.kind] }} />
+                    {i < timeline.length - 1 && <span className="mt-1 w-0 flex-1 border-l border-rule" />}
                   </div>
                   <article className="min-w-0 flex-1 pb-6">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Chip color={KIND_COLOR[e.kind]} title={kindHint(t, e.kind)}>
-                        {kindLabel(t, e.kind)}
+                      <Chip color={KIND_COLOR[item.e.kind]} title={kindHint(t, item.e.kind)}>
+                        {kindLabel(t, item.e.kind)}
                       </Chip>
                       <span className="mono text-meta text-faint">
-                        {byline(t, e)}{ago(e.created_at, t)}
+                        {byline(t, item.e)}{ago(item.e.created_at, t)}
                       </span>
-                      <form action={deleteEntryAction} className="ml-auto">
-                        <input type="hidden" name="entry_id" value={e.id} />
-                        <SubmitButton
-                          className="link-more row-action text-meta"
-                          pendingLabel={t("working")}
-                        >
-                          {t("delete")}
-                          <span className="sr-only"> — {kindLabel(t, e.kind)}</span>
-                        </SubmitButton>
-                      </form>
+                      {canDelete(item.e) && (
+                        <form action={deleteEntryAction} className="ml-auto">
+                          <input type="hidden" name="entry_id" value={item.e.id} />
+                          <SubmitButton
+                            className="link-more row-action text-meta"
+                            pendingLabel={t("working")}
+                          >
+                            {t("delete")}
+                            <span className="sr-only"> — {kindLabel(t, item.e.kind)}</span>
+                          </SubmitButton>
+                        </form>
+                      )}
                     </div>
-                    <EntryBody body={e.body} more={t("showMore")} less={t("showLess")} />
+                    <EntryBody body={item.e.body} more={t("showMore")} less={t("showLess")} />
                   </article>
                 </li>
-              ))}
+                ),
+              )}
             </ol>
 
             <LogComposer
