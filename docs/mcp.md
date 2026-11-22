@@ -183,8 +183,7 @@ any of this: it has no filesystem, so it has nothing to look at.
 
 **A second carrier, for the hosted endpoint.** Connected to `/api/mcp`, there is
 no local todox process to do the watching — which is most people. The
-plugin's hooks (Claude Code from plugin 0.1.5; Codex from the release after
-0.1.6) run on your machine at a session's
+plugin's hooks (Claude Code from plugin 0.1.5; Codex from 0.1.7) run on your machine at a session's
 edges — the Stop hook after every turn, if git changed since the last one it
 sent, and SessionEnd — and send the same row with `source: "plugin-hook"`
 (`"claude-code-hook"` up to 0.1.6) and `client` naming the agent
@@ -202,13 +201,15 @@ The Claude Code plugin (0.1.5 and later) runs command hooks: plain processes,
 no model call, talking to nothing but your todox server's `/api/rpc` with the
 token you gave the plugin. Every call carries `x-todox-carrier:
 claude-code-hook`, so it is counted under `hook:<method>` and never as your
-agent's call (see below).
+agent's call (see below). The Codex hooks are the same script and send the same
+header; the name predates them.
 
 | Hook | Sends | When |
 |---|---|---|
 | SessionStart | `getContext` with your `cwd`, the repository's `origin` URL (credentials stripped), `shape: "digest"`, `create_if_missing: false` | startup, resume, `/clear`, after compaction |
 | SessionStart | `getContext` (full, same arguments) for the files linked to open tasks, then `reportRefs`: each link's id and the sha256 of the file as it is on this machine, or null when it is gone | when an open task has a linked file this machine can read |
 | Stop | `sessionStatus` with your `cwd` and a window of hours | only if this session touched a todox task |
+| PreCompact (Claude Code only) | `sessionStatus`, the same call as Stop | before compaction, only if this session touched a todox task |
 | Stop, SessionEnd | `recordObservation`: the `origin` URL, branch, two commit ids, commit and dirty-file counts, up to three commit subjects, ids of tasks set to `doing` | only if git changed since the last one sent |
 
 The remote is there so a second checkout of a repository todox already knows,

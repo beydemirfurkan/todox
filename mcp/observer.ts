@@ -208,8 +208,10 @@ export function createObserver(options: ObserverOptions) {
   try {
     root = options.git.root(options.cwd);
     if (root) base = options.git.head(root);
-  } catch {
-    // A checkout that cannot be read is one we do not observe.
+  } catch (error) {
+    // A checkout that cannot be read is one we do not observe. stderr only:
+    // stdout is the MCP protocol.
+    console.error("[todox] not observing:", error instanceof Error ? error.message : error);
   }
 
   async function send(
@@ -332,9 +334,11 @@ export function createObserver(options: ObserverOptions) {
   async function observeQuietly(params: Record<string, unknown>, final = false): Promise<void> {
     try {
       await observe(params, final);
-    } catch {
-      // Deliberately silent. This runs inside the agent's own tool call, and a
-      // message here would attach a failure to work that did not cause it.
+    } catch (error) {
+      // Never surfaced to the agent: this runs inside its own tool call, and a
+      // message there would attach a failure to work that did not cause it.
+      // stderr is the client's log, not the conversation.
+      console.error("[todox] observation not sent:", error instanceof Error ? error.message : error);
     }
   }
 

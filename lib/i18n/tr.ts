@@ -18,7 +18,7 @@ export const tr: Record<Key, string> = {
   metaDescriptionLogin:
     "Projelerine, görevlerine ve her kodlama oturumundan sağ çıkan günlüğe ulaşmak için todox'a giriş yap; agent'ınla aynı belleği paylaş.",
   metaDescriptionRegister:
-    "Ücretsiz bir todox hesabı aç; projelerini, görev günlüğünü ve kodlama agent'ının bağlamını tek bir yerde topla. Başka kimse bunların hiçbirini göremez.",
+    "Ücretsiz bir todox hesabı aç; projelerini, görev günlüğünü ve kodlama agent'ının bağlamını tek bir yerde topla. Sen davet etmedikçe ya da bağlantı paylaşmadıkça kimse göremez.",
   metaDescriptionForgot:
     "todox hesabının şifresini tek adımda sıfırla. Bir kez kullanılabilen ve bir saat içinde geçersiz olan bir bağlantıyı e-postana göndeririz; giriş yapmana gerek kalmaz.",
   metaDescriptionAbout:
@@ -40,9 +40,9 @@ export const tr: Record<Key, string> = {
   whatItIs1: "Depo başına bir proje; üzerinde çalıştığın görevler ve her birinin başına gelenleri anlatan günlük girdileri.",
   whatItIs2: "Görev başına canlı bir günlük: yapılıyor, takıldı, bitti. Her değişiklik bir satır, düzenleme değil; tarihçe tek doğru kaynak.",
   whatItIs3: "Günlük ve haftalık etkinlik raporu — günü başlatan kişi için: geliştirici ya da devralacağı agent.",
-  whatItIs4: "Aynı yüzeyi kodlama agent'larına açan bir MCP sunucusu (/api/mcp). Barındırılan uç ile stdio süreci aynı araç listesini paylaşır.",
+  whatItIs4: "Aynı yüzeyi kodlama agent'larına açan bir MCP sunucusu (/api/mcp). Barındırılan uç ile stdio süreci araçların tek bir tanımından kurulur.",
   whatItIsNot: "nedir değil",
-  whatItIsNot1: "Bir Kanban panosu değil. Swimlane, sprint, Gantt yok.",
+  whatItIsNot1: "Bir proje yönetim aracı değil. Pano var, ama swimlane, sprint, Gantt yok.",
   whatItIsNot2: "Takım sohbeti değil. Yorumlar anlattıkları değişikliğin yanında durur.",
   whatItIsNot3: "Bir wiki değil. Notlar kısa ve tarihlidir.",
   whatItIsNot4:
@@ -204,7 +204,7 @@ export const tr: Record<Key, string> = {
   loginTitle: "tekrar hoş geldin",
   loginIntro: "Projelerine ve arkalarındaki kayda ulaşmak için giriş yap.",
   registerTitle: "hesabını oluştur",
-  registerIntro: "Projelerin, kaydın, agent'ların. Hiçbirini başkası göremez.",
+  registerIntro: "Projelerin, kaydın, agent'ların. Sen davet etmedikçe ya da bağlantı paylaşmadıkça kimse göremez.",
   identifier: "kullanıcı adı veya e-posta",
   username: "kullanıcı adı",
   email: "e-posta",
@@ -379,7 +379,7 @@ export const tr: Record<Key, string> = {
   exportCta: "verilerimi indir",
   deleteAccount: "hesabı sil",
   deleteAccountNote:
-    "Hesabı kapatır; bütün projeleri, görevleri ve kayıt girdilerini de birlikte götürür. Kopyası yok, geri alınamaz — saklamak istediğin ne varsa önce dışarı aktar.",
+    "Hesabı kapatır; sahibi olduğun bütün projeleri görevleri ve kayıtlarıyla birlikte götürür. Başkalarının projelerine yazdıkların orada imzasız kalır. Kopyası yok, geri alınamaz — saklamak istediğin ne varsa önce dışarı aktar.",
   deleteAccountShared: "Önce başkalarının da çalıştığı her projeyi devret ya da sil. Hesabı silmek onların emeğini de götürür:",
   deleteAccountSharedMembers: "{n} başka üye",
   deleteAccountConfirm: "onaylamak için kullanıcı adını yaz",
@@ -554,7 +554,7 @@ export const tr: Record<Key, string> = {
   priorityLabel: "öncelik",
 
   sharing: "paylaşım",
-  shareOff: "Bu proje özel. Sadece sen görebilirsin.",
+  shareOff: "Herkese açık bağlantı yok. Yalnızca sen ve projenin üyeleri görebilir.",
   shareOn: "Bu bağlantıya sahip herkes görev listesini okuyabilir.",
   shareEnable: "herkese açık bağlantı oluştur",
   shareDisable: "paylaşımı durdur",
@@ -791,7 +791,7 @@ export const tr: Record<Key, string> = {
   briefingTitle: "agentın tek çağrıda okuduğu şey",
   briefingBody:
     "Bu, `get_context`'in şekli — her oturumun yaptığı ilk çağrı. Ürünün özeti değil: yükün kendisi.",
-  briefingCaption: "Ekrana sığsın diye kısaltıldı. Gerçeği açık olan her görevi taşır.",
+  briefingCaption: "Ekrana sığsın diye kısaltıldı. Gerçeği en önemliden başlayarak elli açık göreve kadar taşır.",
   landingShotAlt:
     "Bir todox proje panosu: sırada, yapılıyor ve takıldı sütunlarında görev kartları, yanında da bir karar ile bir çıkmaz taşıyan günlüğüyle açık bir görev",
   landingShotCaption:

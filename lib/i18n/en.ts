@@ -20,7 +20,7 @@ export const en = {
   metaDescriptionLogin:
     "Sign in to todox to reach your projects, tasks and the log that survives every coding session.",
   metaDescriptionRegister:
-    "Create a free todox account to keep your projects, task log and coding-agent context in one place. Nobody else can see any of it.",
+    "Create a free todox account to keep your projects, task log and coding-agent context in one place. Nobody else sees it unless you invite them or share a link.",
   metaDescriptionForgot:
     "Reset your todox account password in one step. We email a link that works once and expires in an hour, with no login required.",
   metaDescriptionAbout:
@@ -42,9 +42,9 @@ export const en = {
   whatItIs1: "A project per repository, with the tasks you are working on and the log entries that explain what happened to them.",
   whatItIs2: "A live log per task: doing, blocked, done. Each change is a row, not an edit, so the history is the source of truth.",
   whatItIs3: "A daily and weekly activity report written for whoever is starting their day — the developer or the agent they are about to hand off to.",
-  whatItIs4: "An MCP server (/api/mcp) that exposes the same surface to coding agents. The hosted endpoint and the stdio process share one tool list.",
+  whatItIs4: "An MCP server (/api/mcp) that exposes the same surface to coding agents. The hosted endpoint and the stdio process are built from one definition of the tools.",
   whatItIsNot: "what it is not",
-  whatItIsNot1: "A kanban board. There is no swimlane, no sprint, no Gantt.",
+  whatItIsNot1: "A project-management tool. There is a board, but no swimlane, no sprint, no Gantt.",
   whatItIsNot2: "A team chat. Comments live next to the change they describe.",
   whatItIsNot3: "A wiki. Notes are short and dated.",
   whatItIsNot4:
@@ -209,7 +209,7 @@ export const en = {
   loginTitle: "welcome back",
   loginIntro: "Sign in to reach your projects and the log behind them.",
   registerTitle: "create your account",
-  registerIntro: "Your projects, your log, your agents. Nobody else can see any of it.",
+  registerIntro: "Your projects, your log, your agents. Nobody else sees them unless you invite them or share a link.",
   identifier: "username or email",
   username: "username",
   email: "email",
@@ -386,7 +386,7 @@ export const en = {
   exportCta: "download my data",
   deleteAccount: "delete account",
   deleteAccountNote:
-    "Ends the account and takes every project, task and log entry with it. There is no copy and no undo — export anything you want to keep first.",
+    "Ends the account and takes every project you own, with its tasks and log, with it. What you wrote in other people's projects stays there, unsigned. There is no copy and no undo — export anything you want to keep first.",
   deleteAccountShared: "First hand on, or delete, each project other people work in. Deleting the account would take their work too:",
   deleteAccountSharedMembers: "{n} other members",
   deleteAccountConfirm: "type your username to confirm",
@@ -564,7 +564,7 @@ export const en = {
 
   /* sharing */
   sharing: "sharing",
-  shareOff: "This project is private. Only you can see it.",
+  shareOff: "No public link. Only you and the project's members can see it.",
   shareOn: "Anyone with this link can read the task list.",
   shareEnable: "create a public link",
   shareDisable: "stop sharing",
@@ -809,7 +809,7 @@ export const en = {
   briefingTitle: "what your agent reads, in one call",
   briefingBody:
     "This is the shape of `get_context` — the first call every session makes. Not a summary of the product: the payload.",
-  briefingCaption: "Trimmed for width. The real one carries every open task.",
+  briefingCaption: "Trimmed for width. The real one carries up to fifty open tasks, the most important first.",
   landingShotAlt:
     "A todox project board: queued, doing and blocked columns of task cards, and beside them one task open with its log of a decision and a dead end",
   landingShotCaption:

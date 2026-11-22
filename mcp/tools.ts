@@ -91,7 +91,7 @@ const BASE = [
   "will not finish this session. Registering a NEW project needs `repo_root` or",
   "`repo_url` -- a bare cwd is a directory, not a repository; the refusal names",
   "what to send. Put the plan a task follows in `files`, wherever it lives;",
-  "todox warns when it moves on.",
+  "todox warns when a file on this machine moves on (a URL is kept, not checked).",
   "",
   "WHILE WORKING: update_task to move status -- 'doing' when you actually start.",
   "log_entry for 'decision' (what and why it beat the alternative), 'dead_end'",
@@ -236,7 +236,7 @@ export function skillDocument(): string {
  * `server.json` there. Three files, one release, one test that fails when
  * somebody bumps only two of them.
  */
-export const SERVER_INFO = { name: "todox", version: "0.1.6" } as const;
+export const SERVER_INFO = { name: "todox", version: "0.1.7" } as const;
 
 const ok = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
@@ -725,8 +725,10 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       try {
         await call("reportRefs", { refs: unreported });
         for (const r of unreported) reported.set(r.id, r.hash);
-      } catch {
-        /* the status above is still correct for this call */
+      } catch (error) {
+        // The status above is still correct for this call. stderr, because in
+        // the stdio process stdout is the protocol.
+        console.error("[todox] reportRefs failed:", error instanceof Error ? error.message : error);
       }
     }
 
@@ -928,7 +930,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Link files to a task or a note",
       description:
-        "Attach file paths to a task (`task_id`) or a note (`context_id`), one or the other -- the files the work touches, and the plan it follows, wherever that lives: a path outside the repository is fine and a URL (a claude.ai artifact, say) is kept as written. todox can then warn when a linked file changes, and get_file_context can find the task or note from the path.",
+        "Attach file paths to a task (`task_id`) or a note (`context_id`), one or the other -- the files the work touches, and the plan it follows, wherever that lives: a path outside the repository is fine and a URL (a claude.ai artifact, say) is kept as written. todox can then warn when a linked file on this machine changes (a URL is never checked), and get_file_context can find the task or note from the path.",
     },
     local
       ? {

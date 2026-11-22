@@ -96,6 +96,13 @@ overwritten by an update.
   nothing for a session that is written up or only read, and honours the same
   `TODOX_STOP=off` and "no-handoff".
 
+- **SessionEnd hook** (Claude Code) and the Stop hook also record what git did
+  during the session — branch, commit ids and counts, up to three commit
+  subjects — as an *observation*: evidence the next briefing shows in its own
+  section, never an entry, and gone after two weeks unless an agent writes it
+  up. Only when git changed since the last one sent; `TODOX_OBSERVE=off` turns
+  it off. `docs/mcp.md` lists exactly what is sent.
+
 An earlier version of this README argued against a Stop hook: a prompt hook at
 stop sees only the last message, so it blocks every chat or none, and an agent
 hook that reads the transcript is a model call on every stop. Both are true and

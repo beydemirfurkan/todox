@@ -1,4 +1,5 @@
 import { all, one, run } from "../db/client";
+import { logError } from "../server/log";
 import { now } from "../util/time";
 
 /**
@@ -85,8 +86,9 @@ export async function record(userId: number, method: string, ok: boolean): Promi
   const at = now();
   try {
     await run(QUERIES.record, [userId, method, at.slice(0, 10), ok ? 0 : 1, at, at]);
-  } catch {
-    // Deliberately silent. See above: the caller is somebody else's work.
+  } catch (error) {
+    // Logged, never thrown. See above: the caller is somebody else's work.
+    logError("toolUsage.recordFailed", error);
   }
 }
 
