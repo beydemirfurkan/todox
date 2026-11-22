@@ -251,14 +251,21 @@ export async function deleteProjectAction(
   if (str(fd, "confirm").toLowerCase() !== project.slug.toLowerCase())
     return { errors: [{ field: "confirm", code: "confirmMismatch" }] };
 
-  await projects.remove(user.id, id);
+  // Through the service: the members lose their work in it too, and have to
+  // be told, and who they were only exists on rows the delete takes away.
+  await collaboration.deleteProject(user.id, id);
   revalidatePath("/", "layout");
   redirect("/");
 }
 
+/**
+ * Comes back to the team tab with the outcome in the address. `invite` has six
+ * answers and five of them are a refusal; dropping the result made a typo, an
+ * unverified sender and a rate limit all look exactly like "sent".
+ */
 export async function inviteProjectAction(fd: FormData) {
   const user = await writingUser();
-  await invite({
+  const result = await invite({
     userId: user.id,
     projectId: num(fd, "project_id"),
     email: str(fd, "email"),
@@ -266,7 +273,21 @@ export async function inviteProjectAction(fd: FormData) {
   });
   revalidatePath("/account");
   revalidatePath("/", "layout");
+  redirect(teamTab(str(fd, "slug"), `invite=${result}`));
 }
+
+/** Hands the project to a member; the former owner lands on it as a member. */
+export async function transferOwnershipAction(fd: FormData) {
+  const user = await writingUser();
+  const outcome = await collaboration.transferOwnership(user.id, num(fd, "membership_id"));
+  revalidatePath("/", "layout");
+  if (!outcome.ok) redirect(teamTab(str(fd, "slug"), "transfer=failed"));
+  redirect(`/p/${outcome.formerOwnerSlug}`);
+}
+
+/** Only a slug-shaped value goes into the address; anything else goes home. */
+const teamTab = (slug: string, query: string) =>
+  /^[a-z0-9-]{1,64}$/.test(slug) ? `/p/${slug}/settings?tab=team&${query}` : "/";
 
 export async function revokeProjectInviteAction(fd: FormData) {
   const user = await writingUser();

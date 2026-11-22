@@ -42,6 +42,11 @@ export function notificationText(n: NotificationView, t: T): string {
       return t("notifInviteAccepted", { who, project });
     case "member_removed":
       return t("notifMemberRemoved", { project });
+    case "ownership_received":
+      return t("notifOwnershipReceived", { who, project });
+    // The project is gone, so its name survives only in `detail`.
+    case "project_deleted":
+      return t("notifProjectDeleted", { who, project: n.detail ?? t("aProject") });
   }
 }
 

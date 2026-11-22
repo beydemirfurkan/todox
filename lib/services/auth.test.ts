@@ -43,6 +43,7 @@ const authTokensRepo = vi.hoisted(() => ({
     params: [],
   })),
 }));
+const membershipsRepo = vi.hoisted(() => ({ sharedOwnedBy: vi.fn() }));
 const db = vi.hoisted(() => ({ tx: vi.fn() }));
 const pw = vi.hoisted(() => ({
   hashPassword: vi.fn(async (p: string) => `hashed:${p}`),
@@ -53,6 +54,7 @@ vi.mock("../repositories/users", () => usersRepo);
 vi.mock("../repositories/sessions", () => sessionsRepo);
 vi.mock("../repositories/api-tokens", () => apiTokensRepo);
 vi.mock("../repositories/auth-tokens", () => authTokensRepo);
+vi.mock("../repositories/project-memberships", () => membershipsRepo);
 vi.mock("../db/client", () => db);
 vi.mock("../util/password", () => pw);
 vi.mock("./rate-limit", () => ({ sweep: vi.fn() }));
@@ -75,6 +77,7 @@ const passwordIs = (correct: string) =>
 beforeEach(() => {
   vi.clearAllMocks();
   passwordIs("right");
+  membershipsRepo.sharedOwnedBy.mockResolvedValue([]);
 });
 
 describe("publicUser", () => {
@@ -333,6 +336,22 @@ describe("deleteAccount", () => {
 
     expect(result).toMatchObject({ ok: false, errors: [{ code: "confirmMismatch" }] });
     expect(usersRepo.remove).not.toHaveBeenCalled();
+  });
+
+  it("refuses while the account owns a project other people work in", async () => {
+    // The cascade would take the members' tasks and log with it.
+    membershipsRepo.sharedOwnedBy.mockResolvedValue([{ id: 7, name: "api", slug: "api", members: 2 }]);
+    const result = await auth.deleteAccount(USER.id, "right", "bob");
+
+    expect(result).toEqual({ ok: false, errors: [{ field: "form", code: "hasSharedProjects" }] });
+    expect(usersRepo.remove).not.toHaveBeenCalled();
+  });
+
+  it("checks the credentials before saying anything about shared projects", async () => {
+    membershipsRepo.sharedOwnedBy.mockResolvedValue([{ id: 7, name: "api", slug: "api", members: 2 }]);
+    const result = await auth.deleteAccount(USER.id, "WRONG", "bob");
+
+    expect(result).toMatchObject({ ok: false, errors: [{ code: "badCredentials" }] });
   });
 });
 

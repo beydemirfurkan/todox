@@ -50,6 +50,8 @@ export const NOTIFICATION_KINDS = [
   "invite_received",
   "invite_accepted",
   "member_removed",
+  "ownership_received",
+  "project_deleted",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

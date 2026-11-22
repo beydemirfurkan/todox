@@ -2,6 +2,7 @@ import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
 import * as authTokens from "../repositories/auth-tokens";
 import type { ClientUse } from "../repositories/api-tokens";
+import * as memberships from "../repositories/project-memberships";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
 import { logInfo } from "../server/log";
@@ -263,9 +264,15 @@ export async function changeEmail(
  * username is asked for on the way in too, but that is a confirmation and not
  * a credential -- it exists so this cannot happen by reflex.
  *
- * One statement is enough: every table that references a user does so with
- * ON DELETE CASCADE, so projects, tasks, entries, events, refs, contexts,
- * sessions and agent tokens all go with it. Deliberately unrecoverable.
+ * One statement does it. The account's projects cascade, and with them
+ * their tasks, entries, refs and notes; so do sessions and agent tokens. What
+ * this person wrote in somebody else's project stays, unsigned: `entries`
+ * and `task_events` point at a user with ON DELETE SET NULL, because the log
+ * belongs to the project. Deliberately unrecoverable.
+ *
+ * Refused while the account owns a project somebody else works in: the
+ * cascade would take their work too. Each has to be handed on or deleted
+ * first, as a decision the owner makes rather than a side effect.
  */
 export async function deleteAccount(
   userId: number,
@@ -288,6 +295,9 @@ export async function deleteAccount(
   // somebody their own username is wrong.
   if (confirmation.trim().toLowerCase() !== user.username.toLowerCase())
     return { ok: false, errors: [{ field: "confirm", code: "confirmMismatch" }] };
+
+  if ((await memberships.sharedOwnedBy(userId)).length > 0)
+    return { ok: false, errors: [{ field: "form", code: "hasSharedProjects" }] };
 
   await users.remove(userId);
   return { ok: true, value: true };

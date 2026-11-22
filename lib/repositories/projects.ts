@@ -123,6 +123,27 @@ export const ownedById = (userId: number, id: number) =>
     userId,
   ]);
 
+/** Whether this account already owns a project under this slug. */
+export const isOwnedSlugTaken = async (userId: number, slug: string): Promise<boolean> =>
+  Boolean(await one("SELECT 1 AS n FROM projects WHERE user_id = ? AND slug = ?", [userId, slug]));
+
+/**
+ * Hands the project to another account, guarded on the caller still owning it.
+ *
+ * The slug and path change with it: both are the owner's own, and the new
+ * owner arrives with theirs from the membership being retired beside this.
+ */
+export const transferStmt = (input: {
+  id: number;
+  fromUserId: number;
+  toUserId: number;
+  slug: string;
+  rootPath: string | null;
+}): Statement => ({
+  text: "UPDATE projects SET user_id = ?, slug = ?, root_path = ? WHERE id = ? AND user_id = ?",
+  params: [input.toUserId, input.slug, input.rootPath, input.id, input.fromUserId],
+});
+
 /**
  * Projects this user has a filesystem path for.
  *
