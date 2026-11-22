@@ -257,12 +257,17 @@ async function runSuite(mode: Mode, token: string) {
   }
   console.log("repo_url advertised:", showsUrl);
 
+  // Hosted, a call must name one; locally the launch directory stands in for
+  // both, so neither is required and a bare `{}` is answered, not refused.
   const createTask = tools.tools.find((tool) => tool.name === "create_task");
   const requirements = alternativeRequirements(createTask?.inputSchema as ToolSchema | undefined);
-  if (!requirements.includes("project") || !requirements.includes("cwd")) {
-    throw new Error("create_task must advertise project OR cwd as required alternatives");
+  const requiresOne = requirements.includes("project") && requirements.includes("cwd");
+  if (requiresOne === mode.local) {
+    throw new Error(
+      `create_task should ${mode.local ? "require neither locally" : "require project OR cwd remotely"}, but required: ${requirements.join(", ") || "nothing"}`,
+    );
   }
-  console.log("create_task reference:", "project OR cwd");
+  console.log("create_task requires project or cwd:", requiresOne);
 
   const text = async (name: string, args: Record<string, unknown> = {}) => {
     const r = await client.callTool({ name, arguments: args });
@@ -748,6 +753,16 @@ async function runSuite(mode: Mode, token: string) {
   if (typeof question.id !== "number")
     throw new Error(`the briefing handed back a question with no id: ${JSON.stringify(question)}`);
   console.log("asked, and nameable: #" + question.id);
+
+  // Claude Code's first call to a deferred tool is a guess, and for
+  // get_context the guess was `{}`. Locally the process knows where it was
+  // launched, so that call must land on the same project.
+  if (mode.local) {
+    const bare = JSON.parse(await text("get_context", {}));
+    if (bare.project?.slug !== withQuestion.project?.slug)
+      throw new Error(`get_context {} resolved ${bare.project?.slug}, not ${withQuestion.project?.slug}`);
+    console.log("get_context {} answered from the launch directory:", bare.project.slug);
+  }
 
   // Two refusals. `text` hands a tool error back as its text rather than
   // throwing, which is how the agent sees it too -- so this reads the answer.
