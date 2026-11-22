@@ -2238,6 +2238,17 @@ pre {
   }
 }
 
+/* Connecting a sign-in: the button opens a small password form in place. */
+.connect-provider > summary {
+  list-style: none;
+}
+.connect-provider > summary::-webkit-details-marker {
+  display: none;
+}
+.connect-provider[open] > summary {
+  display: none;
+}
+
 /* ------------------------------------------------------------- loading */
 
 /* A page on its way: bars where its rows will be. They breathe rather than

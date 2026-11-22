@@ -1,5 +1,6 @@
 import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
+import * as authTokens from "../repositories/auth-tokens";
 import type { ClientUse } from "../repositories/api-tokens";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
@@ -48,6 +49,22 @@ async function provesOwnership(user: User, password: string, sessionToken: strin
 }
 
 const REAUTH: FieldError = { field: "form", code: "reauthRequired" };
+
+/**
+ * The same proof `changePassword` asks for, for actions that are not a
+ * password change but grant as much -- linking a new way to sign in. `null`
+ * when it holds; otherwise the error to show.
+ */
+export async function confirmIdentity(
+  userId: number,
+  password: string,
+  sessionToken: string | undefined,
+): Promise<FieldError | null> {
+  const user = await users.byId(userId);
+  if (!user) return { field: "form", code: "badCredentials" };
+  if (await provesOwnership(user, password, sessionToken)) return null;
+  return user.password_hash === null ? REAUTH : { field: "password", code: "badCredentials" };
+}
 
 export function validateRegistration(input: {
   username: string;
@@ -194,6 +211,7 @@ export async function changeEmail(
   userId: number,
   currentPassword: string,
   next: string,
+  sessionToken?: string,
 ): Promise<Result<{ user: PublicUser; previousEmail: string }>> {
   const user = await users.byId(userId);
   if (!user) return { ok: false, errors: [{ field: "form", code: "badCredentials" }] };
@@ -216,7 +234,18 @@ export async function changeEmail(
   if (clash && clash.id !== userId)
     return { ok: false, errors: [{ field: "email", code: "emailTaken" }] };
 
-  await users.updateEmail(userId, email);
+  // One transaction. A reset link already in the old inbox must not reach an
+  // account that now has a different address: completing it marks the
+  // *current* address verified, so it would vouch for an address nobody had
+  // proved -- and a verified address is what accepts invitations sent to it.
+  // Other sessions go too, as with a password change.
+  await tx([
+    users.updateEmailStmt(userId, email),
+    authTokens.invalidateAllStmt(userId, "reset"),
+    authTokens.invalidateAllStmt(userId, "verify"),
+    authTokens.invalidateAllStmt(userId, "oauth_link"),
+    sessionToken ? sessions.destroyOthersForStmt(userId, sessionToken) : sessions.destroyAllForStmt(userId),
+  ]);
   return {
     ok: true,
     value: {

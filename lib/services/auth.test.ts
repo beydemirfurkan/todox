@@ -17,7 +17,7 @@ const usersRepo = vi.hoisted(() => ({
   byEmail: vi.fn(),
   create: vi.fn(),
   remove: vi.fn(),
-  updateEmail: vi.fn(),
+  updateEmailStmt: vi.fn(() => ({ text: "UPDATE users SET email", params: [] })),
   updateProfile: vi.fn(),
   updatePasswordStmt: vi.fn(() => ({ text: "UPDATE users SET password_hash", params: [] })),
 }));
@@ -27,6 +27,7 @@ const sessionsRepo = vi.hoisted(() => ({
   userForToken: vi.fn(),
   purgeExpired: vi.fn(),
   destroyAllForStmt: vi.fn(() => ({ text: "DELETE FROM sessions", params: [] })),
+  destroyOthersForStmt: vi.fn(() => ({ text: "DELETE FROM sessions others", params: [] })),
   openedAt: vi.fn(),
 }));
 const apiTokensRepo = vi.hoisted(() => ({
@@ -35,6 +36,12 @@ const apiTokensRepo = vi.hoisted(() => ({
   remove: vi.fn(),
   destroyAllFor: vi.fn(),
   userForToken: vi.fn(),
+}));
+const authTokensRepo = vi.hoisted(() => ({
+  invalidateAllStmt: vi.fn((_userId: number, purpose: string) => ({
+    text: `UPDATE auth_tokens ${purpose}`,
+    params: [],
+  })),
 }));
 const db = vi.hoisted(() => ({ tx: vi.fn() }));
 const pw = vi.hoisted(() => ({
@@ -45,6 +52,7 @@ const pw = vi.hoisted(() => ({
 vi.mock("../repositories/users", () => usersRepo);
 vi.mock("../repositories/sessions", () => sessionsRepo);
 vi.mock("../repositories/api-tokens", () => apiTokensRepo);
+vi.mock("../repositories/auth-tokens", () => authTokensRepo);
 vi.mock("../db/client", () => db);
 vi.mock("../util/password", () => pw);
 vi.mock("./rate-limit", () => ({ sweep: vi.fn() }));
@@ -243,7 +251,7 @@ describe("changeEmail", () => {
       ok: false,
       errors: [{ field: "current", code: "badCredentials" }],
     });
-    expect(usersRepo.updateEmail).not.toHaveBeenCalled();
+    expect(usersRepo.updateEmailStmt).not.toHaveBeenCalled();
   });
 
   it("checks the password before it looks at the address at all", async () => {
@@ -260,14 +268,14 @@ describe("changeEmail", () => {
     const result = await auth.changeEmail(USER.id, "right", "taken@example.com");
 
     expect(result).toMatchObject({ ok: false, errors: [{ code: "emailTaken" }] });
-    expect(usersRepo.updateEmail).not.toHaveBeenCalled();
+    expect(usersRepo.updateEmailStmt).not.toHaveBeenCalled();
   });
 
   it("accepts the account's own address as a no-op", async () => {
     const result = await auth.changeEmail(USER.id, "right", "BOB@example.com");
 
     expect(result.ok).toBe(true);
-    expect(usersRepo.updateEmail).not.toHaveBeenCalled();
+    expect(usersRepo.updateEmailStmt).not.toHaveBeenCalled();
   });
 
   it("marks the new address unverified", async () => {
@@ -278,6 +286,25 @@ describe("changeEmail", () => {
     if (!result.ok) throw new Error("expected success");
     expect(result.value.user.email_verified_at).toBeNull();
     expect(result.value.previousEmail).toBe("bob@example.com");
+  });
+
+  it("retires every link already sent, and the other sessions, in the same write", async () => {
+    // A reset link mailed before the change would otherwise mark the *new*
+    // address verified when followed -- an address nobody had proved.
+    usersRepo.byEmail.mockResolvedValue(undefined);
+
+    await auth.changeEmail(USER.id, "right", "new@example.com", "this-session");
+
+    expect(db.tx).toHaveBeenCalledTimes(1);
+    const texts = (db.tx.mock.calls[0]![0] as { text: string }[]).map((st) => st.text);
+    expect(texts).toEqual([
+      "UPDATE users SET email",
+      "UPDATE auth_tokens reset",
+      "UPDATE auth_tokens verify",
+      "UPDATE auth_tokens oauth_link",
+      "DELETE FROM sessions others",
+    ]);
+    expect(sessionsRepo.destroyOthersForStmt).toHaveBeenCalledWith(USER.id, "this-session");
   });
 });
 
@@ -486,7 +513,7 @@ describe("an account without a password", () => {
     openedMinutesAgo(1);
     const result = await auth.changeEmail(3, "", "new@example.com");
     expect(result).toEqual({ ok: false, errors: [{ field: "current", code: "passwordNotSet" }] });
-    expect(usersRepo.updateEmail).not.toHaveBeenCalled();
+    expect(usersRepo.updateEmailStmt).not.toHaveBeenCalled();
   });
 
   it("is deleted only after a recent sign-in", async () => {

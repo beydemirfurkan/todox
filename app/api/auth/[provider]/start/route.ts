@@ -1,22 +1,20 @@
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { OAUTH_COOKIE } from "@/lib/cookies";
 import { publicUrl } from "@/lib/public-url";
 import { clientIp } from "@/lib/server/client-ip";
-import { encodePending, isProvider, safeNext } from "@/lib/services/oauth-flow";
-import { authorizationUrl, newCodeVerifier, newState } from "@/lib/services/oauth-providers";
+import { beginOAuth } from "@/lib/oauth-begin";
+import { isProvider, safeNext } from "@/lib/services/oauth-flow";
 import * as limit from "@/lib/services/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-/** Ten minutes to finish at the provider; longer than anybody needs. */
-const PENDING_SECONDS = 600;
-
 /**
- * Off to Google or GitHub. A plain GET a link can point at, because the
- * buttons are links: the CSP allows forms to post only to this origin, and
- * the provider is not this origin.
+ * Off to Google or GitHub to sign in. A plain GET a link can point at, because
+ * the buttons are links: the CSP allows forms to post only to this origin, and
+ * the provider is not this origin. Linking a new identity to an account that
+ * is already signed in does not start here: it needs the password first, so it
+ * starts from `startProviderLinkAction`.
  */
 export async function GET(
   request: Request,
@@ -29,18 +27,8 @@ export async function GET(
   const gate = await limit.consume("oauthPerIp", clientIp(await headers()));
   if (!gate.allowed) return back("tooManyAttempts");
 
-  const state = newState();
-  const codeVerifier = newCodeVerifier();
-  const target = authorizationUrl(provider, { state, codeVerifier });
-  if (!target) return back("oauthFailed");
-
   const next = safeNext(new URL(request.url).searchParams.get("next"));
-  (await cookies()).set(OAUTH_COOKIE, encodePending({ provider, state, codeVerifier, next }), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/api/auth",
-    maxAge: PENDING_SECONDS,
-  });
+  const target = await beginOAuth({ provider, next });
+  if (!target) return back("oauthFailed");
   return NextResponse.redirect(target);
 }

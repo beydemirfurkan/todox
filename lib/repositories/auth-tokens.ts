@@ -58,11 +58,13 @@ export const consumeStmt = (id: number, consumedAt: string): Statement => ({
 export const consume = (id: number) => runStmt(consumeStmt(id, now()));
 
 /** Issuing a new one retires the old: two live reset links is one too many. */
+export const invalidateAllStmt = (userId: number, purpose: AuthTokenPurpose): Statement => ({
+  text: "UPDATE auth_tokens SET used_at = ? WHERE user_id = ? AND purpose = ? AND used_at IS NULL",
+  params: [now(), userId, purpose],
+});
+
 export const invalidateAll = (userId: number, purpose: AuthTokenPurpose) =>
-  run(
-    "UPDATE auth_tokens SET used_at = ? WHERE user_id = ? AND purpose = ? AND used_at IS NULL",
-    [now(), userId, purpose],
-  );
+  runStmt(invalidateAllStmt(userId, purpose));
 
 export const purgeExpired = () =>
   run("DELETE FROM auth_tokens WHERE expires_at <= ?", [now()]);

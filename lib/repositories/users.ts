@@ -44,8 +44,20 @@ export const markEmailVerifiedStmt = (id: number): Statement => ({
 export const markEmailVerified = (id: number) => runStmt(markEmailVerifiedStmt(id));
 
 /** Changing the address un-verifies it; the new one has proved nothing yet. */
-export const updateEmail = (id: number, email: string) =>
-  run("UPDATE users SET email = ?, email_verified_at = NULL WHERE id = ?", [email, id]);
+export const updateEmailStmt = (id: number, email: string): Statement => ({
+  text: "UPDATE users SET email = ?, email_verified_at = NULL WHERE id = ?",
+  params: [email, id],
+});
+
+/**
+ * For an account whose address was never proved, taken over by the person who
+ * just proved it through Google or GitHub: whoever registered it under that
+ * address may know the password, and must not keep it.
+ */
+export const clearPasswordStmt = (id: number): Statement => ({
+  text: "UPDATE users SET password_hash = NULL WHERE id = ?",
+  params: [id],
+});
 
 export const updatePasswordStmt = (id: number, passwordHash: string): Statement => ({
   text: "UPDATE users SET password_hash = ? WHERE id = ?",

@@ -207,6 +207,7 @@ describe("asking for a reset link", () => {
     // A leaked older email has to be inert once a newer one is asked for.
     mocks.byEmail.mockResolvedValue(USER);
     await recovery.requestPasswordReset(USER.email, "en");
+    await vi.waitFor(() => expect(mocks.createAuthToken).toHaveBeenCalled());
 
     const invalidatedAt = mocks.invalidateAll.mock.invocationCallOrder[0]!;
     const createdAt = mocks.createAuthToken.mock.invocationCallOrder[0]!;
@@ -217,6 +218,8 @@ describe("asking for a reset link", () => {
     mocks.byEmail.mockResolvedValue(USER);
     await recovery.requestPasswordReset(USER.email, "en");
 
+    // Sent after the answer, so the timing does not say the address exists.
+    await vi.waitFor(() => expect(mocks.send).toHaveBeenCalled());
     const [message] = mocks.send.mock.calls[0] as [{ to: string; text: string }];
     expect(message.to).toBe(USER.email);
     expect(message.text).toContain("/reset?token=");

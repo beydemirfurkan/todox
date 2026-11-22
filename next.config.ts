@@ -57,6 +57,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Says which framework, and so which advisories, to try first.
+  poweredByHeader: false,
   async headers() {
     if (process.env.NODE_ENV !== "production") return [];
     return [

@@ -50,5 +50,11 @@ export const destroyAllForStmt = (userId: number): Statement => ({
 
 export const destroyAllFor = (userId: number) => runStmt(destroyAllForStmt(userId));
 
+/** Every session but the one making the request. */
+export const destroyOthersForStmt = (userId: number, keepToken: string): Statement => ({
+  text: "DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?",
+  params: [userId, hashToken(keepToken)],
+});
+
 export const purgeExpired = () =>
   run("DELETE FROM sessions WHERE expires_at <= ?", [now()]);

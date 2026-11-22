@@ -40,6 +40,12 @@ export const createStmt = (input: {
  * provider. The check is in the statement so two unlinks racing each other
  * cannot both pass it.
  */
+/** Used by recovery: whoever lost the account may have linked their own identity. */
+export const destroyAllForStmt = (userId: number): Statement => ({
+  text: "DELETE FROM oauth_accounts WHERE user_id = ?",
+  params: [userId],
+});
+
 export const removeUnlessLast = (userId: number, provider: OAuthProvider) =>
   run(
     `DELETE FROM oauth_accounts o

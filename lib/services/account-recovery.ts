@@ -1,6 +1,7 @@
 import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
 import * as authTokens from "../repositories/auth-tokens";
+import * as oauthAccounts from "../repositories/oauth-accounts";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
 import type { AuthTokenPurpose, PublicUser } from "../types";
@@ -11,6 +12,7 @@ import { addDays, now } from "../util/time";
 import { MIN_PASSWORD, publicUser, type Result } from "./auth";
 import { publicUrl } from "../public-url";
 import { send } from "./mailer";
+import { logError } from "../server/log";
 
 const RESET_TTL_MIN = 60;
 const VERIFY_TTL_DAYS = 3;
@@ -36,10 +38,16 @@ async function issue(userId: number, purpose: AuthTokenPurpose, expiresAt: strin
 export async function requestPasswordReset(email: string, lang: "tr" | "en") {
   const user = await users.byEmail(email.trim());
   if (!user) return;
+  // Not awaited: issuing the link and the SMTP round trip only happen when the
+  // address has an account, so waiting for them made a registered address
+  // measurably slower to answer -- the one thing the message text is careful
+  // not to say. The process is long-lived, so the promise still finishes.
+  void mailResetLink(user, lang).catch((error: unknown) => logError("auth.reset_mail", error));
+}
 
+async function mailResetLink(user: { id: number; name: string; email: string }, lang: "tr" | "en") {
   const token = await issue(user.id, "reset", expiryIn(RESET_TTL_MIN * 60_000));
   const link = `${publicUrl()}/reset?token=${encodeURIComponent(token)}`;
-
   await send({
     to: user.email,
     ...templates.passwordReset({ name: user.name, link, minutes: RESET_TTL_MIN, lang }),
@@ -87,6 +95,9 @@ export async function completePasswordReset(
     // full permissions is exactly what an intruder would keep. Killing sessions
     // while leaving those alive would have been security theatre.
     apiTokens.destroyAllForStmt(hit.user.id),
+    // And any Google or GitHub identity linked to it, for the same reason: an
+    // intruder's own identity is a way back in that no password change ends.
+    oauthAccounts.destroyAllForStmt(hit.user.id),
     // Reaching the inbox proves the address, so verification comes for free.
     ...(hit.user.email_verified_at ? [] : [users.markEmailVerifiedStmt(hit.user.id)]),
   ]);
@@ -139,6 +150,23 @@ export async function sendEmailChanged(
       username: user.username,
       previousEmail,
       newEmail: user.email,
+      forgotUrl: `${publicUrl()}/forgot`,
+      lang,
+    }),
+  });
+}
+
+export async function sendProviderLinked(
+  user: { name: string; username: string; email: string },
+  provider: string,
+  lang: "tr" | "en",
+) {
+  await send({
+    to: user.email,
+    ...templates.providerLinked({
+      name: user.name,
+      username: user.username,
+      provider,
       forgotUrl: `${publicUrl()}/forgot`,
       lang,
     }),

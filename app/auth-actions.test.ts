@@ -84,7 +84,7 @@ vi.mock("@/lib/services/account-recovery", () => ({
 
 const actions = await import("./auth-actions");
 
-const USER = { id: 5, email: "bob@example.com", email_verified_at: null };
+const USER = { id: 5, username: "bob", email: "bob@example.com", email_verified_at: null };
 const ALLOWED = { allowed: true } as const;
 
 const form = (fields: Record<string, string>) => {
@@ -115,20 +115,29 @@ beforeEach(() => {
 describe("loginAction", () => {
   const creds = form({ identifier: "bob", password: "hunter2" });
 
-  it("checks both buckets before it hashes anything", async () => {
+  it("counts both buckets before it hashes anything", async () => {
     mocks.login.mockResolvedValue({ ok: false, errors: [] });
 
     await outcome(() => actions.loginAction(null, creds));
 
-    // `auth.login` is where scrypt runs. A limiter consulted afterwards meters
-    // nothing that costs anything.
-    expect(mocks.order).toEqual(["check", "check", "login"]);
-    expect(mocks.check).toHaveBeenCalledWith("loginPerIdentity", "bob");
-    expect(mocks.check).toHaveBeenCalledWith("loginPerIp", "unknown");
+    // `auth.login` is where scrypt runs. Checking first and counting a failure
+    // afterwards let a burst of parallel guesses all pass a gate none of them
+    // had been counted against yet.
+    expect(mocks.order).toEqual(["consume", "consume", "login"]);
+    expect(mocks.consume).toHaveBeenCalledWith("loginPerIdentity", "bob");
+    expect(mocks.consume).toHaveBeenCalledWith("loginPerIp", "unknown");
+  });
+
+  it("meters the identity however it is capitalised", async () => {
+    mocks.login.mockResolvedValue({ ok: false, errors: [] });
+
+    await outcome(() => actions.loginAction(null, form({ identifier: " Bob ", password: "x" })));
+
+    expect(mocks.consume).toHaveBeenCalledWith("loginPerIdentity", "bob");
   });
 
   it("refuses before hashing when a bucket is spent", async () => {
-    mocks.check.mockResolvedValueOnce({ allowed: false, retryAfterSec: 120 });
+    mocks.consume.mockResolvedValueOnce({ allowed: false, retryAfterSec: 120 });
 
     const state = await outcome(() => actions.loginAction(null, creds));
 
@@ -136,23 +145,24 @@ describe("loginAction", () => {
     expect(state).toMatchObject({ errors: [{ code: "tooManyAttempts", retryAfterSec: 2 }] });
   });
 
-  it("counts a failure against both buckets, and starts no session", async () => {
+  it("keeps a failure's count, and starts no session", async () => {
     mocks.login.mockResolvedValue({ ok: false, errors: [{ field: "form", code: "bad" }] });
 
     await outcome(() => actions.loginAction(null, creds));
 
-    expect(mocks.penalise).toHaveBeenCalledWith("loginPerIdentity", "bob");
-    expect(mocks.penalise).toHaveBeenCalledWith("loginPerIp", "unknown");
+    expect(mocks.forgive).not.toHaveBeenCalled();
     expect(mocks.setSessionCookie).not.toHaveBeenCalled();
   });
 
-  it("counts nothing against a success, so signing in all day never locks you out", async () => {
+  it("gives a success its identity count back, so signing in all day never locks you out", async () => {
     mocks.login.mockResolvedValue({ ok: true, value: USER });
 
     await outcome(() => actions.loginAction(null, creds));
 
-    expect(mocks.penalise).not.toHaveBeenCalled();
     expect(mocks.forgive).toHaveBeenCalledWith("loginPerIdentity", "bob");
+    // Not the address: one working account would otherwise reset the
+    // per-address bucket between guesses at everybody else's.
+    expect(mocks.forgive).not.toHaveBeenCalledWith("loginPerIp", expect.anything());
     expect(mocks.setSessionCookie).toHaveBeenCalledWith("session-token");
   });
 
@@ -166,8 +176,8 @@ describe("loginAction", () => {
 
     await outcome(() => actions.loginAction(null, creds));
 
-    expect(mocks.check).toHaveBeenCalledWith("loginPerIp", "10.0.0.2");
-    expect(mocks.check).not.toHaveBeenCalledWith("loginPerIp", "203.0.113.7");
+    expect(mocks.consume).toHaveBeenCalledWith("loginPerIp", "10.0.0.2");
+    expect(mocks.consume).not.toHaveBeenCalledWith("loginPerIp", "203.0.113.7");
   });
 
   it("puts two requests that differ only in a forged hop in one bucket", async () => {
@@ -181,7 +191,7 @@ describe("loginAction", () => {
     mocks.headerValues.set("x-forwarded-for", "198.51.100.99, 10.0.0.2");
     await outcome(() => actions.loginAction(null, creds));
 
-    const buckets = mocks.check.mock.calls
+    const buckets = mocks.consume.mock.calls
       .filter(([policy]) => policy === "loginPerIp")
       .map(([, subject]) => subject);
     expect(new Set(buckets)).toEqual(new Set(["10.0.0.2"]));
@@ -194,7 +204,7 @@ describe("loginAction", () => {
 
     await outcome(() => actions.loginAction(null, creds));
 
-    expect(mocks.check).toHaveBeenCalledWith("loginPerIp", "unknown");
+    expect(mocks.consume).toHaveBeenCalledWith("loginPerIp", "unknown");
   });
 
   describe("the post-login destination", () => {
@@ -262,17 +272,25 @@ describe("requestResetAction", () => {
 });
 
 describe("deleteAccountAction", () => {
-  it("reads the bucket without spending it, and charges only a failure", async () => {
-    // Consuming up front meant five mistyped confirmations locked you out of
-    // deleting the account *and* changing the address for an hour, having
-    // succeeded at neither.
-    mocks.deleteAccount.mockResolvedValue({ ok: false, errors: [{ code: "confirmMismatch" }] });
+  it("charges nothing for a mistyped confirmation, and checks no password", async () => {
+    // Five slips used to lock the address and the deletion for an hour, having
+    // succeeded at neither. The username is free to get wrong.
+    const state = await outcome(() =>
+      actions.deleteAccountAction(null, form({ password: "p", confirm: "x" })),
+    );
 
-    await outcome(() => actions.deleteAccountAction(null, form({ password: "p", confirm: "x" })));
-
-    expect(mocks.check).toHaveBeenCalledWith("emailChangePerUser", "5");
     expect(mocks.consume).not.toHaveBeenCalled();
-    expect(mocks.penalise).toHaveBeenCalledWith("emailChangePerUser", "5");
+    expect(mocks.deleteAccount).not.toHaveBeenCalled();
+    expect(state).toMatchObject({ errors: [{ code: "confirmMismatch" }] });
+  });
+
+  it("counts the password attempt before it is checked", async () => {
+    mocks.deleteAccount.mockResolvedValue({ ok: false, errors: [{ code: "badCredentials" }] });
+
+    await outcome(() => actions.deleteAccountAction(null, form({ password: "p", confirm: "Bob" })));
+
+    expect(mocks.order).toEqual(["consume", "deleteAccount"]);
+    expect(mocks.consume).toHaveBeenCalledWith("emailChangePerUser", "5");
   });
 
   it("charges nothing when the account is actually deleted", async () => {
@@ -290,7 +308,7 @@ describe("deleteAccountAction", () => {
   });
 
   it("stops at a spent bucket without touching the account", async () => {
-    mocks.check.mockResolvedValue({ allowed: false, retryAfterSec: 3600 });
+    mocks.consume.mockResolvedValue({ allowed: false, retryAfterSec: 3600 });
 
     await outcome(() => actions.deleteAccountAction(null, form({ password: "p", confirm: "bob" })));
 

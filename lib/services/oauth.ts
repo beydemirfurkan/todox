@@ -1,27 +1,44 @@
 import { randomBytes } from "node:crypto";
 
-import { runStmt } from "../db/client";
+import { tx, type Statement } from "../db/client";
+import * as apiTokens from "../repositories/api-tokens";
+import * as authTokens from "../repositories/auth-tokens";
 import * as oauthAccounts from "../repositories/oauth-accounts";
 import type { OAuthProvider } from "../repositories/oauth-accounts";
+import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
 import { logInfo } from "../server/log";
+import { newSessionToken } from "../util/tokens";
+import { now } from "../util/time";
 import type { OAuthProfile } from "./oauth-providers";
 
 /**
  * What a sign-in through Google or GitHub turns into.
  *
  * Four cases, in this order:
- *  1. the identity is already linked: that account, or a refusal if somebody
- *     else is signed in here and the identity is theirs;
- *  2. somebody is signed in: link the identity to them (the account page's
- *     "connect" button);
+ *  1. the identity is already linked: that account -- a sign-in, or for the
+ *     account that is signed in here, a fresh proof that it is theirs; a
+ *     refusal if somebody else is signed in and the identity is not theirs;
+ *  2. somebody is signed in: link the identity to them, but only with a
+ *     `oauth_link` grant minted by re-entering the password. A session cookie
+ *     alone used to be enough, so a stolen one could attach the thief's own
+ *     identity -- a way back in that no password change or reset ended;
  *  3. the address belongs to an account: link and sign in, but only when the
  *     provider has verified the address -- otherwise anybody could open a
- *     provider account under your address and walk into yours;
+ *     provider account under your address and walk into yours. If the account
+ *     never proved that address itself, whoever registered it may not be the
+ *     person it belongs to, so it is handed over clean: no password, no
+ *     sessions, no agent tokens;
  *  4. nobody: a new account, with no password.
  */
 export type SignInOutcome =
-  | { ok: true; userId: number; how: "signed_in" | "linked" | "created" }
+  | {
+      ok: true;
+      userId: number;
+      how: "signed_in" | "reauthenticated" | "linked" | "created";
+      /** An identity was attached to an existing account just now. */
+      isNewLink?: boolean;
+    }
   | { ok: false; code: OAuthErrorCode };
 
 export type OAuthErrorCode =
@@ -29,54 +46,101 @@ export type OAuthErrorCode =
   | "oauthProviderTaken"
   | "oauthEmailUnverified"
   | "oauthNoEmail"
+  | "oauthLinkExpired"
   | "oauthFailed";
+
+/** Ten minutes from typing the password to finishing at the provider. */
+const LINK_GRANT_MS = 10 * 60_000;
+
+/**
+ * The permission to link, handed out once the password (or, for an account
+ * without one, a recent sign-in) has been checked by the caller.
+ */
+export async function issueLinkGrant(userId: number): Promise<string> {
+  await authTokens.invalidateAll(userId, "oauth_link");
+  const token = newSessionToken();
+  await authTokens.create({
+    user_id: userId,
+    purpose: "oauth_link",
+    token,
+    expiresAt: new Date(Date.now() + LINK_GRANT_MS).toISOString(),
+  });
+  return token;
+}
 
 export async function resolveSignIn(input: {
   provider: OAuthProvider;
   profile: OAuthProfile;
   currentUserId: number | null;
+  linkGrant?: string;
 }): Promise<SignInOutcome> {
   const { provider, profile, currentUserId } = input;
   const linked = await oauthAccounts.byIdentity(provider, profile.providerUserId);
   if (linked) {
-    if (currentUserId !== null && linked.user_id !== currentUserId)
-      return { ok: false, code: "oauthLinkedElsewhere" };
-    return { ok: true, userId: linked.user_id, how: currentUserId === null ? "signed_in" : "linked" };
+    if (currentUserId === null) return { ok: true, userId: linked.user_id, how: "signed_in" };
+    if (linked.user_id !== currentUserId) return { ok: false, code: "oauthLinkedElsewhere" };
+    return { ok: true, userId: linked.user_id, how: "reauthenticated" };
   }
 
-  if (currentUserId !== null) return link(currentUserId, provider, profile, "linked");
+  if (currentUserId !== null) {
+    const grant = input.linkGrant ? await authTokens.resolve("oauth_link", input.linkGrant) : undefined;
+    if (!grant || grant.user.id !== currentUserId) return { ok: false, code: "oauthLinkExpired" };
+    return link({ userId: currentUserId, provider, profile, how: "linked", grantId: grant.row.id });
+  }
 
   if (!profile.email) return { ok: false, code: "oauthNoEmail" };
   const owner = await users.byEmail(profile.email);
   if (owner) {
     if (!profile.isEmailVerified) return { ok: false, code: "oauthEmailUnverified" };
-    return link(owner.id, provider, profile, "signed_in");
+    return link({
+      userId: owner.id,
+      provider,
+      profile,
+      how: "signed_in",
+      takeOver: owner.email_verified_at === null,
+    });
   }
   return create(provider, profile);
 }
 
-async function link(
-  userId: number,
-  provider: OAuthProvider,
-  profile: OAuthProfile,
-  how: "signed_in" | "linked",
-): Promise<SignInOutcome> {
+async function link(input: {
+  userId: number;
+  provider: OAuthProvider;
+  profile: OAuthProfile;
+  how: "signed_in" | "linked";
+  grantId?: number;
+  takeOver?: boolean;
+}): Promise<SignInOutcome> {
+  const { userId, provider, profile, how } = input;
+  // All of it or none: an identity linked while the squatter's password or
+  // tokens survive is the hijack this exists to stop, and a grant left
+  // unspent after a link could be spent again.
+  const statements: Statement[] = [
+    ...(input.grantId !== undefined ? [authTokens.consumeStmt(input.grantId, now())] : []),
+    oauthAccounts.createStmt({
+      userId,
+      provider,
+      providerUserId: profile.providerUserId,
+      email: profile.email,
+    }),
+    ...(input.takeOver
+      ? [
+          users.clearPasswordStmt(userId),
+          sessions.destroyAllForStmt(userId),
+          apiTokens.destroyAllForStmt(userId),
+          users.markEmailVerifiedStmt(userId),
+        ]
+      : []),
+  ];
   try {
-    await runStmt(
-      oauthAccounts.createStmt({
-        userId,
-        provider,
-        providerUserId: profile.providerUserId,
-        email: profile.email,
-      }),
-    );
+    await tx(statements);
   } catch (error) {
     // The account already has a different identity from this provider.
     if (isUniqueViolation(error)) return { ok: false, code: "oauthProviderTaken" };
     throw error;
   }
-  logInfo("account.oauth_linked", { userId, provider });
-  return { ok: true, userId, how };
+  logInfo("account.oauth_linked", { userId, provider, takeOver: input.takeOver === true });
+  return { ok: true, userId, how, isNewLink: true };
 }
 
 const CREATE_ATTEMPTS = 5;

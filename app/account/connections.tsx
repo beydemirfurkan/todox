@@ -1,10 +1,12 @@
 import type { T } from "@/lib/i18n";
 import * as oauthAccounts from "@/lib/repositories/oauth-accounts";
+import * as users from "@/lib/repositories/users";
 import { enabledProviders } from "@/lib/services/oauth-providers";
 
 import { authMessages, isAuthCode } from "../auth-messages";
 import { unlinkProviderAction } from "../auth-actions";
 import { SubmitButton } from "../features/submit";
+import { ConnectProvider } from "./connect-provider";
 
 const PROVIDER_NAME: Record<oauthAccounts.OAuthProvider, string> = {
   google: "Google",
@@ -26,7 +28,9 @@ export async function Connections({
   errorCode: string;
   t: T;
 }) {
-  const linked = await oauthAccounts.listForUser(userId);
+  const [linked, user] = await Promise.all([oauthAccounts.listForUser(userId), users.byId(userId)]);
+  const hasPassword = Boolean(user?.password_hash);
+  const messages = authMessages(t);
   const enabled = enabledProviders();
   const shown = oauthAccounts.OAUTH_PROVIDERS.filter(
     (provider) => enabled.includes(provider) || linked.some((row) => row.provider === provider),
@@ -66,13 +70,18 @@ export async function Connections({
                     </SubmitButton>
                   </form>
                 ) : (
-                  <a
-                    href={`/api/auth/${provider}/start?next=${encodeURIComponent("/account?tab=connections")}`}
-                    className="btn"
-                  >
-                    {t("connectionsConnect")}
-                    <span className="sr-only"> — {PROVIDER_NAME[provider]}</span>
-                  </a>
+                  <ConnectProvider
+                    provider={provider}
+                    providerName={PROVIDER_NAME[provider]}
+                    hasPassword={hasPassword}
+                    labels={{
+                      connect: t("connectionsConnect"),
+                      password: t("connectionsPasswordLabel", { provider: PROVIDER_NAME[provider] }),
+                      continueTo: t("connectionsContinue", { provider: PROVIDER_NAME[provider] }),
+                      working: t("working"),
+                    }}
+                    messages={messages}
+                  />
                 )}
               </li>
             );
