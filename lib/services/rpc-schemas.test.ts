@@ -756,3 +756,16 @@ describe("a task's id, however the first call guesses it", () => {
     expect(() => parseParams("logEntry", { id: 9, kind: "note", body: "b" })).toThrow(/invalid params/);
   });
 });
+
+describe("a log entry with no task", () => {
+  it("is refused with where the why goes instead", () => {
+    expect(() => parseParams("logEntry", { kind: "decision", body: "walk() tracks realpaths" })).toThrow(
+      /add_context \(kind 'decision' or 'gotcha', with cwd\)/,
+    );
+  });
+
+  it("still takes a task id as a number or its digits", () => {
+    expect(() => parseParams("logEntry", { task_id: "12", kind: "note", body: "b" })).not.toThrow();
+    expect(() => parseParams("logEntry", { task_id: "12a", kind: "note", body: "b" })).toThrow(/numeric task id/);
+  });
+});
