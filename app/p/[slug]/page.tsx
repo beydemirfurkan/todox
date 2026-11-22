@@ -37,6 +37,7 @@ import {
 } from "../../components";
 import { QuickAdd } from "../../components/quick-add";
 import { TaskRow, TaskSection } from "../../components/task-row";
+import { ProjectMenu } from "../../features/project-menu";
 import { privatePageMetadata } from "../../metadata-shared";
 import {
   projectHref,
@@ -143,18 +144,30 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
             <Chip color="var(--k-handoff)">{t("sharedBy", { name: project.owner_name })}</Chip>
           )}
           {isOwner && (
-            <Link
-              href={`/p/${slug}/settings`}
-              aria-label={t("projectSettings")}
-              title={t("projectSettings")}
-              className="icon-button"
-            >
-              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="5" cy="12" r="1.8" />
-                <circle cx="12" cy="12" r="1.8" />
-                <circle cx="19" cy="12" r="1.8" />
-              </svg>
-            </Link>
+            <ProjectMenu
+              project={{
+                id: project.id,
+                slug: project.slug,
+                name: project.name,
+                summary: project.summary,
+                repoUrl: project.repo_url,
+                rootPath: project.root_path,
+              }}
+              labels={{
+                open: t("projectSettings"),
+                details: t("settingsGeneral"),
+                name: t("projectNameLabel"),
+                summary: t("projectSummaryLabel"),
+                repo: t("projectRepoLabel"),
+                repoPlaceholder: t("projectRepoPh"),
+                save: t("apply"),
+                saving: t("saving"),
+                team: t("settingsTeam"),
+                sharing: t("sharing"),
+                allSettings: t("projectAllSettings"),
+                delete: t("deleteProject"),
+              }}
+            />
           )}
         </div>
 

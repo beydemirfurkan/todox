@@ -461,8 +461,13 @@ body:has([data-wide-page]) .page-column {
     border-right: 1px solid var(--rule);
   }
 }
+/* `min-h-0 flex-1` on the list is what lets it scroll here: without them the
+   list grew past the sidebar, the page grew with it, and at the bottom of a
+   long page the sticky sidebar ran out of room and slid away. Two projects
+   in a seed database never showed it; sixty do. */
 .sidebar-projects {
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -481,6 +486,12 @@ body:has([data-wide-page]) .page-column {
 .sidebar-link:hover {
   background: #18181b;
   color: var(--ink);
+}
+/* Inside the sidebar the ring is drawn within the row, not 2px outside it,
+   where it overlapped the next link and read as a selected state. */
+.sidebar-link:focus-visible {
+  outline-width: 2px;
+  outline-offset: -2px;
 }
 .sidebar-link[aria-current="page"] {
   background: var(--raised);
@@ -714,6 +725,81 @@ body:has([data-wide-page]) .page-column {
   font-weight: 600;
 }
 
+.brain-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background-color 0.12s ease;
+}
+.brain-row:hover {
+  background: var(--raised);
+}
+
+.waiting-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  overflow: hidden;
+}
+.waiting-list > li + li {
+  border-top: 1px solid var(--rule);
+}
+.waiting-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 14px;
+  padding: 14px 16px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 0.12s ease;
+}
+.waiting-row:hover {
+  background: var(--raised);
+}
+.waiting-row:focus-visible {
+  outline-offset: -3px;
+}
+/* The kind as a word in its colour, the same shape as the "important" badge. */
+.waiting-kind {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 24px;
+  margin-top: -1px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--kind) 16%, transparent);
+  color: color-mix(in srgb, var(--kind) 80%, var(--ink));
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.waiting-meta {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+  color: var(--faint);
+  font-size: var(--text-meta);
+  white-space: nowrap;
+}
+@media (min-width: 640px) {
+  .waiting-meta {
+    max-width: 14rem;
+    margin-left: auto;
+  }
+}
+
 .today-heading {
   margin: 0;
   padding-inline: 16px;
@@ -765,18 +851,20 @@ body:has([data-wide-page]) .page-column {
   color: var(--muted);
   font-size: 14px;
 }
-.quick-add-flag input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
+.quick-add-flag {
+  cursor: pointer;
+  user-select: none;
 }
+/* `background-color`, not the shorthand: the shorthand wiped the chevron, and
+   the picker read as a second text field. */
 .quick-add-select {
   min-height: 40px;
+  width: auto;
   max-width: 12rem;
-  padding: 0 10px;
+  padding: 0 34px 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--inset);
+  background-color: var(--raised);
   color: var(--ink);
   font: inherit;
   font-size: 14px;
@@ -1156,10 +1244,10 @@ textarea,
 select {
   font-family: inherit;
   font-size: 15px;
-  background: var(--inset);
-  border: 1.5px solid var(--line);
-  border-radius: 10px;
-  padding: 7px 11px;
+  background-color: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-inner);
+  padding: 9px 13px;
   color: var(--ink);
   caret-color: var(--accent);
   width: 100%;
@@ -1175,8 +1263,16 @@ input[type="search"]::-webkit-search-decoration {
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow-sm);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+/* A field already shows focus with its own border. The blanket ring on top
+   of it drew a second, thicker orange box around the first -- and inside the
+   quick-add bar, a third. Checkboxes have no border to change, so they keep
+   the ring. */
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 input::placeholder,
 textarea::placeholder {
@@ -1208,9 +1304,11 @@ textarea {
 select {
   appearance: none;
   padding-right: 26px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' stroke='%23f1eee5' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' stroke='%23a1a1aa' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 9px center;
+  background-position: right 13px center;
+  cursor: pointer;
 }
 /* The rule above is written for text fields, and a checkbox is not one: it was
    inheriting `width: 100%`, `padding: 7px 11px`, a 1.5px border and a 10px
@@ -1226,6 +1324,32 @@ input[type="radio"] {
   background: none;
   /* native controls follow the dark scheme rather than rendering white */
   accent-color: var(--accent);
+}
+/* Drawn rather than native: Chromium's dark checkbox is a light grey square
+   that belongs to no palette here. */
+input[type="checkbox"] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid #3a3a41;
+  border-radius: 5px;
+  background-color: var(--inset);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+input[type="checkbox"]:hover {
+  border-color: #55555e;
+}
+input[type="checkbox"]:checked {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6l4.5-5' stroke='%231a0e08' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 /* A field that cannot be used should look like one. There was nothing here, so
@@ -1543,6 +1667,14 @@ pre {
   color: var(--danger-ink);
 }
 
+/* The project "…" holds a small form, so it is wider than a list of links. */
+.project-menu-panel {
+  width: min(360px, calc(100vw - 32px));
+  padding: 8px;
+}
+.project-menu-panel textarea {
+  min-height: 72px;
+}
 .user-menu-sep {
   height: 1px;
   margin: 6px 8px;
@@ -2128,20 +2260,7 @@ pre {
   .control-sm,
   .searchbox input,
   .picker-trigger,
-  .quick-add-flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  color: var(--muted);
-  font-size: 14px;
-}
-.quick-add-flag input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
-}
-.quick-add-select {
+  .quick-add-select {
     font-size: 16px;
   }
 
@@ -2312,6 +2431,13 @@ pre {
   /* The dim behind an open sheet. It is the menu root's own box, fixed over
      the page, so a tap on it is a tap on the root -- which the menus treat as
      "close" -- and never reaches whatever is underneath. */
+  /* A sheet opened inside the page sits in the page's stacking context, which
+     is under the tab bar, so the bar covered its last rows. While a sheet is
+     open the bar steps aside; nothing on it is reachable through the dim
+     anyway. */
+  body:has(.user-menu-panel[data-state="open"]) .tab-bar {
+    visibility: hidden;
+  }
   .user-menu:has(> .user-menu-panel[data-state="open"])::after {
     content: "";
     position: fixed;

@@ -140,6 +140,7 @@ export const en = {
   viewBoard: "Board",
   projectDoingEmpty: "Nothing in progress here.",
   settingsSections: "Settings sections",
+  projectAllSettings: "All settings",
   settingsGeneral: "General",
   settingsTeam: "Team",
   settingsDanger: "Danger zone",
@@ -155,7 +156,7 @@ export const en = {
   metaTitleBrain: "Your brain — todox",
   brainTitle: "Your brain",
   brainLede:
-    "What every agent reads about you before it starts, in every project and with any model: who you are, what you build with, how you work, and the rules you keep everywhere. Agents write here as they learn; you correct it.",
+    "What every agent reads about you before it starts, in any project. Agents add to it as they learn; you correct it.",
   brainProfile: "Who you are",
   brainProfileHint: "Role, languages you speak and write, what you are working towards.",
   brainStack: "What you build with",
@@ -168,10 +169,17 @@ export const en = {
   brainRulesSub: "Conventions, gotchas and preferences that hold wherever you work.",
   brainMapTitle: "Where your thinking is",
   brainMapSub:
-    "The last {n} days. A project grows with what was written there; its line thickens with what is still open; the dots are decisions, dead ends and questions.",
+    "The last {n} days: a bigger project had more written, a thicker line has more still open.",
   brainMapEmpty: "No project has open work or anything written in the last {n} days.",
-  brainMapRow:
-    "{entries} entries · {open} open · {decisions} decisions · {deadEnds} dead ends · {questions} questions",
+  brainMapMore: "and {n} more, each on its own project page.",
+  brainStatOpen: "{n} open",
+  brainStatOpenOne: "1 open",
+  brainStatDecisions: "{n} decisions",
+  brainStatDecisionsOne: "1 decision",
+  brainStatDeadEnds: "{n} dead ends",
+  brainStatDeadEndsOne: "1 dead end",
+  brainStatQuestions: "{n} questions",
+  brainStatQuestionsOne: "1 question",
   brainAgentView: "What an agent reads",
   brainAgentViewSub:
     "get_developer answers with exactly this, with no project needed. Every get_context briefing opens with the three sections above.",

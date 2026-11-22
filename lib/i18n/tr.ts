@@ -138,6 +138,7 @@ export const tr: Record<Key, string> = {
   viewBoard: "Pano",
   projectDoingEmpty: "Burada şu an üzerinde çalışılan bir şey yok.",
   settingsSections: "Ayar bölümleri",
+  projectAllSettings: "Tüm ayarlar",
   settingsGeneral: "Genel",
   settingsTeam: "Ekip",
   settingsDanger: "Tehlikeli",
@@ -153,7 +154,7 @@ export const tr: Record<Key, string> = {
   metaTitleBrain: "Beynin — todox",
   brainTitle: "Beynin",
   brainLede:
-    "Her agent'ın, hangi projede ve hangi modelle olursa olsun, işe başlamadan önce senin hakkında okuduğu şey: kim olduğun, neyle çalıştığın, nasıl çalıştığın ve her yerde geçerli kuralların. Agent'lar öğrendikçe buraya yazar; sen düzeltirsin.",
+    "Her agent'ın, hangi projede olursa olsun, işe başlamadan önce senin hakkında okuduğu şey. Agent'lar öğrendikçe ekler; sen düzeltirsin.",
   brainProfile: "Kimsin",
   brainProfileHint: "Rolün, konuşup yazdığın diller, neye doğru çalıştığın.",
   brainStack: "Neyle çalışıyorsun",
@@ -166,10 +167,17 @@ export const tr: Record<Key, string> = {
   brainRulesSub: "Nerede çalışırsan çalış geçerli olan kurallar, tuzaklar ve tercihler.",
   brainMapTitle: "Düşüncen nerede",
   brainMapSub:
-    "Son {n} gün. Bir proje orada yazılanlarla büyür; çizgisi hâlâ açık olan işle kalınlaşır; noktalar kararlar, çıkmazlar ve sorulardır.",
+    "Son {n} gün: büyük proje daha çok yazılmış, kalın çizgi daha çok açık iş demek.",
   brainMapEmpty: "Son {n} günde açık işi ya da yazılmış bir şeyi olan proje yok.",
-  brainMapRow:
-    "{entries} kayıt · {open} açık · {decisions} karar · {deadEnds} çıkmaz · {questions} soru",
+  brainMapMore: "ve {n} proje daha, her biri kendi sayfasında.",
+  brainStatOpen: "{n} açık",
+  brainStatOpenOne: "1 açık",
+  brainStatDecisions: "{n} karar",
+  brainStatDecisionsOne: "1 karar",
+  brainStatDeadEnds: "{n} çıkmaz",
+  brainStatDeadEndsOne: "1 çıkmaz",
+  brainStatQuestions: "{n} soru",
+  brainStatQuestionsOne: "1 soru",
   brainAgentView: "Agent'ın okuduğu",
   brainAgentViewSub:
     "get_developer proje gerekmeden tam olarak bunu döndürür. Her get_context brifingi yukarıdaki üç bölümle açılır.",
