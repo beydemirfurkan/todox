@@ -2038,6 +2038,42 @@ pre {
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
+/* Tables arrive with GFM: the report's "day by day", and any table an agent
+   writes into an entry. Hairlines, no fills, numbers aligned as written. */
+.report-markdown table,
+.entry-markdown table {
+  margin: 10px 0 14px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: normal;
+}
+.report-markdown th,
+.report-markdown td,
+.entry-markdown th,
+.entry-markdown td {
+  padding: 6px 14px 6px 0;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  white-space: nowrap;
+}
+.report-markdown th,
+.entry-markdown th {
+  color: var(--muted);
+  font-weight: 500;
+}
+.report-markdown td[align="right"],
+.report-markdown th[align="right"],
+.entry-markdown td[align="right"],
+.entry-markdown th[align="right"] {
+  text-align: right;
+}
+.entry-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .report-markdown > :first-child {
   margin-top: 0;
 }

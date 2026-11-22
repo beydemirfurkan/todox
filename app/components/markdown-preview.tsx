@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 function EntryHeading({ children }: { children?: ReactNode }) {
   return <h4>{children}</h4>;
@@ -14,7 +15,10 @@ export function MarkdownPreview({
 }) {
   return (
     <div className={variant === "report" ? "report-markdown" : "entry-markdown"}>
+      {/* GFM because the report's "day by day" section is a table, and plain
+          CommonMark printed it as a line of pipes. */}
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         skipHtml
         components={{
           // Reports can contain agent-written Markdown. Do not turn an image

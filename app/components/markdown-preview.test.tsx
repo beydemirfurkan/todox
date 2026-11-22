@@ -40,4 +40,16 @@ describe("MarkdownPreview", () => {
     expect(entry).not.toContain("<h1>");
     expect(report).toContain('class="report-markdown"');
   });
+
+  it("draws the report's day-by-day table as a table, not a line of pipes", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownPreview
+        markdown={["| | done | time |", "|---|---:|---:|", "| 2026-11-22 | 1 | 2h |"].join("\n")}
+      />,
+    );
+
+    expect(html).toContain("<table>");
+    expect(html).toContain("<td>2026-11-22</td>");
+    expect(html).not.toContain("|---");
+  });
 });
