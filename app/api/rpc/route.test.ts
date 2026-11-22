@@ -119,15 +119,41 @@ describe("authentication", () => {
 });
 
 describe("rate limiting", () => {
-  it("answers 429 with retry-after when the bad-token gate is shut", async () => {
+  it("answers 429 with retry-after to a bad token once the gate is shut", async () => {
     mocks.check.mockResolvedValue({ allowed: false, retryAfterSec: 42 });
-    const res = await post();
+    mocks.userForApiToken.mockResolvedValue(undefined);
+    const res = await post({ token: "todox_guess" });
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).toBe("42");
-    // The token is looked up alongside the gate to save a round trip, but a
-    // shut gate answers the same whatever the lookup found: a valid token
-    // learns nothing, does not count against its pace, and runs nothing.
     expect(mocks.consume).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it("lets a valid token through a shut gate", async () => {
+    // The gate is per address. Behind a shared one, twenty bad guesses from
+    // somebody else used to lock every working agent out with them.
+    mocks.check.mockResolvedValue({ allowed: false, retryAfterSec: 42 });
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(mocks.invoke).toHaveBeenCalled();
+  });
+
+  it("refuses a body over the ceiling that never declared its size", async () => {
+    const big = JSON.stringify({ method: "listProjects", params: { pad: "x".repeat(4_100_000) } });
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(big));
+        controller.close();
+      },
+    });
+    const req = new Request("http://localhost/api/rpc", {
+      method: "POST",
+      headers: { authorization: "Bearer todox_good", "content-type": "application/json" },
+      body: stream,
+      duplex: "half",
+    } as RequestInit);
+    const res = await POST(req as never);
+    expect(res.status).toBe(413);
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
 

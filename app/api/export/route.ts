@@ -37,7 +37,18 @@ export async function GET(req: Request): Promise<Response> {
     // asking `userForApiToken("")` would be a lookup for nothing.
     const user = token ? await userForApiToken(token) : await currentUser();
     if (!user) {
-      if (token) await limit.penalise("badTokenPerIp", clientIp(req.headers));
+      // Penalised and never checked, this was a token oracle with no ceiling.
+      // Checked only for a caller that failed, as on the agent routes.
+      if (token) {
+        const ip = clientIp(req.headers);
+        const gate = await limit.check("badTokenPerIp", ip);
+        if (!gate.allowed)
+          return new Response("too many failed authentications", {
+            status: 429,
+            headers: { ...headers, "retry-after": String(gate.retryAfterSec) },
+          });
+        await limit.penalise("badTokenPerIp", ip);
+      }
       return Response.json({ ok: false, error: "sign in, or send a token" }, { status: 401, headers });
     }
 

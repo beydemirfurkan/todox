@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { bodyTooLarge, MAX_BODY_BYTES } from "@/lib/server/body-size";
+import { bodyTooLarge, BodyTooLarge, MAX_BODY_BYTES, readJsonWithin } from "@/lib/server/body-size";
 import { bearerToken } from "@/lib/server/bearer";
 import { clientIp } from "@/lib/server/client-ip";
 import { logError, logWarn, newRequestId } from "@/lib/server/log";
@@ -41,14 +41,16 @@ export async function POST(req: NextRequest) {
     // Tokens are long random strings, but nothing should be free to brute force.
     // The lookup rides alongside the gate; its answer is ignored until the
     // gate has allowed the call. One round trip instead of two.
+    // A valid token is never held back by the failures of others: behind a
+    // shared address -- an office, a proxy misread -- twenty bad tokens used to
+    // lock every agent out, including the ones with good ones.
     const [gate, user] = await Promise.all([limit.check("badTokenPerIp", ip), userForApiToken(token)]);
-    if (!gate.allowed)
-      return NextResponse.json(
-        { ok: false, error: "too many failed authentications" },
-        { status: 429, headers: { "retry-after": String(gate.retryAfterSec), ...idHeader(requestId) } },
-      );
-
     if (!user) {
+      if (!gate.allowed)
+        return NextResponse.json(
+          { ok: false, error: "too many failed authentications" },
+          { status: 429, headers: { "retry-after": String(gate.retryAfterSec), ...idHeader(requestId) } },
+        );
       await limit.penalise("badTokenPerIp", ip);
       return fail(401, "invalid or revoked token", requestId);
     }
@@ -69,8 +71,12 @@ export async function POST(req: NextRequest) {
 
     let payload: { method?: unknown; params?: unknown };
     try {
-      payload = await req.json();
-    } catch {
+      const parsed = await readJsonWithin(req);
+      if (typeof parsed !== "object" || parsed === null) return fail(400, "body must be a JSON object", requestId);
+      payload = parsed;
+    } catch (error) {
+      if (error instanceof BodyTooLarge)
+        return fail(413, `body must be under ${MAX_BODY_BYTES} bytes`, requestId);
       return fail(400, "body must be JSON", requestId);
     }
     if (typeof payload.method !== "string") return fail(400, "method must be a string", requestId);

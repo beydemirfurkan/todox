@@ -8,11 +8,10 @@
  * goes. Vercel used to bound this at the platform edge; the shipped Dockerfile
  * bounds nothing.
  *
- * `content-length` rather than a counting stream: every MCP and HTTP client that
- * reaches these endpoints sends one, and a streaming guard is a lot of
- * machinery for a case none of them produce. The honest limit of this is that a
- * chunked body with no `content-length` is not caught here -- it still meets
- * every schema cap behind it.
+ * Two checks. The declared `content-length` refuses an honest oversize body
+ * before a byte is read; `readJsonWithin` counts the bytes as they arrive, so
+ * a chunked body that declares nothing is cut off at the same ceiling instead
+ * of being buffered whole.
  */
 
 /**
@@ -46,3 +45,39 @@ export const bodyTooLarge = (headers: Pick<Headers, "get">, max = MAX_BODY_BYTES
   const bytes = declaredBodyBytes(headers);
   return bytes !== null && bytes > max;
 };
+
+export class BodyTooLarge extends Error {
+  constructor(max: number) {
+    super(`body exceeds ${max} bytes`);
+    this.name = "BodyTooLarge";
+  }
+}
+
+/**
+ * The body as JSON, read no further than `max` bytes. Throws `BodyTooLarge`
+ * past the ceiling and `SyntaxError` for a body that is not JSON.
+ */
+export async function readJsonWithin(req: Request, max = MAX_BODY_BYTES): Promise<unknown> {
+  if (!req.body) return JSON.parse("");
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel();
+      throw new BodyTooLarge(max);
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
