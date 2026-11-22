@@ -5,6 +5,7 @@ import type { Task } from "@/lib/types";
 import type { Status } from "@/lib/constants";
 import { setStatusAction } from "../../actions";
 import { Chip, Counter, StatusDot } from "../../components";
+import { ClosePopoverAfterSubmit } from "../../features/close-popover-after-submit";
 import { PanelLink } from "../../features/panel-link";
 import { kindLabel, statusLabel } from "../../kinds";
 import { boardHref } from "./board";
@@ -78,7 +79,7 @@ export function Board({
       {/* Stacked, the columns are one long page: the queue alone can be thirty
           cards, and what is in flight sits under all of them. These are the
           way past it. Gone from `md` up, where the columns are side by side. */}
-      <nav aria-label={t("jumpToColumn")} className="flex flex-wrap gap-1.5 md:hidden">
+      <nav aria-label={t("jumpToColumn")} className="board-jump no-scrollbar flex gap-1.5 overflow-x-auto md:hidden">
         {columns.map((column) => (
           <a key={column.status} href={`#column-${column.status}`} className="pill">
             {column.title}
@@ -90,7 +91,10 @@ export function Board({
         </a>
       </nav>
       <BoardDnd moveAction={setStatusAction} labels={{ moving: t("boardMoving"), statusNames }}>
-        <div className="grid min-w-0 gap-3 md:grid-cols-3 md:items-start">
+        {/* On a phone the columns sit side by side and swipe, one per screen
+            with the next one peeking in, the way a board app does it; the
+            pills above jump straight to one. From `md` a three-column grid. */}
+        <div className="board-swipe flex min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto md:grid md:grid-cols-3 md:items-start md:overflow-visible">
           {columns.map((column) => (
             <Column key={column.status} column={column} slug={slug} selectedId={selectedId} t={t} />
           ))}
@@ -146,7 +150,7 @@ function Column({
       // itself, like the panel beside it: a queue of thirty used to make the
       // page thirty cards long, with two empty columns running down beside it.
       data-drop-status={column.status}
-      className="board-col relative flex min-w-0 scroll-mt-4 flex-col p-2 md:sticky md:top-4 md:max-h-[calc(100vh-2rem)]"
+      className="board-col relative flex w-[86%] min-w-0 shrink-0 snap-start scroll-mt-20 flex-col self-start p-2 md:sticky md:top-4 md:w-auto md:max-h-[calc(100vh-2rem)]"
     >
       {/* Tall enough for the "+", which is absolutely placed over its right
           edge and would otherwise hang into the first card. */}
@@ -249,26 +253,34 @@ function Card({
 const MENU_STATUSES: Status[] = ["todo", "doing", "blocked", "done", "dropped"];
 
 /**
- * Every card's way to another column without a mouse: a disclosure of
+ * Every card's way to another column without a mouse: a native popover of
  * plain forms, so it works on a phone, from the keyboard and before any
  * script has loaded. Outside the card's link, because a form cannot sit
  * inside an anchor.
+ *
+ * A popover and not a `<details>`: it opens in the top layer, so on a phone it
+ * can be a sheet over the whole screen -- inside a details element Chrome
+ * gave the panel its own containing block and it opened as a strip the width
+ * of the card, under the tab bar. Esc and a tap outside close it for free.
  */
 function StatusMenu({ taskId, current, t }: { taskId: number; current: Status; t: T }) {
+  const id = `status-menu-${taskId}`;
   return (
-    <details className="status-menu absolute top-2 right-2">
-      <summary
+    <div className="absolute top-2 right-2">
+      <button
+        type="button"
+        popoverTarget={id}
         aria-label={t("boardMoveMenu", { id: taskId })}
         title={t("boardMoveMenu", { id: taskId })}
-        className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-[var(--wash-strong)] hover:text-ink"
+        className="status-menu-trigger flex size-8 items-center justify-center rounded-full text-muted hover:bg-[var(--wash-strong)] hover:text-ink"
       >
         <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <circle cx="3" cy="8" r="1.5" />
           <circle cx="8" cy="8" r="1.5" />
           <circle cx="13" cy="8" r="1.5" />
         </svg>
-      </summary>
-      <div className="status-menu-panel">
+      </button>
+      <div id={id} popover="auto" className="status-menu-panel" aria-label={t("boardMoveTo")}>
         <p className="px-2.5 pt-1 pb-1.5 text-meta text-faint">{t("boardMoveTo")}</p>
         {MENU_STATUSES.filter((status) => status !== current).map((status) => (
           <form key={status} action={setStatusAction}>
@@ -281,10 +293,11 @@ function StatusMenu({ taskId, current, t }: { taskId: number; current: Status; t
               <StatusDot status={status} t={t} />
               <span aria-hidden="true">{statusLabel(t, status)}</span>
             </button>
+            <ClosePopoverAfterSubmit />
           </form>
         ))}
       </div>
-    </details>
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 /**
  * Drag a card to another column and its status changes.
@@ -29,8 +29,6 @@ export function BoardDnd({
   const [movingId, setMovingId] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [, startTransition] = useTransition();
-  const rootRef = useRef<HTMLDivElement>(null);
-  useStatusMenus(rootRef);
 
   function onDragStart(event: React.DragEvent) {
     const card = (event.target as HTMLElement).closest<HTMLElement>("[data-drag-id]");
@@ -87,7 +85,6 @@ export function BoardDnd({
 
   return (
     <div
-      ref={rootRef}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -106,70 +103,6 @@ export function BoardDnd({
       </p>
     </div>
   );
-}
-
-/**
- * The card menus are `<details>`, which open without a script but sit inside
- * a column that scrolls, so an open one was cut off at the column's edge.
- * With a script, an open menu is lifted out of that box: placed against the
- * viewport under its button (or above it, near the bottom), one open at a
- * time, and closed by Escape, a click elsewhere or a scroll.
- */
-function useStatusMenus(rootRef: React.RefObject<HTMLDivElement | null>) {
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const openMenus = () => [...root.querySelectorAll<HTMLDetailsElement>("details.status-menu[open]")];
-    const closeAll = (except?: Element) =>
-      openMenus().forEach((menu) => {
-        if (menu !== except) menu.open = false;
-      });
-
-    const onToggle = (event: Event) => {
-      const menu = event.target as HTMLDetailsElement;
-      if (!menu.matches?.("details.status-menu") || !menu.open) return;
-      closeAll(menu);
-      placeMenu(menu);
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      const inside = (event.target as Element).closest?.("details.status-menu[open]");
-      closeAll(inside ?? undefined);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      const open = openMenus()[0];
-      if (!open) return;
-      open.open = false;
-      open.querySelector("summary")?.focus();
-    };
-    const onScroll = () => closeAll();
-
-    root.addEventListener("toggle", onToggle, true);
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, true);
-    return () => {
-      root.removeEventListener("toggle", onToggle, true);
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll, true);
-    };
-  }, [rootRef]);
-}
-
-function placeMenu(menu: HTMLDetailsElement) {
-  const button = menu.querySelector("summary");
-  const panel = menu.querySelector<HTMLElement>(".status-menu-panel");
-  if (!button || !panel) return;
-  const at = button.getBoundingClientRect();
-  const width = panel.offsetWidth;
-  const height = panel.offsetHeight;
-  const below = at.bottom + 4 + height <= window.innerHeight - 8;
-  panel.style.position = "fixed";
-  panel.style.top = `${below ? at.bottom + 4 : Math.max(8, at.top - 4 - height)}px`;
-  panel.style.left = `${Math.min(Math.max(8, at.right - width), window.innerWidth - width - 8)}px`;
-  panel.style.right = "auto";
-  panel.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
 }
 
 function cardOf(id: string): HTMLElement | null {

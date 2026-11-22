@@ -493,26 +493,38 @@ body:has([data-wide-page]) .page-column {
   [data-pending] { animation: none; }
 }
 
-/* The card's status menu: a <details> so it opens without a script. */
-.status-menu > summary {
-  cursor: pointer;
-}
-.status-menu[open] > .status-menu-panel {
-  display: flex;
-}
+/* The card's status menu: a native popover, so it opens without a script.
+   Under its trigger like a menu where the browser can anchor it; a card in
+   the middle of the screen elsewhere; a sheet on a phone (below). */
 .status-menu-panel {
-  display: none;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 30;
+  margin: auto;
   min-width: 11rem;
   flex-direction: column;
   padding: 6px;
+  color: inherit;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: var(--shadow-pop);
+}
+.status-menu-panel:popover-open {
+  display: flex;
+}
+.status-menu-panel::backdrop {
+  background: var(--scrim);
+}
+@supports (position-area: block-end) {
+  @media (min-width: 768px) {
+    .status-menu-panel {
+      inset: auto;
+      margin: 4px 0 0;
+      position-area: block-end span-inline-start;
+      position-try-fallbacks: flip-block;
+    }
+    .status-menu-panel::backdrop {
+      background: transparent;
+    }
+  }
 }
 
 /* ------------------------------------------------------------- controls */
@@ -728,7 +740,7 @@ summary {
    button that opened it (the invoker is the implicit anchor). No dim there:
    it reads as part of the page, not a dialog over it. */
 @supports (position-area: block-end) {
-  @media (min-width: 641px) {
+  @media (min-width: 768px) {
     .composer {
       inset: auto;
       margin: 0.5rem 0 0;
@@ -1778,4 +1790,178 @@ pre {
   .lift:hover {
     box-shadow: none;
   }
+}
+
+/* ---------------------------------------------------------- mobile shell */
+
+/* Below `md` the signed-in app is laid out like an app: a pinned bar on top,
+   five tabs at the bottom, and every menu a sheet that rises from the bottom
+   edge, where the thumb already is. The insets are the notch and the home
+   indicator; the viewport is `viewport-fit=cover`, so without them the bars
+   would sit underneath both. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tab-bar-h: 60px;
+}
+
+.tab-bar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px max(6px, env(safe-area-inset-left, 0px)) calc(6px + var(--safe-bottom))
+    max(6px, env(safe-area-inset-right, 0px));
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+.tab-bar-item {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+.tab-bar-item > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-bar-item:active {
+  background: var(--wash-strong);
+}
+.tab-bar-item[aria-current="page"] {
+  color: var(--ink-head);
+}
+.tab-bar-item[aria-current="page"] > svg {
+  color: var(--accent);
+}
+
+@media (max-width: 767px) {
+  /* One row, pinned. Opaque rather than frosted: a backdrop-filter here would
+     make this the containing block of every fixed sheet below it. */
+  .app-bar {
+    position: sticky;
+    top: 0;
+    /* Above the tab bar: the header is the stacking context its sheets and
+       their dim live in, and both have to cover the tabs. */
+    z-index: 60;
+    flex-wrap: nowrap;
+    padding-top: calc(10px + var(--safe-top));
+    padding-bottom: 10px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  body[data-signed-in] > main {
+    padding-top: 16px;
+    padding-bottom: calc(var(--tab-bar-h) + var(--safe-bottom) + 28px);
+  }
+  /* The tabs are the way around; the marketing footer under every screen of
+     a signed-in app was a second page of links nobody was looking for. */
+  body[data-signed-in] > .site-footer {
+    display: none;
+  }
+
+  /* Menus become sheets. Same panels, same markup, same open/close logic;
+     only where they sit changes. Above the tab bar, edge to edge. */
+  .user-menu-panel,
+  .status-menu-panel {
+    position: fixed;
+    inset: auto 0 0 0;
+    margin: 0;
+    z-index: 70;
+    width: auto;
+    min-width: 0;
+    max-height: min(75vh, 34rem);
+    overflow-y: auto;
+    padding: 10px 10px calc(14px + var(--safe-bottom));
+    border-width: 1px 0 0;
+    border-radius: 20px 20px 0 0;
+    background: var(--card);
+    transform-origin: bottom center;
+  }
+  .user-menu-panel:not([data-state="open"]) {
+    transform: translateY(24px);
+  }
+  .user-menu-panel::before,
+  .status-menu-panel::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 10px;
+    border-radius: 999px;
+    background: var(--line);
+  }
+  /* The dim behind an open sheet. It is the menu root's own box, fixed over
+     the page, so a tap on it is a tap on the root -- which the menus treat as
+     "close" -- and never reaches whatever is underneath. */
+  .user-menu:has(> .user-menu-panel[data-state="open"])::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    background: var(--scrim);
+  }
+  .user-menu-panel .user-menu-item,
+  .status-menu-panel button {
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  /* The composer rises from the bottom too, instead of floating mid-screen. */
+  .composer {
+    width: 100%;
+    max-width: 100%;
+    margin: auto 0 0;
+    max-height: 88dvh;
+    overflow-y: auto;
+    padding-bottom: calc(1rem + var(--safe-bottom));
+    border-radius: 20px 20px 0 0;
+    border-width: 1px 0 0;
+  }
+}
+
+@media (max-width: 767px) {
+  /* The board's swipe row bleeds to the screen edges so a column can peek in
+     from the right, and snaps with the same gutter the page has. */
+  .board-swipe {
+    margin-inline: -1.25rem;
+    padding-inline: 1.25rem;
+    scroll-padding-inline: 1.25rem;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .board-swipe::-webkit-scrollbar {
+    display: none;
+  }
+  .board-jump > a {
+    flex: 0 0 auto;
+  }
+}
+/* `.tab-bar` sets its own display, which outranks Tailwind's `md:hidden`. */
+@media (min-width: 768px) {
+  .tab-bar {
+    display: none;
+  }
+}
+
+/* A row that scrolls sideways without showing a bar: chips, tabs, filters. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

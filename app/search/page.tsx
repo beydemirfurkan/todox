@@ -92,9 +92,20 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
       </div>
 
       {/* A GET form, so a filtered search is a URL somebody can keep. The
-          query rides along in a hidden field rather than being retyped. */}
-      <form action="/search" className="flex flex-wrap items-end gap-3">
-        <input type="hidden" name="q" value={query} />
+          query is a field of its own here: on a phone the header has no
+          search box, so this page is where a search is typed. */}
+      <form action="/search" role="search" className="flex flex-wrap items-end gap-3">
+        <Field label={t("searchLabel")} className="w-full">
+          <input
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder={t("searchPlaceholder")}
+            autoFocus={!query}
+            enterKeyHint="search"
+            autoComplete="off"
+          />
+        </Field>
         <Field label={t("searchKind")}>
           <Picker
             name="kind"

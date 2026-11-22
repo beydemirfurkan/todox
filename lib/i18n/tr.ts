@@ -540,6 +540,12 @@ export const tr: Record<Key, string> = {
   chartDone: "Biten görevler",
   chartActive: "Üzerinde çalışılan süre",
   chartWritten: "Loga yazılanlar",
+  tabBarLabel: "Ana menü",
+  tabProjects: "Projeler",
+  tabSearch: "Ara",
+  tabReport: "Rapor",
+  tabBrain: "Beyin",
+  tabAccount: "Hesap",
   pubTitle: "Açık profil",
   pubLede:
     "Linki olan herkesin açabileceği bir sayfa: bir yıllık etkinliğin sayılar ve bir grafik olarak, seçtiğin projeler ve beyninde herkese açık işaretlediğin notlar. Başka hiçbir şey yok: görev yok, log satırı yok, dosya yolu yok, e-posta yok. Sen açana kadar kapalı ve arama motorlarına kapalı.",

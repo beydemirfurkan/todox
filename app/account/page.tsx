@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { ago } from "@/lib/i18n";
+import { ago, LANGS, LANG_NAME } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { publicUrl } from "@/lib/public-url";
 import { listApiTokens } from "@/lib/services/auth";
@@ -29,8 +29,9 @@ import { privatePageMetadata } from "../metadata-shared";
 import { authMessages } from "../auth-messages";
 import { AuthForm } from "../features/auth-form";
 import { SubmitButton } from "../features/submit";
+import { RevealCurrent } from "../features/reveal-current";
 import { TokenForm } from "../features/token-form";
-import { acceptProjectInviteAction, updatePublicProfileAction } from "../actions";
+import { acceptProjectInviteAction, setLangAction, updatePublicProfileAction } from "../actions";
 import { PROFILE_BIO_MAX } from "@/lib/constants";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -112,7 +113,7 @@ export default async function AccountPage({
   searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const user = await requireUser();
-  const { t } = await getT();
+  const { t, lang } = await getT();
   // Only for an address this account has proved it holds. Registration does not
   // require verification and the app works without it, so listing by the claimed
   // address told anyone who signed up as somebody else exactly which projects
@@ -155,11 +156,29 @@ export default async function AccountPage({
             )}
           </p>
         </div>
-        <form action={logoutAction} className="ml-auto shrink-0 sm:hidden">
-          <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
-            {t("signOut")}
-          </SubmitButton>
-        </form>
+        {/* A phone has no user menu: this tab is where signing out and the
+            language live. From `md` both are in the header. */}
+        <div className="flex w-full flex-wrap items-center gap-2 md:hidden">
+          <form action={setLangAction} className="flex gap-1.5" aria-label={t("languageLabel")}>
+            {LANGS.map((l) => (
+              <button
+                key={l}
+                name="lang"
+                value={l}
+                type="submit"
+                className="pill seg"
+                aria-current={l === lang ? "true" : undefined}
+              >
+                {LANG_NAME[l]}
+              </button>
+            ))}
+          </form>
+          <form action={logoutAction} className="ml-auto shrink-0">
+            <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+              {t("signOut")}
+            </SubmitButton>
+          </form>
+        </div>
       </div>
 
       {!user.email_verified_at && (
@@ -201,6 +220,7 @@ export default async function AccountPage({
             )}
           </Link>
         ))}
+        <RevealCurrent />
       </nav>
 
       {activeTab === "profile" && (

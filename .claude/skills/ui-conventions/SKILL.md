@@ -79,6 +79,31 @@ surfaces one step up, hairlines instead of shadows, one orange.
   agent can do to a task a person can do too -- the board's cards move by drag
   *and* by a menu of plain forms.
 
+## The phone shell
+
+Below `md` (768px) a signed-in page is laid out like an app, and new pages get
+this for free -- do not build a second navigation:
+
+- **App bar:** `header.app-bar` is sticky, one row: the wordmark and the bell.
+  The search box, the language and the user menu are `hidden md:block`.
+- **Tab bar:** `app/features/tab-bar.tsx`, five tabs (Projects, Search, Report,
+  Brain, Account), fixed at the bottom with `--safe-bottom`. A new top-level
+  page either belongs to one of those tabs (`isActive`) or is reached from one.
+  `main` is padded for it; the marketing footer is hidden.
+- **Sheets, not dropdowns:** `.user-menu-panel` (bell, menus) and
+  `.status-menu-panel` become bottom sheets with a dim. For anything new that
+  opens over the page use a native `popover` (top layer: escapes every
+  stacking context and containing block, Esc and tap-outside for free) or the
+  settings drawer's `<dialog>`. Not a `<details>` -- Chrome gives its content
+  its own containing block and a fixed panel inside it is not fixed.
+- **Sideways rows:** chips, tabs and filters scroll in one row on a phone with
+  `.no-scrollbar`; put `<RevealCurrent />` inside so the selected one is in view.
+- **Safe areas:** `viewport-fit=cover`; anything pinned to an edge pads with
+  `--safe-top` / `--safe-bottom`.
+- **Display and Tailwind:** a custom class that sets `display` (`.user-menu`,
+  `.tab-bar`) outranks `hidden` / `md:hidden`, because unlayered CSS beats a
+  utility. Put the breakpoint on a wrapper or in the class's own CSS.
+
 ## Mobile rules
 
 These are written down because every one of them was a bug on a real phone.

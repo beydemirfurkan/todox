@@ -553,6 +553,12 @@ export const en = {
   chartDone: "Tasks finished",
   chartActive: "Time in doing",
   chartWritten: "Written to the log",
+  tabBarLabel: "Main",
+  tabProjects: "Projects",
+  tabSearch: "Search",
+  tabReport: "Report",
+  tabBrain: "Brain",
+  tabAccount: "Account",
   pubTitle: "Public profile",
   pubLede:
     "A page anyone with the link can open: your year of activity as numbers and a chart, the projects you pick, and the brain notes you mark public. Nothing else: no task, no log line, no path, no email. Off until you turn it on, and unlisted from search engines.",
