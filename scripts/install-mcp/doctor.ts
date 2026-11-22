@@ -48,7 +48,8 @@ if (argv1) {
         process.exit(1);
       });
     }
-  } catch {
+  } catch (error) {
     // process.argv[1] may not be a file URL on every platform; skip the shim.
+    if (process.env.TODOX_DEBUG) console.error("[todox doctor] shim skipped:", error);
   }
 }

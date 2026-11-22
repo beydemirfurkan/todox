@@ -96,8 +96,9 @@ export function SharePanel({
               await navigator.clipboard.writeText(url);
               setCopied(true);
               setTimeout(() => setCopied(false), 1800);
-            } catch {
-              /* clipboard blocked -- the link is visible and selectable anyway */
+            } catch (error) {
+              // Clipboard blocked; the link is visible and selectable anyway.
+              console.warn("clipboard write refused", error);
             }
           }}
         >

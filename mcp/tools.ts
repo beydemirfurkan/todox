@@ -725,8 +725,10 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       try {
         await call("reportRefs", { refs: unreported });
         for (const r of unreported) reported.set(r.id, r.hash);
-      } catch {
-        /* the status above is still correct for this call */
+      } catch (error) {
+        // The status above is still correct for this call. stderr, because in
+        // the stdio process stdout is the protocol.
+        console.error("[todox] reportRefs failed:", error instanceof Error ? error.message : error);
       }
     }
 
