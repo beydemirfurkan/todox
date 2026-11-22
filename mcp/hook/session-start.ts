@@ -30,7 +30,7 @@ export const DIGEST_CHARS = 9_200;
 export async function sessionStart(ctx: HookContext): Promise<HookOutput> {
   recordStart(ctx);
   if (!ctx.rpc) {
-    ctx.log("session-start", "no token (CLAUDE_PLUGIN_OPTION_TOKEN): reminder only");
+    ctx.log("session-start", "no token (CLAUDE_PLUGIN_OPTION_TOKEN or TODOX_TOKEN): reminder only");
     return inject(reminderFor(ctx));
   }
   if (!ctx.input.cwd) return inject(REMINDER);

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
-import { HOSTED_URL, hookConfig, urlFromMcpJson } from "./config";
+import { HOSTED_URL, hookConfig, tokenFrom, urlFromMcpJson } from "./config";
 
 function pluginWith(mcpJson: string): string {
   const root = mkdtempSync(join(tmpdir(), "todox-hook-config-"));
@@ -49,5 +49,18 @@ describe("token, data directory and the off switch", () => {
   it("turns off on TODOX_HOOKS=off and nothing else", () => {
     expect(hookConfig({ TODOX_HOOKS: "off" }, undefined, vi.fn()).disabled).toBe(true);
     expect(hookConfig({ TODOX_HOOKS: "on" }, undefined, vi.fn()).disabled).toBe(false);
+  });
+});
+
+describe("which token a hook uses", () => {
+  it("prefers the plugin's prompted token, in Claude Code or Cursor, over the environment's", () => {
+    expect(tokenFrom({ CLAUDE_PLUGIN_OPTION_TOKEN: "a", TODOX_TOKEN: "env" })).toBe("a");
+    expect(tokenFrom({ TODOX_PLUGIN_TOKEN: "c", TODOX_TOKEN: "env" })).toBe("c");
+  });
+
+  it("falls back to TODOX_TOKEN when Cursor left the variable empty or unexpanded", () => {
+    expect(tokenFrom({ TODOX_PLUGIN_TOKEN: "", TODOX_TOKEN: "env" })).toBe("env");
+    expect(tokenFrom({ TODOX_PLUGIN_TOKEN: "${token}", TODOX_TOKEN: "env" })).toBe("env");
+    expect(tokenFrom({ TODOX_PLUGIN_TOKEN: "${token}" })).toBeUndefined();
   });
 });

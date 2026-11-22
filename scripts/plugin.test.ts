@@ -181,7 +181,7 @@ describe("the Codex and Cursor manifests", () => {
     };
     expect(hooks.version).toBe(1);
     for (const [, [hook]] of Object.entries(hooks.hooks)) {
-      const match = /^TODOX_TOKEN="\$\{token\}" sh "\$\{CURSOR_PLUGIN_ROOT\}\/hooks\/run\.sh" ([a-z-]+) cursor$/.exec(hook.command);
+      const match = /^TODOX_PLUGIN_TOKEN="\$\{token\}" sh "\$\{CURSOR_PLUGIN_ROOT\}\/hooks\/run\.sh" ([a-z-]+) cursor$/.exec(hook.command);
       expect(match?.[1] && HANDLED.includes(match[1])).toBe(true);
     }
     // The Stop hook asks once per session on its own; Cursor's loop limit says so twice.
