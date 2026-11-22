@@ -18,7 +18,9 @@ import * as invitationsRepo from "../lib/repositories/project-invitations";
 import * as membershipsRepo from "../lib/repositories/project-memberships";
 import * as projectsRepo from "../lib/repositories/projects";
 import * as usersRepo from "../lib/repositories/users";
+import * as entryDeletions from "../lib/repositories/entry-deletions";
 import { removeMember } from "../lib/services/collaboration";
+import { deleteEntry } from "../lib/services/entry-deletion";
 import { feed } from "../lib/services/notifications";
 import { accept, invite } from "../lib/services/project-invitations";
 import * as limit from "../lib/services/rate-limit";
@@ -156,6 +158,37 @@ async function main() {
     [task.id],
   );
   expect("and a transition records who moved it", moved?.user_id === owner.id);
+
+  line("a member deletes only what they wrote, and every deletion leaves a trace");
+  const ownersDecision = await taskService.addEntry({
+    task_id: task.id,
+    kind: "decision",
+    body: "the owner decided this",
+    author: "human",
+    user_id: owner.id,
+  });
+  const refusal = await deleteEntry(member.id, ownersDecision.id).then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(
+    "the member is refused the owner's entry, as if it did not exist",
+    refusal instanceof Error && refusal.name === "NotYours",
+  );
+  expect("and the entry survives", Boolean(await entriesRepo.byId(ownersDecision.id)));
+
+  const own = (await entriesRepo.listByTask(task.id)).find((e) => e.body === "this one is mine")!;
+  expect("the member may delete their own", (await deleteEntry(member.id, own.id)).deleted);
+  expect("the owner may delete anyone's", (await deleteEntry(owner.id, ownersDecision.id)).deleted);
+
+  const traces = await entryDeletions.listByTask(task.id);
+  expect("both deletions left a trace", traces.length === 2);
+  expect(
+    "naming who wrote and who removed, never the text",
+    traces.some((d) => d.author_name === owner.name && d.deleted_by_name === owner.name) &&
+      traces.some((d) => d.author_name === member.name && d.deleted_by_name === member.name) &&
+      traces.every((d) => !("body" in d)),
+  );
 
   line("removal tells the person it happened to");
   const membership = roster.find((m) => m.user_id === member.id)!;

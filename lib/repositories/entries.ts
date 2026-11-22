@@ -566,6 +566,12 @@ export async function create(input: NewEntry): Promise<Entry> {
 
 export const remove = (id: number) => run("DELETE FROM entries WHERE id = ?", [id]);
 
+/** Beside `remove` for the deletion that has to leave a trace in the same transaction. */
+export const removeStmt = (id: number): Statement => ({
+  text: "DELETE FROM entries WHERE id = ?",
+  params: [id],
+});
+
 /**
  * One row per task: the last entry of any kind, the last handoff, and this
  * user's last entry with and without handoffs counted. The twin of

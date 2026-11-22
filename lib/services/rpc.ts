@@ -15,7 +15,6 @@ import { BadRequest } from "./errors";
 import { addContext } from "./context-service";
 import {
   assertContext,
-  assertEntry,
   assertObservation,
   assertProject,
   assertProjectAccess,
@@ -31,6 +30,7 @@ import { isMethod, parseParams, type MethodName, type ObservationSource } from "
 import { silentAccountNudge } from "./nudge";
 import { highlightedTerms, search } from "./search";
 import { sessionStatus } from "./session-status";
+import { deleteEntry } from "./entry-deletion";
 import * as taskService from "./task-service";
 import { headlineHint, quickCloseHint } from "./write-hints";
 import { logError } from "../server/log";
@@ -550,11 +550,7 @@ export const methods = {
     return { deleted: removed > 0 };
   },
 
-  deleteEntry: async ({ userId }, p: { entry_id: number }) => {
-    await assertEntry(userId, p.entry_id);
-    const removed = await entriesRepo.remove(p.entry_id);
-    return { deleted: removed > 0 };
-  },
+  deleteEntry: ({ userId }, p: { entry_id: number }) => deleteEntry(userId, p.entry_id),
 
   search: async (
     { userId },

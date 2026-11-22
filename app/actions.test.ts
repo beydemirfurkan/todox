@@ -22,11 +22,11 @@ const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
   consume: vi.fn(),
   assertTask: vi.fn(),
-  assertEntry: vi.fn(),
+  assertCanDeleteEntry: vi.fn(),
   assertRef: vi.fn(),
   assertProject: vi.fn(),
   assertContext: vi.fn(),
-  entriesRemove: vi.fn(),
+  deleteEntry: vi.fn(),
   refsUnlink: vi.fn(),
   refsAcceptSeen: vi.fn(),
   contextsRemove: vi.fn(),
@@ -51,12 +51,12 @@ vi.mock("@/lib/lang", () => ({ LANG_COOKIE: "lang", getLang: async () => "en" })
 vi.mock("@/lib/services/rate-limit", () => ({ consume: mocks.consume }));
 vi.mock("@/lib/services/ownership", () => ({
   assertTask: mocks.assertTask,
-  assertEntry: mocks.assertEntry,
+  assertCanDeleteEntry: mocks.assertCanDeleteEntry,
   assertRef: mocks.assertRef,
   assertProject: mocks.assertProject,
   assertContext: mocks.assertContext,
 }));
-vi.mock("@/lib/repositories/entries", () => ({ remove: mocks.entriesRemove }));
+vi.mock("@/lib/services/entry-deletion", () => ({ deleteEntry: mocks.deleteEntry }));
 vi.mock("@/lib/repositories/refs", () => ({
   unlink: mocks.refsUnlink,
   acceptSeen: mocks.refsAcceptSeen,
@@ -119,8 +119,8 @@ const GUARDED = [
   {
     action: "deleteEntryAction",
     field: "entry_id",
-    guard: mocks.assertEntry,
-    write: mocks.entriesRemove,
+    guard: mocks.assertCanDeleteEntry,
+    write: mocks.deleteEntry,
   },
   { action: "unlinkRefAction", field: "ref_id", guard: mocks.assertRef, write: mocks.refsUnlink },
   {
@@ -317,7 +317,7 @@ describe("the ceiling on writes from a browser", () => {
     // message is indistinguishable from one that succeeded.
     mocks.consume.mockResolvedValue({ allowed: false, retryAfterSec: 300 });
     await expect(actions.deleteEntryAction(form({ entry_id: "1" }))).rejects.toThrow();
-    expect(mocks.entriesRemove).not.toHaveBeenCalled();
+    expect(mocks.deleteEntry).not.toHaveBeenCalled();
   });
 
 });

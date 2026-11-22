@@ -47,6 +47,24 @@ export const ownsEntry = (userId: number, id: number) =>
     [userId, id, userId],
   );
 
+/**
+ * Deleting is narrower than reading. Anybody on the project can see an entry,
+ * but only the person who wrote it -- or whose agent did -- and the project's
+ * owner may remove it. A member used to be able to delete the owner's
+ * decisions, without a trace (dogfood 2026-11-22). Somebody who may not delete
+ * gets the same 404 as somebody who cannot see the row: the answer must not
+ * tell them the entry exists.
+ */
+export const canDeleteEntry = (userId: number, id: number) =>
+  owns(
+    `SELECT 1 AS n FROM entries e
+     JOIN tasks t ON t.id = e.task_id
+     JOIN projects p ON p.id = t.project_id
+     LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?
+     WHERE e.id = ? AND (p.user_id = ? OR (pm.user_id IS NOT NULL AND e.user_id = ?))`,
+    [userId, id, userId, userId],
+  );
+
 export const ownsRef = (userId: number, id: number) =>
   owns(
     `SELECT 1 AS n FROM refs r
@@ -109,6 +127,9 @@ export async function assertProjectAccess(userId: number, id: number) {
 }
 export async function assertEntry(userId: number, id: number) {
   if (!(await ownsEntry(userId, id))) throw new NotYours("entry", id);
+}
+export async function assertCanDeleteEntry(userId: number, id: number) {
+  if (!(await canDeleteEntry(userId, id))) throw new NotYours("entry", id);
 }
 export async function assertRef(userId: number, id: number) {
   if (!(await ownsRef(userId, id))) throw new NotYours("ref", id);

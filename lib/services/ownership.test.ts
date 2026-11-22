@@ -37,6 +37,7 @@ const PREDICATES = [
   "accessesProject",
   "ownsTask",
   "ownsEntry",
+  "canDeleteEntry",
   "ownsRef",
   "ownsContext",
   "ownsObservation",
@@ -155,6 +156,24 @@ describe("owner-only versus shared", () => {
       const { text } = await statementFor(name);
       expect(text, name).toContain("project_memberships");
     }
+  });
+});
+
+describe("canDeleteEntry, narrower than reading", () => {
+  // A member can see every entry in a shared project, and used to be able to
+  // delete any of them -- the owner's decisions included, without a trace.
+  it("lets a member delete only what they wrote", async () => {
+    const { text, params } = await statementFor("canDeleteEntry");
+    expect(text).toContain("e.user_id = ?");
+    expect(text).toContain("p.user_id = ?");
+    expect(params.filter((p) => p === USER)).toHaveLength(3);
+  });
+
+  it("is not the read check", async () => {
+    const read = await statementFor("ownsEntry");
+    const del = await statementFor("canDeleteEntry");
+    expect(read.text).not.toContain("e.user_id");
+    expect(del.text).not.toBe(read.text);
   });
 });
 
