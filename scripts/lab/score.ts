@@ -5,6 +5,11 @@
  *   pnpm lab:score                 today's run
  *   TODOX_LAB_RUN=<id> pnpm lab:score
  *
+ * A repeated run (`lab:run --repeat N`) holds r1, r2, ... under its id: each
+ * is scored on its own, and the run's own scores.md puts their totals side by
+ * side, because one run of a model is an anecdote and two disagreeing ones
+ * are the error bar.
+ *
  * Reads each session's transcript (Claude Code stream-json or OpenCode json,
  * normalised to one list of tool calls), its meta.json and its state.json, and
  * writes scores.json and scores.md beside them.
@@ -202,8 +207,8 @@ const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit", "edit"
 const isRefusal = (call: ToolCall) =>
   call.isTodox && (call.isError || /"error"\s*:|\brefused\b|bad_request|invalid_params/i.test(call.output.slice(0, 400)));
 
-function scoreSession(p: Persona, n: number) {
-  const dir = join(RUN_DIR, `${p.key}-s${n}`);
+function scoreSession(runDir: string, p: Persona, n: number) {
+  const dir = join(runDir, `${p.key}-s${n}`);
   if (!existsSync(join(dir, "meta.json"))) return undefined;
   const session = p.sessions[n - 1];
   const meta = JSON.parse(readFileSync(join(dir, "meta.json"), "utf8")) as Meta;
@@ -221,6 +226,12 @@ function scoreSession(p: Persona, n: number) {
     (entry) => entry.by_user === p.username && entry.created_at >= meta.startedAt,
   );
   const firstLines = mine.map((entry) => entry.body.split("\n")[0]);
+  // Context notes, which carry the why of work finished without a task --
+  // the thing the first run found missing (B5). From the state, not the
+  // calls, so a refused add_context does not count.
+  const notesWritten = state.contexts.filter(
+    (note) => note.by_user === p.username && note.created_at >= meta.startedAt,
+  ).length;
   const projectIds = new Set(
     state.tasks.filter((task) => task.updated_at >= meta.startedAt).map((task) => task.project_id),
   );
@@ -262,6 +273,7 @@ function scoreSession(p: Persona, n: number) {
         ? mine.some((entry) => entry.answers_entry_id !== null)
         : undefined,
       entriesWritten: mine.length,
+      notesWritten,
       avgFirstLine: mine.length
         ? Math.round(firstLines.reduce((sum, line) => sum + line.length, 0) / mine.length)
         : 0,
@@ -336,23 +348,31 @@ function summary(scores: SessionScore[]) {
     handoff: rate(scores, (s) => s.discipline.handoff),
     answeredQuestion: rate(scores, (s) => s.discipline.answeredQuestion),
     leftDoing: scores.reduce((sum, s) => sum + s.discipline.leftDoing.length, 0),
+    entries: scores.reduce((sum, s) => sum + s.discipline.entriesWritten, 0),
+    notesWritten: scores.reduce((sum, s) => sum + s.discipline.notesWritten, 0),
+    jonasEntries: scores
+      .filter((s) => s.persona === "jonas")
+      .reduce((sum, s) => sum + s.discipline.entriesWritten + s.discipline.notesWritten, 0),
+    withoutTodox: scores.filter((s) => s.cost.todoxCalls === 0).map((s) => `${s.persona} s${s.session}`),
     refusals: scores.reduce((sum, s) => sum + s.cost.refusals.length, 0),
     costUsd: Math.round(scores.reduce((sum, s) => sum + s.costUsd, 0) * 100) / 100,
     minutes: Math.round(scores.reduce((sum, s) => sum + s.minutes, 0)),
   };
 }
 
-function main(): void {
-  if (!existsSync(RUN_DIR)) throw new Error(`no run at ${RUN_DIR}`);
+type Totals = ReturnType<typeof summary>;
+
+/** Scores one run directory and writes its scores.json and scores.md. */
+function scoreRun(runDir: string, runId: string): { totals: Totals; md: string } {
   const scores = PERSONAS.flatMap((p) =>
-    [1, 2, 3].map((n) => scoreSession(p, n)).filter((s): s is SessionScore => s !== undefined),
+    [1, 2, 3].map((n) => scoreSession(runDir, p, n)).filter((s): s is SessionScore => s !== undefined),
   );
   const totals = summary(scores);
   const leaks = contamination();
-  writeFileSync(join(RUN_DIR, "scores.json"), JSON.stringify({ run: RUN_ID, totals, leaks, scores }, null, 2));
+  writeFileSync(join(runDir, "scores.json"), JSON.stringify({ run: runId, totals, leaks, scores }, null, 2));
   const refusals = scores.flatMap((s) => s.cost.refusals.map((r) => `- ${s.persona} s${s.session}: ${r}`));
   const md = [
-    `# Lab run ${RUN_ID}`,
+    `# Lab run ${runId}`,
     "",
     "```json",
     JSON.stringify(totals, null, 2),
@@ -367,6 +387,46 @@ function main(): void {
     "## Contamination",
     "",
     leaks.length ? leaks.map((line) => `- ${line}`).join("\n") : "None found.",
+    "",
+  ].join("\n");
+  writeFileSync(join(runDir, "scores.md"), md);
+  return { totals, md };
+}
+
+/** The repetitions of a repeated run, in order: r1, r2, ... */
+const repetitionsOf = (runDir: string): string[] =>
+  readdirSync(runDir)
+    .filter((name) => /^r\d+$/.test(name))
+    .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+
+/** One row per total, one column per repetition. */
+function sideBySide(runs: { name: string; totals: Totals }[]): string {
+  const keys = Object.keys(runs[0]!.totals) as (keyof Totals)[];
+  const head = `| total | ${runs.map((r) => r.name).join(" | ")} |`;
+  const rule = `|---|${runs.map(() => "---").join("|")}|`;
+  const cell = (value: unknown) => (Array.isArray(value) ? value.join(", ") || "–" : String(value));
+  const rows = keys.map((key) => `| ${key} | ${runs.map((r) => cell(r.totals[key])).join(" | ")} |`);
+  return [head, rule, ...rows].join("\n");
+}
+
+function main(): void {
+  if (!existsSync(RUN_DIR)) throw new Error(`no run at ${RUN_DIR}`);
+  const reps = repetitionsOf(RUN_DIR);
+  if (reps.length === 0) {
+    console.log(scoreRun(RUN_DIR, RUN_ID).md);
+    return;
+  }
+  const runs = reps.map((name) => ({ name, ...scoreRun(join(RUN_DIR, name), `${RUN_ID}/${name}`) }));
+  writeFileSync(
+    join(RUN_DIR, "scores.json"),
+    JSON.stringify({ run: RUN_ID, repetitions: runs.map((r) => ({ name: r.name, totals: r.totals })) }, null, 2),
+  );
+  const md = [
+    `# Lab run ${RUN_ID}, ${runs.length} repetitions`,
+    "",
+    sideBySide(runs),
+    "",
+    ...runs.map((r) => `Per session: [${r.name}/scores.md](${r.name}/scores.md)`),
     "",
   ].join("\n");
   writeFileSync(join(RUN_DIR, "scores.md"), md);

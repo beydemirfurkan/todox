@@ -5,6 +5,8 @@
  *   pnpm lab:run mert                 one persona
  *   pnpm lab:run mert 2               one session
  *   pnpm lab:run --dry-run            print the commands, run nothing
+ *   pnpm lab:run --repeat 2           the whole lab twice, from a fresh setup
+ *                                     each time, into <run>/r1 and <run>/r2
  *
  * Personas run side by side; one persona's sessions run in order, each in a
  * fresh process, so the only thing that carries from one to the next is what
@@ -30,6 +32,7 @@ import {
   OPENCODE_MODELS,
   repoDir,
   RUNS,
+  TSX,
 } from "./paths";
 import { PERSONAS, personaByKey, type Persona, type PersonaKey, type Session } from "./personas";
 
@@ -39,7 +42,9 @@ const SESSION_TIMEOUT_MS = 20 * 60_000;
 const MAX_TURNS = "60";
 const MAX_BUDGET_USD = "5";
 
-export const RUN_ID = process.env.TODOX_LAB_RUN ?? new Date().toISOString().slice(0, 10);
+const BASE_RUN_ID = process.env.TODOX_LAB_RUN ?? new Date().toISOString().slice(0, 10);
+/** `<run>`, or `<run>/r<n>` inside a repeated lab. Set once per repetition. */
+let RUN_ID = BASE_RUN_ID;
 export const runDir = (persona: PersonaKey, session: number) =>
   join(RUNS, RUN_ID, `${persona}-s${session}`);
 
@@ -293,13 +298,54 @@ function barriers(personas: Persona[]) {
   return map;
 }
 
+/** `--repeat N`, and the arguments that are left once it is taken out. */
+function parseRepeat(argv: string[]): { repeat: number | undefined; rest: string[] } {
+  const at = argv.indexOf("--repeat");
+  if (at === -1) return { repeat: undefined, rest: argv };
+  const repeat = Number(argv[at + 1]);
+  if (!Number.isInteger(repeat) || repeat < 1) throw new Error("--repeat takes a whole number, 1 or more");
+  return { repeat, rest: [...argv.slice(0, at), ...argv.slice(at + 2)] };
+}
+
+/**
+ * A fresh lab before a repetition, unless that repetition has already begun:
+ * a run that died halfway resumes where it stopped, and resetting under it
+ * would wipe the todox state its next session is meant to read.
+ */
+function freshLabFor(personas: Persona[], isDryRun: boolean): void {
+  const hasBegun = personas.some((p) => [1, 2, 3].some((n) => existsSync(join(runDir(p.key, n), "meta.json"))));
+  if (hasBegun) {
+    console.log(`[lab] ${RUN_ID} already begun, resuming without a reset`);
+    return;
+  }
+  if (isDryRun) {
+    console.log(`[lab] ${RUN_ID}: would run lab:setup --reset`);
+    return;
+  }
+  console.log(`[lab] ${RUN_ID}: lab:setup --reset`);
+  execFileSync(TSX, [join(import.meta.dirname, "setup.ts"), "--reset"], { stdio: "inherit" });
+}
+
 async function main(): Promise<void> {
-  const positional = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
-  const isDryRun = process.argv.includes("--dry-run");
+  const { repeat, rest } = parseRepeat(process.argv.slice(2));
+  const positional = rest.filter((arg) => !arg.startsWith("--"));
+  const isDryRun = rest.includes("--dry-run");
   const only = positional[0] && positional[0] !== "all" ? personaByKey(positional[0]) : undefined;
   if (positional[0] && positional[0] !== "all" && !only) throw new Error(`no persona "${positional[0]}"`);
   const sessions = positional[1] ? [Number(positional[1])] : [1, 2, 3];
   const personas = only ? [only] : PERSONAS;
+  if (repeat !== undefined && (only || positional[1]))
+    throw new Error("--repeat runs the whole lab; it does not take a persona or a session");
+
+  if (repeat === undefined) return runAll(personas, sessions, isDryRun);
+  for (let r = 1; r <= repeat; r++) {
+    RUN_ID = `${BASE_RUN_ID}/r${r}`;
+    freshLabFor(personas, isDryRun);
+    await runAll(personas, sessions, isDryRun);
+  }
+}
+
+async function runAll(personas: Persona[], sessions: number[], isDryRun: boolean): Promise<void> {
   const gates = barriers(PERSONAS);
   // A persona outside this run cannot hold anybody up.
   for (const p of PERSONAS)
