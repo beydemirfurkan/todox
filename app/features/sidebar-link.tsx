@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { LinkPending } from "./link-pending";
+
 /** Today owns "/" only; every other place owns its own subtree. */
 export function isCurrentPlace(href: string, pathname: string): boolean {
   if (href === "/") return pathname === "/";
@@ -34,6 +36,7 @@ export function SidebarLink({
       aria-current={isCurrent ? "page" : undefined}
     >
       {children}
+      <LinkPending />
     </Link>
   );
 }

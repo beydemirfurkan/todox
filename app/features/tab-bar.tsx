@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { LinkPending } from "./link-pending";
+
 import { Icon, type IconName } from "../components/icons";
 
 export interface Tab {
@@ -42,6 +44,7 @@ export function TabBar({ tabs, label }: { tabs: Tab[]; label: string }) {
           >
             <Icon name={tab.icon} size={22} />
             <span>{tab.label}</span>
+            <LinkPending />
           </Link>
         );
       })}

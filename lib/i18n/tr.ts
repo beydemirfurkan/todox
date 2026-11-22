@@ -655,7 +655,6 @@ export const tr: Record<Key, string> = {
   decisionsMade: "alınan kararlar",
   deadEndsHit: "girilen çıkmazlar",
   questionsRaised: "sorulan sorular",
-  readEntryInFull: "tamamını oku",
   showMore: "devamını göster",
   showLess: "daha az göster",
   noActivity: "Bu aralıkta hiçbir şey olmamış.",
@@ -797,4 +796,7 @@ export const tr: Record<Key, string> = {
   minutesAgo: "{n} dk önce",
   hoursAgo: "{n} sa önce",
   daysAgo: "{n} gün önce",
+  loadingPage: "yükleniyor…",
+  showMoreCount: "{n} tane daha",
+  showFewer: "daha az göster",
 };

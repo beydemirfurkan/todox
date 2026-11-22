@@ -667,7 +667,6 @@ export const en = {
   decisionsMade: "decisions made",
   deadEndsHit: "dead ends hit",
   questionsRaised: "questions raised",
-  readEntryInFull: "read it in full",
   showMore: "show more",
   showLess: "show less",
   noActivity: "Nothing happened in this window.",
@@ -817,6 +816,9 @@ export const en = {
   minutesAgo: "{n}m ago",
   hoursAgo: "{n}h ago",
   daysAgo: "{n}d ago",
+  loadingPage: "loading…",
+  showMoreCount: "{n} more",
+  showFewer: "show fewer",
 } as const;
 
 export type Key = keyof typeof en;
