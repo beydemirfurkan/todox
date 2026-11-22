@@ -99,7 +99,7 @@ async function SidebarProjects({ userId, t }: { userId: number; t: T }) {
               <span className="min-w-0 flex-1 truncate">{project.name}</span>
               {open > 0 && (
                 <span className="text-meta text-faint">
-                  <span className="sr-only">{t("sidebarOpenCount", { n: open })}</span>
+                  <span className="sr-only">{open === 1 ? t("sidebarOpenCountOne") : t("sidebarOpenCount", { n: open })}</span>
                   <span aria-hidden="true">{open}</span>
                 </span>
               )}
