@@ -42,13 +42,15 @@ entry it finds — and writes nothing.
 | `--token` | `$TODOX_TOKEN`, else a prompt | the agent token |
 | `--transport` | `http` | `stdio` is OpenCode only |
 | `--opencode-layout` | detected | force `v1` or `v2`; see below |
-| `--write-memory` | off | the four-line habit, in the client's user-level memory file |
+| `--write-memory` / `--no-write-memory` | asked in a terminal (yes by default), off otherwise | the four-line habit, in the client's user-level memory file |
 | `--write-skill` | off | the whole session protocol, as a `SKILL.md` the client loads by description |
 | `--dry-run` | off | plan only, nothing written |
 | `--verbose` | off | platform, node version and resolved home |
 
-Both `--write-*` flags are off by default because the file, or the directory,
-is the user's. The memory file is edited as a guest — todox's lines in a
+Neither is written without consent, because the file, or the directory, is the
+user's: the memory habit is asked for in a terminal and defaults to yes there,
+since a connection with no habit is the usual way todox goes unused; the skill
+is off unless passed. The memory file is edited as a guest — todox's lines in a
 fenced block, everything else untouched. The skill file is wholly todox's
 (`<skills dir>/todox/SKILL.md`), generated from the same text the server sends
 at `initialize`, and replaced whole on a later run so an upgrade carries into

@@ -16,13 +16,18 @@ export type ParsedArgs = {
   /**
    * Also write the four-line habit into the client's user-level memory file.
    *
-   * Off by default, and asked for by name. Registering a server in a config
-   * file todox owns the entry in is one thing; adding lines to the file someone
+   * Without either flag an interactive run asks, defaulting to yes: a config
+   * with no habit left a small model never calling todox at all (dogfood
+   * 2026-11-22, B6). A run with no terminal still writes nothing unasked.
+   * Never written silently, because registering a server in a config file
+   * todox owns the entry in is one thing; adding lines to the file someone
    * keeps their own standing instructions in is another, and doing the second
    * because they asked for the first is the kind of surprise that gets a tool
    * uninstalled. `--dry-run` prints what it would write.
    */
   writeMemory: boolean;
+  /** `--no-write-memory`: do not write it, and do not ask. */
+  skipMemory: boolean;
   /**
    * Also write the session protocol as a skill in the client's user-level
    * skills directory. Off by default like `--write-memory`, and for the
@@ -49,7 +54,13 @@ const KNOWN_CLIENTS = ["claude-code", "codex", "cursor", "vscode", "opencode"] a
  * what follows, and `pnpm install:mcp --dry-run claude-code` is the natural
  * order for a one-shot script.
  */
-const BOOLEAN_FLAGS = new Set(["dry-run", "verbose", "write-memory", "write-skill"]);
+const BOOLEAN_FLAGS = new Set([
+  "dry-run",
+  "verbose",
+  "write-memory",
+  "no-write-memory",
+  "write-skill",
+]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const positional: string[] = [];
@@ -81,6 +92,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
     );
   }
 
+  if (flags["write-memory"] && flags["no-write-memory"])
+    throw new Error("--write-memory and --no-write-memory contradict each other; pass one");
+
   const transport = typeof flags.transport === "string" ? flags.transport : "http";
   if (transport !== "http" && transport !== "stdio") {
     throw new Error(`--transport must be 'http' or 'stdio' (got '${transport}')`);
@@ -111,6 +125,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     dryRun: Boolean(flags["dry-run"]),
     verbose: Boolean(flags.verbose),
     writeMemory: Boolean(flags["write-memory"]),
+    skipMemory: Boolean(flags["no-write-memory"]),
     writeSkill: Boolean(flags["write-skill"]),
   };
 }

@@ -39,6 +39,7 @@ import { createApiToken } from "../lib/services/auth";
 import { hashPassword } from "../lib/util/password";
 import { normalisePath } from "../lib/util/paths";
 import { SERVER_INFO } from "../mcp/tools";
+import { memoryBlock } from "./install-mcp/memory";
 
 /**
  * Resolved, because the two halves of this suite would otherwise disagree
@@ -81,6 +82,13 @@ const NOT_A_REPO = join(TMP, "todox-smoke-scratch", "2026-09-04", "some-prompt")
 const ELSEWHERE = join(TMP, "todox-smoke-repo-elsewhere");
 /** Both checkouts answer with this, which is what ties them together. */
 const REMOTE = "git@github.com:todox-smoke/repo.git";
+/**
+ * The stdio process's home. It reads the client's user-level memory file to
+ * decide whether to send setup notes, and the developer running this suite
+ * usually has the habit in theirs -- so the real home made the notes vanish
+ * and the assertion about them depend on whose laptop it ran on.
+ */
+const STDIO_HOME = join(TMP, "todox-smoke-home");
 /** A clean checkout for one short session, and its own remote. */
 const SHORT = join(TMP, "todox-smoke-short");
 const SHORT_REMOTE = "git@github.com:todox-smoke/short.git";
@@ -122,6 +130,7 @@ const stdioTransport = (token: string, cwd: string): StdioClientTransport =>
     // is the difference the assertion below exists to catch.
     env: {
       ...process.env,
+      HOME: STDIO_HOME,
       TODOX_TOKEN: token,
       TODOX_URL: URL_BASE,
       TODOX_CLIENT_NAME: CLIENT_NAME,
@@ -832,6 +841,20 @@ async function runSuite(mode: Mode, token: string) {
     throw new Error(`notes did not mention the memory file: ${JSON.stringify(a.notes)}`);
   console.log(`client: ${a.client} · ${a.notes.length} note(s)`);
 
+  // And gone once the habit is there: the same advice on every session, to
+  // an agent that followed it long ago, was 600-700 bytes of every stdio
+  // briefing (dogfood 2026-11-22, B9). Only stdio can read the file.
+  if (mode.local) {
+    const memory = join(STDIO_HOME, ".claude", "CLAUDE.md");
+    mkdirSync(join(STDIO_HOME, ".claude"), { recursive: true });
+    writeFileSync(memory, `${memoryBlock()}\n`);
+    const settled = JSON.parse(await text("get_context", { cwd: SCRATCH }));
+    rmSync(memory, { force: true });
+    if (settled.notes?.length)
+      throw new Error(`setup notes came back with the habit installed: ${JSON.stringify(settled.notes)}`);
+    console.log("habit installed: no setup notes");
+  }
+
   if (a.project.slug === b.project.slug)
     throw new Error(`two working directories resolved to one project: ${a.project.slug}`);
 
@@ -1281,6 +1304,7 @@ async function main() {
     process.exit(1);
   }
 
+  mkdirSync(STDIO_HOME, { recursive: true });
   mkdirSync(join(SCRATCH, "src", "deep"), { recursive: true });
   writeFileSync(join(SCRATCH, "package.json"), '{"name":"smoke-repo"}\n');
   mkdirSync(OTHER, { recursive: true });
@@ -1566,6 +1590,14 @@ async function removeRows(userId: number) {
     )
       await projectsRepo.remove(userId, p.id);
   }
+  // Account-wide notes belong to no project, so removing the projects never
+  // reached them: every failed run left another SMOKE-EVERYWHERE behind, and
+  // thirty-odd of them crowded the live tasks out of the 2000-character
+  // digest, failing an assertion about something else entirely.
+  await run("DELETE FROM contexts WHERE user_id = ? AND project_id IS NULL AND title LIKE ?", [
+    userId,
+    "SMOKE-%",
+  ]);
 }
 
 /**
@@ -1574,7 +1606,7 @@ async function removeRows(userId: number) {
  * are the ones `main` has just built and git-initialised.
  */
 function removeDirs() {
-  for (const dir of [SCRATCH, OTHER, ELSEWHERE, SHORT])
+  for (const dir of [SCRATCH, OTHER, ELSEWHERE, SHORT, STDIO_HOME])
     rmSync(dir, { recursive: true, force: true });
 }
 

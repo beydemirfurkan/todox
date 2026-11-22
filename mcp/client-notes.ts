@@ -1,8 +1,4 @@
-import {
-  MCP_MEMORY_PATHS,
-  MEMORY_FILE_NAME,
-  type McpClientId,
-} from "../lib/mcp-clients";
+import { userMemoryPath, type McpClientId } from "../lib/mcp-clients";
 import type { ClientFamily } from "../lib/client-identity";
 
 /**
@@ -22,12 +18,9 @@ import type { ClientFamily } from "../lib/client-identity";
  * exists to prevent on the config side.
  */
 function memoryLocation(client: McpClientId): string {
-  const target = MCP_MEMORY_PATHS[client];
-  // Every entry is currently the same on all three platforms, and
-  // `client-notes.test.ts` holds it that way -- the server is answering an
+  // The darwin spelling stands for all three: the server is answering an
   // agent whose operating system it has no way of knowing.
-  const location = target.location.darwin;
-  return target.kind === "directory" ? `${location}/${MEMORY_FILE_NAME}` : location;
+  return userMemoryPath(client);
 }
 
 /**

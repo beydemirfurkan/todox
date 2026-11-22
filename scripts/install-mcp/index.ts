@@ -19,8 +19,9 @@
  *
  * --write-memory does the other half: the config makes the tools exist, and the
  * habit in the client's user-level memory file is what makes an agent reach for
- * them. Off by default because that file is the user's own, and every run says
- * which file it would be either way.
+ * them. Without it an interactive run asks, defaulting to yes; a run with no
+ * terminal, or with --no-write-memory, writes nothing there, because that file
+ * is the user's own. Every run says which file it would be either way.
  *
  * --write-skill puts the whole session protocol -- the text the server sends at
  * initialize -- in the client's user-level skills directory, where the client
@@ -38,7 +39,7 @@ import { memoryFileFor, skillFileFor } from "./clients/contract";
 import { runDoctor } from "./reachability";
 import { memoryBlock, planMemoryWrite, readMemoryFile, writeMemoryFile } from "./memory";
 import { parseArgs } from "./parse";
-import { maskToken, promptForToken } from "./prompt";
+import { confirm, maskToken, promptForToken } from "./prompt";
 import { planSkillWrite, readSkillFile, writeSkillFile } from "./skill";
 import type { McpClientId } from "../../lib/mcp-clients";
 
@@ -94,6 +95,10 @@ async function main() {
 
   // Named before the write, so a dry run says what both halves would do.
   const memoryFile = memoryFileFor(args.client as McpClientId);
+  if (!args.writeMemory && !args.skipMemory && !args.dryRun)
+    args.writeMemory = await confirm(
+      `[todox] memory : add the four-line habit to ${memoryFile}? It is what makes an agent use todox.`,
+    );
   if (args.writeMemory) {
     console.error(`[todox] memory : ${memoryFile}`);
   } else {

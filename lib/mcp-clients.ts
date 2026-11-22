@@ -144,6 +144,26 @@ export const MCP_MEMORY_PATHS = {
   opencode: { location: everywhere("~/.config/opencode/AGENTS.md"), kind: "file" },
 } as const satisfies Record<McpClientId, McpMemoryTarget>;
 
+/** What each client is called where a person reads it. */
+export const MCP_CLIENT_NAMES = {
+  "claude-code": "Claude Code",
+  codex: "Codex",
+  cursor: "Cursor",
+  vscode: "VS Code",
+  opencode: "OpenCode",
+} as const satisfies Record<McpClientId, string>;
+
+/**
+ * The user-level memory file a client reads, as one path to show somebody.
+ * Every entry is currently the same on all three platforms, which
+ * `client-notes.test.ts` holds.
+ */
+export function userMemoryPath(client: McpClientId): string {
+  const target = MCP_MEMORY_PATHS[client];
+  const location = target.location.darwin;
+  return target.kind === "directory" ? `${location}/${MEMORY_FILE_NAME}` : location;
+}
+
 /**
  * Where a client reads skills that apply to every project.
  *

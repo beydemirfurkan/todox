@@ -218,6 +218,10 @@ export const en = {
   inviteEmailMismatch: "Sign in with the email address that received this invitation.",
   inviteInvalidTitle: "This invitation is no longer available",
   inviteInvalidBody: "It may have expired, been revoked, or already been accepted.",
+  habitTitle: "The habit your agent needs",
+  habitIntro:
+    "A token makes the tools exist; these four lines are what make an agent use them. Paste them into your agent's user-level memory file: the one it reads in every project, not the one inside a repository. pnpm install:mcp offers to do it for you.",
+  habitWhere: "Where each agent reads it:",
   apiTokensIntro:
     "An agent signs in with one of these. Create one and you get setup text you can paste straight into whichever agent you use; it reaches your account and nothing else.",
   tokenName: "what is it for",

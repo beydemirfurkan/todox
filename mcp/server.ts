@@ -12,6 +12,7 @@
  * host stay in step.
  */
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -21,6 +22,8 @@ import type { MethodName } from "../lib/services/rpc-schemas";
 import { isAbsolutePath } from "../lib/util/paths";
 import { runInstallDoctor } from "./doctor";
 import { runHookCommand } from "./git-hook/cli";
+import { memoryFileFor } from "../scripts/install-mcp/clients/contract";
+import { hasMemoryBlock } from "../scripts/install-mcp/memory";
 import { createObserver } from "./observer";
 import { createClient, readConfig } from "./rpc-client";
 import { instructions, registerTools, SERVER_INFO, type Workspace } from "./tools";
@@ -79,6 +82,14 @@ const localWorkspace: Workspace = {
   hash: hashFile,
   checkRefs,
   clientInfo: async () => envClient(),
+  hasHabit: async (client) => {
+    try {
+      return hasMemoryBlock(await readFile(memoryFileFor(client), "utf8"));
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw e;
+    }
+  },
 };
 
 /**

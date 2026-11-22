@@ -43,6 +43,8 @@ function buildRemoteWorkspace(agent: AgentIdentity): Workspace {
     // read for the hundredth time is the always-true sentence the briefing is
     // built to avoid.
     clientInfo: async () => clientDuringSetup(agent),
+    // No disk here: the notes fall back to the token-age rule above.
+    hasHabit: async () => null,
   };
 }
 

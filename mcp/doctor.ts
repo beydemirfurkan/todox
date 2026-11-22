@@ -126,7 +126,13 @@ function judgeEntry(
   };
 }
 
-/** The habit beside the config: an agent that has the tools and no reason to reach for them. */
+/**
+ * The habit beside the config: an agent that has the tools and no reason to
+ * reach for them. A failure, not a warning: in the first dogfood run a small
+ * model with a working config and no habit made no todox call at all in two
+ * sessions out of three (dogfood 2026-11-22, B6). A connection nobody uses is
+ * not a working install.
+ */
 async function inspectMemory(client: McpClientId): Promise<Finding> {
   const file = memoryFileFor(client);
   let text: string;
@@ -136,7 +142,7 @@ async function inspectMemory(client: McpClientId): Promise<Finding> {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     return finding(
       client,
-      "warn",
+      "fail",
       `${tilde(file)} does not exist -- connecting is not the same as being used; ` +
         "write the habit there (install:mcp --write-memory, or paste the four lines)",
     );
@@ -145,7 +151,7 @@ async function inspectMemory(client: McpClientId): Promise<Finding> {
     ? finding(client, "ok", `${tilde(file)} carries the todox block`)
     : finding(
         client,
-        "warn",
+        "fail",
         `${tilde(file)} has no todox block -- the habit is what makes an agent reach for the tools`,
       );
 }

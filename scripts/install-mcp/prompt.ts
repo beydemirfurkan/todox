@@ -126,3 +126,34 @@ export function promptForToken(
     input.on("data", onData);
   });
 }
+
+/** The part of `process.stdin` a yes/no question needs. */
+export type AnswerInput = {
+  isTTY?: boolean;
+  resume(): unknown;
+  pause(): unknown;
+  once(event: "data", listener: (chunk: Buffer) => void): unknown;
+};
+
+/**
+ * Ask a yes/no question whose answer defaults to yes: Enter, "y" or "yes"
+ * (any case) is yes, anything else is no. Resolves false without asking when
+ * the input is not a terminal -- a script piping into this did not consent to
+ * anything.
+ */
+export function confirm(
+  question: string,
+  input: AnswerInput = process.stdin,
+  output: TokenOutput = process.stderr,
+): Promise<boolean> {
+  if (!input.isTTY) return Promise.resolve(false);
+  output.write(`${question} [Y/n] `);
+  return new Promise<boolean>((resolve) => {
+    input.once("data", (chunk) => {
+      input.pause();
+      const answer = chunk.toString("utf8").trim().toLowerCase();
+      resolve(answer === "" || answer === "y" || answer === "yes");
+    });
+    input.resume();
+  });
+}

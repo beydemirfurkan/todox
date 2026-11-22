@@ -56,6 +56,7 @@ describe("parseArgs", () => {
       dryRun: false,
       verbose: false,
       writeMemory: false,
+      skipMemory: false,
       writeSkill: false,
     });
   });
@@ -81,6 +82,7 @@ describe("parseArgs", () => {
       dryRun: true,
       verbose: true,
       writeMemory: false,
+      skipMemory: false,
       writeSkill: false,
     });
   });
@@ -100,6 +102,15 @@ describe("parseArgs", () => {
     // asked to register a server is not what they asked for.
     expect(parseArgs(["claude-code"]).writeMemory).toBe(false);
     expect(parseArgs(["claude-code", "--write-memory"]).writeMemory).toBe(true);
+  });
+
+  it("takes --no-write-memory, and refuses both at once", () => {
+    expect(parseArgs(["claude-code", "--no-write-memory"])).toMatchObject({
+      writeMemory: false,
+      skipMemory: true,
+    });
+    expect(parseArgs(["--no-write-memory", "codex"]).client).toBe("codex");
+    expect(() => parseArgs(["codex", "--write-memory", "--no-write-memory"])).toThrow(/contradict/);
   });
 
   it("does not swallow the client name after --write-memory", () => {
@@ -129,6 +140,7 @@ describe("parseArgs", () => {
       dryRun: true,
       verbose: false,
       writeMemory: false,
+      skipMemory: false,
       writeSkill: false,
     });
     expect(parseArgs(["--verbose", "codex"]).verbose).toBe(true);

@@ -270,8 +270,11 @@ Or let the installer do it:
 pnpm install:mcp claude-code --write-memory
 ```
 
-It is off unless asked, because that file is yours rather than ours, and it is
-idempotent — the block is fenced with an HTML comment, so a second run replaces
+Run in a terminal, the installer asks before writing it, with yes as the
+default -- a connected agent with no habit is the most common way todox ends up
+unused. With no terminal it writes nothing unless `--write-memory` is passed,
+and `--no-write-memory` skips the question, because that file is yours rather
+than ours. It is idempotent — the block is fenced with an HTML comment, so a second run replaces
 it instead of leaving two sets of instructions where the older one wins. Add
 `--dry-run` to see the exact block first.
 
