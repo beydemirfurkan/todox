@@ -82,6 +82,7 @@ const localWorkspace: Workspace = {
   hash: hashFile,
   checkRefs,
   clientInfo: async () => envClient(),
+  launchDir: () => process.cwd(),
   hasHabit: async (client) => {
     try {
       return hasMemoryBlock(await readFile(memoryFileFor(client), "utf8"));
