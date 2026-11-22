@@ -24,6 +24,7 @@ const project = (id: number, createdAt: string): Project => ({
   created_at: createdAt,
   share_token: null,
   share_log: 0,
+    on_profile: false,
 });
 
 beforeEach(() => {

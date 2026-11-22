@@ -13,6 +13,9 @@ export type User = {
   password_hash: string;
   created_at: string;
   email_verified_at: string | null;
+  /** Whether /u/<username> answers at all. */
+  profile_public: boolean;
+  bio: string | null;
 };
 
 export const AUTH_TOKEN_PURPOSES = ["reset", "verify"] as const;
@@ -62,6 +65,8 @@ export type Project = {
   created_at: string;
   share_token: string | null;
   share_log: number;
+  /** Named on the owner's public profile. */
+  on_profile: boolean;
   /** The caller's relationship to this project, when loaded privately. */
   access_role?: "owner" | "member";
   /** Who it belongs to. Only selected on the private reads that join users. */

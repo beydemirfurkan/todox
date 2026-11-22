@@ -17,6 +17,8 @@ const PUBLIC = [
   "/verify",
   "/invite",
   "/s/",
+  // Public profiles. Each one answers 404 until its owner turns it on.
+  "/u/",
   // Posts are the one public thing with children: the index and every slug
   // under it. Prefix on purpose, and nothing signed-in lives under /blog.
   "/blog",
@@ -96,7 +98,7 @@ const SHORT_CACHE = new Set(["/sitemap.xml", "/robots.txt", "/llms.txt"]);
  * than a defence -- the ceiling on what it reads and `sharePerIp` are the
  * defence -- but a refresh should not be a second full read.
  */
-const SHORT_CACHE_PREFIX = "/s/";
+const SHORT_CACHE_PREFIXES = ["/s/", "/u/"];
 
 /**
  * `?lang=en` — a link that arrives in the language it promises.
@@ -145,7 +147,7 @@ function cached(pathname: string, res: NextResponse): NextResponse {
   else if (SHORT_CACHE.has(pathname)) {
     res.headers.set("Cache-Control", "public, max-age=300, must-revalidate");
     res.headers.set("Last-Modified", new Date().toUTCString());
-  } else if (pathname.startsWith(SHORT_CACHE_PREFIX))
+  } else if (SHORT_CACHE_PREFIXES.some((prefix) => pathname.startsWith(prefix)))
     res.headers.set("Cache-Control", "private, max-age=60");
   return res;
 }

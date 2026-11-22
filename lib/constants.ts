@@ -113,3 +113,6 @@ export function isPriority(value: unknown): value is number {
     value <= MAX_PRIORITY
   );
 }
+
+/** A public profile's bio: as long as a line on a card stays a line. */
+export const PROFILE_BIO_MAX = 280;

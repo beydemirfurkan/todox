@@ -250,6 +250,17 @@ CREATE INDEX IF NOT EXISTS idx_contexts_user ON contexts (user_id);
 -- reaches the profile, whatever this says.
 ALTER TABLE contexts ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
 
+-- The public profile at /u/<username>. Off until the owner turns it on, and
+-- read only through explicit column lists, never SELECT star, so email and the
+-- password hash cannot reach it by accident.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_public BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+-- Which of the owner's projects the profile names. Name, summary and counts
+-- only: a task, a log line or a path never leaves through it.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS on_profile BOOLEAN NOT NULL DEFAULT false;
+-- The profile's year of activity is one person's entries by day.
+CREATE INDEX IF NOT EXISTS idx_entries_user_created ON entries (user_id, created_at);
+
 -- Files in play, hashed at link time so we can tell the agent when a note it
 -- is about to trust describes code that has since moved on.
 -- Files in play. \`hash\` is what the file looked like when it was linked;

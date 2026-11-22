@@ -167,3 +167,87 @@ export function ShareBars({ rows, color }: { rows: Share[]; color: string }) {
     </ul>
   );
 }
+
+const CELL = 12;
+const CELL_GAP = 3;
+const STEP = CELL + CELL_GAP;
+const DAY_MS = 86_400_000;
+const LEVEL_OPACITY = [0, 0.3, 0.5, 0.75, 1];
+
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/**
+ * A year of days as a grid, one column a week, Monday on top: how much was
+ * written each day, in four shades of one colour.
+ *
+ * The keys are calendar dates, so the walk is done in UTC on purpose -- the
+ * date strings already say which local day they are, and UTC has no DST to
+ * skip a row. The drawing is `aria-hidden`; the page says the same thing as
+ * a sentence (how many days, how many entries, the busiest one).
+ */
+export function Heatmap({
+  days,
+  today,
+  less,
+  more,
+}: {
+  days: { day: string; n: number }[];
+  /** `YYYY-MM-DD`, the last cell. */
+  today: string;
+  less: string;
+  more: string;
+}) {
+  const counts = new Map(days.map((d) => [d.day, d.n]));
+  const end = Date.parse(`${today}T00:00:00Z`);
+  const first = end - 364 * DAY_MS;
+  const mondayOffset = (new Date(first).getUTCDay() + 6) % 7;
+  const start = first - mondayOffset * DAY_MS;
+  const max = Math.max(1, ...days.map((d) => d.n));
+  const level = (n: number) => (n ? Math.min(4, Math.max(1, Math.ceil((4 * n) / max))) : 0);
+
+  const cells: { key: string; col: number; row: number; n: number }[] = [];
+  for (let at = start, i = 0; at <= end; at += DAY_MS, i++) {
+    const key = isoDay(at);
+    cells.push({ key, col: Math.floor(i / 7), row: i % 7, n: counts.get(key) ?? 0 });
+  }
+  const cols = cells[cells.length - 1].col + 1;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="overflow-x-auto pb-1">
+        <svg
+          viewBox={`0 0 ${cols * STEP - CELL_GAP} ${7 * STEP - CELL_GAP}`}
+          className="h-auto w-full min-w-[640px]"
+          aria-hidden="true"
+          focusable="false"
+        >
+          {cells.map((c) => (
+            <rect
+              key={c.key}
+              x={c.col * STEP}
+              y={c.row * STEP}
+              width={CELL}
+              height={CELL}
+              rx={2.5}
+              fill={c.n ? "var(--accent)" : "var(--line)"}
+              fillOpacity={c.n ? LEVEL_OPACITY[level(c.n)] : 1}
+            >
+              <title>{`${c.key}: ${c.n}`}</title>
+            </rect>
+          ))}
+        </svg>
+      </div>
+      <div className="flex items-center justify-end gap-1.5 text-meta text-faint" aria-hidden="true">
+        <span>{less}</span>
+        {LEVEL_OPACITY.map((o, i) => (
+          <span
+            key={o}
+            className="size-3 rounded-[3px]"
+            style={{ background: i ? "var(--accent)" : "var(--line)", opacity: i ? o : 1 }}
+          />
+        ))}
+        <span>{more}</span>
+      </div>
+    </div>
+  );
+}
