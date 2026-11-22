@@ -25,7 +25,7 @@ null means the budget was spent, not that the record is empty.
   <img src="public/screenshots/task-log.jpg" width="720" alt="A task in todox: its status as a row of choices, where the last session left off, then the log of a decision, a dead end and a handoff, with the task's details beside it">
 </p>
 
-## How it works
+## how it works
 
 <img src="docs/how-it-works.svg" width="880" alt="The agent on your machine talks MCP to todox: it reads a briefing with get_context, writes tasks and log entries while it works, and sends the sha256 of the files it links, because the server has no copy of your code. You read the same log in the browser.">
 
@@ -36,7 +36,7 @@ repository, whichever machine or agent touched it last:
 | --- | --- |
 | <img src="public/screenshots/dashboard.jpg" width="420" alt="Today: a quick-add field, then everything in progress across every project with the last note under each, then what is up next, important first"> | <img src="public/screenshots/project.jpg" width="420" alt="A project: its tasks as a list grouped into in progress and up next, a switch to a board, and the project menu behind the three dots"> |
 
-## What goes in a log
+## what goes in a log
 
 | kind | what it means |
 | --- | --- |
@@ -46,7 +46,7 @@ repository, whichever machine or agent touched it last:
 | `handoff` | end-of-session state, written for a stranger |
 | `note` | everything else |
 
-Two things fall out of treating the log as the product:
+Three things fall out of treating the log as the product:
 
 - **Stale context is flagged, and never faked.** Linked files are hashed by the
   side that can see them — the agent — and the server stores the hashes and
@@ -57,7 +57,7 @@ Two things fall out of treating the log as the product:
 - **Reports come from the log, not from commits.** Every status change is an
   event, so *what did I finish today, how long did it take, which model did it*
   is a query rather than archaeology. A task set `doing` and walked away from
-  counts as the morning it was set, not the weeks since -- and the report
+  counts as the morning it was set, not the weeks since — and the report
   says how much it left out, rather than folding it into the headline.
 - **A file can be asked what is known about it.** The same links that carry the
   hashes are readable from the other end: `get_file_context` takes a path and
@@ -65,7 +65,7 @@ Two things fall out of treating the log as the product:
   note attached to it. Paths are folded to their repo-relative form, so a link
   made on one machine is found from another.
 
-## Why not the memory your agent already has?
+## why not the memory your agent already has?
 
 Claude Code writes its own notes now (auto memory, on by default since
 February 2026), and Cursor and Codex have theirs. Use them: they are good at
@@ -84,7 +84,7 @@ todox is for what falls outside that line:
   ends as their own kind, a report read from the log, a stale note that says
   so — and a briefing that reports what its caps left out.
 
-### Beside other memory servers
+### beside other memory servers
 
 Compared with what each project's own README says (read 2026-10-16). Where a
 README does not describe something, the cell says so rather than guessing.
@@ -102,25 +102,13 @@ They solve different problems. A knowledge graph or a notes vault is a good
 place for what is true about a person or a domain; todox is for the state of
 work in a repository, and for not repeating what already failed there.
 
-## Try it
+## try it
 
 **[todox.dev](https://www.todox.dev)** — anyone can register, with an email
 and password or with Google or GitHub. Small personal deployment, no uptime
 promise. Self-host if the log matters to you.
 
-### Meet Tod
-
-<img src="docs/mascot.svg" width="72" align="left" alt="">
-
-Tod is the prompt tile grown a body: the `>` of the old mark is the winking
-eye and the cursor is the smile, so the favicon in your tab and the creature
-on an empty page are the same thing. The yellow ribbon is a bookmark — the
-place the last session stopped. Source: [`docs/mascot.svg`](docs/mascot.svg)
-and [`app/components/mascot.tsx`](app/components/mascot.tsx); `pnpm og` and
-`pnpm favicon` rebuild the share image and `favicon.ico` from it.
-<br clear="left">
-
-## Run your own
+## run your own
 
 ```bash
 pnpm install
@@ -130,16 +118,15 @@ pnpm seed                      # optional demo account: demo / todox-demo
 pnpm dev
 ```
 
-## Connect an agent
+## connect an agent
 
 todox is a remote MCP server. There is nothing to install and no repository to
 clone: point any MCP client at the URL with an agent token.
 
 Create a token on the Account page and it hands you text you can paste straight
-into whichever agent you use, plus the config snippet for the four common ones.
-The shape is always the same — one URL, one header:
+into whichever agent you use.
 
-**Claude Code has a shorter path.** The plugin carries the server, the session
+**Claude Code: the plugin.** It carries the server, the session
 protocol as a skill, and one reminder at session start; it asks for the token
 once and keeps it in your Claude Code settings:
 
@@ -148,11 +135,11 @@ claude plugin marketplace add beydemirfurkan/todox
 claude plugin install todox@todox
 ```
 
-Everything else below still applies to it — the plugin is the same four lines,
-installed rather than pasted. See [`plugin/README.md`](plugin/README.md) for
+Everything below still applies to it — the plugin is the config and the
+habit, installed rather than pasted. See [`plugin/README.md`](plugin/README.md) for
 what it does and does not do.
 
-**Codex installs the same plugin.** One directory, two manifests: the same
+**Codex: the same plugin.** One directory, two manifests: the same
 skill and the same hook script, briefing at session start and asking once for
 the handoff at the end. Codex runs the stdio server from the release tarball
 and reads the token from your environment:
@@ -166,8 +153,10 @@ codex plugin add todox@todox
 Codex asks you to review a plugin's hooks before it runs them; until you do,
 the plugin is the MCP server alone.
 
+**Any client, by hand.** The shape is always the same — one URL, one header:
+
 ```bash
-# Claude Code. --scope user, because the default is this directory only.
+# Claude Code without the plugin. --scope user, because the default is this directory only.
 claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp \
   --header "Authorization: Bearer todox_…"
 ```
@@ -271,7 +260,7 @@ simply are not there in the next project, so the agent never mentions them.
 Spell out `"type": "http"`. A client that finds a `url` without one tends to
 assume a local command and fails with something unhelpful.
 
-### Then tell your agent to use it
+### then tell your agent to use it
 
 Connecting is not the same as being used, and the gap is bigger than it looks.
 An MCP server's `instructions` are background reading; a skill or a CLAUDE.md
@@ -298,7 +287,7 @@ pnpm install:mcp claude-code --write-memory
 ```
 
 Run in a terminal, the installer asks before writing it, with yes as the
-default -- a connected agent with no habit is the most common way todox ends up
+default — a connected agent with no habit is the most common way todox ends up
 unused. With no terminal it writes nothing unless `--write-memory` is passed,
 and `--no-write-memory` skips the question, because that file is yours rather
 than ours. It is idempotent — the block is fenced with an HTML comment, so a second run replaces
@@ -369,7 +358,7 @@ the two from disagreeing.
 The token stays out of that file — it lives in your MCP config. This is the
 habit, not the credential.
 
-### Optional: local mode
+### optional: local mode
 
 The hosted server has no filesystem — but your agent does, and that is enough:
 it sends the hash when it links a file (which counts as a check, so the link
@@ -417,7 +406,7 @@ server-side ever finds its way into the tool surface again.
 From a clone, `pnpm -C /path/to/todox mcp` still works and is what to use when
 you are changing the tools themselves.
 
-### Optional: a git hook, for any client
+### optional: a git hook, for any client
 
 The briefing's `observations` section — what git did while an earlier session
 ran — needs something on your machine to watch. The stdio server and the
@@ -438,7 +427,7 @@ for that project in the last half hour. `hook status` says what is installed,
 `hook uninstall` takes out only its own block. Repositories that commit their
 hooks (husky, lefthook) are not edited; it prints the line to add instead.
 
-### Tools
+### tools
 
 | tool | what it does |
 | --- | --- |
@@ -457,7 +446,7 @@ hooks (husky, lefthook) are not edited; it prints the line to add instead.
 | `get_file_context` | What is known about one file: the tasks that touched it with their dead ends, and the notes attached to it, each with its link (id, hash, status). `linked:false` when there is nothing. Absolute or repo-relative; both find a link made on another machine. |
 | `session_status` | **Call before finishing.** The tasks you changed or wrote on in this project within the last 12 hours (any status), each with whether a handoff was written since the last thing you did there — plus tasks left `doing` for 7+ days with nothing logged. Ids, titles, dates and one boolean; the `hint` says what each list still needs. The wrap-up rule asks for a handoff on every task touched, and this is the list it assumed the agent would remember. |
 | `update_context` · `delete_context` | Correct a note that turned out wrong. A log that can only be added to stops being worth reading. |
-| `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier.  Words that only one of the two languages treats as noise are dropped, so a question does not match every record containing the word "a". `kinds` narrows to dead ends or decisions; `project` stops it looking elsewhere. Ask in the language the log is written in — it stems, it does not translate — and if a sentence finds nothing, retry with the distinctive identifiers alone (3+ characters; shorter ones match as whole words only). |
+| `search` | Across all your projects, ranked by relevance. Ask the question in words; quote a phrase to require it. Stems English and Turkish, and still matches the middle of an identifier. Words that only one of the two languages treats as noise are dropped, so a question does not match every record containing the word "a". `kinds` narrows to dead ends or decisions; `project` stops it looking elsewhere. Ask in the language the log is written in — it stems, it does not translate — and if a sentence finds nothing, retry with the distinctive identifiers alone (3+ characters; shorter ones match as whole words only). |
 | `get_task` | One task with its log and linked files. |
 | `list_tasks` · `list_projects` | The plain lists, when `get_context` is more than you need. Projects are newest-activity-first and carry `activity_at`. |
 | `create_project` · `update_project` | Rarely needed: `create_task` with a `cwd` registers one. A path or remote that is already registered returns that project rather than a twin. A summary is worth adding. |
@@ -468,7 +457,7 @@ Every write tool takes a `model`, and the server instructions tell the agent to
 always pass it. That is what makes the per-model breakdown real rather than
 guessed.
 
-### Prompts
+### prompts
 
 Three, because there are three moments this is for. They show up in your
 client's own menu, so you can see what the server does without reading
@@ -480,7 +469,7 @@ anything:
 | `wrap_up` | before finishing — leave a handoff, and the dead ends especially |
 | `standup` | when somebody asks what got done |
 
-## Deploying
+## deploying
 
 A container and a Postgres beside it. `docker-compose.yml` at the root is that,
 assembled — the database publishes no port at all and is reachable only over
@@ -517,33 +506,12 @@ That is also why the image keeps its dev dependencies instead of using Next's
 `scripts/`, and a database that is deliberately unreachable from the internet
 can only be migrated from something already inside the network.
 
-### Knowing it actually deployed
+A merge is not a deploy. The image tag is the git sha, so
+`docker inspect <container> --format '{{.Config.Image}}'` against
+`git rev-parse origin/main` says whether the code you are reading is the code
+that is running.
 
-A merge is not a deploy, and the gap between them is silent: nothing errors,
-the site stays up, and the only symptom is that a fix you watched go green is
-not the one people are running. On 2026-09-05 this instance served code two
-days and fifty-six commits old, and the thing that made it visible was looking
-rather than anything reporting it.
-
-The image tag is the git sha and the container name changes on every deploy, so
-one line answers it:
-
-```bash
-docker inspect <container> --format '{{.Config.Image}}'
-```
-
-Compare that against `git rev-parse origin/main`. If they differ, the code you
-are reading is not the code that is running.
-
-Automatic deploys are worth wiring up, and worth checking after you do. A
-platform that pulls on a webhook can have the switch on and still never fire,
-because the switch and the webhook are two settings in two places: this
-instance had auto-deploy enabled for weeks while the repository had no webhook
-at all, so nothing was ever told to look. After wiring one, confirm from the
-sending side — the delivery log — rather than from the switch, because a
-webhook pointed at the wrong path answers cheerfully and does nothing.
-
-## Taking your data with you
+## taking your data with you
 
 The Account page has a **Download my data** button, and `/api/export` answers
 the same file to a bearer token — so an agent can write the backup without the
@@ -563,7 +531,7 @@ whose slug is taken arrives under the next free one. Task events come across
 too, so durations in a report on the restored copy say what they said on the
 original.
 
-## Security
+## security
 
 Passwords are scrypt; sessions, agent tokens and email links are stored as
 hashes only. Ownership is enforced in one module, and a row belonging to someone
@@ -573,48 +541,36 @@ the database, so they hold across instances.
 Details, and an honest list of what is **not** covered, in
 [SECURITY.md](SECURITY.md).
 
-## Known gaps
+## known gaps
 
-- Search's substring half is indexed only where the database allows it. The
-  two halves are asked separately and merged, which is what lets either use an
-  index at all — measured on 110k rows, a search went from 5.7s to 0.16s on the
-  full-text arm alone. The `ILIKE` arm that finds identifiers full-text cannot
-  needs `pg_trgm`; `pnpm db:migrate` creates the extension and its five indexes
-  where the role may, and says so either way. Where it may not — a Postgres
-  without contrib, a managed service that refuses extensions — that arm stays
-  a sequential scan and `pnpm smoke:search` prints `SKIP` for it rather than
-  failing. The `postgres:18` image in `docker-compose.yml` has it.
+- Search finds identifiers through `pg_trgm`. `pnpm db:migrate` creates it
+  where the database role may; where it may not (a Postgres without contrib),
+  that half of search falls back to a sequential scan. The `postgres:18` image
+  in `docker-compose.yml` has it.
 - Staleness is per-file hash; per-symbol would be the honest version. Hosted,
   it depends on the agent actually sending hashes — the instructions ask, and
   nothing can make it.
-- Coverage sits around 39%, and the shape matters more than the number: the
-  agent surface, the auth boundary and the repositories that answer "is this
-  yours" are covered, while much of the UI is not.
+- Tests cover the agent surface, the auth boundary and the repositories that
+  answer "is this yours"; much of the UI is checked by eye, not by test.
 - Observations see what git can tell them and which task a session set to
-  `doing`, so they answer "what changed" and "on what" — and never "why". The
-  half that carries reasoning is a transcript, and the only hook API that
-  exposes one belongs to a single client.
+  `doing`, so they answer "what changed" and "on what" — never "why". They
+  also need a process on your machine (the Claude Code plugin, `npx
+  todox-mcp`, or the git hook): connected to `/api/mcp` alone, the section
+  stays empty.
 - The briefing's byte budget covers log bodies, note bodies and task bodies.
   One axis is still bounded only by a row count: the *heads* of carried
   entries and tasks, fifty tasks' worth. It is far smaller than what the
   budgets fixed — one project went from 143 KB to about 55 KB on the log
   alone — but it is not bounded in bytes, and `pnpm bench:memory` prints it
   so the next reader does not have to discover it.
-- **Observations need a process on your machine.** Watching git means running
-  where the checkout is, and the hosted endpoint does not. Three things do: the
-  Claude Code plugin's hooks (at Stop and SessionEnd), `npx todox-mcp`, and the
-  git hook (`todox-mcp hook install`, per repository, at each commit) — all
-  counts and three commit subjects, never a diff. Connected to `/api/mcp` from
-  any other client with none of them installed, the `observations` section
-  stays empty, and the git hook sees commits, not uncommitted work in progress.
 - No 2FA, no per-session revocation, no audit log.
 - Share links are unlisted, not access-controlled.
-- No keyboard navigation beyond `/` for search.
+- Search opens with `/` or ⌘K; lists have no keyboard navigation yet.
 
-## Cutting a release
+## cutting a release
 
 ```bash
-git tag v0.1.6 && git push origin v0.1.6
+git tag vX.Y.Z && git push origin vX.Y.Z    # the version in package.json
 ```
 
 That is the procedure. The workflow checks the tag against `package.json`,
@@ -631,7 +587,7 @@ the local-mode section above.
 `server-json.test.ts` holds it there, so the tag, the package and the registry
 move together or the release stops.
 
-## Contributing
+## contributing
 
 The rules the codebase actually follows, and how to run the checks:
 [CONTRIBUTING.md](CONTRIBUTING.md).
