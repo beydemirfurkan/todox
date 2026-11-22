@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { OPEN_STATUSES } from "@/lib/constants";
 import { getT, getTz } from "@/lib/lang";
+import type { Lang, T } from "@/lib/i18n";
 import { currentUser } from "@/lib/session";
+import type { PublicUser } from "@/lib/types";
 import * as apiTokens from "@/lib/repositories/api-tokens";
 import * as contexts from "@/lib/repositories/contexts";
 import * as entriesRepo from "@/lib/repositories/entries";
@@ -15,6 +18,7 @@ import { accountProjects } from "./account-projects";
 import { clearEmptyProjectAction } from "./actions";
 import { IconTile, WaitingList } from "./components";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
+import { PageSkeleton } from "./components/page-skeleton";
 import { projectColor } from "./components/project-color";
 import { QuickAdd } from "./components/quick-add";
 import { TaskRow, TaskSection } from "./components/task-row";
@@ -50,7 +54,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-
 export default async function Home() {
   const { t, lang } = await getT();
   const user = await currentUser();
@@ -67,6 +70,17 @@ export default async function Home() {
         <Landing t={t} />
       </>
     );
+  // Its own boundary, so a click on Today shows the page's shape at once
+  // instead of waiting for nine queries. Not a `loading.tsx`: one at the root
+  // would flash a skeleton over the landing page and every marketing page too.
+  return (
+    <Suspense fallback={<PageSkeleton label={t("loadingPage")} />}>
+      <Today user={user} t={t} lang={lang} />
+    </Suspense>
+  );
+}
+
+async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) {
   const [{ projects: allProjects, counts }, connected] = await Promise.all([
     // Shared with the sidebar through `cache`, so this is not a second query.
     accountProjects(user.id),

@@ -677,6 +677,8 @@ export const tr: Record<Key, string> = {
     "Sahipsiz diye işaretlenen süre, görev `doing`'deyken log'da kimsenin orada olduğunu gösteren hiçbir şeyin bulunmadığı süredir: uçuşa alınıp bırakılmış bir görev. Buradaki hiçbir sayıya girmez. Bir günün altındaki aralık bütünüyle sayılır; daha uzununda her kaydın ve durum değişikliğinin dört saat öncesi ve sonrası sayılmaya devam eder. Durduğunda görevi `todo` ya da `blocked`'a geri çekmek, sayıyı dürüst tutan şeydir.",
   copyReport: "markdown olarak kopyala",
   reportCopied: "kopyalandı",
+  reportCopyFailed: "kopyalanamadı",
+  reportPreviewFailed: "Önizleme yüklenemedi. Kapatıp yeniden deneyin.",
   reportForManager:
     "Markdown kopyası, doğrudan bir duruma güncellemesine yapıştırılacak şekilde yazıldı.",
 
