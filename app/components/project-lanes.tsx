@@ -29,8 +29,7 @@ import { StatusDot } from "./status";
 const taskHref = (slug: string, taskId: number) =>
   `${boardHref(slug, { task: taskId, view: "task" })}#panel`;
 
-const LANE_STATUSES = ["todo", "doing", "blocked"] as const satisfies readonly Status[];
-type LaneStatus = (typeof LANE_STATUSES)[number];
+type LaneStatus = Extract<Status, "todo" | "doing" | "blocked">;
 
 /** Tasks a card lists; the bar and the numbers cover the rest. */
 const CARD_TASKS = 4;
