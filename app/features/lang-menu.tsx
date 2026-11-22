@@ -1,22 +1,22 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { LANGS, LANG_NAME, type Lang } from "@/lib/i18n";
 import { setLangAction } from "../actions";
-import { Flag } from "./flag";
+import { useDismiss } from "./use-dismiss";
 
 /**
- * The language switcher, as a popup rather than a native select.
+ * The language switcher: a quiet button with a globe and the language's code,
+ * opening the same panel as every other menu in the app.
  *
- * It borrows the navbar menu wholesale — trigger, panel, item, the same
- * `aria-haspopup`, escape and click-outside — because there are now two
- * dropdowns in that row and they should not be two different things.
+ * It used to be a bordered pill with a flag in it. A flag is a country, not a
+ * language, and English is not one country's; the pill was also the only
+ * control in the header drawn that way. The code is short enough for a phone,
+ * and the panel names each language in full.
  *
- * A flag is a country, not a language, and English is not one country's. So
- * the flag never stands alone: the name sits beside it everywhere except the
- * trigger on a narrow screen, where the panel is one tap away and says both.
+ * Choosing is still a plain form post, with a `<noscript>` path.
  */
 export function LangMenu({
   lang,
@@ -28,69 +28,37 @@ export function LangMenu({
   label: string;
   switchingLabel: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      // The root itself is the dim behind a sheet on a phone (its ::after),
-      // so a tap that lands on it is a tap outside the menu.
-      if (e.target === rootRef.current || !rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const close = useCallback(() => setIsOpen(false), []);
+  useDismiss({ isOpen, rootRef, triggerRef, close });
 
   return (
     <div className="user-menu lang-menu" ref={rootRef}>
       <button
         ref={triggerRef}
         type="button"
-        className="user-menu-trigger"
+        className="lang-menu-trigger"
+        aria-label={`${label}: ${LANG_NAME[lang]}`}
         aria-haspopup="menu"
-        aria-expanded={open}
+        aria-expanded={isOpen}
         aria-controls={menuId}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setIsOpen((value) => !value)}
       >
-        <span className="sr-only">{label}</span>
-        <Flag lang={lang} />
-        <span className="lang-menu-name" aria-hidden="true">
-          {LANG_NAME[lang]}
-        </span>
-        <Chevron open={open} />
+        <GlobeIcon />
+        <span aria-hidden="true">{lang.toUpperCase()}</span>
       </button>
 
-      <div
-        id={menuId}
-        className="user-menu-panel"
-        role="menu"
-        data-state={open ? "open" : "closed"}
-      >
-        {/* Still a plain form posting to a server action, so choosing a
-            language is one request and needs nothing from this component
-            beyond opening the panel. */}
+      <div id={menuId} className="user-menu-panel lang-menu-panel" role="menu" data-state={isOpen ? "open" : "closed"}>
         <form action={setLangAction} className="contents">
           {LANGS.map((l) => (
-            <LangItem key={l} lang={l} active={l === lang} switchingLabel={switchingLabel} />
+            <LangItem key={l} lang={l} isActive={l === lang} switchingLabel={switchingLabel} />
           ))}
         </form>
       </div>
 
-      {/* Scripting off means no panel, so the plain choice is still rendered.
-          It was a `<noscript>` submit before this and it stays one. */}
       <noscript>
         <form action={setLangAction} className="flex gap-1.5">
           {LANGS.map((l) => (
@@ -105,61 +73,57 @@ export function LangMenu({
 }
 
 /**
- * Its own component because `useFormStatus` only reports for the form it is
- * rendered inside, and `data` is what tells the two buttons apart — without it
- * both would go busy when either is pressed, which on a phone connection reads
- * as having tapped the wrong one.
+ * Its own component because `useFormStatus` reports for the form it sits in,
+ * and `data` is what tells the two items apart while one is switching.
  */
 function LangItem({
   lang,
-  active,
+  isActive,
   switchingLabel,
 }: {
   lang: Lang;
-  active: boolean;
+  isActive: boolean;
   switchingLabel: string;
 }) {
   const { pending, data } = useFormStatus();
-  const switching = pending && data?.get("lang") === lang;
+  const isSwitching = pending && data?.get("lang") === lang;
 
   return (
     <button
       name="lang"
       value={lang}
       type="submit"
-      role="menuitem"
-      className="user-menu-item"
-      // Never disabled, including the one already chosen: a dead control is
-      // indistinguishable from a missed tap, and it leaves the tab order.
-      aria-current={active ? "true" : undefined}
-      aria-busy={switching}
+      role="menuitemradio"
+      aria-checked={isActive}
+      lang={lang}
+      className="user-menu-item lang-menu-item"
+      aria-busy={isSwitching}
     >
-      <Flag lang={lang} />
-      <span>{LANG_NAME[lang]}</span>
-      {switching && <span className="sr-only"> — {switchingLabel}</span>}
+      <span className="flex-1">{LANG_NAME[lang]}</span>
+      {isActive && <CheckIcon />}
+      {isSwitching && <span className="sr-only"> — {switchingLabel}</span>}
     </button>
   );
 }
 
-function Chevron({ open }: { open: boolean }) {
+function GlobeIcon() {
   return (
-    <svg
-      className="chev"
-      width="10"
-      height="7"
-      viewBox="0 0 12 8"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-      data-open={open ? "true" : "false"}
-    >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
       <path
-        d="M1 1.5 6 6.5 11 1.5"
+        d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"
         stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
+        strokeWidth="1.7"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+      <path d="m5 12.5 4.5 4.5L19 7.5" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

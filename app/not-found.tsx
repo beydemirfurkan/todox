@@ -16,14 +16,14 @@ export default async function NotFound() {
 
   return (
     <AuthShell
-      fill="var(--k-question)"
       mood="puzzled"
       title={t("notFoundTitle")}
       intro={t("notFoundBody")}
-    >
-      <Link href="/" className="btn block text-center">
-        {t("backHome")}
-      </Link>
-    </AuthShell>
+      footer={
+        <Link href="/" className="btn">
+          {t("backHome")}
+        </Link>
+      }
+    />
   );
 }

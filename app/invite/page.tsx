@@ -27,7 +27,7 @@ export default async function InvitePage({
   const invitation = token ? await invitations.byToken(token, new Date().toISOString()) : null;
   if (!invitation)
     return (
-      <AuthShell fill="var(--k-dead_end)" title={t("inviteInvalidTitle")}>
+      <AuthShell mood="puzzled" title={t("inviteInvalidTitle")}>
         <p className="text-[15px] text-muted">{t("inviteInvalidBody")}</p>
         <Link href="/account?tab=invites" className="btn mt-4 block text-center">
           {t("viewInvites")}

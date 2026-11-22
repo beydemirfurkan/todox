@@ -19,6 +19,10 @@ Every visible string comes from `lib/i18n/`. There is no library and no
   browser sends `tr` and is negotiated to Turkish. Write the Turkish properly —
   full orthography, real diacritics. Do not machine-translate it: it is a
   first-class language here, not a translation of the English.
+- **Labels and headings are lowercase** (the project's first rule of tone):
+  "where it left off", "kaldığı yer". A sentence ending in a full stop keeps
+  its capital; a name keeps its own (GitHub, MCP, Türkçe). In Turkish mind the
+  dotted and dotless i: "İşlemler" becomes "işlemler", "I" becomes "ı".
 - Keep a new key next to the ones it belongs with; both files are grouped by
   area (`/* chrome */`, `/* auth */`, …) and in the same order.
 

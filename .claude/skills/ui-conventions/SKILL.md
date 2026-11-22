@@ -63,7 +63,7 @@ year of days; wide, so it sits in an `overflow-x-auto` box with a
 `publish` for account-wide notes). Client-side pieces: `app/features/`. The board's
 drag-and-drop is `app/p/[slug]/board-dnd.tsx`.
 
-## The look, in six rules
+## The look, in seven rules
 
 A developer tool, dark only (task #811, 2026-11-22): near-black graphite,
 surfaces one step up, hairlines instead of shadows, one orange.
@@ -86,6 +86,15 @@ surfaces one step up, hairlines instead of shadows, one orange.
   times, headings in `.display` without `font-bold` (the class sets the
   weight). A number a person scans for is a badge in `StatBadges`, never a big
   tile: a summary costs one line of the screen.
+- **Interface text is lowercase.** Headings, page titles, nav, tabs, buttons,
+  labels and menu items start with a small letter, in both languages:
+  "today", "where it left off", "sign out", "bugün", "çıkış yap". The rule
+  lives in the dictionaries, never in `text-transform`: CSS would also
+  lowercase what people wrote (a project called "Example Service", a task
+  title), and those stay as typed. Full sentences that end in a full stop
+  keep their capital, and so do names (Google, GitHub, MCP, English,
+  Türkçe). No `uppercase` either -- section labels are lowercase like the
+  rest.
 - **The panel is for people.** Agents never look at it. Every state a person
   needs to act on is visible without opening anything, and everything an
   agent can do to a task a person can do too -- the board's cards move by drag

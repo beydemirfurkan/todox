@@ -42,14 +42,14 @@ export default function Error({
 
   return (
     <AuthShell
-      fill="var(--k-dead_end)"
       mood="puzzled"
       title={t("errorTitle")}
       intro={t("errorBody")}
-    >
-      <button type="button" onClick={reset} className="btn w-full">
-        {t("errorRetry")}
-      </button>
-    </AuthShell>
+      footer={
+        <button type="button" onClick={reset} className="btn">
+          {t("errorRetry")}
+        </button>
+      }
+    />
   );
 }
