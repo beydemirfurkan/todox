@@ -17,8 +17,27 @@ export const CONTEXT_KINDS = [
   "convention",
   "gotcha",
   "preference",
+  "profile",
+  "stack",
+  "workflow",
 ] as const;
 export type ContextKind = (typeof CONTEXT_KINDS)[number];
+
+/**
+ * The kinds that describe the developer rather than a codebase: who they are,
+ * what they build with, how they like to work. Account-wide only -- "who I am"
+ * inside one project is a contradiction, and keeping them out of projects is
+ * what lets every briefing carry them whole without asking which project wins.
+ */
+export const DEVELOPER_KINDS = ["profile", "stack", "workflow"] as const;
+export type DeveloperKind = (typeof DEVELOPER_KINDS)[number];
+
+/** The kinds a project note can be. */
+export const PROJECT_CONTEXT_KINDS = ["decision", "convention", "gotcha", "preference"] as const;
+
+export function isDeveloperKind(value: unknown): value is DeveloperKind {
+  return typeof value === "string" && (DEVELOPER_KINDS as readonly string[]).includes(value);
+}
 
 /**
  * What a notification can be about.

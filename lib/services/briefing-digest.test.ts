@@ -31,6 +31,7 @@ function task(id: number, status: string, extra: Partial<Briefing["open_tasks"][
 function briefingWith(overrides: Partial<Briefing> = {}): Briefing {
   return {
     project: { slug: "repo", name: "repo", root_path: "/repo", summary: "A repository." },
+    developer: [],
     global_context: [],
     project_context: [],
     context_omitted: 0,
@@ -129,5 +130,20 @@ describe("the briefing digest", () => {
     );
     expect(digest.text).toContain("[convention] Use tx() (note 5)");
     expect(digest.text).toContain("- #1 (entry 9, 2026-11-20): Which port?");
+  });
+
+  it("opens with who the developer is, bodies and all, before any rule", () => {
+    const { text } = renderDigest(
+      briefingWith({
+        developer: [
+          { id: 7, kind: "profile", title: "Who", body: "Backend developer,\nwrites Turkish.", created_at: "", updated_at: "" },
+          { id: 8, kind: "stack", title: "Tools", body: null, created_at: "", updated_at: "" },
+        ],
+        global_context: [{ id: 1, kind: "gotcha", title: "A rule", body: null, created_at: "", updated_at: "" }],
+      } as unknown as Partial<Briefing>),
+    );
+    expect(text).toContain("- [profile] Who: Backend developer, writes Turkish.");
+    expect(text).toContain("- [stack] Tools (note 8)");
+    expect(text.indexOf("[profile]")).toBeLessThan(text.indexOf("A rule"));
   });
 });

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   pageByProject: vi.fn(),
   staleDoing: vi.fn(),
   pageNotes: vi.fn(),
+  developerNotes: vi.fn(async () => ({ rows: [], omitted: 0 })),
   pageByTasksPerKind: vi.fn(),
   countsByTasks: vi.fn(),
   listRefs: vi.fn(),
@@ -26,7 +27,10 @@ vi.mock("../repositories/tasks", () => ({
   pageByProject: mocks.pageByProject,
   staleDoing: mocks.staleDoing,
 }));
-vi.mock("../repositories/contexts", () => ({ pageByProject: mocks.pageNotes }));
+vi.mock("../repositories/contexts", () => ({
+  pageByProject: mocks.pageNotes,
+  developerNotes: mocks.developerNotes,
+}));
 vi.mock("../repositories/entries", () => ({
   pageByTasksPerKind: mocks.pageByTasksPerKind,
   countsByTasks: mocks.countsByTasks,

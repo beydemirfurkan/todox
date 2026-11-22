@@ -205,6 +205,15 @@ const BRIEFING_NOTES_FOCUSED = 25;
  * bench:memory` prints the curve these were read off.
  */
 const BRIEFING_NOTE_BYTES = 8_192;
+
+/**
+ * The developer's profile, stack and workflow notes, carried whole at the top
+ * of every briefing in every project -- the part that lets an agent that has
+ * never met this person work the way they do. Its own budget, apart from the
+ * notes', so a long rulebook cannot push the person out and a long profile
+ * cannot push the rules out.
+ */
+export const BRIEFING_DEVELOPER_BYTES = 2_048;
 const BRIEFING_NOTE_BYTES_FOCUSED = 6_144;
 
 /**
@@ -313,7 +322,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const liveIds = live.map((t) => t.id);
   const idleIds = idle.map((t) => t.id);
 
-  const [globalContext, projectContext, logs, idleHandoffs, counts, files, observed, sameName] =
+  const [globalContext, projectContext, logs, idleHandoffs, counts, files, observed, sameName, developer] =
     await Promise.all([
       contexts.pageByProject(userId, null, notes, noteBytes, focus),
       contexts.pageByProject(userId, project.id, notes, noteBytes, focus),
@@ -342,6 +351,8 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // production that is two live pairs, one of them a project with twelve open
     // tasks beside a namesake with one.
     projects.listByName(userId, project.name),
+    // Ninth, and the same round trip: who the developer is.
+    contexts.developerNotes(userId, BRIEFING_DEVELOPER_BYTES),
   ]);
 
   const bodies = budgetBodies(live, BRIEFING_TASK_BYTES);
@@ -451,12 +462,18 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * what to do; this is the field a program can read.
      */
     ...(project.summary?.trim() ? {} : { summary_missing: true }),
+    /**
+     * Who the developer is -- profile, stack, workflow -- before anything about
+     * the code. Ids ride along so a body left out can be fetched with
+     * get_context_note; `is_public` does not, it is the person's business.
+     */
+    developer: developer.rows.map(({ is_public: _private, ...note }) => note),
     global_context: globalContext.rows,
     project_context: projectContext.rows,
     // One number for both scopes: an agent reads it to decide whether to go
     // looking, and which of the two lists a title sits in is already visible
     // from the lists themselves.
-    context_omitted: globalContext.omitted + projectContext.omitted,
+    context_omitted: globalContext.omitted + projectContext.omitted + developer.omitted,
     // Which of the two orderings the notes above came back in, because the
     // agent cannot tell by looking and the answer changes what a missing body
     // means. Ranked: what you asked about is at the top and the rest is the
@@ -522,7 +539,11 @@ export async function briefing(userId: number, project: Project, focus?: string)
      * relevant ones or merely the newest.
      */
     log_ranked_by: focus ? "focus" : "recency",
-    hint: closingHint(allOpen, staleDoing, project),
+    hint: closingHint(allOpen, staleDoing, {
+      slug: project.slug,
+      summary: project.summary,
+      knowsDeveloper: developer.rows.length > 0,
+    }),
   };
 }
 
@@ -589,7 +610,7 @@ function duplicateOf(
 function closingHint(
   openTasks: { id: number; last_handoff: object | null }[],
   stale: { rows: { id: number }[]; total: number },
-  project: { slug: string; summary: string | null },
+  project: { slug: string; summary: string | null; knowsDeveloper: boolean },
 ): string {
   const naked = openTasks.filter((t) => t.last_handoff === null);
   const always =
@@ -612,6 +633,15 @@ function closingHint(
     lines.push(
       `This project has no summary: update_project(project:'${project.slug}', ` +
         `summary:'one or two sentences on what this repository is'), once you know.`,
+    );
+  // Said only while nothing is known: one agent that learns how this person
+  // works and writes it down saves every later agent, in every project, from
+  // learning it again.
+  if (!project.knowsDeveloper)
+    lines.push(
+      "Nothing is recorded about this developer yet. When you learn who they are, what " +
+        "they build with or how they like to work, add_context(kind:'profile'|'stack'|" +
+        "'workflow') with no project, so every agent in every project starts knowing it.",
     );
   if (naked.length)
     lines.push(

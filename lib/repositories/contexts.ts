@@ -1,4 +1,4 @@
-import type { ContextKind } from "../constants";
+import { DEVELOPER_KINDS, type ContextKind } from "../constants";
 import { all, one, run, setClause, type Statement } from "../db/client";
 import { document, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
 import type { Context } from "../types";
@@ -156,9 +156,11 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
       ? ``
       : `JOIN projects p ON p.id = c.project_id
          LEFT JOIN project_memberships pm ON pm.project_id = p.id AND pm.user_id = ?`;
+  // The developer's own notes are read by `developerNotes`, with a budget of
+  // their own, so they are left out here rather than paid for twice.
   const where =
     scope === "account"
-      ? `c.user_id = ? AND c.project_id IS NULL`
+      ? `c.user_id = ? AND c.project_id IS NULL AND c.kind NOT IN (${DEVELOPER_KIND_LIST})`
       : `c.project_id = ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)`;
 
   const doc = document("contexts", "c");
@@ -197,6 +199,46 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
      SELECT id, kind, title, created_at, updated_at,
             CASE WHEN rn <= ? AND coalesce(spent_before, 0) < ? THEN body END AS body
        FROM spent ORDER BY rn`;
+}
+
+const DEVELOPER_KIND_LIST = DEVELOPER_KINDS.map((k) => `'${k}'`).join(", ");
+
+/**
+ * Who the developer is: their profile, stack and workflow notes, for the top
+ * of every briefing and for `get_developer`.
+ *
+ * Profile first, then stack, then workflow, newest first inside each, with
+ * bodies only while `budgetBytes` lasts -- the same whole-or-nothing charge as
+ * `pageByProjectSql`, so a long profile cannot crowd out the project.
+ */
+export const developerNotesSql = `
+  WITH ranked AS (
+    SELECT id, kind, title, body, created_at, updated_at, is_public,
+           row_number() OVER (
+             ORDER BY CASE kind WHEN 'profile' THEN 0 WHEN 'stack' THEN 1 ELSE 2 END,
+                      updated_at DESC, id DESC
+           ) AS rn
+      FROM contexts
+     WHERE user_id = ? AND project_id IS NULL AND kind IN (${DEVELOPER_KIND_LIST})
+  ),
+  spent AS (
+    SELECT *, SUM(octet_length(body)) OVER (
+                ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+              ) AS spent_before
+      FROM ranked
+  )
+  SELECT id, kind, title, created_at, updated_at, is_public,
+         CASE WHEN coalesce(spent_before, 0) < ? THEN body END AS body
+    FROM spent ORDER BY rn`;
+
+export type DeveloperNote = BriefingNote & { is_public: boolean };
+
+export async function developerNotes(
+  userId: number,
+  budgetBytes: number,
+): Promise<{ rows: DeveloperNote[]; omitted: number }> {
+  const rows = await all<DeveloperNote>(developerNotesSql, [userId, budgetBytes]);
+  return { rows, omitted: rows.filter((r) => r.body === null).length };
 }
 
 /**
@@ -272,6 +314,14 @@ export async function create(input: NewContext): Promise<Context> {
   const row = await one<Context>(stmt.text, stmt.params);
   return row!;
 }
+
+/**
+ * Whether an account-wide note is on the public profile. `project_id IS NULL`
+ * is in the statement, not left to the caller: a project note must never be
+ * publishable, even by a caller that forgot to check.
+ */
+export const setPublic = (id: number, isPublic: boolean) =>
+  run("UPDATE contexts SET is_public = ? WHERE id = ? AND project_id IS NULL", [isPublic, id]);
 
 const COLUMNS = ["kind", "title", "body"] as const;
 

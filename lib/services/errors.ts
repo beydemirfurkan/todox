@@ -37,6 +37,8 @@ export type RefusalReason =
   | "no_project"
   /** A path nobody could show was a repository, so nothing was registered. */
   | "no_evidence"
+  /** A developer note (profile, stack, workflow) aimed at a project. */
+  | "developer_kind_in_project"
   | "other";
 
 /**

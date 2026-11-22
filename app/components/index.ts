@@ -9,6 +9,7 @@ export { Composer } from "./composer";
 export { Group } from "./group";
 export { MarkdownPreview } from "./markdown-preview";
 export { NoteGroups } from "./note-list";
+export { BrainMap } from "./brain-map";
 export { Empty, Panel } from "./panel";
 export { Progress, ProjectLanes, WaitingList, type ProjectLane } from "./project-lanes";
 export { ProjectFields, ProjectRow, type ProjectCountRow } from "./project-list";

@@ -1,4 +1,4 @@
-import type { ContextKind, EntryKind, Status } from "../constants";
+import { isDeveloperKind, type ContextKind, type EntryKind, type Status } from "../constants";
 import * as apiTokensRepo from "../repositories/api-tokens";
 import * as contextsRepo from "../repositories/contexts";
 import * as entriesRepo from "../repositories/entries";
@@ -9,6 +9,7 @@ import * as tasksRepo from "../repositories/tasks";
 import * as toolUsage from "../repositories/tool-usage";
 import { briefing } from "./briefing";
 import { renderDigest, type Briefing } from "./briefing-digest";
+import { developerBrief, renderDeveloper } from "./developer";
 import { fileContext } from "./file-context";
 import { BadRequest } from "./errors";
 import { addContext } from "./context-service";
@@ -62,6 +63,18 @@ export type Carrier = (typeof CARRIERS)[number];
 export type RpcContext = { userId: number; token?: string; carrier?: Carrier };
 
 type Handler = (ctx: RpcContext, params: Record<string, never>) => Promise<unknown>;
+
+/**
+ * A profile, stack or workflow note describes the developer, so it lives
+ * account-wide, where every project's briefing carries it. The refusal says
+ * what to send instead rather than quietly dropping the project.
+ */
+const developerKindInProject = (kind: string) =>
+  new BadRequest(
+    `a ${kind} note describes the developer, not a project: omit project and cwd ` +
+      "to write it account-wide, or use convention/preference for a project rule",
+    "developer_kind_in_project",
+  );
 
 const pickRef = (p: { project?: string; cwd?: string }) => {
   const ref = p.project ?? p.cwd;
@@ -472,6 +485,11 @@ export const methods = {
     return fileContext(userId, project, p.path);
   },
 
+  getDeveloper: async ({ userId }, p: { shape?: "text" | "full" }) => {
+    const brief = await developerBrief(userId);
+    return p.shape === "full" ? brief : { text: renderDeveloper(brief) };
+  },
+
   getContextNote: async ({ userId }, p: { context_id: number }) => {
     // Same guard as the write paths, for the same reason: `contexts.byId`
     // takes no user id, so this is the only thing between an id off the wire
@@ -492,6 +510,7 @@ export const methods = {
     },
   ) => {
     const ref = p.project ?? p.cwd;
+    if (ref && isDeveloperKind(p.kind)) throw developerKindInProject(p.kind);
     const projectId = ref ? (await mustResolve(userId, ref)).id : null;
     // A note inside a shared project, not the project row: a member who can
     // already open tasks and log entries here can write one. This asserted
@@ -519,6 +538,8 @@ export const methods = {
     // `contexts.update` takes no user id -- this is the only thing standing
     // between a context id off the wire and somebody else's note.
     await assertContext(userId, id);
+    if (isDeveloperKind(patch.kind) && (await contextsRepo.byId(id))?.project_id != null)
+      throw developerKindInProject(patch.kind);
     await contextsRepo.update(id, patch);
     return contextsRepo.byId(id);
   },

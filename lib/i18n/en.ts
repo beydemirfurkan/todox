@@ -94,6 +94,37 @@ export const en = {
   langSwitching: "switching language…",
   breadcrumb: "Breadcrumb",
   navReport: "Report",
+  navBrain: "Brain",
+  metaTitleBrain: "Your brain — todox",
+  brainTitle: "Your brain",
+  brainLede:
+    "What every agent reads about you before it starts, in every project and with any model: who you are, what you build with, how you work, and the rules you keep everywhere. Agents write here as they learn; you correct it.",
+  brainProfile: "Who you are",
+  brainProfileHint: "Role, languages you speak and write, what you are working towards.",
+  brainStack: "What you build with",
+  brainStackHint: "Languages, frameworks, tools, and what you reach for first.",
+  brainWorkflow: "How you work",
+  brainWorkflowHint: "How you like changes made, reviewed, explained and shipped.",
+  brainSectionEmpty: "Nothing yet. Write it here, or an agent will add it when it learns.",
+  brainAdd: "Add",
+  brainRules: "Rules in every project",
+  brainRulesSub: "Conventions, gotchas and preferences that hold wherever you work.",
+  brainMapTitle: "Where your thinking is",
+  brainMapSub:
+    "The last {n} days. A project grows with what was written there; its line thickens with what is still open; the dots are decisions, dead ends and questions.",
+  brainMapEmpty: "No project has open work or anything written in the last {n} days.",
+  brainMapRow:
+    "{entries} entries · {open} open · {decisions} decisions · {deadEnds} dead ends · {questions} questions",
+  brainAgentView: "What an agent reads",
+  brainAgentViewSub:
+    "get_developer answers with exactly this, with no project needed. Every get_context briefing opens with the three sections above.",
+  brainCardTitle: "Your brain",
+  brainCardBody: "What every agent reads about you first, in every project.",
+  brainOpen: "Open",
+  brainYou: "you",
+  brainNotesCount: "notes about you",
+  brainRulesCount: "rules everywhere",
+
   notifications: "Notifications",
   notificationsLabel: "Notifications, {n} unread",
   notificationsNone: "Nothing new.",
@@ -318,10 +349,13 @@ export const en = {
   projectPathPh: "/absolute/path/to/repo (optional)",
   projectSummaryPh: "what is this project? written for a cold agent",
   globalContext: "Global context",
-  globalContextSub: "— true in every project",
   globalEmpty:
     "Nothing yet. This is where cross-project knowledge lives: standing preferences, decisions that bind every repo, traps you keep falling into.",
   addGlobalNote: "New global note",
+  editNote: "edit",
+  onProfile: "on profile",
+  showOnProfile: "show on profile",
+  hideFromProfile: "hide from profile",
   noteBodyPh: "the note itself",
   hookTitle: "Hook up your agent",
   hookBody:
@@ -593,6 +627,9 @@ export const en = {
   c_convention: "convention",
   c_gotcha: "gotcha",
   c_preference: "preference",
+  c_profile: "profile",
+  c_stack: "stack",
+  c_workflow: "workflow",
 
   deleteProject: "Delete this project",
   deleteProjectNote:

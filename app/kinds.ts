@@ -1,4 +1,4 @@
-import { CONTEXT_KINDS, STATUSES } from "@/lib/constants";
+import { PROJECT_CONTEXT_KINDS, STATUSES } from "@/lib/constants";
 import type { ContextKind, EntryKind, Status } from "@/lib/constants";
 import type { Key, T } from "@/lib/i18n";
 
@@ -26,6 +26,11 @@ export const CONTEXT_KIND_COLOR: Record<ContextKind, string> = {
   decision: "var(--k-decision)",
   convention: "var(--k-handoff)",
   preference: "var(--k-note)",
+  // The developer's own notes: who (the accent), what with (the green of
+  // done), how (the amber a question wears -- the ones an agent asks about).
+  profile: "var(--accent)",
+  stack: "var(--ok)",
+  workflow: "var(--k-question)",
 };
 
 /**
@@ -68,8 +73,9 @@ export const priorityOptions = (t: T) => [
   { value: "3", label: t("p3"), colour: "var(--k-note)" },
 ];
 
-export const kindOptions = (t: T) =>
-  CONTEXT_KINDS.map((k) => ({
+/** The picker's choices; a project note cannot be one of the developer's kinds. */
+export const kindOptions = (t: T, kinds: readonly ContextKind[] = PROJECT_CONTEXT_KINDS) =>
+  kinds.map((k) => ({
     value: k,
     label: contextKindLabel(t, k),
     colour: CONTEXT_KIND_COLOR[k],

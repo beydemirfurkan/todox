@@ -30,6 +30,7 @@ export function UserMenu({
   labels: {
     navAccount: string;
     navReport: string;
+    navBrain: string;
     signOut: string;
     working: string;
   };
@@ -88,6 +89,14 @@ export function UserMenu({
           onClick={() => setOpen(false)}
         >
           {labels.navAccount}
+        </Link>
+        <Link
+          href="/me"
+          role="menuitem"
+          className="user-menu-item"
+          onClick={() => setOpen(false)}
+        >
+          {labels.navBrain}
         </Link>
         <Link
           href="/report"

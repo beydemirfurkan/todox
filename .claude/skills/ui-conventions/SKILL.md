@@ -40,7 +40,11 @@ Components: `app/components/` via the barrel `app/components/index.ts` --
 `Panel`, `Empty`, `Chip`, `Counter`, `Field`, `StatusDot`, `StatBadges` (a row
 of numbers as badges: dot, mono figure, word), `IconTile` (a line icon on an inset tile,
 where a picture helps an empty state or a notice) and `LogoMark` (the prompt
-tile; brand only). Client-side pieces: `app/features/`. The board's
+tile; brand only). `BrainMap` draws the developer and their projects as
+plain server-side SVG: hidden from assistive tech and below `sm`, always
+beside a list that says the same numbers in words -- the pattern for any
+drawing of data here. `NoteGroups` takes `actions` (`remove`, `update`, and
+`publish` for account-wide notes). Client-side pieces: `app/features/`. The board's
 drag-and-drop is `app/p/[slug]/board-dnd.tsx`.
 
 ## The look, in six rules

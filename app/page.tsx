@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { CONTEXT_KINDS } from "@/lib/constants";
+import { isDeveloperKind } from "@/lib/constants";
+import type { T } from "@/lib/i18n";
 import { getT } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import * as apiTokens from "@/lib/repositories/api-tokens";
@@ -13,25 +14,19 @@ import * as memberships from "@/lib/repositories/project-memberships";
 import * as tasks from "@/lib/repositories/tasks";
 import * as projectActivity from "@/lib/services/project-activity";
 import {
-  addContextAction,
   clearEmptyProjectAction,
   createProjectAction,
-  deleteContextAction,
 } from "./actions";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { Explainer, FirstRun } from "./features/explainer";
 import { Landing } from "./features/landing";
-import { Picker } from "./features/picker";
 import { SubmitButton } from "./features/submit";
-import { kindOptions } from "./kinds";
 import {
   Composer,
   Counter,
   Empty,
-  Field,
   Group,
   IconTile,
-  NoteGroups,
   ProjectFields,
   ProjectLanes,
   ProjectRow,
@@ -205,28 +200,6 @@ export default async function Home() {
   );
   const teamOf = (id: number) => teamSizes.get(id) ?? 0;
 
-  const newGlobalNote = (
-    <Composer id="new-global-note" label={t("addGlobalNote")} action={addContextAction}>
-      <Field label={t("title")}>
-        <input name="title" autoFocus required />
-      </Field>
-      <Field label={t("noteBodyPh")}>
-        <textarea name="body" required />
-      </Field>
-      <div className="flex flex-wrap items-end gap-2">
-        <Field label={t("globalContext")} className="w-full min-w-0 sm:w-40">
-          <Picker
-            name="kind"
-            value={CONTEXT_KINDS[0]}
-            options={kindOptions(t)}
-            label={t("globalContext")}
-          />
-        </Field>
-        <SubmitButton pendingLabel={t("saving")}>{t("save")}</SubmitButton>
-      </div>
-    </Composer>
-  );
-
   return (
     // Wide, like a project: this is a board of lanes, not a page to read --
     // once there are projects. Before the first one it is a pitch and a form,
@@ -316,27 +289,13 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Above the quiet projects, not below every project: these are the
-          notes that hold everywhere, and they used to sit under thirty cards. */}
-      <Group
-        id="global-context"
-        title={t("globalContext")}
-        count={globalContext.length}
-        countLabel={t("notes")}
-        right={<span className="text-small font-normal text-muted">{t("globalContextSub")}</span>}
-        action={newGlobalNote}
-        open
-        delay={120}
-      >
-        {globalContext.length === 0 ? (
-          <Empty>{t("globalEmpty")}</Empty>
-        ) : (
-          // The same rows as a project's notes: a note that ran to three
-          // thousand characters used to push everything under it off the
-          // first screen, and now it is a line until it is opened.
-          <NoteGroups notes={globalContext} t={t} deleteAction={deleteContextAction} />
-        )}
-      </Group>
+      {/* Above the quiet projects: who the developer is, and the rules that
+          hold everywhere, live on their own page now -- this is the door. */}
+      <BrainCard
+        developerNotes={globalContext.filter((n) => isDeveloperKind(n.kind)).length}
+        rules={globalContext.filter((n) => !isDeveloperKind(n.kind)).length}
+        t={t}
+      />
 
       {!beforeFirstProject && (
         <Group
@@ -442,3 +401,28 @@ export default async function Home() {
   );
 }
 
+/** The way into the brain page, with what it holds counted. */
+function BrainCard({ developerNotes, rules, t }: { developerNotes: number; rules: number; t: T }) {
+  return (
+    <section
+      className="sticker pop flex flex-wrap items-center gap-x-4 gap-y-3 p-4"
+      style={{ animationDelay: "120ms" }}
+    >
+      <IconTile name="brain" color="var(--accent)" />
+      <div className="min-w-[12rem] flex-1">
+        <h2 className="text-[16px] font-semibold text-ink-head">{t("brainCardTitle")}</h2>
+        <p className="text-small text-muted">{t("brainCardBody")}</p>
+      </div>
+      <StatBadges
+        label={t("brainCardTitle")}
+        stats={[
+          { label: t("brainNotesCount"), value: developerNotes, mark: "var(--accent)" },
+          { label: t("brainRulesCount"), value: rules, mark: "var(--k-handoff)" },
+        ]}
+      />
+      <Link href="/me" className="btn btn-quiet">
+        {t("brainOpen")}
+      </Link>
+    </section>
+  );
+}
