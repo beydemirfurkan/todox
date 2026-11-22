@@ -16,6 +16,16 @@
     "todox",
     "engineering-log"
   ],
+  "interface": {
+    "displayName": "todox",
+    "shortDescription": "The log your next session resumes from",
+    "longDescription": "Decisions, dead ends, handoffs and open tasks, kept per repository over the todox MCP server. The session starts with a briefing from the log and is asked for its handoff before it finishes.",
+    "developerName": "Furkan Beydemir",
+    "category": "Productivity",
+    "websiteURL": "https://www.todox.dev",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg"
+  },
   "skills": "./skills/",
   "hooks": "./hooks/codex-hooks.json",
   "mcpServers": "./codex-mcp.json"
