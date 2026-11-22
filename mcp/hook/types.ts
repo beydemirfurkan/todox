@@ -3,11 +3,8 @@ import type { RpcClient } from "../rpc-client";
 import type { HookConfig } from "./config";
 import type { Logger } from "./log";
 
-/**
- * Which agent ran the hook. Claude Code and Codex send the same shapes; Cursor
- * is translated at the door (`clients.ts`) so no handler has to know.
- */
-export type HookClient = "claude-code" | "codex" | "cursor";
+/** Which agent ran the hook. Both send the same shapes (`clients.ts`). */
+export type HookClient = "claude-code" | "codex";
 
 /** What Claude Code sends a hook on stdin; only the fields read here. */
 export interface HookInput {

@@ -204,7 +204,7 @@ Bunları rekabet konuşmasında kullanmadan önce yeniden doğrulayın; tarih: 2
 
 ### Alınabilecekler, kabaca öncelik sırasıyla
 
-1. **Codex ve Cursor plugin paketleri.** `.codex-plugin`/`.agents/plugins` ve `.cursor-plugin` manifestoları ve hook'lu paketler. Bizim hook'larımız zaten bağımlılıksız tek bir `.mjs`; mem0'ın yaptığı gibi tek kaynaktan birden çok pakete kopyalamak (`plugin:sync` bunun başı) Codex ve Cursor'a SessionStart briefing'ini ve Stop handoff'unu taşır.
+1. **Codex plugin paketi.** `.codex-plugin`/`.agents/plugins` manifestosu ve hook'lu paket. Bizim hook'larımız zaten bağımlılıksız tek bir `.mjs`; mem0'ın yaptığı gibi tek kaynaktan birden çok pakete kopyalamak (`plugin:sync` bunun başı) Codex'e SessionStart briefing'ini ve Stop handoff'unu taşır. *Yapıldı (`46b84d5`). Cursor paketi de yazıldı, sonra kaldırıldı: hedef istemciler Claude Code, Codex ve OpenCode.*
 
    Lab'daki ret ve "todox'a hiç dokunmadı" sorunlarının bir kısmı hook'suz istemcilerden geliyor. Codex'te `SessionStart` var. Cursor'da hook bağlama ekleyemiyor (mem0 da aynı duvara çarpmış); Cursor'da yalnızca Stop ve kayıt tarafı işe yarar.
 

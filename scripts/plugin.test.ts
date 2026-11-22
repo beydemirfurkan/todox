@@ -8,10 +8,9 @@ import {
   expectedHookBundle,
   expectedSkill,
   expectedVersion,
-  CURSOR_MARKETPLACE_PATH,
   HOOK_BUNDLE_PATH,
   MANIFEST_PATH,
-  OTHER_MANIFEST_PATHS,
+  CODEX_MANIFEST_PATH,
   PLUGIN_ROOT,
   SKILL_PATH,
 } from "./plugin-sync";
@@ -128,31 +127,26 @@ describe("the hook bundle", () => {
 });
 
 /**
- * Codex and Cursor install the same directory through their own manifests.
- * Everything those manifests name has to exist, every hook has to reach the
- * one bundle through run.sh with the agent's name on the end, and each event
- * must be one the bundle handles -- a misspelt event is a hook that never
- * fires and never errors.
+ * Codex installs the same directory through its own manifest. Everything it
+ * names has to exist, every hook has to reach the one bundle through run.sh
+ * with `codex` on the end, and each event must be one the bundle handles -- a
+ * misspelt event is a hook that never fires and never errors.
  */
-describe("the Codex and Cursor manifests", () => {
+describe("the Codex manifest", () => {
   const read = (path: string) => JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
   const HANDLED = ["session-start", "post-tool-use", "user-prompt-submit", "stop", "pre-compact", "session-end"];
 
-  it("carry package.json's version, the Cursor marketplace entry included", () => {
-    for (const path of OTHER_MANIFEST_PATHS) expect(read(path).version).toBe(expectedVersion());
-    const marketplace = read(CURSOR_MARKETPLACE_PATH) as { plugins: { version: string }[] };
-    for (const entry of marketplace.plugins) expect(entry.version).toBe(expectedVersion());
+  it("carries package.json's version", () => {
+    expect(read(CODEX_MANIFEST_PATH).version).toBe(expectedVersion());
   });
 
-  it("point at files that exist: the shared skill, their hooks and their MCP entry", () => {
-    for (const path of OTHER_MANIFEST_PATHS) {
-      const manifest = read(path) as { skills: string; hooks: string; mcpServers: string };
-      expect(manifest.skills).toBe("./skills/");
-      for (const file of [manifest.hooks, manifest.mcpServers]) expect(existsSync(join(PLUGIN_ROOT, file))).toBe(true);
-    }
+  it("points at files that exist: the shared skill, its hooks and its MCP entry", () => {
+    const manifest = read(CODEX_MANIFEST_PATH) as { skills: string; hooks: string; mcpServers: string };
+    expect(manifest.skills).toBe("./skills/");
+    for (const file of [manifest.hooks, manifest.mcpServers]) expect(existsSync(join(PLUGIN_ROOT, file))).toBe(true);
   });
 
-  it("run every Codex hook through run.sh as codex, on events Codex has", () => {
+  it("runs every hook through run.sh as codex, on events Codex has", () => {
     const hooks = read(join(PLUGIN_ROOT, "hooks", "codex-hooks.json")) as {
       hooks: Record<string, { hooks: { command: string }[] }[]>;
     };
@@ -164,7 +158,7 @@ describe("the Codex and Cursor manifests", () => {
     }
   });
 
-  it("records Codex's apply_patch and the todox task tools, nothing else", () => {
+  it("records apply_patch and the todox task tools, nothing else", () => {
     const hooks = read(join(PLUGIN_ROOT, "hooks", "codex-hooks.json")) as {
       hooks: { PostToolUse: { matcher: string }[] };
     };
@@ -174,33 +168,7 @@ describe("the Codex and Cursor manifests", () => {
     expect(matcher.test("Bash")).toBe(false);
   });
 
-  it("run every Cursor hook through run.sh as cursor, with the prompted token", () => {
-    const hooks = read(join(PLUGIN_ROOT, "hooks", "cursor-hooks.json")) as {
-      version: number;
-      hooks: Record<string, { command: string; loop_limit?: number }[]>;
-    };
-    expect(hooks.version).toBe(1);
-    for (const [, [hook]] of Object.entries(hooks.hooks)) {
-      const match = /^TODOX_PLUGIN_TOKEN="\$\{token\}" sh "\$\{CURSOR_PLUGIN_ROOT\}\/hooks\/run\.sh" ([a-z-]+) cursor$/.exec(hook.command);
-      expect(match?.[1] && HANDLED.includes(match[1])).toBe(true);
-    }
-    // The Stop hook asks once per session on its own; Cursor's loop limit says so twice.
-    expect(hooks.hooks.stop[0].loop_limit).toBe(1);
-  });
-
-  it("asks Cursor for the token and sends it only to the todox endpoint", () => {
-    const manifest = read(OTHER_MANIFEST_PATHS[1]) as { variables: { required: string[] } };
-    expect(manifest.variables.required).toEqual(["token"]);
-    const mcp = read(join(PLUGIN_ROOT, "cursor-mcp.json")) as {
-      mcpServers: { todox: { url: string; headers: Record<string, string> } };
-    };
-    expect(mcp.mcpServers.todox).toEqual({
-      url: "https://www.todox.dev/api/mcp",
-      headers: { Authorization: "Bearer ${token}" },
-    });
-  });
-
-  it("starts Codex's stdio server from the release tarball, passing only todox's variables", () => {
+  it("starts the stdio server from the release tarball, passing only todox's variables", () => {
     const mcp = read(join(PLUGIN_ROOT, "codex-mcp.json")) as {
       mcpServers: { todox: { command: string; args: string[]; env_vars: string[] } };
     };
@@ -209,12 +177,10 @@ describe("the Codex and Cursor manifests", () => {
     expect(mcp.mcpServers.todox.env_vars).toEqual(["TODOX_TOKEN", "TODOX_URL"]);
   });
 
-  it("are listed where each agent looks for a marketplace", () => {
+  it("is listed where Codex looks for a marketplace", () => {
     const codex = read(join(PLUGIN_ROOT, "..", ".agents", "plugins", "marketplace.json")) as {
       plugins: { source: { path: string } }[];
     };
     expect(codex.plugins[0].source.path).toBe("./plugin");
-    const cursor = read(CURSOR_MARKETPLACE_PATH) as { plugins: { source: string }[] };
-    expect(cursor.plugins[0].source).toBe("./plugin");
   });
 });

@@ -38,18 +38,11 @@ export const HOSTED_URL = "https://www.todox.dev";
 type Env = Record<string, string | undefined>;
 
 /**
- * The plugin's own prompted token first, then the environment's.
- *
- * Cursor's hooks are handed the prompted value as `TODOX_PLUGIN_TOKEN="${token}"`
- * in the command line. Whether Cursor substitutes a plugin variable there is
- * not documented: if it does not, the shell expands `${token}` to nothing, or
- * the text reaches us unexpanded -- and either must fall through to
- * `TODOX_TOKEN` rather than silence it.
+ * Claude Code's prompted token first; Codex cannot prompt, so its plugin
+ * reads `TODOX_TOKEN` from the environment, as the stdio server does.
  */
-export function tokenFrom(env: Env): string | undefined {
-  const given = [env.CLAUDE_PLUGIN_OPTION_TOKEN, env.TODOX_PLUGIN_TOKEN, env.TODOX_TOKEN];
-  return given.find((value) => value && !value.startsWith("${")) || undefined;
-}
+export const tokenFrom = (env: Env): string | undefined =>
+  env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || undefined;
 
 export function hookConfig(
   env: Env,
@@ -69,13 +62,13 @@ export function hookConfig(
 
 /**
  * Claude Code and Codex hand a plugin its data directory as
- * `CLAUDE_PLUGIN_DATA` (Codex sets `PLUGIN_DATA` as well). Cursor documents
- * none, so its plugin keeps its state beside Cursor's own.
+ * `CLAUDE_PLUGIN_DATA` (Codex sets `PLUGIN_DATA` as well); the fallback keeps
+ * each agent's state beside its own.
  */
 export function dataDirFrom(env: Env, client: HookClient = "claude-code"): string {
   const given = env.CLAUDE_PLUGIN_DATA || env.PLUGIN_DATA;
   if (given) return given;
-  const home = client === "cursor" ? ".cursor" : client === "codex" ? ".codex" : ".claude";
+  const home = client === "codex" ? ".codex" : ".claude";
   return join(homedir(), home, "plugins", "data", "todox");
 }
 

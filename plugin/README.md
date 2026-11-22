@@ -13,35 +13,26 @@ claude plugin install todox@todox
 It asks for your agent token once (Account page on todox.dev, or your own
 instance) and keeps it in your Claude Code settings, not in the plugin.
 
-**Codex and Cursor** read the same directory through their own manifests,
-`.codex-plugin/plugin.json` and `.cursor-plugin/plugin.json`. The skill and
-`hooks/todox-hook.mjs` are shared; what differs is the hooks file each agent
-reads and its MCP entry:
+**Codex** reads the same directory through its own manifest,
+`.codex-plugin/plugin.json`. The skill and `hooks/todox-hook.mjs` are shared;
+what differs is the hooks file and the MCP entry:
 
-| | Codex | Cursor |
-| --- | --- | --- |
-| Install | `codex plugin marketplace add beydemirfurkan/todox` | add the repo as a plugin marketplace, install **todox** |
-| Token | `TODOX_TOKEN` in your environment (Codex plugins cannot prompt) | asked for at install (`variables.token`); the hooks fall back to `TODOX_TOKEN` in your environment |
-| MCP | the stdio server from the release tarball (`codex-mcp.json`), so files are hashed and git is observed locally | the hosted endpoint (`cursor-mcp.json`) |
-| Hooks | `hooks/codex-hooks.json`: SessionStart, PostToolUse (`apply_patch` and the todox task tools), UserPromptSubmit, Stop | `hooks/cursor-hooks.json`: sessionStart, postToolUse, afterFileEdit, beforeSubmitPrompt, stop, sessionEnd |
-| Not there | PreCompact: Codex ignores a PreCompact hook's text | PreCompact: Cursor's is observational and cannot reach the summary; stop has no message for you, so the "edited without a task" note is Claude Code and Codex only |
+- **Install:** `codex plugin marketplace add beydemirfurkan/todox`, then
+  `codex plugin add todox@todox`.
+- **Token:** `TODOX_TOKEN` in your environment; Codex plugins cannot prompt.
+- **MCP:** the stdio server from the release tarball (`codex-mcp.json`), so
+  files are hashed and git is observed locally.
+- **Hooks:** `hooks/codex-hooks.json` -- SessionStart, PostToolUse
+  (`apply_patch` and the todox task tools), UserPromptSubmit, Stop.
+- **Not there:** PreCompact. Codex ignores a PreCompact hook's text.
 
 Codex runs a plugin's hooks only after you review and trust them.
 
-What has been checked, and how (2026-11-22):
-
-- **Codex 0.171.0, live**, in a throwaway `CODEX_HOME`: the marketplace adds,
-  the plugin installs, `codex mcp list` shows the stdio entry with
-  `TODOX_TOKEN`/`TODOX_URL` passed through, the skill reaches the prompt, and
-  SessionStart and UserPromptSubmit fire. In a registered checkout the digest
-  was injected; in an unregistered one, the checkout's `repo_url`.
-- **Cursor CLI 2026.11.22, against its code**, because it will not start a
-  session without a Cursor login: the manifest's `variables` field, all six
-  hook events used here and `${CURSOR_PLUGIN_ROOT}` are what it reads. Whether
-  it substitutes a plugin variable inside a hook command is not settled by its
-  code or its docs, so the hooks receive the token as `TODOX_PLUGIN_TOKEN` and
-  fall back to `TODOX_TOKEN` in your environment when it arrives empty or
-  unexpanded. The MCP entry's `${token}` is the documented case.
+Checked on 2026-11-22 with Codex 0.171.0, live, in a throwaway `CODEX_HOME`:
+the marketplace adds, the plugin installs, `codex mcp list` shows the stdio
+entry with `TODOX_TOKEN`/`TODOX_URL` passed through, the skill reaches the
+prompt, and SessionStart and UserPromptSubmit fire. In a registered checkout
+the digest was injected; in an unregistered one, the checkout's `repo_url`.
 
 What it adds:
 

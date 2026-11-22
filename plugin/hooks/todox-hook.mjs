@@ -37,64 +37,9 @@ function createClient(baseUrl, token, options = {}) {
 }
 
 // mcp/hook/clients.ts
-var CLIENTS = ["claude-code", "codex", "cursor"];
+var CLIENTS = ["claude-code", "codex"];
 function hookClientFrom(arg) {
   return CLIENTS.find((c) => c === arg) ?? "claude-code";
-}
-function normalizeInput(client, raw) {
-  return client === "cursor" ? fromCursor(raw) : raw;
-}
-function shapeOutput(client, event, output) {
-  return client === "cursor" ? toCursor(event, output) : output;
-}
-function fromCursor(raw) {
-  const roots = Array.isArray(raw.workspace_roots) ? raw.workspace_roots : [];
-  const input = {
-    session_id: stringOr(raw.session_id) ?? stringOr(raw.conversation_id),
-    cwd: stringOr(raw.cwd) ?? stringOr(roots[0]),
-    hook_event_name: stringOr(raw.hook_event_name),
-    prompt: stringOr(raw.prompt),
-    trigger: stringOr(raw.trigger),
-    stop_hook_active: typeof raw.loop_count === "number" && raw.loop_count > 0
-  };
-  if (raw.hook_event_name === "afterFileEdit" && typeof raw.file_path === "string")
-    return { ...input, tool_name: "Write", tool_input: { file_path: raw.file_path } };
-  if (typeof raw.tool_name === "string")
-    return {
-      ...input,
-      tool_name: cursorToolName(raw.tool_name),
-      tool_input: objectFrom(raw.tool_input),
-      tool_response: parsedOr(raw.tool_output)
-    };
-  return input;
-}
-function cursorToolName(name) {
-  const mcp = /^MCP:(.+)$/.exec(name);
-  return mcp ? `mcp__todox__${mcp[1]}` : name;
-}
-function toCursor(event, output) {
-  if (event === "user-prompt-submit") return { continue: true };
-  if (!output || typeof output === "string") return null;
-  if (event === "session-start") {
-    const context = output.hookSpecificOutput?.additionalContext;
-    return typeof context === "string" ? { additional_context: context } : null;
-  }
-  if (event === "stop" && output.decision === "block" && typeof output.reason === "string")
-    return { followup_message: output.reason };
-  return null;
-}
-var stringOr = (value) => typeof value === "string" ? value : void 0;
-function parsedOr(value) {
-  if (typeof value !== "string") return value;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
-  }
-}
-function objectFrom(value) {
-  const parsed = parsedOr(value);
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : void 0;
 }
 
 // mcp/hook/config.ts
@@ -102,10 +47,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 var HOSTED_URL = "https://www.todox.dev";
-function tokenFrom(env) {
-  const given = [env.CLAUDE_PLUGIN_OPTION_TOKEN, env.TODOX_PLUGIN_TOKEN, env.TODOX_TOKEN];
-  return given.find((value) => value && !value.startsWith("${")) || void 0;
-}
+var tokenFrom = (env) => env.CLAUDE_PLUGIN_OPTION_TOKEN || env.TODOX_TOKEN || void 0;
 function hookConfig(env, pluginRoot, warn, client = "claude-code") {
   return {
     token: tokenFrom(env),
@@ -119,7 +61,7 @@ function hookConfig(env, pluginRoot, warn, client = "claude-code") {
 function dataDirFrom(env, client = "claude-code") {
   const given = env.CLAUDE_PLUGIN_DATA || env.PLUGIN_DATA;
   if (given) return given;
-  const home = client === "cursor" ? ".cursor" : client === "codex" ? ".codex" : ".claude";
+  const home = client === "codex" ? ".codex" : ".claude";
   return join(homedir(), home, "plugins", "data", "todox");
 }
 function urlFromMcpJson(pluginRoot, warn) {
@@ -634,14 +576,14 @@ async function runHook(event, rawInput, env, client = "claude-code") {
   try {
     const config = hookConfig(env, pluginRootFrom(env), (m) => log(event, m), client);
     if (config.disabled) return null;
-    const input = normalizeInput(client, parseInput(rawInput));
-    return shapeOutput(client, event, await handler(contextFor({ client, config, log, input })));
+    const input = parseInput(rawInput);
+    return await handler(contextFor({ client, config, log, input }));
   } catch (e) {
     log(event, `failed: ${e.message}`);
     return null;
   }
 }
-var pluginRootFrom = (env) => env.CLAUDE_PLUGIN_ROOT || env.PLUGIN_ROOT || env.CURSOR_PLUGIN_ROOT || void 0;
+var pluginRootFrom = (env) => env.CLAUDE_PLUGIN_ROOT || env.PLUGIN_ROOT || void 0;
 function contextFor(parts) {
   const rpc = parts.config.token ? createClient(parts.config.url, parts.config.token, { headers: CARRIER, timeoutMs: RPC_TIMEOUT_MS }) : null;
   return { ...parts, rpc, now: () => /* @__PURE__ */ new Date(), git: workspaceGit };

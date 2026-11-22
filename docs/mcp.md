@@ -183,12 +183,12 @@ any of this: it has no filesystem, so it has nothing to look at.
 
 **A second carrier, for the hosted endpoint.** Connected to `/api/mcp`, there is
 no local todox process to do the watching — which is most people. The
-plugin's hooks (Claude Code from plugin 0.1.5; Codex and Cursor from the
-release after 0.1.6) run on your machine at a session's
+plugin's hooks (Claude Code from plugin 0.1.5; Codex from the release after
+0.1.6) run on your machine at a session's
 edges — the Stop hook after every turn, if git changed since the last one it
 sent, and SessionEnd — and send the same row with `source: "plugin-hook"`
 (`"claude-code-hook"` up to 0.1.6) and `client` naming the agent
-(`claude-code-plugin`, `codex-plugin`, `cursor-plugin`): the same fields, built by the same function as the stdio
+(`claude-code-plugin` or `codex-plugin`): the same fields, built by the same function as the stdio
 observer's, the same table, the same two weeks, keyed by Claude Code's own
 session id (`cc:<id>`). `TODOX_OBSERVE=off` turns this carrier off too. Each row in the briefing
 says which carrier saw it. Where the stdio process is already watching the same
