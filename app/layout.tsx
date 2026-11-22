@@ -9,6 +9,7 @@ import { currentUser } from "@/lib/session";
 import { publicUrl } from "@/lib/public-url";
 import { LogoMark } from "./components";
 import { AppSidebar } from "./components/app-sidebar";
+import { HeaderAuthLink } from "./features/header-auth-link";
 import { LangSwitcher } from "./features/lang-switcher";
 import { Notifications } from "./features/notifications";
 import { TabBar } from "./features/tab-bar";
@@ -127,9 +128,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               </span>
               <div className="ml-auto flex items-center gap-2">
                 <LangSwitcher lang={lang} t={t} />
-                <Link href="/login" className="btn btn-quiet">
-                  {t("signIn")}
-                </Link>
+                <HeaderAuthLink signIn={t("signIn")} signUp={t("signUp")} />
               </div>
             </header>
             <main

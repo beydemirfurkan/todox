@@ -1,4 +1,5 @@
 export { LogoMark } from "./logo-mark";
+export { Mascot, type MascotMood } from "./mascot";
 export { Icon, IconTile, type IconName } from "./icons";
 export { StatBadges, type Stat } from "./stat-badges";
 export { Chip, Counter } from "./chip";

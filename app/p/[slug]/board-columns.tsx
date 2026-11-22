@@ -279,10 +279,11 @@ function CardChips({
 }) {
   const chips: React.ReactNode[] = [];
   if (task.priority === 1) {
+    // The same word the lists use; "p1" was the one place it was a code.
     chips.push(
-      <Chip key="p1" color="var(--accent)">
-        p1
-      </Chip>,
+      <span key="p1" className="important-badge">
+        {t("todayImportant")}
+      </span>,
     );
   }
   if (quietDays !== null) {

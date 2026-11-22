@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 
 import { updateProjectAction } from "../actions";
 import { SubmitButton } from "./submit";
+import { useDismiss } from "./use-dismiss";
 
 export interface ProjectMenuLabels {
   open: string;
@@ -46,7 +47,8 @@ export function ProjectMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
-  useDismiss({ isOpen, rootRef, triggerRef, close: () => setIsOpen(false) });
+  const close = useCallback(() => setIsOpen(false), []);
+  useDismiss({ isOpen, rootRef, triggerRef, close });
 
   const settings = `/p/${project.slug}/settings`;
   const saveDetails = async (fd: FormData) => {
@@ -125,34 +127,4 @@ export function ProjectMenu({
       </div>
     </div>
   );
-}
-
-/** Escape and a press outside both close it; Escape returns focus to the trigger. */
-function useDismiss(input: {
-  isOpen: boolean;
-  rootRef: React.RefObject<HTMLDivElement | null>;
-  triggerRef: React.RefObject<HTMLButtonElement | null>;
-  close: () => void;
-}): void {
-  const { isOpen, rootRef, triggerRef, close } = input;
-  useEffect(() => {
-    if (!isOpen) return;
-    const onDown = (event: MouseEvent) => {
-      // On a phone the root's own box is the dim behind the sheet, so a press
-      // on the root itself is a press outside the menu.
-      const root = rootRef.current;
-      if (event.target === root || !root?.contains(event.target as Node)) close();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      close();
-      triggerRef.current?.focus();
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [isOpen, rootRef, triggerRef, close]);
 }

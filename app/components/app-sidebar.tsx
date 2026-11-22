@@ -5,6 +5,7 @@ import type { T } from "@/lib/i18n";
 import type { PublicUser } from "@/lib/types";
 
 import { accountProjects } from "../account-projects";
+import { AccountMenu } from "../features/account-menu";
 import { Notifications } from "../features/notifications";
 import { SearchBox } from "../features/search-box";
 import { SidebarLink } from "../features/sidebar-link";
@@ -62,12 +63,18 @@ export function AppSidebar({ user, t }: { user: PublicUser; t: T }) {
             clearLabel={t("searchClear")}
           />
         </Suspense>
-        <SidebarLink href="/account">
-          <span aria-hidden="true" className="sidebar-avatar">
-            {initial(user)}
-          </span>
-          <span className="min-w-0 flex-1 truncate">@{user.username}</span>
-        </SidebarLink>
+        <AccountMenu
+          name={user.name}
+          username={user.username}
+          initial={initial(user)}
+          labels={{
+            open: t("accountMenuOpen"),
+            account: t("accountTitle"),
+            brain: t("navBrain"),
+            signOut: t("signOut"),
+            signingOut: t("signingOut"),
+          }}
+        />
       </div>
     </nav>
   );

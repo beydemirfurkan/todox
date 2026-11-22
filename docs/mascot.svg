@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="Tod, the todox mascot">
+  <ellipse cx="60" cy="109" rx="30" ry="4" fill="#000" opacity=".18"/>
+  <rect x="38" y="96" width="12" height="11" rx="5" fill="#b8501f"/>
+  <rect x="70" y="96" width="12" height="11" rx="5" fill="#b8501f"/>
+  <path d="M86 26 L86 8 L96 8 L96 26 L91 22 Z" fill="#ffd84d"/>
+  <rect x="20" y="20" width="80" height="80" rx="24" fill="#ff7a2e"/>
+  <rect x="12" y="60" width="14" height="10" rx="5" fill="#ff7a2e" transform="rotate(-20 19 65)"/>
+  <g transform="translate(97 44) rotate(-50)">
+    <rect x="0" y="-5" width="14" height="10" rx="5" fill="#ff7a2e"/>
+  </g>
+  <path d="M40 46l11 9-11 9" fill="none" stroke="#111" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="79" cy="55" r="6" fill="#111"/>
+  <circle cx="81" cy="53" r="1.8" fill="#fff"/>
+  <circle cx="36" cy="72" r="5" fill="#ff4d6d" opacity=".35"/>
+  <circle cx="86" cy="72" r="5" fill="#ff4d6d" opacity=".35"/>
+  <path d="M52 76q8 6 16 0" fill="none" stroke="#111" stroke-width="6" stroke-linecap="round"/>
+</svg>

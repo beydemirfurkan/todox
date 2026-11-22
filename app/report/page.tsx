@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { duration, translator, type Key, type T } from "@/lib/i18n";
+import { duration, translator, type T } from "@/lib/i18n";
 import { getT, getTz } from "@/lib/lang";
 import { requireUser } from "@/lib/session";
 import { resolve } from "@/lib/services/project-resolver";
@@ -10,7 +10,6 @@ import { periodLabel, renderMarkdown } from "@/lib/services/report-markdown";
 import { activityReport, type ReportEntry, type TaskReport } from "@/lib/services/reports";
 import { resolvePeriod, type PeriodName } from "@/lib/util/time";
 import {
-  Chip,
   Counter,
   Empty,
   IconTile,
@@ -23,7 +22,7 @@ import { RevealCurrent } from "../features/reveal-current";
 import { Daily } from "./daily";
 import { privatePageMetadata } from "../metadata-shared";
 import { CopyMarkdown } from "../features/copy-markdown";
-import { IMPORTANCE_COLOR, KIND_COLOR, statusLabel } from "../kinds";
+import { KIND_COLOR, statusLabel } from "../kinds";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getT();
@@ -163,7 +162,8 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                       // identical rows with different links are a trap.
                       label: (
                         <Link href={`/p/${bp.slug}`} className="hover:underline">
-                          {bp.name} <span className="mono text-meta text-faint">{bp.slug}</span>
+                          {bp.name}
+                          {bp.slug !== bp.name && <span className="text-small text-faint"> {bp.slug}</span>}
                         </Link>
                       ),
                       value: bp.active_ms || bp.touched,
@@ -194,7 +194,7 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
               title={t("completedTasks")}
               right={<Counter n={report.completed.length} label={t("completedTasks")} />}
             >
-              <ul className="space-y-3">
+              <ul className="-mx-2 flex flex-col">
                 {report.completed.map((task) => (
                   <TaskRow key={task.id} task={task} t={t} />
                 ))}
@@ -208,9 +208,9 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
               title={t("inProgressTasks")}
               right={<Counter n={report.in_progress.length} label={t("inProgressTasks")} />}
             >
-              <ul className="space-y-3">
+              <ul className="-mx-2 flex flex-col">
                 {report.in_progress.map((task) => (
-                  <TaskRow key={task.id} task={task} t={t} />
+                  <TaskRow key={task.id} task={task} statusText={statusLabel(t, task.status)} t={t} />
                 ))}
               </ul>
             </Panel>
@@ -250,7 +250,12 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
                   label={t("copyReport")}
                   copiedLabel={t("reportCopied")}
                 />
-                <MarkdownPreview markdown={markdown} />
+                <details className="disclosure">
+                  <summary className="text-small text-muted">{t("reportPreview")}</summary>
+                  <div className="mt-3">
+                    <MarkdownPreview markdown={markdown} />
+                  </div>
+                </details>
               </div>
             </div>
           </Panel>
@@ -260,59 +265,75 @@ export default async function ReportPage({ searchParams }: PageProps<"/report">)
   );
 }
 
-function TaskRow({ task, t }: { task: TaskReport; t: T }) {
-  // The glyph is a hint, not the message. It marked a figure the report cannot
-  // stand behind -- a backfilled task, or one closed without ever being in
-  // flight -- and said so nowhere: no legend, no title, nothing a screen
-  // reader reaches. Colour and glyphs never carry meaning alone here.
-  const approx = task.partial;
+/**
+ * A task in the report as one calm row: the title, then a single line of
+ * what the period says about it. It was a card with the id, a dotted
+ * underline, three chips ("todox", "normal", "done") and a mono line of
+ * labelled figures, sixty times over. What it dropped carries nothing here:
+ * "done" under a heading that says completed, "normal" on almost every task,
+ * and a "worked ~0m" that only meant nobody measured it.
+ */
+function TaskRow({ task, statusText, t }: { task: TaskReport; statusText?: string; t: T }) {
+  const facts = reportFacts(task, t);
   return (
-    <li className="sticker-flat p-3">
-      <div className="flex flex-wrap items-baseline gap-2">
-        <span className="mono text-[12px] text-faint">#{task.id}</span>
-        <Link
-          href={`/p/${task.project_slug}/t/${task.id}`}
-          className="min-w-0 text-[15px] font-medium break-words underline decoration-dotted underline-offset-2"
-        >
-          {task.title}
-        </Link>
-        <Chip>{task.project_slug}</Chip>
-        {/* "normal" used to pass var(--card) here, which paints --on-fill on
-            the card colour: 1.16:1, i.e. an invisible word. */}
-        <Chip color={IMPORTANCE_COLOR[task.importance]}>
-          {t(`imp_${task.importance}` as Key)}
-        </Chip>
-        <Chip>{statusLabel(t, task.status)}</Chip>
-      </div>
-
-      <div className="mono mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
-        <span title={approx ? t("approxWhy") : undefined}>
-          {t("activeTime")}: {approx && <span aria-hidden="true">~</span>}
-          {duration(task.active_ms_in_period, t)}
-          {approx && <span className="sr-only"> ({t("approxWhy")})</span>}
-          {task.discounted_ms_in_period > 0 && (
-            <span title={t("discountedNote")}>
-              {" "}
-              ({t("discountedSuffix", { d: duration(task.discounted_ms_in_period, t) })})
-            </span>
-          )}
-        </span>
-        <span>
-          {t("leadTime")}: {duration(task.lead_ms, t)}
-        </span>
-        {task.models.length > 0 && (
-          <span>
-            {t("modelLabel")}: {task.models.join(", ")}
+    <li className="border-t border-rule first:border-t-0">
+      <Link href={`/p/${task.project_slug}/t/${task.id}`} className="report-row">
+        <span className="flex min-w-[min(16rem,100%)] flex-1 flex-col gap-1">
+          <span className="text-[15px] leading-snug break-words text-ink">{task.title}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-small text-faint">
+            <span className="text-muted">{task.project_name}</span>
+            {statusText && <Dotted>{statusText}</Dotted>}
+            {facts.map((fact) => (
+              <Dotted key={fact.key} title={fact.title}>
+                {fact.text}
+              </Dotted>
+            ))}
           </span>
-        )}
-        {task.dead_ends.length > 0 && (
-          <span>
-            {task.dead_ends.length} {t("deadEndCountPlural")}
-          </span>
-        )}
-      </div>
+        </span>
+        {task.importance === "high" && <span className="important-badge shrink-0">{t("todayImportant")}</span>}
+      </Link>
     </li>
   );
+}
+
+const MINUTE_MS = 60_000;
+
+function Dotted({ children, title }: { children: React.ReactNode; title?: string }) {
+  return (
+    <span title={title} className="inline-flex items-center gap-2">
+      <span aria-hidden="true">·</span>
+      {children}
+    </span>
+  );
+}
+
+interface ReportFact {
+  key: string;
+  text: string;
+  title?: string;
+}
+
+/** Only the figures that say something: a zero that means "not measured" is left out. */
+function reportFacts(task: TaskReport, t: T): ReportFact[] {
+  const facts: ReportFact[] = [];
+  if (task.active_ms_in_period >= MINUTE_MS) {
+    // The tilde is a hint, never the message: the title and the words say it.
+    const approx = task.partial ? "~" : "";
+    const discounted = task.discounted_ms_in_period
+      ? ` (${t("discountedSuffix", { d: duration(task.discounted_ms_in_period, t) })})`
+      : "";
+    facts.push({
+      key: "worked",
+      text: `${t("activeTime")} ${approx}${duration(task.active_ms_in_period, t)}${discounted}`,
+      title: task.partial ? t("approxWhy") : undefined,
+    });
+  }
+  if (task.lead_ms) facts.push({ key: "lead", text: `${t("leadTime")} ${duration(task.lead_ms, t)}` });
+  if (task.models.length) facts.push({ key: "models", text: task.models.join(", ") });
+  if (task.dead_ends.length) {
+    facts.push({ key: "dead", text: `${task.dead_ends.length} ${t("deadEndCountPlural")}` });
+  }
+  return facts;
 }
 
 /**
@@ -348,7 +369,7 @@ function EntryList({
               style={{ background: color, borderColor: "var(--edge-dark)" }}
             />
             <span className="min-w-0">
-              <span className="display text-[13px] font-bold break-words">{item.task}</span>
+              <span className="text-[14px] font-medium break-words text-ink">{item.task}</span>
               {/* Both classes, and for the reasons the sibling render on the
                   share page has always had them: a body is paragraphs, which
                   is what `pre-wrap` keeps, and it carries paths, urls and
