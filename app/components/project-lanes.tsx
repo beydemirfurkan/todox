@@ -113,7 +113,7 @@ function Lane({
     <li className={`sticker-flat space-y-3 p-3 md:space-y-0 ${LANE_GRID}`}>
       <div className={`min-w-0 space-y-1.5 ${LANE_WIDE_CELL}`}>
         <h3 className="display text-[18px] leading-tight font-bold break-words">
-          <Link href={projectHref} className="inline-flex items-center hover:text-accent max-sm:min-h-[44px]">
+          <Link href={projectHref} className="inline-flex items-center hover:text-accentInk max-sm:min-h-[44px]">
             {project.name}
           </Link>
         </h3>
@@ -149,7 +149,7 @@ function Lane({
       <p className={`min-w-0 xl:pt-0.5 ${LANE_WIDE_CELL}`}>
         <Link
           href={boardHref(project.slug, { task: null, view: "closed" })}
-          className="inline-flex items-baseline gap-1 hover:text-accent max-sm:min-h-[44px] max-sm:items-center"
+          className="inline-flex items-baseline gap-1 hover:text-accentInk max-sm:min-h-[44px] max-sm:items-center"
         >
           <span className="mono text-[17px]">{counts.done}</span>{" "}
           <span className="text-meta text-muted">{t("countDone")}</span>
@@ -201,7 +201,7 @@ function LaneCell({
                 {/* Text, not a filled chip: most open work is p1, and a
                     yellow block on every row of every lane marked nothing. */}
                 {task.priority === 1 && (
-                  <span className="mono shrink-0 text-meta font-medium text-accent">p1</span>
+                  <span className="mono shrink-0 text-meta font-medium text-accentInk">p1</span>
                 )}
               </Link>
             </li>

@@ -43,7 +43,7 @@ export function Field({
       {(error || hint) && (
         <span
           className="mt-1 block text-small"
-          style={error ? { color: "var(--k-dead_end)" } : { color: "var(--faint)" }}
+          style={error ? { color: "var(--danger-ink)" } : { color: "var(--faint)" }}
         >
           {error || hint}
         </span>
