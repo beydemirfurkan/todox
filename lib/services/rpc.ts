@@ -629,9 +629,15 @@ export const methods = {
       task_ids?: number[];
       started_at?: string;
       source?: ObservationSource;
+      repo_url?: string;
     },
   ) => {
-    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }));
+    // The remote finds a repository the account already knows under another
+    // path -- a second checkout, a second machine. Resolution only: a carrier
+    // never registers a project, that is the agent's call.
+    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }), {
+      repoUrl: p.repo_url,
+    });
     await assertProjectAccess(userId, project.id);
 
     // Read before the write: afterwards it would answer with the row this call

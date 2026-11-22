@@ -22,6 +22,8 @@ import type { RpcClient } from "../rpc-client";
 export interface CommitGit extends ObserverGit {
   parent(dir: string): string | undefined;
   gitDir(dir: string): string | undefined;
+  /** `origin`, credentials scrubbed: how the server finds a known repo at a new path. */
+  remote(dir: string): string | undefined;
 }
 
 export interface CommitContext {
@@ -83,8 +85,13 @@ export async function observeCommit(ctx: CommitContext): Promise<Outcome> {
     taskIds: [],
     startedAt,
   };
+  const remote = git.remote(dir);
   const send = (f: typeof facts) =>
-    ctx.rpc("recordObservation", { ...observationPayload(f), source: "git-hook" }) as Promise<{
+    ctx.rpc("recordObservation", {
+      ...observationPayload(f),
+      source: "git-hook",
+      ...(remote ? { repo_url: remote } : {}),
+    }) as Promise<{
       last_head_sha?: string | null;
       skipped?: string;
     }>;

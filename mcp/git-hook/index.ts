@@ -1,7 +1,7 @@
 import { workspaceGit } from "../hook/git";
 import { fileLogger } from "../hook/log";
 import { createClient } from "../rpc-client";
-import { gitDir, gitParent } from "../workspace";
+import { gitDir, gitParent, gitRemote } from "../workspace";
 import { gitHookConfig, todoxHome } from "./config";
 import { observeCommit, type Outcome } from "./observe-commit";
 
@@ -36,7 +36,7 @@ export async function runGitHook(
     return await observeCommit({
       event,
       cwd,
-      git: { ...workspaceGit, parent: gitParent, gitDir },
+      git: { ...workspaceGit, parent: gitParent, gitDir, remote: gitRemote },
       rpc: createClient(config.url, config.token, {
         headers: { "x-todox-carrier": "git-hook" },
         timeoutMs: RPC_TIMEOUT_MS,
