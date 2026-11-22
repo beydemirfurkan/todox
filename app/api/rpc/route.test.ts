@@ -24,7 +24,7 @@ vi.mock("@/lib/services/rate-limit", () => ({
   consume: mocks.consume,
   penalise: mocks.penalise,
 }));
-vi.mock("@/lib/services/rpc", () => ({ invoke: mocks.invoke }));
+vi.mock("@/lib/services/rpc", () => ({ invoke: mocks.invoke, CARRIERS: ["claude-code-hook", "git-hook"] }));
 
 const { POST } = await import("./route");
 const { BadRequest } = await import("@/lib/services/errors");
@@ -55,6 +55,31 @@ beforeEach(() => {
   mocks.penalise.mockResolvedValue(undefined);
   mocks.userForApiToken.mockResolvedValue(USER);
   mocks.invoke.mockResolvedValue({ projects: [] });
+});
+
+/**
+ * A hook says it is a hook in a header, and the only thing that changes is the
+ * name the call is counted under. An unknown value must read as an ordinary
+ * agent call, not as a carrier the counter has no name for.
+ */
+describe("who placed the call", () => {
+  const contextOf = () => mocks.invoke.mock.calls[0][0] as { carrier?: string };
+
+  it("passes on each known carrier", async () => {
+    for (const carrier of ["claude-code-hook", "git-hook"]) {
+      mocks.invoke.mockClear();
+      await post({ headers: { "x-todox-carrier": carrier } });
+      expect(contextOf().carrier).toBe(carrier);
+    }
+  });
+
+  it("treats an unknown or missing one as the agent", async () => {
+    await post({ headers: { "x-todox-carrier": "cursor" } });
+    expect(contextOf()).not.toHaveProperty("carrier");
+    mocks.invoke.mockClear();
+    await post();
+    expect(contextOf()).not.toHaveProperty("carrier");
+  });
 });
 
 describe("authentication", () => {

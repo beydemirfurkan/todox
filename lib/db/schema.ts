@@ -387,20 +387,17 @@ CREATE TABLE IF NOT EXISTS observations (
   id              SERIAL PRIMARY KEY,
   user_id         INTEGER NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
   project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  -- Minted by the stdio process at startup. Not a foreign key to anything:
+  -- Minted by the carrier: the stdio process at startup, the plugin's hooks
+  -- as 'cc:' + Claude Code's own session id, a git hook as 'git:' + machine,
+  -- branch and day. Not a foreign key to anything:
   -- todox has no sessions table and does not want one, because the only thing
   -- it would carry is what this row already carries.
   session_id      TEXT NOT NULL,
-  -- Which carrier saw this. Only the stdio process writes today, and nothing
-  -- can write anything else: recordObservation has no source parameter, so
-  -- every row says 'stdio'. The briefing therefore does NOT carry it -- a field
-  -- with one possible value tells a reader nothing and costs bytes on the call
-  -- every session opens with.
-  -- The column stays because a second carrier is a real prospect (Claude Code
-  -- hooks see what a tool call cannot: the session boundary and the reasoning),
-  -- and the day one lands, the parameter and the briefing field go back
-  -- together. Not before: a column written without a reader is exactly what
-  -- repo_url and refs.context_id each were for months.
+  -- Which carrier saw this: 'stdio' (the local process, every tool call),
+  -- 'claude-code-hook' (the plugin's hooks, a session's edges -- the carrier
+  -- for everyone connected to the hosted endpoint, where no local process
+  -- runs) or 'git-hook' (a git hook, commits only, any client). recordObservation's source parameter and the briefing's field
+  -- arrived together, as this comment used to ask.
   source          TEXT NOT NULL DEFAULT 'stdio',
   client          TEXT,
   branch          TEXT,

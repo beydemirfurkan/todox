@@ -57,9 +57,11 @@ export const QUERIES = {
    * How many tools one account called inside a window. One number, for the
    * one question the nudge asks: has this account used todox at all lately.
    */
+  // A hook's calls (`hook:<method>`) are the client asking for itself, not an
+  // agent: counted here they would make a silent account look active.
   callsBy: `SELECT coalesce(sum(calls), 0) AS n
               FROM tool_usage
-             WHERE user_id = ? AND day >= ?`,
+             WHERE user_id = ? AND day >= ? AND method NOT LIKE 'hook:%'`,
 } as const;
 
 export type UsageRow = {

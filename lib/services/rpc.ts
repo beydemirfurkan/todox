@@ -26,15 +26,15 @@ import { merge as mergeProjects } from "./project-merge";
 import * as projectActivity from "./project-activity";
 import { existingFor, mustResolve, noMatch, resolve, resolveOrCreate } from "./project-resolver";
 import { activityReport } from "./reports";
-import { isMethod, parseParams, type MethodName } from "./rpc-schemas";
+import { isMethod, parseParams, type MethodName, type ObservationSource } from "./rpc-schemas";
 import { silentAccountNudge } from "./nudge";
-import { search } from "./search";
+import { highlightedTerms, search } from "./search";
 import { sessionStatus } from "./session-status";
 import * as taskService from "./task-service";
 import { headlineHint, quickCloseHint } from "./write-hints";
 import { logError } from "../server/log";
 import { isAbsolutePath, normalisePath, scrubRemote } from "../util/paths";
-import { resolvePeriod, type PeriodName } from "../util/time";
+import { now, resolvePeriod, type PeriodName } from "../util/time";
 import { hashToken } from "../util/tokens";
 
 /**
@@ -50,7 +50,16 @@ import { hashToken } from "../util/tokens";
  * one (the MCP route) and is consumed by `recordClientInfo` to identify the
  * caller without re-reading the row.
  */
-export type RpcContext = { userId: number; token?: string };
+/**
+ * Who placed the call when it was not an agent: a client-side hook that asks
+ * on the agent's behalf (the Claude Code plugin's SessionStart and Stop) or a
+ * git hook reporting a commit. Counted under its own name so `tool_usage`
+ * keeps describing agents -- see `usageName`.
+ */
+export const CARRIERS = ["claude-code-hook", "git-hook"] as const;
+export type Carrier = (typeof CARRIERS)[number];
+
+export type RpcContext = { userId: number; token?: string; carrier?: Carrier };
 
 type Handler = (ctx: RpcContext, params: Record<string, never>) => Promise<unknown>;
 
@@ -316,6 +325,7 @@ export const methods = {
       project: { slug: project.slug, name: project.name, root_path: project.root_path },
       project_created: created,
       ...(warning ? { warning } : {}),
+      ...(await relatedDeadEnds(userId, project.id, p.title)),
       ...(created
         ? {
             next: `Registered a new project "${project.slug}". Call update_project with a one-paragraph summary and repo_url set to \`git remote get-url origin\` — the summary is what a cold session reads, and the remote is the only name this project has on any machine but this one.`,
@@ -618,15 +628,25 @@ export const methods = {
       commit_subjects?: string;
       task_ids?: number[];
       started_at?: string;
+      source?: ObservationSource;
+      repo_url?: string;
     },
   ) => {
-    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }));
+    // The remote finds a repository the account already knows under another
+    // path -- a second checkout, a second machine. Resolution only: a carrier
+    // never registers a project, that is the agent's call.
+    const project = await mustResolve(userId, pickRef({ project: p.project, cwd: p.cwd }), {
+      repoUrl: p.repo_url,
+    });
     await assertProjectAccess(userId, project.id);
 
     // Read before the write: afterwards it would answer with the row this call
     // just wrote, which is this session's own HEAD and tells the next session
     // nothing.
     const previous = await observationsRepo.lastHeadFor(userId, project.id);
+
+    const shadowed = await shadowedBy(userId, project.id, p);
+    if (shadowed) return { ok: true, project: project.slug, last_head_sha: previous, skipped: shadowed };
 
     await observationsRepo.record({
       user_id: userId,
@@ -644,6 +664,7 @@ export const methods = {
       // stored and never seen. Ownership stays in ownership.ts.
       task_ids: p.task_ids ?? [],
       started_at: p.started_at,
+      source: p.source ?? "stdio",
     });
 
     // Retention, swept on a write path because this deployment has no
@@ -692,6 +713,97 @@ function shapeBriefing(
   return { digest: text, chars, dropped };
 }
 
+/**
+ * How many distinct terms of a new task's title a dead end must share before
+ * it is offered with the task.
+ *
+ * Counted from the snippet's highlights rather than from the score. The
+ * full-text query is rewritten to a disjunction, so a title matches every dead
+ * end sharing one word with it, and `ts_rank` cannot draw the line: measured in
+ * `smoke:search`, three shared terms scored 0.046 and one scored 0.030, and
+ * both numbers move with the length of the title. `ts_headline` marks each term
+ * it matched, so two different marked words is "about the same thing" in a
+ * form that does not drift.
+ */
+const RELATED_DEAD_END_TERMS = 2;
+const RELATED_DEAD_ENDS = 3;
+
+/**
+ * "Has this been tried?", answered at the one moment the answer is cheapest:
+ * when the work is being written down, before anybody has spent an afternoon
+ * rediscovering why it failed. Same project only, headlines only, and absent
+ * when nothing clears the bar -- an empty list on every create_task would be
+ * a key the agent learns to skip.
+ *
+ * Never fails the create. The task is already written; a search that errors
+ * here costs the hint, not the work.
+ */
+async function relatedDeadEnds(
+  userId: number,
+  projectId: number,
+  title: string,
+): Promise<{ related_dead_ends?: { entry_id: number; task_id: number | undefined; on_task: string; snippet: string }[] }> {
+  try {
+    const hits = await search(userId, title, 10, { projectId, kinds: ["dead_end"] });
+    const related = hits
+      .filter((h) => highlightedTerms(h.snippet) >= RELATED_DEAD_END_TERMS)
+      .slice(0, RELATED_DEAD_ENDS);
+    if (related.length === 0) return {};
+    return {
+      related_dead_ends: related.map((h) => ({
+        entry_id: h.id,
+        task_id: h.task_id,
+        on_task: h.title.replace(/^dead_end @ /, ""),
+        snippet: h.snippet,
+      })),
+    };
+  } catch (e) {
+    logError("createTask.relatedDeadEnds", e);
+    return {};
+  }
+}
+
+/** How long a richer carrier's last write keeps a git hook quiet. */
+export const CARRIER_ACTIVE_MS = 30 * 60_000;
+
+/**
+ * Who silences whom, and from when.
+ *
+ * Two carriers watching one checkout write two rows under two session ids,
+ * and the briefing's six observation slots then hold three sessions. So the
+ * richer carrier wins: stdio sees every tool call, the plugin's hooks see a
+ * session's edges, a git hook sees only commits.
+ *
+ * - A plugin hook stands down for stdio since its own session began, so
+ *   yesterday's stdio session does not silence today's hook-only one.
+ * - A git hook has no session to date from -- it fires per commit -- so it
+ *   stands down while either richer carrier has written in the last half
+ *   hour: a commit made inside an agent's session is that session's, and its
+ *   carrier will say so at its next write.
+ */
+const SHADOWS: Partial<
+  Record<ObservationSource, { by: ObservationSource[]; reason: string; since: (p: { started_at?: string }) => string }>
+> = {
+  "claude-code-hook": { by: ["stdio"], reason: "stdio_active", since: (p) => p.started_at ?? now() },
+  "git-hook": {
+    by: ["stdio", "claude-code-hook"],
+    reason: "carrier_active",
+    since: () => new Date(Date.now() - CARRIER_ACTIVE_MS).toISOString(),
+  },
+};
+
+/** The reason a write is skipped because a richer carrier has it, or null. */
+async function shadowedBy(
+  userId: number,
+  projectId: number,
+  p: { source?: ObservationSource; started_at?: string },
+): Promise<string | null> {
+  const rule = p.source ? SHADOWS[p.source] : undefined;
+  if (!rule) return null;
+  const active = await observationsRepo.observedBySourcesSince(userId, projectId, rule.by, rule.since(p));
+  return active ? rule.reason : null;
+}
+
 function pruneEmptyProjects(userId: number, keep: number) {
   const cutoff = new Date(Date.now() - EMPTY_PROJECT_DAYS * 86_400_000).toISOString();
   void projectsRepo
@@ -700,6 +812,18 @@ function pruneEmptyProjects(userId: number, keep: number) {
 }
 
 export type { MethodName };
+
+/**
+ * The name a call is counted under. A hook's call is `hook:<method>`, still a
+ * method name and nothing more, so the measurement rule holds -- but it is no
+ * longer an agent's. Folded in, the SessionStart hook's getContext would read
+ * as every session starting by the book, and the silent-account nudge (which
+ * asks "has this account called anything?") would go quiet for an account
+ * whose agents never call anything at all.
+ */
+export function usageName(ctx: RpcContext, method: MethodName): string {
+  return ctx.carrier ? `hook:${method}` : method;
+}
 
 /**
  * Params are validated here, not trusted here.
@@ -733,7 +857,8 @@ export async function invoke(ctx: RpcContext, method: string, params: unknown) {
   // reads until `pnpm usage` runs. The process is a long-lived container,
   // not a function frozen at the response, so the write completes behind the
   // reply. What a crash between the two would lose is one count.
-  const count = (ok: boolean) => void toolUsage.record(ctx.userId, method, ok).catch(() => {});
+  const count = (ok: boolean) =>
+    void toolUsage.record(ctx.userId, usageName(ctx, method), ok).catch((e) => logError("toolUsage.record", e));
 
   try {
     const clean = parseParams(method, params);

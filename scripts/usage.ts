@@ -67,8 +67,12 @@ const KIND = {
   reportRefs: "automatic",
 } satisfies Record<MethodName, Kind>;
 
-const kindOf = (method: string): Kind | "unknown" =>
-  method in KIND ? KIND[method as MethodName] : "unknown";
+// `hook:<method>` is a client-side hook asking on the agent's behalf
+// (`usageName` in lib/services/rpc.ts): the client, by definition.
+const kindOf = (method: string): Kind | "unknown" => {
+  if (method.startsWith("hook:")) return "automatic";
+  return method in KIND ? KIND[method as MethodName] : "unknown";
+};
 
 const days = () => {
   const raw = process.argv[2];

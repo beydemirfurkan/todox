@@ -15,7 +15,14 @@ export class RpcError extends Error {
 
 export type RpcClient = (method: string, params?: unknown) => Promise<unknown>;
 
-export function createClient(baseUrl: string, token: string): RpcClient {
+export interface ClientOptions {
+  /** Sent with every call. The plugin's hooks name themselves here. */
+  headers?: Record<string, string>;
+  /** Abandon a call after this long. A hook has seconds, not a session. */
+  timeoutMs?: number;
+}
+
+export function createClient(baseUrl: string, token: string, options: ClientOptions = {}): RpcClient {
   const endpoint = new URL("/api/rpc", baseUrl).toString();
 
   return async (method, params) => {
@@ -24,10 +31,12 @@ export function createClient(baseUrl: string, token: string): RpcClient {
       res = await fetch(endpoint, {
         method: "POST",
         headers: {
+          ...options.headers,
           "content-type": "application/json",
           authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ method, params: params ?? {} }),
+        ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
       });
     } catch (e) {
       throw new RpcError(

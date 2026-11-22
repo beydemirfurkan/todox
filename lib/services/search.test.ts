@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MIN_SUBSTRING_CHARS, SEARCHED, TRGM_INDEXES, TSQUERY } from "../db/fts";
 import { SCHEMA } from "../db/schema";
-import { escapeLike, QUERIES } from "./search";
+import { escapeLike, highlightedTerms, QUERIES } from "./search";
 
 /**
  * The query went into `%…%` and straight to ILIKE. Two characters in that
@@ -232,4 +232,14 @@ describe("the query it matches on is not the query it ranks by", () => {
       expect(QUERIES[table]).toContain("WITH ORDINALITY");
     });
   }
+});
+
+describe("highlightedTerms", () => {
+  it("counts each marked word once, whatever its case", () => {
+    expect(highlightedTerms("<b>Redis</b> <b>session</b> ... <b>redis</b> again")).toBe(2);
+  });
+
+  it("is zero for a snippet nothing was marked in", () => {
+    expect(highlightedTerms("a substring-only hit has no marks")).toBe(0);
+  });
 });
