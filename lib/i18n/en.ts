@@ -55,7 +55,9 @@ export const en = {
   forAgents: "Are you an agent? Read /llms.txt.",
   privacyLastUpdated: "Last updated: 22 November 2026.",
   privacyWhatWeStore: "What we store",
-  privacyStore1: "Your account: email, username, display name, and a password hash. The hash is scrypt and we cannot read your password.",
+  privacyStore1: "Your account: email, username, display name, and a password hash if you set a password. The hash is scrypt and we cannot read your password.",
+  privacyStoreOAuth:
+    "If you sign in with Google or GitHub: which provider, the account id it gives us, and the email address it has verified. We ask only for your name and email, use the access it grants once to read them, and do not keep any provider token.",
   privacyStore2: "Your projects, tasks, log entries, context notes, and project memberships — the data you put into todox.",
   privacyStore3: "Session cookies that keep you signed in. They are HTTP-only, signed, and expire when you sign out or after 30 days of inactivity.",
   privacyStore4: "Server logs with your IP address and request path, kept for 30 days for abuse detection and debugging.",
@@ -67,6 +69,8 @@ export const en = {
   privacySubprocessorsBody:
     "todox itself is the only processor of your data. We use a small set of infrastructure sub-processors to run the service:",
   privacySub1: "Hostinger — a virtual server in Frankfurt, Germany. The application and the PostgreSQL database both run on it, so your projects, tasks and notes stay on that one machine.",
+  privacySubOAuth:
+    "Google and GitHub — only if you choose to sign in with them. They see that you are signing in to todox, and tell us who you are; nothing about your projects goes to them.",
   privacySub2: "Resend — transactional email for verification and password reset. Only the recipient address and the message itself are handed over, and Resend processes them in its Tokyo (ap-northeast-1) region.",
   privacyRetention: "How long we keep your data",
   privacyRetentionBody:
