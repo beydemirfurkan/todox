@@ -1,48 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { isDeveloperKind } from "@/lib/constants";
+import { OPEN_STATUSES } from "@/lib/constants";
 import type { T } from "@/lib/i18n";
-import { getT } from "@/lib/lang";
+import { getT, getTz } from "@/lib/lang";
 import { currentUser } from "@/lib/session";
 import * as apiTokens from "@/lib/repositories/api-tokens";
-import { OPEN_STATUSES } from "@/lib/constants";
 import * as contexts from "@/lib/repositories/contexts";
 import * as entriesRepo from "@/lib/repositories/entries";
 import * as invitationsRepo from "@/lib/repositories/project-invitations";
 import * as memberships from "@/lib/repositories/project-memberships";
 import * as tasks from "@/lib/repositories/tasks";
-import * as projectActivity from "@/lib/services/project-activity";
-import {
-  clearEmptyProjectAction,
-  createProjectAction,
-} from "./actions";
+import { firstLine } from "@/lib/util/headline";
+import { accountProjects } from "./account-projects";
+import { clearEmptyProjectAction, createTaskAction } from "./actions";
+import { IconTile, WaitingList } from "./components";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
-import { Explainer, FirstRun } from "./features/explainer";
+import { projectColor } from "./components/project-color";
+import { TaskRow } from "./components/task-row";
+import { FirstSteps } from "./features/first-steps";
 import { Landing } from "./features/landing";
 import { SubmitButton } from "./features/submit";
-import {
-  Composer,
-  Counter,
-  Empty,
-  Group,
-  IconTile,
-  ProjectFields,
-  ProjectLanes,
-  ProjectRow,
-  WaitingList,
-  StatBadges,
-} from "./components";
 import { QUIET_AFTER_DAYS } from "./p/[slug]/board";
-import { groupProjects, isLive } from "./project-groups";
 import { pageOpenGraph } from "./metadata-shared";
 import { waitingItems } from "./waiting";
 
 /**
- * Titles a lane prints per status. The counts beside them are the true ones;
- * a lane is a glance, and past a few lines per cell it stops being one.
+ * Rows Today prints per section. The totals beside them are the true ones,
+ * and the rest are a click away on their projects.
  */
-const LANE_TASKS_PER_STATUS = 2;
+const DOING_SHOWN = 20;
+const NEXT_SHOWN = 8;
+const BLOCKED_SHOWN = 5;
 
 /** Cards in "Waiting on you". The rest are counted, and found on their projects. */
 const WAITING_SHOWN = 6;
@@ -63,7 +52,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 
 export default async function Home() {
-  const { t } = await getT();
+  const { t, lang } = await getT();
   const user = await currentUser();
   // The one page with two audiences. Signed out this is the only description
   // of the product anyone can reach; signed in it is the dashboard.
@@ -78,77 +67,57 @@ export default async function Home() {
         <Landing t={t} />
       </>
     );
-  // One counts query for the whole page instead of one per project card.
-  const [allProjects, globalContext, counts, connected] = await Promise.all([
-    projectActivity.listRecent(user.id),
-    contexts.listByProject(user.id, null),
-    tasks.countsByProject(user.id),
+  const [{ projects: allProjects, counts }, connected] = await Promise.all([
+    // Shared with the sidebar through `cache`, so this is not a second query.
+    accountProjects(user.id),
     // Rides along rather than costing a round trip of its own.
     apiTokens.hasConnectedAgent(user.id),
   ]);
+
+  if (allProjects.length === 0)
+    return <FirstSteps name={user.name.trim()} isConnected={connected} t={t} />;
+
   /**
    * Owned, and empty for everybody -- not just for me.
    *
    * Both halves were wrong first time round and both were found by building
-   * the case. The project activity list answers with projects shared WITH this
-   * account as well as its own, and `clearEmptyProjectAction` asserts ownership
-   * -- so a shared project appeared in this list and its button threw. And
-   * notes were counted per author, so a project holding only its owner's
-   * standing rules read as empty to a member. `removeIfEmpty` refuses on any
-   * note by anyone, which is the definition this list now matches.
+   * the case. The project list answers with projects shared WITH this account
+   * as well as its own, and `clearEmptyProjectAction` asserts ownership -- so a
+   * shared project appeared in this list and its button threw. And notes were
+   * counted per author, so a project holding only its owner's standing rules
+   * read as empty to a member. `removeIfEmpty` refuses on any note by anyone,
+   * which is the definition this list matches.
    */
   const owned = allProjects.filter((p) => p.user_id === user.id);
   const allIds = allProjects.map((p) => p.id);
-  // A lane is drawn for a project with work in flight, and which those are is
-  // known from the counts already in hand -- so their tasks ride in the second
-  // round below rather than costing a third.
-  const liveIds = allIds.filter((id) => isLive(counts.map.get(id)));
   const renderedAt = new Date();
   const quietBefore = new Date(renderedAt.getTime() - QUIET_AFTER_DAYS * DAY_MS).toISOString();
-  // All of these need the project list first, so they wait -- but they wait
-  // together, the way the project page pairs its own second round.
-  const [teamSizes, notesByProject, pending, leftOff, laneTasks, questions, stalled] =
+  // Everything below needs the project ids, so it waits for them -- together.
+  const [doing, next, blocked, teamSizes, notesByProject, pending, questions, stalled] =
     await Promise.all([
-    // One grouped query for every card, not one per card.
-    memberships.countsByProjects(allProjects.map((p) => p.id)),
-    contexts.projectIdsHoldingNotes(owned.map((p) => p.id)),
-    // People waiting on an invitation. Without this the list and the DELETE
-    // disagree, and a disagreement here is a button that does nothing.
-    invitationsRepo.projectIdsWithPending(owned.map((p) => p.id), new Date().toISOString()),
-    // What a card can say that its name and its counts cannot.
-    entriesRepo.latestHandoffByProjects(allIds, OPEN_STATUSES),
-    // The top of each status, per project, in one query for every lane.
-    tasks.openByProjects(liveIds, LANE_TASKS_PER_STATUS),
-    // What only a person can move: asked across every project this account
-    // can see, because a question in a quiet project waits just as long.
-    entriesRepo.openQuestionsByProjects(allIds, OPEN_STATUSES, WAITING_SHOWN),
-    tasks.stalledByProjects(allIds, quietBefore, WAITING_SHOWN),
-  ]);
+      tasks.openAcross(allIds, "doing", DOING_SHOWN),
+      tasks.openAcross(allIds, "todo", NEXT_SHOWN),
+      tasks.openAcross(allIds, "blocked", BLOCKED_SHOWN),
+      memberships.countsByProjects(allIds),
+      contexts.projectIdsHoldingNotes(owned.map((p) => p.id)),
+      // People waiting on an invitation. Without this the list and the DELETE
+      // disagree, and a disagreement here is a button that does nothing.
+      invitationsRepo.projectIdsWithPending(owned.map((p) => p.id), renderedAt.toISOString()),
+      // What only a person can move: asked across every project this account
+      // can see, because a question in a quiet project waits just as long.
+      entriesRepo.openQuestionsByProjects(allIds, OPEN_STATUSES, WAITING_SHOWN),
+      tasks.stalledByProjects(allIds, quietBefore, WAITING_SHOWN),
+    ]);
+  // The agent's last word on each task in progress: one query for all of them.
+  const handoffs = await entriesRepo.latestHandoffByTasks(doing.map((task) => task.id));
   const waiting = waitingItems({ questions, stalled, limit: WAITING_SHOWN, now: renderedAt });
   const slugOf = new Map(allProjects.map((p) => [p.id, p.slug]));
+  const projectOf = new Map(allProjects.map((p) => [p.id, p]));
 
   /**
-   * Projects that hold nothing at all.
-   *
-   * `list_projects` has counted these and left them out since it was written,
-   * and the browser has never had anywhere to act on that count. Registration
-   * is deliberately frictionless -- a path an agent passes becomes a project --
-   * so the shells are the price of that, and on 2026-09-04 they were eighteen
-   * of sixty-four across the account holders here.
-   *
-   * Notes are what separates "empty" from "quiet": a project can carry standing
-   * rules and no tasks, and that is a project doing its job.
-   */
-  /**
-   * The same question `removeIfEmpty` asks, in the same terms.
-   *
-   * A project with people in it is not empty, whatever else it holds -- and
-   * the state right after inviting somebody into a fresh repo is exactly no
-   * tasks and no notes. That project was listed here with a one-click remove,
-   * and the click took the membership and the invitation with it.
-   *
-   * The two definitions have to stay in step: if this list is looser than the
-   * DELETE the button does nothing, and if it is tighter the fold hides work
+   * The same question `removeIfEmpty` asks, in the same terms: no tasks, no
+   * notes, no people, no invitation waiting. If this list is looser than the
+   * DELETE the button does nothing; if it is tighter the fold hides work
    * somebody could clear.
    */
   const emptyProjects = owned.filter(
@@ -159,187 +128,136 @@ export default async function Home() {
       !pending.has(p.id),
   );
 
-  /**
-   * The pitch is for somebody who has not started yet.
-   *
-   * It used to be here on every visit: a headline, a paragraph explaining what
-   * todox is, and three cards explaining how it works — better than half the
-   * screen, above the projects, for an account that has been using it for a
-   * month. Explaining the product to the person already using it is the same
-   * failure the log itself is written against: a thing that is always true
-   * does not need saying every time.
-   *
-   * The first project is the line. Before it there is nothing else to show and
-   * the page has to teach; after it the page has work on it, and the
-   * explanation is one click away on /about. The five entry kinds go with it,
-   * because the task composer already names each one where it is actually
-   * being chosen.
-   */
-  const beforeFirstProject = allProjects.length === 0;
+  const total = (status: "todo" | "doing" | "blocked") =>
+    allIds.reduce((sum, id) => sum + (counts.map.get(id)?.[status] ?? 0), 0);
+  const totals = { doing: total("doing"), todo: total("todo"), blocked: total("blocked") };
+  const projectsWithOpenWork = allIds.filter((id) => {
+    const count = counts.map.get(id);
+    return count && count.todo + count.doing + count.blocked > 0;
+  }).length;
+  const today = new Intl.DateTimeFormat(lang === "tr" ? "tr-TR" : "en-GB", {
+    day: "numeric",
+    month: "long",
+    weekday: "long",
+    timeZone: await getTz(),
+  }).format(renderedAt);
 
-  /**
-   * What is moving, then what is not.
-   *
-   * Every project used to be a card, at equal weight, newest activity first:
-   * thirty-two of them over 4,200px on the account that measured it, with the
-   * six that had work in flight sitting among twenty-four that had none, and
-   * the notes that hold for every project at the very bottom. The page now
-   * reads in the order the agent's briefing does -- the same fold the project
-   * page moved to -- and a quiet project is a row, because there is nothing
-   * happening in it to fill a card with.
-   */
-  const { live, quiet } = groupProjects(
-    allProjects,
-    counts.map,
-    new Set(emptyProjects.map((p) => p.id)),
-  );
-  const countsOf = (id: number) => counts.map.get(id) ?? counts.empty;
-  const totals = allProjects.reduce(
-    (sum, p) => ({ doing: sum.doing + countsOf(p.id).doing, blocked: sum.blocked + countsOf(p.id).blocked }),
-    { doing: 0, blocked: 0 },
-  );
-  const teamOf = (id: number) => teamSizes.get(id) ?? 0;
+  const rowFor = (task: tasks.LaneTask, note?: string | null) => {
+    const project = projectOf.get(task.project_id);
+    if (!project) return null;
+    return (
+      <TaskRow
+        key={task.id}
+        task={task}
+        project={project}
+        note={note}
+        isImportant={task.priority === 1}
+        t={t}
+      />
+    );
+  };
 
   return (
-    // Wide, like a project: this is a board of lanes, not a page to read --
-    // once there are projects. Before the first one it is a pitch and a form,
-    // and those read at the ordinary measure.
-    <div className="space-y-5" data-wide-page={beforeFirstProject ? undefined : true}>
-      {beforeFirstProject ? (
-        <>
-          <div className="pop prose">
-            <h1 className="display text-[28px] leading-[1.1] font-bold sm:text-[36px]">
-              {t("heroTitle")}
-            </h1>
-            <p className="mt-2 text-[15.5px] leading-relaxed text-muted">{t("heroBody")}</p>
-          </div>
+    <div className="today flex flex-col gap-10">
+      <header className="flex flex-col gap-1.5">
+        <h1 className="display text-[34px] leading-tight">{t("todayTitle")}</h1>
+        <p className="text-body text-muted">
+          {today} ·{" "}
+          {t("todaySummary", {
+            tasks: totals.doing + totals.todo + totals.blocked,
+            projects: projectsWithOpenWork,
+          })}
+        </p>
+      </header>
 
-          <Explainer t={t} />
+      <QuickAdd projects={allProjects} t={t} />
 
-          <h2 className="display pop pt-1 text-[25px] font-bold">{t("projects")}</h2>
-          {/* The first project is the line. Before it there is one thing to
-              do, so the form is open rather than behind a "+". */}
-          <FirstRun t={t}>
-            <form action={createProjectAction} className="mt-2 w-full max-w-sm space-y-2 text-left">
-              <ProjectFields t={t} />
-            </form>
-          </FirstRun>
-        </>
-      ) : (
-        // The page is a list of projects, so that is its heading. Promoted from
-        // h2 rather than left behind a headline that is no longer the subject:
-        // a document has one h1, and this is now it.
-        <>
-          <h1 className="display pop text-[32px] leading-[1.1] sm:text-[44px]">{t("projects")}</h1>
-          <StatBadges
-            className="pop"
-            style={{ animationDelay: "30ms" }}
-            stats={[
-              { mark: "var(--k-decision)", value: live.length, label: t("statLive"), href: "#live" },
-              { mark: "var(--accent)", value: totals.doing, label: t("statDoing"), href: "#live" },
-              { mark: "var(--k-dead_end)", value: totals.blocked, label: t("statBlocked"), href: "#live" },
-              { mark: "var(--k-question)", value: waiting.items.length + waiting.omitted, label: t("statWaiting"), href: waiting.items.length > 0 ? "#waiting" : undefined },
-            ]}
-            label={t("statSummary")}
-          />
-        </>
-      )}
-
-      {/* First, and absent when nothing waits: the one list on this page that
-          is about the reader rather than about the projects. A heading over
-          "nothing is waiting on you" on every visit is the always-true
-          sentence this page has removed twice already. */}
       {waiting.items.length > 0 && (
-        <section
-          aria-labelledby="waiting"
-          className="pop sticker p-4"
-          style={{ animationDelay: "40ms" }}
-        >
-          <h2 id="waiting" className="display text-[17px] font-bold">
+        <section aria-labelledby="waiting" className="flex flex-col gap-2">
+          <h2 id="waiting" className="today-heading text-[color:var(--k-question)]">
             {t("waitingTitle")}
           </h2>
-          <p className="prose mt-0.5 mb-3 text-small text-muted">{t("waitingBody")}</p>
           <WaitingList items={waiting.items} omitted={waiting.omitted} slugOf={slugOf} t={t} />
         </section>
       )}
 
-      {!beforeFirstProject && (
-        // Cards on the canvas, not cards inside a group card: a card in a
-        // card is two edges and two shadows for one thing.
-        <section id="live" aria-labelledby="live-title" className="scroll-mt-4 space-y-4 pt-2">
-          <h2 id="live-title" className="display flex items-center gap-2.5 text-[24px]">
-            {t("inFlight")}
-            <Counter n={live.length} label={t("projectsCount")} />
-          </h2>
-          {live.length === 0 ? (
-            <Empty>{t("liveProjectsEmpty")}</Empty>
-          ) : (
-            <ProjectLanes
-              lanes={live.map((p) => ({
-                project: p,
-                counts: countsOf(p.id),
-                teamSize: teamOf(p.id),
-                tasks: laneTasks.get(p.id) ?? [],
-                leftOff: leftOff.get(p.id)?.body ?? null,
-              }))}
-              titles={{ todo: t("queued"), doing: t("colDoing"), blocked: t("colBlocked") }}
-              t={t}
-            />
-          )}
-        </section>
-      )}
-
-      {/* Above the quiet projects: who the developer is, and the rules that
-          hold everywhere, live on their own page now -- this is the door. */}
-      <BrainCard
-        developerNotes={globalContext.filter((n) => isDeveloperKind(n.kind)).length}
-        rules={globalContext.filter((n) => !isDeveloperKind(n.kind)).length}
+      <TaskSection
+        id="doing"
+        title={t("todayDoing")}
+        hint={t("todayDoingHint")}
+        isAccent
+        shown={doing.length}
+        total={totals.doing}
+        empty={t("todayDoingEmpty")}
         t={t}
-      />
+      >
+        {doing.map((task) => {
+          const handoff = handoffs.get(task.id);
+          return rowFor(task, handoff ? firstLine(handoff.body) : null);
+        })}
+      </TaskSection>
 
-      {!beforeFirstProject && (
-        <Group
-          id="quiet"
-          title={t("quietProjects")}
-          count={quiet.length}
-          countLabel={t("projectsCount")}
-          // A new project has no work in flight, so this is the group it
-          // lands in, and the "+" sits on the group its result lands in.
-          action={
-            <Composer id="new-project" label={t("newProject")} action={createProjectAction}>
-              <ProjectFields t={t} autoFocus />
-            </Composer>
-          }
-          open
-          delay={180}
+      <TaskSection
+        id="next"
+        title={t("todayNext")}
+        hint={t("todayNextHint")}
+        shown={next.length}
+        total={totals.todo}
+        empty={t("todayNextEmpty")}
+        t={t}
+      >
+        {next.map((task) => rowFor(task))}
+      </TaskSection>
+
+      {blocked.length > 0 && (
+        <TaskSection
+          id="blocked"
+          title={t("todayBlocked")}
+          shown={blocked.length}
+          total={totals.blocked}
+          empty=""
+          t={t}
         >
-          {quiet.length === 0 ? (
-            // Only true beside live projects. With none in flight either, it
-            // contradicted the empty state just above it (B14).
-            <Empty>{live.length > 0 ? t("quietEmpty") : t("quietEmptyNothingLive")}</Empty>
-          ) : (
-            <ul className="space-y-1.5">
-              {quiet.map((p) => (
-                <ProjectRow
-                  key={p.id}
-                  project={p}
-                  counts={countsOf(p.id)}
-                  teamSize={teamOf(p.id)}
-                  leftOff={leftOff.get(p.id)?.body ?? null}
-                  t={t}
-                />
-              ))}
-            </ul>
-          )}
-        </Group>
+          {blocked.map((task) => rowFor(task))}
+        </TaskSection>
       )}
+
+      {/* On a phone the sidebar is gone, and with it the project list -- so
+          it lives at the bottom of Today there. */}
+      <section aria-labelledby="projects-mobile" className="flex flex-col gap-2 md:hidden">
+        <h2 id="projects-mobile" className="today-heading">
+          {t("projects")}
+        </h2>
+        <ul className="flex flex-col">
+          {allProjects.map((project) => {
+            const count = counts.map.get(project.id);
+            const open = count ? count.todo + count.doing + count.blocked : 0;
+            return (
+              <li key={project.id}>
+                <Link href={`/p/${project.slug}`} className="task-row" data-align="center">
+                  <span
+                    aria-hidden="true"
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ background: projectColor(project.id) }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-[16px]">{project.name}</span>
+                  {open > 0 && (
+                    <span className="text-meta text-muted">
+                      {t("sidebarOpenCount", { n: open })}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
       {emptyProjects.length > 0 && (
-        // Quiet on purpose: a fold, not a banner. These are not a problem to be
-        // alarmed about -- they are the cost of registration being frictionless
-        // enough that an agent never stops to ask -- so the count is visible
-        // and the list is one click away.
-        <details className="disclosure sticker pop p-4" style={{ animationDelay: "240ms" }}>
+        // Quiet on purpose: a fold, not a banner. These are the cost of
+        // registration being frictionless enough that an agent never stops to
+        // ask, so the count is visible and the list is one click away.
+        <details className="disclosure sticker p-5">
           <summary className="cursor-pointer text-[14px]">
             {emptyProjects.length === 1
               ? t("emptyProjectsTitleOne")
@@ -353,17 +271,13 @@ export default async function Home() {
                   {p.slug}
                 </Link>
                 {p.root_path && (
-                  <span className="mono min-w-0 truncate text-[12px] text-faint" title={p.root_path}>
+                  <span className="mono min-w-0 truncate text-meta text-faint" title={p.root_path}>
                     {p.root_path}
                   </span>
                 )}
                 <form action={clearEmptyProjectAction} className="ms-auto">
                   <input type="hidden" name="project_id" value={p.id} />
-                  {/* A real label, not an icon: colour and shape never carry
-                      meaning alone here. */}
-                  <SubmitButton pendingLabel={t("working")}>
-                    {t("emptyProjectsRemove")}
-                  </SubmitButton>
+                  <SubmitButton pendingLabel={t("working")}>{t("emptyProjectsRemove")}</SubmitButton>
                 </form>
               </li>
             ))}
@@ -371,61 +285,99 @@ export default async function Home() {
         </details>
       )}
 
-      {/* The same rule as the pitch above, applied to the last block on the
-          page: once an agent has actually connected, telling somebody to
-          connect one is advice they have already taken.
-
-          "Connected" is a token that has been used, not a token that exists.
-          Minting one is a click and the setup failing afterwards is precisely
-          the case this prompt is for — which is the same line `pnpm funnel`
-          draws between "got as far as the Account page" and "the setup
-          actually worked", so the page and the measurement agree. */}
+      {/* Once an agent has actually connected -- a token that has been used,
+          not one that exists -- telling somebody to connect one is advice they
+          have already taken. Same line `pnpm funnel` draws. */}
       {!connected && (
-      <section
-        className="pop sticker p-5"
-        style={{ animationDelay: "300ms" }}
-        aria-labelledby="hook-up"
-      >
-        <div className="flex items-start gap-4">
+        <section className="sticker flex items-start gap-4 p-5" aria-labelledby="hook-up">
           <IconTile name="terminal" color="var(--accent-ink)" />
           <div className="min-w-0 flex-1">
             <h2 id="hook-up" className="text-[16px] font-semibold">
               {t("hookTitle")}
             </h2>
             <p className="mt-1 text-[14px] text-muted">{t("hookBody")}</p>
-            <Link href="/account" className="link-more mt-3 inline-block">
+            <Link href="/account?tab=tokens" className="link-more mt-3 inline-block">
               {t("hookCta")}
             </Link>
           </div>
-        </div>
-      </section>
+        </section>
       )}
     </div>
   );
 }
 
-/** The way into the brain page, with what it holds counted. */
-function BrainCard({ developerNotes, rules, t }: { developerNotes: number; rules: number; t: T }) {
+/** A titled list of task rows, with how many it is not showing. */
+function TaskSection({
+  id,
+  title,
+  hint,
+  isAccent = false,
+  shown,
+  total,
+  empty,
+  t,
+  children,
+}: {
+  id: string;
+  title: string;
+  hint?: string;
+  isAccent?: boolean;
+  shown: number;
+  total: number;
+  empty: string;
+  t: T;
+  children: React.ReactNode;
+}) {
   return (
-    <section
-      className="sticker pop flex flex-wrap items-center gap-x-4 gap-y-3 p-4"
-      style={{ animationDelay: "120ms" }}
-    >
-      <IconTile name="brain" color="var(--accent)" />
-      <div className="min-w-[12rem] flex-1">
-        <h2 className="text-[16px] font-semibold text-ink-head">{t("brainCardTitle")}</h2>
-        <p className="text-small text-muted">{t("brainCardBody")}</p>
-      </div>
-      <StatBadges
-        label={t("brainCardTitle")}
-        stats={[
-          { label: t("brainNotesCount"), value: developerNotes, mark: "var(--accent)" },
-          { label: t("brainRulesCount"), value: rules, mark: "var(--k-handoff)" },
-        ]}
-      />
-      <Link href="/me" className="btn btn-quiet">
-        {t("brainOpen")}
-      </Link>
+    <section aria-labelledby={id} className="flex flex-col gap-2">
+      <h2 id={id} className="today-heading" data-accent={isAccent ? "true" : undefined}>
+        {title}
+        {hint && <span className="today-hint"> · {hint}</span>}
+      </h2>
+      {shown === 0 ? (
+        <p className="px-4 py-3 text-body text-muted">{empty}</p>
+      ) : (
+        <ul className="flex flex-col">{children}</ul>
+      )}
+      {total > shown && (
+        <p className="px-4 text-small text-muted">{t("todayMore", { n: total - shown })}</p>
+      )}
     </section>
+  );
+}
+
+/**
+ * Add a task without leaving Today: a title and which project it goes to.
+ * The project the account touched last is preselected.
+ */
+function QuickAdd({ projects, t }: { projects: { slug: string; name: string }[]; t: T }) {
+  return (
+    <form action={createTaskAction} className="quick-add">
+      <span aria-hidden="true" className="quick-add-plus">
+        +
+      </span>
+      <label className="sr-only" htmlFor="quick-add-title">
+        {t("todayAddLabel")}
+      </label>
+      <input
+        id="quick-add-title"
+        name="title"
+        required
+        autoComplete="off"
+        placeholder={t("todayAddPlaceholder")}
+        className="min-w-[12rem] flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-faint"
+      />
+      <label className="sr-only" htmlFor="quick-add-project">
+        {t("todayAddProject")}
+      </label>
+      <select id="quick-add-project" name="slug" className="quick-add-select">
+        {projects.map((project) => (
+          <option key={project.slug} value={project.slug}>
+            {project.name}
+          </option>
+        ))}
+      </select>
+      <SubmitButton pendingLabel={t("working")}>{t("todayAddSubmit")}</SubmitButton>
+    </form>
   );
 }

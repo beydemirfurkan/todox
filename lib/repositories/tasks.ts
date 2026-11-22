@@ -500,6 +500,42 @@ export async function openByProjects(
   return groupBy(rows, (row) => row.project_id);
 }
 
+/**
+ * How Today orders each open status across projects. In progress and stuck
+ * read newest first -- what was touched last is what you were on. Up next
+ * puts the important ones first, then the recently touched.
+ */
+const ACROSS_ORDER = {
+  doing: "updated_at DESC",
+  todo: "priority, updated_at DESC",
+  blocked: "updated_at DESC",
+} as const;
+
+export type AcrossStatus = keyof typeof ACROSS_ORDER;
+
+export const openAcrossSql = (projectCount: number, status: AcrossStatus): string =>
+  `SELECT id, project_id, title, status, priority, updated_at
+     FROM tasks
+    WHERE project_id IN (${Array.from({ length: projectCount }, () => "?").join(",")})
+      AND status = ?
+    ORDER BY ${ACROSS_ORDER[status]}, id DESC
+    LIMIT ?`;
+
+/**
+ * One status, across a set of projects, as a single list rather than a lane
+ * per project: Today asks "what is in progress anywhere", not "what is in
+ * progress in each". The project ids are the caller's accessible set, so this
+ * never decides access itself. The totals come from `countsByProject`.
+ */
+export async function openAcross(
+  projectIds: number[],
+  status: AcrossStatus,
+  limit: number,
+): Promise<LaneTask[]> {
+  if (!projectIds.length) return [];
+  return all<LaneTask>(openAcrossSql(projectIds.length, status), [...projectIds, status, limit]);
+}
+
 export type StalledTask = Pick<Task, "id" | "project_id" | "title" | "status" | "updated_at">;
 
 export const stalledByProjectsSql = (projectCount: number): string =>

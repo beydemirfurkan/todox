@@ -327,6 +327,8 @@ export async function createTaskAction(fd: FormData) {
     user_id: user.id,
   });
   revalidatePath(`/p/${slug}`);
+  // Today's quick add lands here too, and Today lists it under "up next".
+  revalidatePath("/");
 }
 
 export async function setStatusAction(fd: FormData) {
