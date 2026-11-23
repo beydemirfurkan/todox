@@ -609,6 +609,19 @@ body:has([data-wide-page]) .page-column {
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
+.sidebar-heading-action {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.sidebar-heading-action:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
 /* A person's own grouping of projects: see ProjectGroups. */
 .project-groups {
   display: flex;

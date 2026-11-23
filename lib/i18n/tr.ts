@@ -792,6 +792,8 @@ export const tr: Record<Key, string> = {
     "Böyle bir sayfa yok; ya da işaret ettiği projenin adı değişmiş veya silinmiş.",
   backHome: "projelerine dön",
 
+  manageFolders: "klasörler, sabitleme ve arşiv",
+  foldersLink: "klasörler",
   sidebarPinned: "sabitlenenler",
   sidebarLoose: "klasörsüz",
   sidebarArchive: "arşiv",

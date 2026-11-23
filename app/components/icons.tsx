@@ -32,7 +32,8 @@ export type IconName =
   | "arrow-right"
   | "replay"
   | "plus"
-  | "close";
+  | "close"
+  | "folder";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   inbox: (
@@ -108,6 +109,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
   replay: <path d="M3 11a9 9 0 1 1 2.6 7.4M3 5v6h6" />,
   plus: <path d="M12 5v14M5 12h14" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
+  folder: (
+    <>
+      <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+      <path d="M12 11v5M9.5 13.5h5" />
+    </>
+  ),
 };
 
 /** The bare line icon, for a control that already has its own frame. */
