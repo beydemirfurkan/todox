@@ -11,6 +11,7 @@ import { SearchBox } from "../features/search-box";
 import { SidebarLink } from "../features/sidebar-link";
 import { Icon } from "./icons";
 import { LogoMark } from "./logo-mark";
+import { ProjectGroups } from "./project-groups";
 import { projectColor } from "./project-color";
 
 /**
@@ -86,34 +87,44 @@ function initial(user: PublicUser): string {
 
 /** Its own boundary: two queries the rest of the sidebar does not wait for. */
 async function SidebarProjects({ userId, t }: { userId: number; t: T }) {
-  const { projects, counts } = await accountProjects(userId);
+  const { projects, counts, arranged } = await accountProjects(userId);
   if (!projects.length) {
     return <p className="px-3 text-meta leading-relaxed text-faint">{t("sidebarNoProjects")}</p>;
   }
   return (
-    <ul className="sidebar-projects flex min-h-0 flex-1 flex-col gap-0.5">
-      {projects.map((project) => {
-        const count = counts.map.get(project.id);
-        const open = count ? count.todo + count.doing + count.blocked : 0;
-        return (
-          <li key={project.id}>
-            <SidebarLink href={`/p/${project.slug}`} title={project.name}>
-              <span
-                aria-hidden="true"
-                className="size-2 shrink-0 rounded-full"
-                style={{ background: projectColor(project.id) }}
-              />
-              <span className="min-w-0 flex-1 truncate">{project.name}</span>
-              {open > 0 && (
-                <span className="text-meta text-faint">
-                  <span className="sr-only">{open === 1 ? t("sidebarOpenCountOne") : t("sidebarOpenCount", { n: open })}</span>
-                  <span aria-hidden="true">{open}</span>
-                </span>
-              )}
-            </SidebarLink>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="sidebar-projects flex min-h-0 flex-1 flex-col">
+      <ProjectGroups
+        arranged={arranged}
+        listClassName="flex flex-col gap-0.5"
+        labels={{
+          pinned: t("sidebarPinned"),
+          loose: t("sidebarLoose"),
+          archive: t("sidebarArchive"),
+          empty: t("folderEmpty"),
+        }}
+        renderRow={(project) => {
+          const count = counts.map.get(project.id);
+          const open = count ? count.todo + count.doing + count.blocked : 0;
+          return (
+            <li key={project.id}>
+              <SidebarLink href={`/p/${project.slug}`} title={project.name}>
+                <span
+                  aria-hidden="true"
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ background: projectColor(project.id) }}
+                />
+                <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                {open > 0 && (
+                  <span className="text-meta text-faint">
+                    <span className="sr-only">{open === 1 ? t("sidebarOpenCountOne") : t("sidebarOpenCount", { n: open })}</span>
+                    <span aria-hidden="true">{open}</span>
+                  </span>
+                )}
+              </SidebarLink>
+            </li>
+          );
+        }}
+      />
+    </div>
   );
 }

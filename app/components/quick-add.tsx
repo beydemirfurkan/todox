@@ -10,7 +10,14 @@ import { SubmitButton } from "../features/submit";
  */
 export type QuickAddTarget =
   | { slug: string }
-  | { projects: { slug: string; name: string }[] };
+  | { projects: QuickAddProject[] };
+
+/** `folder` groups the picker the way the person grouped their list. */
+export interface QuickAddProject {
+  slug: string;
+  name: string;
+  folder?: string | null;
+}
 
 /**
  * A task in one line: the title, where it goes, and whether it is important.
@@ -40,12 +47,15 @@ export function QuickAdd({ target, t, popoverId }: { target: QuickAddTarget; t: 
           <label className="sr-only" htmlFor={`${fieldPrefix}-project`}>
             {t("todayAddProject")}
           </label>
-          <select id={`${fieldPrefix}-project`} name="slug" className="quick-add-select">
-            {target.projects.map((project) => (
-              <option key={project.slug} value={project.slug}>
-                {project.name}
-              </option>
-            ))}
+          {/* Grouped by folder, but the default stays the project touched
+              last -- the first one given -- wherever its folder puts it. */}
+          <select
+            id={`${fieldPrefix}-project`}
+            name="slug"
+            className="quick-add-select"
+            defaultValue={target.projects[0]?.slug}
+          >
+            <ProjectOptions projects={target.projects} />
           </select>
         </>
       )}
@@ -62,5 +72,25 @@ export function QuickAdd({ target, t, popoverId }: { target: QuickAddTarget; t: 
       <SubmitButton pendingLabel={t("working")}>{t("todayAddSubmit")}</SubmitButton>
       {popoverId && <ClosePopoverAfterSubmit />}
     </form>
+  );
+}
+
+/** Projects in no folder first, then one `<optgroup>` per folder, each in the order given. */
+function ProjectOptions({ projects }: { projects: QuickAddProject[] }) {
+  const option = (project: QuickAddProject) => (
+    <option key={project.slug} value={project.slug}>
+      {project.name}
+    </option>
+  );
+  const folders = [...new Set(projects.flatMap((project) => (project.folder ? [project.folder] : [])))];
+  return (
+    <>
+      {projects.filter((project) => !project.folder).map(option)}
+      {folders.map((folder) => (
+        <optgroup key={folder} label={folder}>
+          {projects.filter((project) => project.folder === folder).map(option)}
+        </optgroup>
+      ))}
+    </>
   );
 }

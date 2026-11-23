@@ -609,6 +609,59 @@ body:has([data-wide-page]) .page-column {
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
+/* A person's own grouping of projects: see ProjectGroups. */
+.project-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.project-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+}
+.project-group > summary {
+  list-style: none;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.project-group > summary::-webkit-details-marker {
+  display: none;
+}
+.project-group > summary:hover {
+  color: var(--ink);
+}
+.project-group > summary:focus-visible {
+  outline-width: 2px;
+  outline-offset: -2px;
+}
+.project-group-caret {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+.project-group[open] > summary .project-group-caret {
+  transform: rotate(45deg);
+}
+.project-group-empty {
+  padding: 2px 12px 6px 26px;
+}
+@media (max-width: 640px) {
+  .project-group > summary {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-group-caret {
+    transition: none;
+  }
+}
 .sidebar-link {
   display: flex;
   align-items: center;

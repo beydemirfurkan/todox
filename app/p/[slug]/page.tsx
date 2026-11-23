@@ -35,6 +35,7 @@ import {
   IconTile,
   NoteGroups,
 } from "../../components";
+import { accountProjects } from "../../account-projects";
 import { QuickAdd } from "../../components/quick-add";
 import { TaskRow, TaskSection } from "../../components/task-row";
 import { ProjectMenu } from "../../features/project-menu";
@@ -103,13 +104,16 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const isOwner = project.access_role === "owner";
   const tab = projectTab(asked.tab);
   const view = taskView(asked.view);
-  const [all, projectContext, members] = await Promise.all([
+  const [all, projectContext, members, arrangement] = await Promise.all([
     tasksRepo.listForBoard(project.id),
     contexts.listByProject(user.id, project.id),
     // Everyone with access sees who else has it: from a member's side, this
     // is the only place that says the collaboration exists at all.
     membershipsRepo.listByProject(project.id),
+    // Already read for the sidebar in this request: `cache` makes it free.
+    accountProjects(user.id),
   ]);
+  const placement = arrangement.placements.find((row) => row.project_id === project.id);
   const open = all.filter((task) => !isClosed(task.status));
 
   // All of these need the task list, so they wait for it -- together.
@@ -143,32 +147,45 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           {!isOwner && project.owner_name && (
             <Chip color="var(--k-handoff)">{t("sharedBy", { name: project.owner_name })}</Chip>
           )}
-          {isOwner && (
-            <ProjectMenu
-              project={{
-                id: project.id,
-                slug: project.slug,
-                name: project.name,
-                summary: project.summary,
-                repoUrl: project.repo_url,
-                rootPath: project.root_path,
-              }}
-              labels={{
-                open: t("projectSettings"),
-                details: t("settingsGeneral"),
-                name: t("projectNameLabel"),
-                summary: t("projectSummaryLabel"),
-                repo: t("projectRepoLabel"),
-                repoPlaceholder: t("projectRepoPh"),
-                save: t("apply"),
-                saving: t("saving"),
-                team: t("settingsTeam"),
-                sharing: t("sharing"),
-                allSettings: t("projectAllSettings"),
-                delete: t("deleteProject"),
-              }}
-            />
-          )}
+          <ProjectMenu
+            project={{ id: project.id, slug: project.slug, name: project.name }}
+            details={
+              isOwner
+                ? { summary: project.summary, repoUrl: project.repo_url, rootPath: project.root_path }
+                : null
+            }
+            placement={{
+              folderId: placement?.folder_id ?? null,
+              pinnedAt: placement?.pinned_at ?? null,
+              archivedAt: placement?.archived_at ?? null,
+              folders: arrangement.folders.map((folder) => ({ id: folder.id, name: folder.name })),
+            }}
+            labels={{
+              open: t("projectSettings"),
+              details: t("settingsGeneral"),
+              name: t("projectNameLabel"),
+              summary: t("projectSummaryLabel"),
+              repo: t("projectRepoLabel"),
+              repoPlaceholder: t("projectRepoPh"),
+              save: t("apply"),
+              saving: t("saving"),
+              team: t("settingsTeam"),
+              sharing: t("sharing"),
+              allSettings: t("projectAllSettings"),
+              delete: t("deleteProject"),
+              arrange: t("projectArrangeTitle"),
+              folder: t("moveToFolder"),
+              noFolder: t("noFolder"),
+              newFolderPlaceholder: t("newFolderPlaceholder"),
+              newFolderAria: t("newFolderAria"),
+              move: t("moveSubmit"),
+              pin: t("pinProject"),
+              unpin: t("unpinProject"),
+              archive: t("archiveProject"),
+              unarchive: t("unarchiveProject"),
+              archiveHint: t("archiveHint"),
+            }}
+          />
         </div>
 
         {project.summary ? (

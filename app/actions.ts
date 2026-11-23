@@ -34,6 +34,7 @@ import {
 import * as limit from "@/lib/services/rate-limit";
 import * as sharing from "@/lib/services/sharing";
 import { deleteEntry } from "@/lib/services/entry-deletion";
+import * as organization from "@/lib/services/project-organization";
 import * as taskService from "@/lib/services/task-service";
 import { accept, invite } from "@/lib/services/project-invitations";
 import { getLang } from "@/lib/lang";
@@ -318,6 +319,60 @@ export async function acceptProjectInviteAction(fd: FormData) {
   if (!slug) redirect("/account?tab=invites&invite=failed");
   revalidatePath("/", "layout");
   redirect(`/p/${slug}`);
+}
+
+/* ------------------------------------------------- arranging projects */
+
+/**
+ * Into the folder picked, into a new one typed beside it, or out of any.
+ * A typed name wins over the picker: typing one is the more deliberate act.
+ */
+export async function moveProjectAction(fd: FormData) {
+  const user = await writingUser();
+  const projectId = num(fd, "project_id");
+  const typed = str(fd, "new_folder");
+  const picked = num(fd, "folder_id");
+  const target = typed
+    ? { newFolderName: typed }
+    : picked > 0
+      ? { folderId: picked }
+      : { none: true as const };
+  await organization.moveToFolder(user.id, projectId, target);
+  revalidatePath("/", "layout");
+}
+
+export async function pinProjectAction(fd: FormData) {
+  const user = await writingUser();
+  const projectId = num(fd, "project_id");
+  if (fd.get("pinned") === "1") await organization.pinProject(user.id, projectId);
+  else await organization.unpinProject(user.id, projectId);
+  revalidatePath("/", "layout");
+}
+
+export async function archiveProjectAction(fd: FormData) {
+  const user = await writingUser();
+  const projectId = num(fd, "project_id");
+  if (fd.get("archived") === "1") await organization.archiveProject(user.id, projectId);
+  else await organization.unarchiveProject(user.id, projectId);
+  revalidatePath("/", "layout");
+}
+
+export async function createFolderAction(fd: FormData) {
+  const user = await writingUser();
+  await organization.createFolder(user.id, str(fd, "name"));
+  revalidatePath("/", "layout");
+}
+
+export async function renameFolderAction(fd: FormData) {
+  const user = await writingUser();
+  await organization.renameFolder(user.id, num(fd, "folder_id"), str(fd, "name"));
+  revalidatePath("/", "layout");
+}
+
+export async function deleteFolderAction(fd: FormData) {
+  const user = await writingUser();
+  await organization.deleteFolder(user.id, num(fd, "folder_id"));
+  revalidatePath("/", "layout");
 }
 
 /* ----------------------------------------------------------------- tasks */

@@ -37,6 +37,7 @@ import { CopyMarkdown } from "../features/copy-markdown";
 import { acceptProjectInviteAction, setLangAction, updatePublicProfileAction } from "../actions";
 import { PROFILE_BIO_MAX } from "@/lib/constants";
 import { MCP_CLIENT_NAMES, MEMORY_SNIPPET, userMemoryPath, type McpClientId } from "@/lib/mcp-clients";
+import { ProjectArrangement } from "./project-arrangement";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getT();
@@ -46,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const tabIds = ["profile", "public", "signin", "tokens", "invites"] as const;
+const tabIds = ["profile", "public", "signin", "tokens", "invites", "projects"] as const;
 type TabId = (typeof tabIds)[number];
 
 /**
@@ -93,6 +94,7 @@ function TabIcon({ tab }: { tab: TabId }) {
         <path d="M18.5 10v7M15 13.5h7" />
       </>
     ),
+    projects: <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />,
   } satisfies Record<TabId, React.ReactNode>;
 
   return (
@@ -158,6 +160,7 @@ export default async function AccountPage({
     { id: "signin", label: t("tabSignIn") },
     { id: "tokens", label: t("apiTokens") },
     { id: "invites", label: t("invites") },
+    { id: "projects", label: t("tabProjects") },
   ];
 
   return (
@@ -495,6 +498,8 @@ export default async function AccountPage({
           </section>
         </Panel>
       )}
+
+      {activeTab === "projects" && <ProjectArrangement userId={user.id} t={t} />}
 
       {activeTab === "invites" && (
         <div className="grid gap-5 lg:grid-cols-2">
