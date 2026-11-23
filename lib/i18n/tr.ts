@@ -821,7 +821,9 @@ export const tr: Record<Key, string> = {
   folderMoveUp: "{name} klasörünü yukarı taşı",
   folderMoveDown: "{name} klasörünü aşağı taşı",
   folderMoved: "{name}, {n}. sıraya taşındı",
-  folderDragHint: "sıralamak için sürükle",
+  projectMoveUp: "{name} projesini klasöründe yukarı taşı",
+  projectMoveDown: "{name} projesini klasöründe aşağı taşı",
+  sortHandle: "{name} sırasını değiştir: sürükle ya da ok tuşlarını kullan",
   folderProjectCountOne: "1 proje",
   folderProjectCount: "{n} proje",
 

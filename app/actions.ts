@@ -385,6 +385,22 @@ export async function reorderFoldersAction(orderedIds: number[]) {
   revalidatePath("/", "layout");
 }
 
+export async function moveProjectInFolderAction(fd: FormData) {
+  const user = await writingUser();
+  const step = str(fd, "step");
+  if (step !== "up" && step !== "down") return;
+  await organization.moveProjectInFolder(user.id, num(fd, "project_id"), step);
+  revalidatePath("/", "layout");
+}
+
+/** A drag inside one folder. Bound to the folder id where it is rendered. */
+export async function reorderProjectsAction(folderId: number, orderedIds: number[]) {
+  const user = await writingUser();
+  const ids = Array.isArray(orderedIds) ? orderedIds.map(Number).filter(Number.isInteger) : [];
+  await organization.reorderProjectsInFolder(user.id, Number(folderId), ids);
+  revalidatePath("/", "layout");
+}
+
 export async function deleteFolderAction(fd: FormData) {
   const user = await writingUser();
   await organization.deleteFolder(user.id, num(fd, "folder_id"));
