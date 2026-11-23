@@ -411,15 +411,12 @@ export const tr: Record<Key, string> = {
 
   heroBody:
     "todox bir yapılacaklar listesi değil. Her görev bir kayıt taşır — arkasındaki kararlar, işe yaramamış denemeler, hâlâ açık sorular ve son oturumun bıraktığı not. Yeni açılan bir agent bunu tek bir get_context çağrısıyla okur ve sana hiçbir şey sormadan devam eder.",
-  step1Title: "yazıya geçer",
-  step1Body:
-    "Çoğunu agent çalışırken yazar: neye karar verdiği, neyi deneyip tutturamadığı, senden neyi öğrenmesi gerektiği.",
-  step2Title: "yerinde kalır",
-  step2Body:
-    "Repolarının dışında tek bir veritabanında. Dal değişimi, worktree ve temiz klonlar onu kaybedemez; git'e de hiç girmez.",
-  step3Title: "sonraki oturum okur",
-  step3Body:
-    "Tek bir get_context çağrısı ve sıfırdan açılan agent öncekinin bildiğini bilir — hangi duvara tekrar toslamayacağı dahil.",
+  step1Title: "agent'ın çalışırken not alır",
+  step1Body: "Kararları, işe yaramayan denemeleri ve yanıt bekleyen soruları kaydeder.",
+  step2Title: "günlük projeyle kalır",
+  step2Body: "Günlük Git dışında saklanır. Proje üyeleri farklı makinelerden aynı kayda erişir.",
+  step3Title: "sonraki oturum devam eder",
+  step3Body: "Tek bir MCP çağrısı açık görevleri, önceki kararları ve son oturumun bıraktığı notu getirir.",
   kindsSummary: "kayda tam olarak ne girer — beş tür",
   projects: "projeler",
   colProject: "proje",
@@ -752,54 +749,30 @@ export const tr: Record<Key, string> = {
   deleteProjectSubmit: "sil, içindekilerle birlikte",
 
   landingHowTitle: "nasıl çalışır",
-  landingSampleDecision: "Görev başına değil, tür başına sınırlandı.",
-  landingSampleDeadEnd: "1 MB gövde tavanı geçerli çağrıları reddetti.",
-  landingSampleHandoff: "Bayt bütçesi girdi. Sıradaki: başlıkları kırp.",
-  landingSampleQuestion: "Kapanan görevler brifingde kalsın mı?",
-  landingNewSession: "yeni bir oturum",
-  landingKnowsNow: "başlamadan önce şunları bilir:",
+  landingHowHeading: "bir oturum yazar, diğeri devam eder",
   landingLede:
-    "Agentın her oturuma bir öncekinden hiçbir şey bilmeden başlıyor. Bunun bedelini iki kez ödüyorsun — bir kez projeyi baştan anlatırken, bir kez de önceki oturumun çoktan tosladığı duvara yeniden toslarken.",
-  landingCta: "hesap oluştur",
-  landingSecondary: "zaten hesabım var",
-  landingScrawl: "MCP sunucusu · açık kaynak · geliştiriciler ve agent'ları için",
+    "Kararlar, çıkmazlar ve sıradaki adımlar tek bir proje günlüğünde. Agent'ın yeni oturuma kaldığı yerden başlar.",
+  landingCta: "hemen başla",
+  landingScrawl: "açık kaynak MCP sunucusu",
   landingHeadline: "agent'ların için {mark}",
   landingHeadlineMark: "çalışma belleği",
-  landingCtaNote: "Açık kaynak. Hepsini istediğin an dışa aktar.",
-  landingConnectTitle: "hâlihazırda kullandığın agent'la çalışır",
+  landingDemoTitle: "bir oturumdan diğerine",
+  landingDemoReplay: "demoyu yeniden oynat",
+  landingDemoSession: "oturum {n}",
+  landingDemoWrite: "Karar: Ödeme isteğini yalnızca ağ hatasında yeniden dene.",
+  landingDemoRead: "Yeniden deneme kuralını biliyorum. Ağ hatası testinden devam edebilirim.",
+  landingConnectEyebrow: "MCP ile bağlan",
+  landingConnectTitle: "tek proje günlüğü, farklı agent'lar",
   landingConnectBody:
-    "Tek bir adres ve bir token. Kurulacak paket yok, ayakta tutulacak yerel süreç yok — MCP konuşan her şey bağlanır: Claude Code, Codex, Cursor, VS Code.",
-  /* ürünün gerçekten ileri sürdüğü üç iddia ve arkasındaki yük */
-  /* yeni gelenin ilk itirazı, ürünün kendi diliyle cevaplanmış */
-  vsNativeTitle: "agent'ının zaten bir hafızası varken neden?",
-  vsNativeBody:
-    "Claude Code artık kendi notlarını tutuyor; Cursor'ın ve Codex'in de kendi hafızaları var. Kullan onları: pnpm tercih ettiğini hatırlamakta iyiler. Kendi dokümanlarında söyledikleri şu: repo başına, makine başına, araç başına ve kimseyle paylaşılmıyor. todox o çizginin dışında kalan için.",
-  vsNative1: "İki makine, tek günlük. Repo remote'uyla tanınır; dizüstünde bırakılan not masaüstünde okunur.",
-  vsNative2: "Her agent, tek günlük. Claude Code, Codex, Cursor ve VS Code hepsi MCP konuşur; birinin bıraktığı devri hangisi olursa olsun bir sonraki okur.",
-  vsNative3: "İnsanlar da. Bir proje paylaşılabilir; günlük kimin ne yazdığını ve hangi modelin yaptığını taşır.",
-  vsNative4: "Bir dosyadaki notun sahip olmadığı biçim: açılıp kapanan görevler, kendi türü olan çıkmaz sokaklar, günlükten okunan rapor ve bayat olduğunu kendisi söyleyen not.",
-  diffTitle: "kayda neden güvenilir",
-  diff1Title: "çıkmaz sokak bir kayıt türü",
-  diff1Body:
-    "Notların çoğu neyin işe yaradığını yazar. Pahalı bilgi ise işe yaramayanıdır: doğru görünen, bir öğleden sonrayı yiyen ve kimsenin yazmadığı bir sebeple çöken yaklaşım. Burada onun kendi türü var, çünkü bir sonraki oturumun aynı duvara toslamasını durduran kayıt odur.",
-  diff2Title: "bayat not bunu kendisi söyler",
-  diff2Body:
-    "Bağlı her dosya, onu görebilen taraf — yani agent'ın — tarafından hash'lenir ve sonra yeniden bakılır. Kod ilerlediyse not \"yalan söylüyor olabilir\" diye işaretlenir. Biri gerçekten bakana kadar da \"kontrol edilmedi\" der, taze olduğunu iddia etmez: yalan söyleyen bağlam hiç bağlam olmamasından beterdir, ve buna ne kadar emin olduğu konusunda yalan söylemek de dahildir.",
-  diff3Title: "rapor bir sorgudur, kazı değil",
-  diff3Body:
-    "Her durum değişikliği bir olaydır; bugün ne bitti, ne kadar sürdü ve hangi model yaptı sorularının cevabı commit'lerden çıkarılmaz, kayıttan okunur.",
-  briefingTitle: "agentın tek çağrıda okuduğu şey",
-  briefingBody:
-    "Bu, `get_context`'in şekli — her oturumun yaptığı ilk çağrı. Ürünün özeti değil: yükün kendisi.",
-  briefingCaption: "Ekrana sığsın diye kısaltıldı. Gerçeği en önemliden başlayarak elli açık göreve kadar taşır.",
+    "Bir adres ve erişim anahtarıyla bağlan. Araç değiştirdiğinde de aynı proje günlüğüne dönersin.",
+  briefingTitle: "örnek yanıtı gör",
+  briefingCaption: "Bir görevi, görevle ilgili kararı ve devir notunu gösteren kısaltılmış yanıt.",
   landingShotAlt:
     "Bir todox proje panosu: sırada, yapılıyor ve takıldı sütunlarında görev kartları, yanında da bir karar ile bir çıkmaz taşıyan günlüğüyle açık bir görev",
   landingShotCaption:
     "Demo proje: kartlar sütunlar arasında taşınır, açık görev de arkasındaki kararı ve bariz yolu eleyen çıkmazı gösterir.",
 
-  landingOpenSource: "Açık kaynak, MIT. Kodu oku, ya da kendi kurulumunu çalıştır.",
-  landingHonest:
-    "Ücretsiz, ve tek küçük bir sunucuda duruyor. Hiçbir şey kilitli değil: tamamı MIT, yani kayıt senin için önemliyse kendin çalıştır.",
+  landingOpenSource: "GitHub'da kaynak kod",
 
   verifyConfirmTitle: "tek tık kaldı",
   verifyConfirmBody:

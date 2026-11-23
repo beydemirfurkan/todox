@@ -187,9 +187,9 @@ function SiteFooter({ t }: { t: T }) {
     },
   ];
   return (
-    <footer className="site-band site-footer mt-20">
-      <div className="mx-auto grid w-full page-column grid-cols-2 gap-10 px-5 pt-14 pb-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-        <div className="col-span-2 flex flex-col gap-3 md:col-span-1">
+    <footer className="site-band site-footer md:mt-12">
+      <div className="mx-auto grid w-full page-column grid-cols-3 gap-x-3 gap-y-8 px-5 pt-8 pb-[calc(2rem+var(--safe-bottom))] md:grid-cols-[1.4fr_repeat(3,1fr)] md:gap-10 md:py-14">
+        <div className="col-span-3 flex flex-col gap-2 md:col-span-1 md:gap-3">
           <span className="flex items-center gap-2.5">
             <LogoMark size={26} />
             <span className="display text-[22px] leading-none">todox</span>
@@ -197,15 +197,15 @@ function SiteFooter({ t }: { t: T }) {
           <p className="mono text-meta text-[var(--band-muted)]">{t("tagline")}</p>
         </div>
         {columns.map((column) => (
-          <nav key={column.title} aria-label={column.title} className="flex flex-col gap-3 text-[14px]">
+          <nav key={column.title} aria-label={column.title} className="flex min-w-0 flex-col text-small md:gap-3">
             <h2 className="band-label text-meta font-medium">{column.title}</h2>
             {column.links.map((link) =>
               link.external ? (
-                <a key={link.href} href={link.href} rel="noreferrer" className="band-link">
+                <a key={link.href} href={link.href} rel="noreferrer" className="band-link flex min-h-11 items-center md:min-h-0">
                   {link.label}
                 </a>
               ) : (
-                <Link key={link.href} href={link.href} className="band-link">
+                <Link key={link.href} href={link.href} className="band-link flex min-h-11 items-center md:min-h-0">
                   {link.label}
                 </Link>
               ),
