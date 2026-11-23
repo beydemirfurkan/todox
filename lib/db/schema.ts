@@ -562,6 +562,66 @@ CREATE TABLE IF NOT EXISTS tool_usage (
 -- primary key cannot serve: its leading column is the account.
 CREATE INDEX IF NOT EXISTS idx_tool_usage_day ON tool_usage (day);
 
+-- MCP authorisation. An agent used to connect with a token pasted out of the
+-- account page, which put a permanent credential in a chat transcript every
+-- time somebody set up a client. Now the client opens a browser, the person
+-- approves it here, and the client keeps what it was given.
+--
+-- A client is known by one of three things: an https URL whose JSON describes
+-- it (a Client ID Metadata Document, the 2025-11 spec's default), a row a
+-- client registered for itself (Dynamic Client Registration, which Cursor
+-- still uses), or the first-party CLI login. \`redirect_uris\` is a JSON array.
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  client_id     TEXT PRIMARY KEY,
+  kind          TEXT NOT NULL,
+  client_name   TEXT NOT NULL,
+  redirect_uris TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  fetched_at    TEXT
+);
+
+-- Authorisation codes: single use, a minute long, hash only. The PKCE
+-- challenge rides here so the token request can prove it holds the verifier.
+CREATE TABLE IF NOT EXISTS oauth_codes (
+  code_hash      TEXT PRIMARY KEY,
+  client_id      TEXT NOT NULL,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  redirect_uri   TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  resource       TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  expires_at     TEXT NOT NULL,
+  used_at        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_codes_expires ON oauth_codes (expires_at);
+
+-- Refresh tokens rotate: each use marks the row used and mints the next one in
+-- the same family. A used one presented again means two parties hold it, so
+-- the whole family -- and the access token it feeds -- is revoked.
+CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+  token_hash TEXT PRIMARY KEY,
+  family_id  TEXT NOT NULL,
+  client_id  TEXT NOT NULL,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  resource   TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at    TEXT,
+  revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_refresh_family ON oauth_refresh_tokens (family_id);
+
+-- An authorised client's access token is an \`api_tokens\` row, so every path
+-- that reads one -- the bearer check, last_used_at, the funnel, client capture
+-- -- works unchanged. One row per grant (\`family_id\`): a refresh swaps its
+-- hash and expiry in place instead of adding a row an hour. A pasted personal
+-- token leaves all three NULL and never expires.
+ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS client_id  TEXT;
+ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS family_id  TEXT;
+ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS expires_at TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tokens_family ON api_tokens (family_id)
+  WHERE family_id IS NOT NULL;
+
 -- What search reads, and the reason it can afford to.
 --
 -- These were written once before and taken straight back out, because
