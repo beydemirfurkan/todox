@@ -209,18 +209,22 @@ export const SKILL_FILE_NAME = "SKILL.md";
 /**
  * The entry todox writes, for a client that takes JSON over HTTP.
  *
+ * Without a token there is no header at all: the client connects, is refused
+ * with a pointer to the OAuth metadata, and asks the person to approve it in
+ * the browser. A token is for where no browser can open.
+ *
  * Returned rather than stringified so callers can nest it wherever their shape
  * puts it; `mcpEntryDocument` does the nesting.
  */
 export function mcpEntry(
   shape: McpJsonShape,
   url: string,
-  token: string,
+  token?: string,
 ): Record<string, unknown> {
   return {
     type: shape.remoteType,
     url,
-    headers: { Authorization: `Bearer ${token}` },
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
   };
 }
 
@@ -232,7 +236,7 @@ export function mcpEntry(
 export function mcpEntryDocument(
   shape: McpJsonShape,
   url: string,
-  token: string,
+  token: string | undefined,
   name = "todox",
 ): Record<string, unknown> {
   let node: Record<string, unknown> = { [name]: mcpEntry(shape, url, token) };

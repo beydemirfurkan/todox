@@ -12,21 +12,28 @@ import {
 import { CopyMarkdown } from "./copy-markdown";
 
 /**
- * What you get once a token exists.
+ * How to connect an agent.
+ *
+ * Without a token -- the default -- every snippet is only the URL: the client
+ * is refused once, finds the OAuth metadata, and opens a browser for the
+ * person to approve it. Nothing in that text is a secret. With a token (the
+ * advanced path, for a machine with no browser) the snippets carry it as a
+ * header, and the warning beside the prompt says so.
  *
  * The paste-to-your-agent block leads, because it is the only option that does
  * not require knowing which config file your tool keeps and where. The
  * per-agent snippets are underneath for people who would rather edit the file
  * themselves.
  *
- * Everything is derived in the browser from the token the action returned. The
- * server does not compose these: it cannot see which machine, which tool or
- * which directory is on the other end, and the last version that pretended
- * otherwise shipped a command with the server's own working directory in it.
+ * Everything is derived in the browser. The server does not compose these: it
+ * cannot see which machine, which tool or which directory is on the other end,
+ * and the last version that pretended otherwise shipped a command with the
+ * server's own working directory in it.
  */
 export type AgentSetupLabels = {
   promptTitle: string;
-  promptWarning: string;
+  /** Shown only beside a prompt that carries a token. */
+  promptWarning?: string;
   manualTitle: string;
   agentLabel: string;
   other: string;
@@ -49,7 +56,7 @@ export type AgentSetupLabels = {
  * worked.
  */
 /** A whole config file, formatted the way it is pasted. */
-function json(shape: (typeof MCP_SHAPES)[keyof typeof MCP_SHAPES], url: string, token: string) {
+function json(shape: (typeof MCP_SHAPES)[keyof typeof MCP_SHAPES], url: string, token?: string) {
   return JSON.stringify(mcpEntryDocument(shape, url, token), null, 2);
 }
 
@@ -64,29 +71,37 @@ export type AgentSnippet = {
   body: string;
 };
 
+/** Claude Code: one command, then the sign-in it offers -- or the header, with a token. */
+function claudeCommand(url: string, token: string | undefined): string {
+  // `--scope user`, not the default `local`, which means this directory.
+  const add = `claude mcp add --scope user --transport http todox ${url}`;
+  if (token) return `${add} \\\n  --header "Authorization: Bearer ${token}"`;
+  return `${add}\n# then, inside Claude Code: /mcp → todox → Authenticate`;
+}
+
+function codexConfig(url: string, token: string | undefined): string {
+  const lines = ["[mcp_servers.todox]", `url = "${url}"`];
+  if (token) return [...lines, `http_headers = { Authorization = "Bearer ${token}" }`].join("\n");
+  return [...lines, "", "# then, in a terminal: codex mcp login todox"].join("\n");
+}
+
 export function snippetsFor(
   url: string,
-  token: string,
+  token: string | undefined,
   otherLabel: string,
 ): AgentSnippet[] {
-  const bearer = `Bearer ${token}`;
   return [
     {
       id: "claude",
       name: "Claude Code",
       target: "terminal",
-      // `--scope user`, not the default `local`, which means this directory.
-      body: `claude mcp add --scope user --transport http todox ${url} \\\n  --header "Authorization: ${bearer}"`,
+      body: claudeCommand(url, token),
     },
     {
       id: "codex",
       name: "Codex",
       target: MCP_CONFIG_PATHS.codex.darwin,
-      body: [
-        "[mcp_servers.todox]",
-        `url = "${url}"`,
-        `http_headers = { Authorization = "${bearer}" }`,
-      ].join("\n"),
+      body: codexConfig(url, token),
     },
     {
       id: "cursor",
@@ -149,7 +164,8 @@ export function AgentSetup({
   labels,
 }: {
   url: string;
-  token: string;
+  /** Only on the advanced path; without it the client signs in through the browser. */
+  token?: string;
   /** Rendered on the server, where the translator lives. */
   prompt: string;
   labels: AgentSetupLabels;
@@ -165,7 +181,9 @@ export function AgentSetup({
         <pre className={pre}>{prompt}</pre>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <CopyMarkdown markdown={prompt} label={labels.copy} copiedLabel={labels.copied} />
-          <p className="text-small text-muted">{labels.promptWarning}</p>
+          {token && labels.promptWarning && (
+            <p className="text-small text-muted">{labels.promptWarning}</p>
+          )}
         </div>
       </div>
 

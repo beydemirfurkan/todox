@@ -110,51 +110,50 @@ pnpm dev
 
 ## Connect an agent
 
-Create a token on the Account page. It gives you text to paste into your
-agent.
+There is no token to copy. Add the server by its URL; the first time the
+agent connects, todox opens a browser tab and you approve it (OAuth 2.1 with
+PKCE — the agent keeps and renews its own access, and you can disconnect it
+from the Account page). The Account page also gives you text to paste into
+your agent that does all of this.
 
 **Claude Code: the plugin.** It installs the server, the session habit and a
-reminder at session start, and asks for the token once.
-[`plugin/README.md`](plugin/README.md) has the details.
+reminder at session start. [`plugin/README.md`](plugin/README.md) has the
+details.
 
 ```bash
 claude plugin marketplace add beydemirfurkan/todox
 claude plugin install todox@todox
+# the hooks run outside the agent, so sign this machine in once:
+npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz login
 ```
 
-**Codex: the same plugin.** It reads the token from your environment. Codex
-asks you to review the plugin's hooks before it runs them.
+**Codex: the same plugin.** Codex asks you to review the plugin's hooks
+before it runs them. The `login` line above serves its hooks too.
 
 ```bash
-export TODOX_TOKEN=todox_…            # in your shell profile
 codex plugin marketplace add beydemirfurkan/todox
 codex plugin add todox@todox
 ```
 
-**Any client, by hand.** One URL and one header:
+**Any client, by hand.** One URL, then the client's own sign-in:
 
 ```bash
 # Claude Code without the plugin. --scope user, so it works in every project.
-claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp \
-  --header "Authorization: Bearer todox_…"
+claude mcp add --scope user --transport http todox https://www.todox.dev/api/mcp
+# then, inside Claude Code: /mcp → todox → Authenticate
 ```
 
 ```toml
-# Codex — ~/.codex/config.toml
+# Codex — ~/.codex/config.toml, then: codex mcp login todox
 [mcp_servers.todox]
 url = "https://www.todox.dev/api/mcp"
-http_headers = { Authorization = "Bearer todox_…" }
 ```
 
 ```json
 // Cursor — ~/.cursor/mcp.json
 {
   "mcpServers": {
-    "todox": {
-      "type": "http",
-      "url": "https://www.todox.dev/api/mcp",
-      "headers": { "Authorization": "Bearer todox_…" }
-    }
+    "todox": { "type": "http", "url": "https://www.todox.dev/api/mcp" }
   }
 }
 ```
@@ -164,24 +163,17 @@ http_headers = { Authorization = "Bearer todox_…" }
 // The root key is "servers", not "mcpServers".
 {
   "servers": {
-    "todox": {
-      "type": "http",
-      "url": "https://www.todox.dev/api/mcp",
-      "headers": { "Authorization": "Bearer todox_…" }
-    }
+    "todox": { "type": "http", "url": "https://www.todox.dev/api/mcp" }
   }
 }
 ```
 
 ```json
 // OpenCode v1 — ~/.config/opencode/opencode.json. Type is "remote".
+// Then: opencode mcp auth todox
 {
   "mcp": {
-    "todox": {
-      "type": "remote",
-      "url": "https://www.todox.dev/api/mcp",
-      "headers": { "Authorization": "Bearer todox_…" }
-    }
+    "todox": { "type": "remote", "url": "https://www.todox.dev/api/mcp" }
   }
 }
 ```
@@ -191,15 +183,17 @@ http_headers = { Authorization = "Bearer todox_…" }
 {
   "mcp": {
     "servers": {
-      "todox": {
-        "type": "remote",
-        "url": "https://www.todox.dev/api/mcp",
-        "headers": { "Authorization": "Bearer todox_…" }
-      }
+      "todox": { "type": "remote", "url": "https://www.todox.dev/api/mcp" }
     }
   }
 }
 ```
+
+**No browser on that machine** (SSH, CI, a container): create a personal
+token under *personal tokens (advanced)* on the Account page and send it as
+a header — `Authorization: Bearer todox_…` in any of the entries above, or
+`TODOX_TOKEN` in the environment for the plugin's hooks. A personal token
+never expires; treat it like a password.
 
 > **Get the key and the type right.** A wrong combination fails silently:
 > the tools just never show up.
