@@ -24,6 +24,13 @@ your client reads as global instructions.
 
 ## Install
 
+Most people need none of this section: add `https://www.todox.dev/api/mcp`
+to the agent and approve it in the browser the first time it connects
+(`/mcp` in Claude Code, `codex mcp login todox`, `opencode mcp auth todox`).
+The README's "Connect an agent" has every client's entry. What follows writes
+a config that carries a personal token instead — for a machine where no
+browser can open.
+
 Run `pnpm install:mcp <client>` once and the CLI writes the right config file
 and verifies the connection. `<client>` is one of:
 `claude-code`, `codex`, `cursor`, `vscode`, `opencode`.
