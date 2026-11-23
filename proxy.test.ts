@@ -105,6 +105,17 @@ describe("what stays reachable without a session", () => {
     expect(redirected(proxy(request("/screenshots/task-log.jpg")))).toBe(false);
   });
 
+  it.each([
+    "/icons/google.svg",
+    "/icons/github.svg",
+    "/integrations/claude-code.svg",
+    "/integrations/codex.svg",
+    "/integrations/cursor.svg",
+    "/integrations/visual-studio-code.svg",
+  ])("serves %s before sign-in", (path) => {
+    expect(redirected(proxy(request(path)))).toBe(false);
+  });
+
   it("serves a share link and its children", () => {
     expect(redirected(proxy(request("/s/abc123")))).toBe(false);
   });
@@ -140,6 +151,7 @@ describe("the prefix match, which is the dangerous part", () => {
     // the other direction too: a public entry must not open a private sibling.
     expect(location(proxy(request("/accounts-payable")))).toContain("/login");
     expect(location(proxy(request("/reportage")))).toContain("/login");
+    expect(location(proxy(request("/integrations/codex.svg/settings")))).toContain("/login");
   });
 });
 
