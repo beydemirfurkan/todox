@@ -818,8 +818,17 @@ export const tr: Record<Key, string> = {
   foldersEmpty: "Henüz klasör yok. Buradan ya da bir projenin menüsünden oluşturabilirsin.",
   archivedTitle: "arşivdekiler",
   archivedEmpty: "Arşivde proje yok.",
+  folderMoveUp: "{name} klasörünü yukarı taşı",
+  folderMoveDown: "{name} klasörünü aşağı taşı",
+  folderMoved: "{name}, {n}. sıraya taşındı",
+  folderDragHint: "sıralamak için sürükle",
   folderProjectCountOne: "1 proje",
   folderProjectCount: "{n} proje",
+
+  todayArchivedHidden: "Arşivdeki {projects} projedeki {tasks} açık görev burada gösterilmiyor.",
+  todayArchivedHiddenOneProject: "Arşivdeki bir projede {tasks} açık görev burada gösterilmiyor.",
+  todayArchivedHiddenOne: "Arşivdeki bir projede 1 açık görev burada gösterilmiyor.",
+  todayArchivedLink: "arşive bak",
 
   queueForAgent: "agent'ıma ver",
   queueForAgentHint: "Bu projede açılan ilk oturumda agent'ın işe bununla başlar.",

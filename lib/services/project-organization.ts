@@ -3,7 +3,7 @@ import * as placements from "../repositories/project-placements";
 import type { ProjectFolder, ProjectPlacement } from "../types";
 import { now } from "../util/time";
 import { BadRequest } from "./errors";
-import { assertFolder, assertProjectAccess } from "./ownership";
+import { assertFolder, assertFolders, assertProjectAccess } from "./ownership";
 
 /**
  * How one person arranges the projects they can see: pinned on top, then
@@ -138,6 +138,40 @@ export async function renameFolder(userId: number, folderId: number, rawName: st
   );
   if (clash) throw new BadRequest(`you already have a folder called "${clash.name}"`);
   await folders.rename(folderId, name);
+}
+
+/**
+ * A new order for all of this person's folders, as a drag leaves it.
+ *
+ * The list must be exactly their folders: one missing, repeated or foreign
+ * is refused rather than half-applied, because a partial order would leave
+ * the missing folder wherever its old number happens to fall. A stale page
+ * (a folder made in another tab since) is refused the same way and simply
+ * re-renders with the real list.
+ */
+export async function reorderFolders(userId: number, orderedIds: readonly number[]): Promise<void> {
+  await assertFolders(userId, orderedIds);
+  const current = await folders.listByUser(userId);
+  const mine = new Set(current.map((folder) => folder.id));
+  const isExactlyMine =
+    orderedIds.length === mine.size &&
+    new Set(orderedIds).size === orderedIds.length &&
+    orderedIds.every((id) => mine.has(id));
+  if (!isExactlyMine) throw new BadRequest("that order does not match your folders");
+  await folders.reorder(orderedIds);
+}
+
+export type FolderStep = "up" | "down";
+
+/** One place earlier or later: the no-script, keyboard and phone way to reorder. */
+export async function moveFolder(userId: number, folderId: number, step: FolderStep): Promise<void> {
+  await assertFolder(userId, folderId);
+  const ids = (await folders.listByUser(userId)).map((folder) => folder.id);
+  const from = ids.indexOf(folderId);
+  const to = step === "up" ? from - 1 : from + 1;
+  if (from < 0 || to < 0 || to >= ids.length) return;
+  [ids[from], ids[to]] = [ids[to], ids[from]];
+  await folders.reorder(ids);
 }
 
 export async function deleteFolder(userId: number, folderId: number): Promise<void> {

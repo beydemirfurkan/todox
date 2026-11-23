@@ -369,6 +369,22 @@ export async function renameFolderAction(fd: FormData) {
   revalidatePath("/", "layout");
 }
 
+export async function moveFolderAction(fd: FormData) {
+  const user = await writingUser();
+  const step = str(fd, "step");
+  if (step !== "up" && step !== "down") return;
+  await organization.moveFolder(user.id, num(fd, "folder_id"), step);
+  revalidatePath("/", "layout");
+}
+
+/** The sidebar's drag: the whole new order, which the service checks is exactly yours. */
+export async function reorderFoldersAction(orderedIds: number[]) {
+  const user = await writingUser();
+  const ids = Array.isArray(orderedIds) ? orderedIds.map(Number).filter(Number.isInteger) : [];
+  await organization.reorderFolders(user.id, ids);
+  revalidatePath("/", "layout");
+}
+
 export async function deleteFolderAction(fd: FormData) {
   const user = await writingUser();
   await organization.deleteFolder(user.id, num(fd, "folder_id"));
