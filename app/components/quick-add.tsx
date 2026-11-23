@@ -53,6 +53,12 @@ export function QuickAdd({ target, t, popoverId }: { target: QuickAddTarget; t: 
         <input type="checkbox" name="priority" value="1" />
         {t("todayImportant")}
       </label>
+      {/* Straight to the front of the agent's queue: written with the task,
+          so there is never a moment it exists and is not yet asked for. */}
+      <label className="quick-add-flag" title={t("queueForAgentHint")}>
+        <input type="checkbox" name="for_agent" value="1" />
+        {t("quickAddForAgent")}
+      </label>
       <SubmitButton pendingLabel={t("working")}>{t("todayAddSubmit")}</SubmitButton>
       {popoverId && <ClosePopoverAfterSubmit />}
     </form>
