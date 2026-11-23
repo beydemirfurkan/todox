@@ -424,15 +424,12 @@ export const en = {
   /* home */
   heroBody:
     "todox is not a checklist. Each task carries a log — the decisions behind it, the approaches that failed, the questions still open, and the note the last session left behind. A fresh agent reads it with one get_context call and continues without asking you anything.",
-  step1Title: "it gets written down",
-  step1Body:
-    "Mostly by the agent, while it works: what it decided, what it tried that failed, what it needs you to answer.",
-  step2Title: "it stays put",
-  step2Body:
-    "In one database outside your repos. Branches, worktrees and fresh clones can't lose it, and it never lands in git.",
-  step3Title: "the next session reads it",
-  step3Body:
-    "One get_context call and a cold agent knows what the last one knew — including which walls not to walk into again.",
+  step1Title: "your agent takes notes",
+  step1Body: "While it works, the agent records decisions, failed approaches and questions that still need answers.",
+  step2Title: "the log stays with the project",
+  step2Body: "The log lives outside Git. Project members can read the same history from different machines.",
+  step3Title: "the next session picks up",
+  step3Body: "One MCP call brings back the open tasks, past decisions and the last session's handoff.",
   kindsSummary: "what actually goes in a log — the five kinds",
   projects: "projects",
   colProject: "project",
@@ -772,56 +769,32 @@ export const en = {
 
   /* the page a visitor who is not signed in sees */
   landingHowTitle: "how it works",
-  landingSampleDecision: "Capped per kind, not per task.",
-  landingSampleDeadEnd: "A 1 MB body ceiling refused legal calls.",
-  landingSampleHandoff: "Byte budget landed. Next: trim the heads.",
-  landingSampleQuestion: "Keep closed tasks in the briefing?",
-  landingNewSession: "a fresh session",
-  landingKnowsNow: "knows, before it starts:",
+  landingHowHeading: "one session writes, the next picks up",
   landingLede:
-    "Your agent starts every session knowing nothing about the last one. You pay for that twice — once explaining the project again, and once when it walks into a wall a previous session already found.",
-  landingCta: "create an account",
-  landingSecondary: "I already have one",
+    "Keep decisions, dead ends and next steps in one project log. Your agent picks up where the last session left off.",
+  landingCta: "get started",
   /* the hero: one sentence with one word under the marker, written in lower
      case on purpose -- the type is the voice, not the capitals */
-  landingScrawl: "MCP server · open source · for developers and their agents",
+  landingScrawl: "open-source MCP server",
   landingHeadline: "working memory {mark}",
   landingHeadlineMark: "for your agents",
-  landingCtaNote: "Open source. Export all of it, whenever you like.",
-  landingConnectTitle: "works with the agent you already use",
+  landingDemoTitle: "from one session to the next",
+  landingDemoReplay: "replay the demo",
+  landingDemoSession: "session {n}",
+  landingDemoWrite: "Decision: retry payment requests only after a network error.",
+  landingDemoRead: "I know the retry rule. I can pick up with the network error test.",
+  landingConnectEyebrow: "connect with MCP",
+  landingConnectTitle: "one project log, different agents",
   landingConnectBody:
-    "One URL and a token. No package to install, no local process to keep running — anything that speaks MCP can connect: Claude Code, Codex, Cursor, VS Code.",
-  /* the three claims the product actually makes, and the payload behind them */
-  diffTitle: "why the log is worth trusting",
-  diff1Title: "dead ends are a kind of entry",
-  diff1Body:
-    "Most notes record what worked. The expensive knowledge is what did not: the approach that looked right, cost an afternoon and failed for a reason nobody writes down. That one has its own kind here, because it is the entry that stops the next session repeating it.",
-  diff2Title: "a stale note says so",
-  diff2Body:
-    "Every linked file is hashed by the side that can see it — your agent — and checked again later. When the code moves on, the note is flagged as possibly lying. Until somebody has actually looked, it says \"not checked\" rather than claiming to be fresh: context that lies is worse than none, and that includes lying about how sure it is.",
-  diff3Title: "the report is a query, not archaeology",
-  diff3Body:
-    "Every status change is an event, so what got finished today, how long it took and which model did it are read from the log rather than reconstructed from commits.",
-  /* the objection a newcomer raises first, answered in the product's own terms */
-  vsNativeTitle: "why not the memory your agent already has?",
-  vsNativeBody:
-    "Claude Code writes its own notes now, and Cursor and Codex have theirs. Use them: they are good at remembering that you prefer pnpm. What they say, in their own documentation, is that they are per repository, per machine and per tool, and shared with nobody. todox is for what falls outside that line.",
-  vsNative1: "Two machines, one log. A repository is identified by its remote, so the note left on the laptop is read on the desktop.",
-  vsNative2: "Every agent, one log. Claude Code, Codex, Cursor and VS Code all speak MCP, and the handoff one leaves is what the next one reads — whichever it is.",
-  vsNative3: "The people, too. A project can be shared, and the log carries who wrote what and which model did it.",
-  vsNative4: "A shape a note in a file does not have: tasks that open and close, dead ends as their own kind, a report read from the log, and a stale note that says so.",
-  briefingTitle: "what your agent reads, in one call",
-  briefingBody:
-    "This is the shape of `get_context` — the first call every session makes. Not a summary of the product: the payload.",
-  briefingCaption: "Trimmed for width. The real one carries up to fifty open tasks, the most important first.",
+    "Connect with a URL and an access token. When you switch tools, your project history is still there.",
+  briefingTitle: "view sample response",
+  briefingCaption: "A shortened response showing one task, its decision and its handoff.",
   landingShotAlt:
     "A todox project board: queued, doing and blocked columns of task cards, and beside them one task open with its log of a decision and a dead end",
   landingShotCaption:
     "The demo project: cards move between columns, and the open task shows the decision behind it and the dead end that ruled out the obvious approach.",
 
-  landingOpenSource: "Open source, MIT. Read the code, or run your own.",
-  landingHonest:
-    "Free, and hosted on one small server. Nothing here is locked in: the whole thing is MIT, so if the log matters to you, run it yourself.",
+  landingOpenSource: "source code on GitHub",
 
   verifyConfirmTitle: "one click to go",
   verifyConfirmBody:

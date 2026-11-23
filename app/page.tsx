@@ -17,10 +17,11 @@ import { firstLine } from "@/lib/util/headline";
 import { accountProjects } from "./account-projects";
 import { clearEmptyProjectAction } from "./actions";
 import { IconTile, WaitingList } from "./components";
+import { Icon } from "./components/icons";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { PageSkeleton } from "./components/page-skeleton";
 import { projectColor } from "./components/project-color";
-import { QuickAdd } from "./components/quick-add";
+import { QuickAdd, type QuickAddTarget } from "./components/quick-add";
 import { TaskRow, TaskSection } from "./components/task-row";
 import { FirstSteps } from "./features/first-steps";
 import { Landing } from "./features/landing";
@@ -173,18 +174,22 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
 
   return (
     <div className="today flex flex-col gap-10">
-      <header className="flex flex-col gap-1.5">
-        <h1 className="display text-[34px] leading-tight">{t("todayTitle")}</h1>
-        <p className="text-body text-muted">
-          {today} ·{" "}
+      <header>
+        <p className="mono text-meta text-faint md:hidden">{today}</p>
+        <h1 className="display mt-1 text-[44px] leading-tight md:mt-0 md:text-[34px]">{t("todayTitle")}</h1>
+        <p className="mt-1.5 text-small text-muted md:text-body">
+          <span className="hidden md:inline">{today} · </span>
           {t("todaySummary", {
             tasks: totals.doing + totals.todo + totals.blocked,
             projects: projectsWithOpenWork,
           })}
         </p>
+        <TodayMobileActions target={{ projects: allProjects }} t={t} />
       </header>
 
-      <QuickAdd target={{ projects: allProjects }} t={t} />
+      <div className="hidden md:block">
+        <QuickAdd target={{ projects: allProjects }} t={t} />
+      </div>
 
       {waiting.items.length > 0 && (
         <section aria-labelledby="waiting" className="flex flex-col gap-2">
@@ -239,10 +244,10 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
       {/* On a phone the sidebar is gone, and with it the project list -- so
           it lives at the bottom of Today there. */}
       <section aria-labelledby="projects-mobile" className="flex flex-col gap-2 md:hidden">
-        <h2 id="projects-mobile" className="today-heading">
+        <h2 id="projects-mobile" tabIndex={-1} className="today-heading scroll-mt-[calc(5rem+var(--safe-top))]">
           {t("projects")}
         </h2>
-        <ul className="flex flex-col">
+        <ul className="today-list flex flex-col">
           {allProjects.map((project) => {
             const count = counts.map.get(project.id);
             const open = count ? count.todo + count.doing + count.blocked : 0;
@@ -256,10 +261,11 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
                   />
                   <span className="min-w-0 flex-1 truncate text-[16px]">{project.name}</span>
                   {open > 0 && (
-                    <span className="text-meta text-muted">
+                    <span className="shrink-0 text-meta text-muted">
                       {t("sidebarOpenCount", { n: open })}
                     </span>
                   )}
+                  <span aria-hidden="true" className="mr-0.5 size-1.5 shrink-0 rotate-45 border-r border-t border-faint" />
                 </Link>
               </li>
             );
@@ -316,6 +322,32 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+const TODAY_ADD_SHEET = "today-add-sheet";
+
+function TodayMobileActions({ target, t }: { target: QuickAddTarget; t: T }): React.JSX.Element {
+  return (
+    <div className="mt-5 grid grid-cols-2 gap-2 md:hidden">
+      <button type="button" popoverTarget={TODAY_ADD_SHEET} className="btn !min-h-11 !px-2">
+        <Icon name="plus" size={18} />
+        {t("todayAddLabel")}
+      </button>
+      <a href="#projects-mobile" className="btn btn-quiet !min-h-11 !px-2">
+        <Icon name="home" size={16} />
+        {t("projects")}
+      </a>
+      <div id={TODAY_ADD_SHEET} popover="auto" role="dialog" aria-labelledby="today-add-heading" className="today-add-sheet composer sticker">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="today-add-heading" className="display text-[22px]">{t("todayAddLabel")}</h2>
+          <button type="button" popoverTarget={TODAY_ADD_SHEET} popoverTargetAction="hide" aria-label={t("close")} className="icon-button !size-11">
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+        <QuickAdd target={target} t={t} popoverId={TODAY_ADD_SHEET} />
+      </div>
     </div>
   );
 }

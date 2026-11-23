@@ -49,17 +49,17 @@ export function TaskRow({
     <li>
       <Link href={`/p/${project.slug}/t/${task.id}`} className="task-row">
         <StatusRing status={task.status} t={t} />
-        <span className="flex min-w-[min(15rem,100%)] flex-1 flex-col gap-1">
-          <span className="text-[16px] leading-snug text-ink">{task.title}</span>
-          {note && <span className="text-small leading-snug text-muted">{note}</span>}
+        <span className="task-row-copy flex min-w-[min(15rem,100%)] flex-1 flex-col gap-1">
+          <span className="text-[16px] leading-snug wrap-anywhere text-ink">{task.title}</span>
+          {note && <span className="text-small leading-snug wrap-anywhere text-muted">{note}</span>}
         </span>
-        <span className="flex w-full flex-wrap items-center gap-2 pl-[34px] sm:w-auto sm:shrink-0 sm:justify-end sm:pt-0.5 sm:pl-0">
+        <span className="task-row-meta flex w-full flex-wrap items-center gap-2 pl-[34px] sm:w-auto sm:shrink-0 sm:justify-end sm:pt-0.5 sm:pl-0">
           {isImportant && <span className="important-badge">{t("todayImportant")}</span>}
           {showProject && (
-            <span className="flex items-center gap-1.5 text-meta text-muted">
+            <span className="flex min-w-0 items-center gap-1.5 text-meta wrap-anywhere text-muted">
               <span
                 aria-hidden="true"
-                className="size-2 rounded-full"
+                className="size-2 shrink-0 rounded-full"
                 style={{ background: projectColor(project.id) }}
               />
               {project.name}
@@ -97,12 +97,12 @@ export function TaskSection({
     <section aria-labelledby={id} className="flex flex-col gap-2">
       <h2 id={id} className="today-heading" data-accent={isAccent ? "true" : undefined}>
         {title}
-        {hint && <span className="today-hint"> · {hint}</span>}
+        {hint && <span className="today-hint"><span className="today-hint-divider"> · </span>{hint}</span>}
       </h2>
       {shown === 0 ? (
-        <p className="px-4 py-3 text-body text-muted">{empty}</p>
+        <p className="today-list px-4 py-3 text-body text-muted">{empty}</p>
       ) : (
-        <ul className="flex flex-col">{children}</ul>
+        <ul className="today-list flex flex-col">{children}</ul>
       )}
       {total > shown && (
         <p className="px-4 text-small text-muted">{t("todayMore", { n: total - shown })}</p>
