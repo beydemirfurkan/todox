@@ -164,6 +164,12 @@ CREATE TABLE IF NOT EXISTS project_placements (
 );
 CREATE INDEX IF NOT EXISTS idx_project_placements_folder
   ON project_placements (folder_id) WHERE folder_id IS NOT NULL;
+-- A project's place inside its folder, once somebody put it there by hand.
+-- Null means "not placed": those follow the placed ones, newest activity
+-- first, so a folder nobody has reordered still reads the way it always did.
+-- Moving a project to another folder clears it -- a place is only a place
+-- among the neighbours it was set beside.
+ALTER TABLE project_placements ADD COLUMN IF NOT EXISTS position INTEGER;
 
 -- Invitation links contain a random secret and only its hash reaches the
 -- database. Accepted and revoked rows remain as a small audit trail.
