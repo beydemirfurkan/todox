@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
   requestPasswordReset: vi.fn(),
   sendVerification: vi.fn(),
   sendEmailChanged: vi.fn(),
+  register: vi.fn(),
+  providers: [] as string[],
   order: [] as string[],
 }));
 
@@ -70,9 +72,10 @@ vi.mock("@/lib/services/auth", () => ({
   createApiToken: mocks.createApiToken,
   revokeApiToken: mocks.revokeApiToken,
   revokeAllApiTokens: vi.fn(),
-  register: vi.fn(),
+  register: mocks.register,
   validateRegistration: vi.fn(() => []),
 }));
+vi.mock("@/lib/services/oauth-providers", () => ({ enabledProviders: () => mocks.providers }));
 vi.mock("@/lib/services/account-recovery", () => ({
   requestPasswordReset: mocks.requestPasswordReset,
   completePasswordReset: vi.fn(),
@@ -106,6 +109,7 @@ async function outcome<T>(run: () => Promise<T>): Promise<T | { redirectedTo: st
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.order = [];
+  mocks.providers = [];
   mocks.headerValues = new Map();
   mocks.requireUser.mockResolvedValue(USER);
   mocks.check.mockResolvedValue(ALLOWED);
@@ -236,6 +240,54 @@ describe("loginAction", () => {
         expect(state, next).toEqual({ redirectedTo: "/" });
       }
     });
+
+    it("sends a password account to connect a provider, once one is offered", async () => {
+      // With a provider on, a password sign-in is an account still to migrate.
+      mocks.providers = ["google"];
+      const state = await outcome(() =>
+        actions.loginAction(null, form({ identifier: "bob", password: "p", next: "https://evil.example" })),
+      );
+
+      expect(state).toEqual({ redirectedTo: "/account?tab=connections" });
+    });
+  });
+});
+
+describe("registerAction", () => {
+  const fields = { name: "Bob", username: "bob", email: "bob@example.com", password: "bbbbbbbb" };
+
+  it("refuses once a provider is configured, before metering or creating anything", async () => {
+    // The sign-in page no longer shows the form then; the action must not be a
+    // side door that still opens.
+    mocks.providers = ["github"];
+    const state = await outcome(() => actions.registerAction(null, form(fields)));
+
+    expect(state).toMatchObject({ errors: [{ code: "registrationClosed" }] });
+    expect(mocks.consume).not.toHaveBeenCalled();
+    expect(mocks.register).not.toHaveBeenCalled();
+  });
+
+  it("passes an invitation's token through, and goes back to the invitation", async () => {
+    const token = "b".repeat(32);
+    mocks.register.mockResolvedValue({ ok: true, value: { user: USER } });
+
+    const state = await outcome(() =>
+      actions.registerAction(null, form({ ...fields, next: `/invite?token=${token}` })),
+    );
+
+    expect(mocks.register).toHaveBeenCalledWith(expect.objectContaining({ inviteToken: token }));
+    expect(state).toEqual({ redirectedTo: `/invite?token=${token}` });
+  });
+
+  it("carries no token for a next that is not an invitation", async () => {
+    mocks.register.mockResolvedValue({ ok: true, value: { user: USER } });
+
+    const state = await outcome(() =>
+      actions.registerAction(null, form({ ...fields, next: "https://evil.example" })),
+    );
+
+    expect(mocks.register).toHaveBeenCalledWith(expect.objectContaining({ inviteToken: undefined }));
+    expect(state).toEqual({ redirectedTo: "/" });
   });
 });
 
@@ -370,6 +422,16 @@ describe("changePasswordAction", () => {
 
     expect(mocks.clearSessionCookie).toHaveBeenCalled();
     expect(state).toEqual({ redirectedTo: "/login" });
+  });
+
+  it("hands changePassword the session, which is how a passwordless account proves itself", async () => {
+    // Dropped once: every account made through Google or GitHub then had no
+    // way to set a password at all.
+    mocks.changePassword.mockResolvedValue({ ok: true, value: true });
+
+    await outcome(() => actions.changePasswordAction(null, form({ current: "", password: "bbbbbbbb" })));
+
+    expect(mocks.changePassword).toHaveBeenCalledWith(USER.id, "", "bbbbbbbb", "session-token");
   });
 
   it("keeps the caller signed in when the change was refused", async () => {

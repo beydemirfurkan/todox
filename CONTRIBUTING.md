@@ -90,9 +90,10 @@ see in review.
   another table's — the SQL stays with the table that owns it and only the
   sequencing moves. There is no JavaScript between the statements, so a write
   that needs the id of the row just inserted cannot use it; `tasks.create` is a
-  CTE for exactly that reason, and so is `project-invitations.acceptWithNewUser`,
-  which has to create the account before it can grant it anything. Those two are
-  the exceptions; a third needs the same justification, not the same shape.
+  CTE for exactly that reason, and so is `oauth-accounts.createUserWithIdentity`,
+  which has to create the account before it can attach the identity that made
+  it. Those two are the exceptions; a third needs the same justification, not
+  the same shape.
   This is not theoretical tidiness: a dropped second write once
   left a task marked `done` whose last event was `doing`, and every daily
   report after it gained a permanent 24 hours.

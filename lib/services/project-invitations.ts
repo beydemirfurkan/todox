@@ -12,7 +12,6 @@ import { send } from "./mailer";
 import { ownsProject } from "./ownership";
 import * as limit from "./rate-limit";
 import { newSessionToken } from "../util/tokens";
-import { hashPassword } from "../util/password";
 import { now } from "../util/time";
 
 const INVITE_DAYS = 7;
@@ -183,39 +182,6 @@ export async function accept(input: {
     (m) => m.project_id === invitation.project_id,
   );
   return existing?.access_slug ?? null;
-}
-
-export async function acceptWithNewAccount(token: string, lang: Lang) {
-  const acceptedAt = now();
-  const invitation = await invitations.byToken(token, acceptedAt);
-  if (!invitation || (await users.byEmail(invitation.email))) return null;
-  const accessSlug = await nextMembershipSlug(0, invitation.project_slug);
-  // The account starts passwordless from the person's point of view. The
-  // random credential is never exposed; they can set one through email reset.
-  const randomCredential = newSessionToken();
-  const username = `invited-${newSessionToken().slice(0, 12).toLowerCase()}`;
-  const result = await invitations.acceptWithNewUser({
-    token,
-    username,
-    passwordHash: await hashPassword(randomCredential),
-    accessSlug,
-    acceptedAt,
-  });
-  if (!result) return null;
-
-  // Written after the fact rather than inside that CTE, which already carries
-  // three dependent writes. A dropped notification is not the class of loss
-  // the transaction rule exists for: nothing later is computed from it.
-  if (invitation.owner_id) {
-    await notifications.create({
-      userId: invitation.owner_id,
-      kind: "invite_accepted",
-      projectId: invitation.project_id,
-      actorId: result.user_id,
-    });
-    await announce(invitation.owner_id, invitation.project_name, result.user_id, lang);
-  }
-  return result;
 }
 
 /**

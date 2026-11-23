@@ -16,7 +16,8 @@ import {
 import * as auth from "@/lib/services/auth";
 import { beginOAuth } from "@/lib/oauth-begin";
 import { issueLinkGrant, unlink } from "@/lib/services/oauth";
-import { isProvider } from "@/lib/services/oauth-flow";
+import { inviteTokenFromNext, isProvider } from "@/lib/services/oauth-flow";
+import { enabledProviders } from "@/lib/services/oauth-providers";
 import * as limit from "@/lib/services/rate-limit";
 import { clientIp as addressOf } from "@/lib/server/client-ip";
 import {
@@ -30,9 +31,15 @@ const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ??
 /** Passwords keep their whitespace; trimming them silently changes the secret. */
 const raw = (fd: FormData, k: string) => (fd.get(k) as string | null) ?? "";
 
-const inviteNext = (fd: FormData) => {
+/**
+ * Where a password sign-in lands. An invitation being accepted goes back to
+ * it. Otherwise, on an instance that offers a provider, a password account is
+ * one still to migrate, so it lands where it can connect one.
+ */
+const loginDestination = (fd: FormData) => {
   const value = str(fd, "next");
-  return /^\/invite\?token=[A-Za-z0-9_-]{32,}$/.test(value) ? value : "/";
+  if (inviteTokenFromNext(value)) return value;
+  return enabledProviders().length ? "/account?tab=connections" : "/";
 };
 
 export type AuthState = { errors: auth.FieldError[] } | null;
@@ -87,25 +94,33 @@ async function startSession(userId: number) {
 
 /* -------------------------------------------------------------- register */
 
+/**
+ * Password registration, for an instance with no provider configured. Once
+ * one is, new accounts come from the provider only, and this refuses rather
+ * than leave a side door the sign-in page no longer shows.
+ */
 export async function registerAction(
   _prev: AuthState,
   fd: FormData,
 ): Promise<AuthState> {
+  if (enabledProviders().length) return { errors: [{ field: "form", code: "registrationClosed" }] };
   const ip = await clientIp();
   const gate = await limit.consume("registerPerIp", ip);
   if (!gate.allowed) return tooMany(gate.retryAfterSec);
 
+  const next = str(fd, "next");
   const result = await auth.register({
     username: str(fd, "username"),
     email: str(fd, "email"),
     name: str(fd, "name"),
     password: raw(fd, "password"),
+    inviteToken: inviteTokenFromNext(next),
   });
   if (!result.ok) return { errors: result.errors };
 
   await sendVerification(result.value.user, await getLang());
   await startSession(result.value.user.id);
-  redirect(inviteNext(fd));
+  redirect(inviteTokenFromNext(next) ? next : "/");
 }
 
 /* ----------------------------------------------------------------- login */
@@ -134,7 +149,7 @@ export async function loginAction(_prev: AuthState, fd: FormData): Promise<AuthS
   // one working account reset the per-address bucket between guesses at others.
   await limit.forgive("loginPerIdentity", identity);
   await startSession(result.value.id);
-  redirect(inviteNext(fd));
+  redirect(loginDestination(fd));
 }
 
 export async function logoutAction() {
@@ -220,6 +235,8 @@ export async function changePasswordAction(
     user.id,
     raw(fd, "current"),
     raw(fd, "password"),
+    // An account without a password proves itself by a recent sign-in, and
+    // this is how changePassword sees that session.
     await currentSessionToken(),
   );
   if (!result.ok) return { errors: result.errors };

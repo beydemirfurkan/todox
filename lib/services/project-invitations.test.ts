@@ -52,7 +52,6 @@ vi.mock("../repositories/project-invitations", () => ({
   byToken: mocks.byToken,
   byIdForEmail: mocks.byIdForEmail,
   acceptStmt: mocks.acceptStmt,
-  acceptWithNewUser: vi.fn(),
 }));
 vi.mock("../repositories/project-memberships", () => ({
   createForAcceptedInvitationStmt: mocks.createMembershipStmt,

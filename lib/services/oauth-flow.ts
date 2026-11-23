@@ -10,6 +10,12 @@ import { OAUTH_PROVIDERS, type OAuthProvider } from "../repositories/oauth-accou
 export const isProvider = (value: string): value is OAuthProvider =>
   (OAUTH_PROVIDERS as readonly string[]).includes(value);
 
+const INVITE_NEXT = /^\/invite\?token=([A-Za-z0-9_-]{32,})$/;
+
+export function inviteTokenFromNext(value: string | null | undefined): string | undefined {
+  return value ? INVITE_NEXT.exec(value)?.[1] : undefined;
+}
+
 /**
  * Where a sign-in may land afterwards. An open redirect on the sign-in path
  * is a phishing kit, so this is an allow-list, not a same-origin check:
@@ -17,7 +23,7 @@ export const isProvider = (value: string): value is OAuthProvider =>
  */
 export function safeNext(value: string | null | undefined): string {
   if (!value) return "/";
-  if (/^\/invite\?token=[A-Za-z0-9_-]{32,}$/.test(value)) return value;
+  if (inviteTokenFromNext(value)) return value;
   if (/^\/account(\?tab=[a-z]+)?$/.test(value)) return value;
   return "/";
 }

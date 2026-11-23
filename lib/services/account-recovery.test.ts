@@ -66,6 +66,7 @@ const USER = {
   name: "Furkan",
   email: "furkan@example.com",
   email_verified_at: "2026-01-01T00:00:00Z",
+  password_hash: "scrypt$existing",
 };
 
 /** The statements handed to `tx`, by the label each mock stamps on them. */
@@ -83,6 +84,13 @@ beforeEach(() => {
 describe("completing a password reset", () => {
   const run = (password = "a-long-enough-password") =>
     recovery.completePasswordReset("token", password);
+
+  it("refuses a link that resolves to an account with no password", async () => {
+    mocks.resolve.mockResolvedValue({ row: { id: 3 }, user: { ...USER, password_hash: null } });
+
+    await expect(run()).resolves.toMatchObject({ ok: false, errors: [{ code: "linkInvalid" }] });
+    expect(mocks.tx).not.toHaveBeenCalled();
+  });
 
   it("refuses a password under the minimum before touching the token", async () => {
     // Otherwise a caller could burn somebody's reset link by submitting
@@ -194,6 +202,17 @@ describe("completing a password reset", () => {
 });
 
 describe("asking for a reset link", () => {
+  it("sends nothing to an account that has no password to reset", async () => {
+    // Made through Google or GitHub: there is no password, and a reset link
+    // would let whoever reads the inbox add one beside the provider.
+    mocks.byEmail.mockResolvedValue({ ...USER, password_hash: null });
+    await expect(recovery.requestPasswordReset(USER.email, "en")).resolves.toBeUndefined();
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.createAuthToken).not.toHaveBeenCalled();
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+
   it("says nothing different for an address nobody has", async () => {
     // Whether an address is registered is not something an unauthenticated
     // caller gets to learn, so there is no branch in the return value.
