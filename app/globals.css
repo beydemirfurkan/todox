@@ -649,6 +649,28 @@ body:has([data-wide-page]) .page-column {
 .project-group[open] > summary .project-group-caret {
   transform: rotate(45deg);
 }
+/* Reordering folders in the sidebar: a line where the folder will land. */
+.folder-drag {
+  position: relative;
+}
+.folder-drag[data-lifted] {
+  opacity: 0.45;
+}
+.folder-drag[data-folder-drop]::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.folder-drag[data-folder-drop="before"]::before {
+  top: -4px;
+}
+.folder-drag[data-folder-drop="after"]::before {
+  bottom: -4px;
+}
 .project-group-empty {
   padding: 2px 12px 6px 26px;
 }

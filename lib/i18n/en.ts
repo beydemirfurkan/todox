@@ -838,8 +838,17 @@ export const en = {
   foldersEmpty: "No folders yet. Make one here, or from a project's menu.",
   archivedTitle: "archived",
   archivedEmpty: "Nothing archived.",
+  folderMoveUp: "move {name} up",
+  folderMoveDown: "move {name} down",
+  folderMoved: "{name} moved to place {n}",
+  folderDragHint: "drag to reorder",
   folderProjectCountOne: "1 project",
   folderProjectCount: "{n} projects",
+
+  todayArchivedHidden: "{tasks} open tasks in {projects} archived projects are left out.",
+  todayArchivedHiddenOneProject: "{tasks} open tasks in an archived project are left out.",
+  todayArchivedHiddenOne: "1 open task in an archived project is left out.",
+  todayArchivedLink: "see the archive",
 
   /* handing work to the agent */
   queueForAgent: "hand to my agent",

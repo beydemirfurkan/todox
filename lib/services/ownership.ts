@@ -165,6 +165,21 @@ export async function assertCanModifyContext(userId: number, id: number) {
 export async function assertFolder(userId: number, id: number) {
   if (!(await ownsFolder(userId, id))) throw new NotYours("folder", id);
 }
+/**
+ * Every folder in a list, in one round trip: a reorder arrives as the whole
+ * list. The first id that is not this person's is the one named, with the
+ * same 404 a single one gets.
+ */
+export async function assertFolders(userId: number, ids: readonly number[]) {
+  if (!ids.length) return;
+  const rows = await all<{ id: number }>(
+    "SELECT id FROM project_folders WHERE user_id = ? AND id = ANY(?::int[])",
+    [userId, ids],
+  );
+  const mine = new Set(rows.map((row) => row.id));
+  const foreign = ids.find((id) => !mine.has(id));
+  if (foreign !== undefined) throw new NotYours("folder", foreign);
+}
 export async function assertObservation(userId: number, id: number) {
   if (!(await ownsObservation(userId, id))) throw new NotYours("observation", id);
 }

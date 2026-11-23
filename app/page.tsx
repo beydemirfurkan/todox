@@ -108,14 +108,23 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
    */
   const owned = allProjects.filter((p) => p.user_id === user.id);
   const allIds = allProjects.map((p) => p.id);
+  /**
+   * What Today's task sections read from: every project except the ones this
+   * person archived. Archiving is how somebody says "out of my way", and a
+   * project that kept filling "up next" would not be out of anybody's way.
+   * Nothing is hidden silently -- `hiddenByArchive` below counts what this
+   * leaves out, and the page says so in a line.
+   */
+  const archivedIds = new Set(arranged.archived.map((p) => p.id));
+  const shownIds = allIds.filter((id) => !archivedIds.has(id));
   const renderedAt = new Date();
   const quietBefore = new Date(renderedAt.getTime() - QUIET_AFTER_DAYS * DAY_MS).toISOString();
   // Everything below needs the project ids, so it waits for them -- together.
   const [doing, next, blocked, teamSizes, notesByProject, pending, questions, stalled, queue] =
     await Promise.all([
-      tasks.openAcross(allIds, "doing", DOING_SHOWN),
-      tasks.openAcross(allIds, "todo", NEXT_SHOWN),
-      tasks.openAcross(allIds, "blocked", BLOCKED_SHOWN),
+      tasks.openAcross(shownIds, "doing", DOING_SHOWN),
+      tasks.openAcross(shownIds, "todo", NEXT_SHOWN),
+      tasks.openAcross(shownIds, "blocked", BLOCKED_SHOWN),
       memberships.countsByProjects(allIds),
       contexts.projectIdsHoldingNotes(owned.map((p) => p.id)),
       // People waiting on an invitation. Without this the list and the DELETE
@@ -123,10 +132,10 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
       invitationsRepo.projectIdsWithPending(owned.map((p) => p.id), renderedAt.toISOString()),
       // What only a person can move: asked across every project this account
       // can see, because a question in a quiet project waits just as long.
-      entriesRepo.openQuestionsByProjects(allIds, OPEN_STATUSES, WAITING_SHOWN),
-      tasks.stalledByProjects(allIds, quietBefore, WAITING_SHOWN),
+      entriesRepo.openQuestionsByProjects(shownIds, OPEN_STATUSES, WAITING_SHOWN),
+      tasks.stalledByProjects(shownIds, quietBefore, WAITING_SHOWN),
       // What was handed to the agent and not yet started.
-      tasks.requestedAcross(allIds, QUEUE_SHOWN),
+      tasks.requestedAcross(shownIds, QUEUE_SHOWN),
     ]);
   // The agent's last word on each task in progress: one query for all of them.
   const handoffs = await entriesRepo.latestHandoffByTasks(doing.map((task) => task.id));
@@ -138,7 +147,6 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
   // The picker offers what the list shows: archived projects stay out of it,
   // and folders group it.
   const folderOf = new Map(arranged.folders.flatMap((folder) => folder.projects.map((p) => [p.id, folder.name] as const)));
-  const archivedIds = new Set(arranged.archived.map((p) => p.id));
   const unarchived = allProjects.filter((p) => !archivedIds.has(p.id));
   // Everything archived still leaves somewhere to add a task.
   const addTargets = (unarchived.length ? unarchived : allProjects).map((p) => ({
@@ -162,13 +170,18 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
       !pending.has(p.id),
   );
 
-  const total = (status: "todo" | "doing" | "blocked") =>
-    allIds.reduce((sum, id) => sum + (counts.map.get(id)?.[status] ?? 0), 0);
-  const totals = { doing: total("doing"), todo: total("todo"), blocked: total("blocked") };
-  const projectsWithOpenWork = allIds.filter((id) => {
+  const openIn = (id: number) => {
     const count = counts.map.get(id);
-    return count && count.todo + count.doing + count.blocked > 0;
-  }).length;
+    return count ? count.todo + count.doing + count.blocked : 0;
+  };
+  const total = (status: "todo" | "doing" | "blocked") =>
+    shownIds.reduce((sum, id) => sum + (counts.map.get(id)?.[status] ?? 0), 0);
+  const totals = { doing: total("doing"), todo: total("todo"), blocked: total("blocked") };
+  const projectsWithOpenWork = shownIds.filter((id) => openIn(id) > 0).length;
+  const hiddenByArchive = {
+    projects: [...archivedIds].filter((id) => openIn(id) > 0).length,
+    tasks: [...archivedIds].reduce((sum, id) => sum + openIn(id), 0),
+  };
   const today = new Intl.DateTimeFormat(lang === "tr" ? "tr-TR" : "en-GB", {
     day: "numeric",
     month: "long",
@@ -279,6 +292,19 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
         >
           {blocked.map((task) => rowFor(task))}
         </TaskSection>
+      )}
+
+      {hiddenByArchive.tasks > 0 && (
+        <p className="text-small text-muted">
+          {hiddenByArchive.tasks === 1
+            ? t("todayArchivedHiddenOne")
+            : hiddenByArchive.projects === 1
+              ? t("todayArchivedHiddenOneProject", { tasks: hiddenByArchive.tasks })
+              : t("todayArchivedHidden", { tasks: hiddenByArchive.tasks, projects: hiddenByArchive.projects })}{" "}
+          <Link href="/account?tab=projects" className="link-more">
+            {t("todayArchivedLink")}
+          </Link>
+        </p>
       )}
 
       {/* On a phone the sidebar is gone, and with it the project list -- so

@@ -7,6 +7,7 @@ import {
   archiveProjectAction,
   createFolderAction,
   deleteFolderAction,
+  moveFolderAction,
   renameFolderAction,
 } from "../actions";
 import { Empty, Panel } from "../components";
@@ -44,7 +45,7 @@ export async function ProjectArrangement({ userId, t }: { userId: number; t: T }
           <Empty>{t("foldersEmpty")}</Empty>
         ) : (
           <ul className="space-y-2">
-            {arranged.folders.map((folder) => (
+            {arranged.folders.map((folder, index) => (
               <li key={folder.id} className="sticker-flat flex flex-col gap-2 p-3">
                 <form action={renameFolderAction} className="flex flex-wrap items-end gap-2">
                   <input type="hidden" name="folder_id" value={folder.id} />
@@ -59,6 +60,14 @@ export async function ProjectArrangement({ userId, t }: { userId: number; t: T }
                 </form>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="mono text-meta text-faint">{countLabel(folder.projects.length)}</span>
+                  {/* The sidebar drags; this is the same move for a keyboard,
+                      a phone, or a page with no script. */}
+                  {index > 0 && (
+                    <FolderStepForm folderId={folder.id} step="up" label={t("folderMoveUp", { name: folder.name })} />
+                  )}
+                  {index < arranged.folders.length - 1 && (
+                    <FolderStepForm folderId={folder.id} step="down" label={t("folderMoveDown", { name: folder.name })} />
+                  )}
                   <form action={deleteFolderAction} className="ml-auto">
                     <input type="hidden" name="folder_id" value={folder.id} />
                     <SubmitButton className="link-more text-small" pendingLabel={t("working")}>
@@ -98,5 +107,18 @@ export async function ProjectArrangement({ userId, t }: { userId: number; t: T }
         )}
       </Panel>
     </div>
+  );
+}
+
+/** One place up or down, as a plain form. */
+function FolderStepForm({ folderId, step, label }: { folderId: number; step: "up" | "down"; label: string }) {
+  return (
+    <form action={moveFolderAction}>
+      <input type="hidden" name="folder_id" value={folderId} />
+      <input type="hidden" name="step" value={step} />
+      <button type="submit" className="icon-button" aria-label={label} title={label}>
+        <span aria-hidden="true">{step === "up" ? "↑" : "↓"}</span>
+      </button>
+    </form>
   );
 }

@@ -11,6 +11,8 @@ import type { ProjectFolder, ProjectPlacement } from "../types";
 const mocks = vi.hoisted(() => ({
   assertProjectAccess: vi.fn(async () => undefined),
   assertFolder: vi.fn(async () => undefined),
+  assertFolders: vi.fn(async (..._args: unknown[]) => undefined),
+  reorder: vi.fn(async (..._args: unknown[]) => 1),
   setFolder: vi.fn(async () => 1),
   setPinnedAt: vi.fn(async () => 1),
   setArchivedAt: vi.fn(async (..._args: unknown[]) => 1),
@@ -23,6 +25,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./ownership", () => ({
   assertProjectAccess: mocks.assertProjectAccess,
   assertFolder: mocks.assertFolder,
+  assertFolders: mocks.assertFolders,
 }));
 vi.mock("../repositories/project-placements", () => ({
   listByUser: vi.fn(async () => []),
@@ -36,6 +39,7 @@ vi.mock("../repositories/project-folders", () => ({
   findOrCreate: mocks.findOrCreate,
   rename: mocks.rename,
   remove: mocks.remove,
+  reorder: mocks.reorder,
 }));
 
 const org = await import("./project-organization");
@@ -177,5 +181,55 @@ describe("writes ask ownership first", () => {
     await org.unarchiveProject(USER, 4);
     expect(mocks.setArchivedAt.mock.calls[0][2]).toEqual(expect.any(String));
     expect(mocks.setArchivedAt.mock.calls[1][2]).toBeNull();
+  });
+});
+
+describe("folder order", () => {
+  const three = () => [folder(10, "a"), folder(11, "b"), folder(12, "c")];
+
+  it("writes a full new order after asking whose folders they are", async () => {
+    mocks.listFolders.mockResolvedValueOnce(three());
+    await org.reorderFolders(USER, [12, 10, 11]);
+    expect(mocks.assertFolders).toHaveBeenCalledWith(USER, [12, 10, 11]);
+    expect(mocks.reorder).toHaveBeenCalledWith([12, 10, 11]);
+  });
+
+  it.each([
+    ["one missing", [12, 10]],
+    ["one repeated", [12, 10, 10]],
+    ["one extra", [12, 10, 11, 13]],
+  ])("refuses an order with %s rather than half-applying it", async (_case, ids) => {
+    mocks.listFolders.mockResolvedValueOnce(three());
+    await expect(org.reorderFolders(USER, ids)).rejects.toThrow("does not match");
+    expect(mocks.reorder).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when a folder in the list is somebody else's", async () => {
+    mocks.assertFolders.mockRejectedValueOnce(new Error("folder #99 does not exist or is not yours"));
+    await expect(org.reorderFolders(USER, [10, 99])).rejects.toThrow("not yours");
+    expect(mocks.reorder).not.toHaveBeenCalled();
+  });
+
+  it("moves one place up or down by swapping neighbours", async () => {
+    mocks.listFolders.mockResolvedValueOnce(three());
+    await org.moveFolder(USER, 11, "up");
+    expect(mocks.reorder).toHaveBeenLastCalledWith([11, 10, 12]);
+    mocks.listFolders.mockResolvedValueOnce(three());
+    await org.moveFolder(USER, 11, "down");
+    expect(mocks.reorder).toHaveBeenLastCalledWith([10, 12, 11]);
+  });
+
+  it("does nothing past either end", async () => {
+    mocks.listFolders.mockResolvedValueOnce(three());
+    await org.moveFolder(USER, 10, "up");
+    mocks.listFolders.mockResolvedValueOnce(three());
+    await org.moveFolder(USER, 12, "down");
+    expect(mocks.reorder).not.toHaveBeenCalled();
+  });
+
+  it("checks the folder is theirs before moving it", async () => {
+    mocks.assertFolder.mockRejectedValueOnce(new Error("folder #10 does not exist or is not yours"));
+    await expect(org.moveFolder(USER, 10, "down")).rejects.toThrow("not yours");
+    expect(mocks.reorder).not.toHaveBeenCalled();
   });
 });

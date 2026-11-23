@@ -5,6 +5,8 @@ import type { T } from "@/lib/i18n";
 import type { PublicUser } from "@/lib/types";
 
 import { accountProjects } from "../account-projects";
+import { reorderFoldersAction } from "../actions";
+import { FolderOrder } from "../features/folder-order";
 import { AccountMenu } from "../features/account-menu";
 import { Notifications } from "../features/notifications";
 import { SearchBox } from "../features/search-box";
@@ -96,6 +98,13 @@ async function SidebarProjects({ userId, t }: { userId: number; t: T }) {
       <ProjectGroups
         arranged={arranged}
         listClassName="flex flex-col gap-0.5"
+        orderFolders={(items) => (
+          <FolderOrder
+            items={items}
+            reorderAction={reorderFoldersAction}
+            labels={{ moved: t("folderMoved"), hint: t("folderDragHint") }}
+          />
+        )}
         labels={{
           pinned: t("sidebarPinned"),
           loose: t("sidebarLoose"),
