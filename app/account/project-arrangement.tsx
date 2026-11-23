@@ -8,6 +8,7 @@ import {
   createFolderAction,
   deleteFolderAction,
   moveFolderAction,
+  moveProjectInFolderAction,
   renameFolderAction,
 } from "../actions";
 import { Empty, Panel } from "../components";
@@ -63,10 +64,22 @@ export async function ProjectArrangement({ userId, t }: { userId: number; t: T }
                   {/* The sidebar drags; this is the same move for a keyboard,
                       a phone, or a page with no script. */}
                   {index > 0 && (
-                    <FolderStepForm folderId={folder.id} step="up" label={t("folderMoveUp", { name: folder.name })} />
+                    <StepForm
+                      action={moveFolderAction}
+                      field="folder_id"
+                      id={folder.id}
+                      step="up"
+                      label={t("folderMoveUp", { name: folder.name })}
+                    />
                   )}
                   {index < arranged.folders.length - 1 && (
-                    <FolderStepForm folderId={folder.id} step="down" label={t("folderMoveDown", { name: folder.name })} />
+                    <StepForm
+                      action={moveFolderAction}
+                      field="folder_id"
+                      id={folder.id}
+                      step="down"
+                      label={t("folderMoveDown", { name: folder.name })}
+                    />
                   )}
                   <form action={deleteFolderAction} className="ml-auto">
                     <input type="hidden" name="folder_id" value={folder.id} />
@@ -76,6 +89,33 @@ export async function ProjectArrangement({ userId, t }: { userId: number; t: T }
                     </SubmitButton>
                   </form>
                 </div>
+                {folder.projects.length > 1 && (
+                  <ol className="flex flex-col gap-1 border-t border-line pt-2">
+                    {folder.projects.map((project, place) => (
+                      <li key={project.id} className="flex items-center gap-1">
+                        <span className="min-w-0 flex-1 truncate text-small text-muted">{project.name}</span>
+                        {place > 0 && (
+                          <StepForm
+                            action={moveProjectInFolderAction}
+                            field="project_id"
+                            id={project.id}
+                            step="up"
+                            label={t("projectMoveUp", { name: project.name })}
+                          />
+                        )}
+                        {place < folder.projects.length - 1 && (
+                          <StepForm
+                            action={moveProjectInFolderAction}
+                            field="project_id"
+                            id={project.id}
+                            step="down"
+                            label={t("projectMoveDown", { name: project.name })}
+                          />
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </li>
             ))}
           </ul>
@@ -110,11 +150,23 @@ export async function ProjectArrangement({ userId, t }: { userId: number; t: T }
   );
 }
 
-/** One place up or down, as a plain form. */
-function FolderStepForm({ folderId, step, label }: { folderId: number; step: "up" | "down"; label: string }) {
+/** One place up or down, as a plain form: a folder among folders, or a project inside its folder. */
+function StepForm({
+  action,
+  field,
+  id,
+  step,
+  label,
+}: {
+  action: (fd: FormData) => Promise<void>;
+  field: "folder_id" | "project_id";
+  id: number;
+  step: "up" | "down";
+  label: string;
+}) {
   return (
-    <form action={moveFolderAction}>
-      <input type="hidden" name="folder_id" value={folderId} />
+    <form action={action}>
+      <input type="hidden" name={field} value={id} />
       <input type="hidden" name="step" value={step} />
       <button type="submit" className="icon-button" aria-label={label} title={label}>
         <span aria-hidden="true">{step === "up" ? "↑" : "↓"}</span>

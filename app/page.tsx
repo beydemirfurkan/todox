@@ -15,7 +15,7 @@ import * as memberships from "@/lib/repositories/project-memberships";
 import * as tasks from "@/lib/repositories/tasks";
 import { firstLine } from "@/lib/util/headline";
 import { accountProjects } from "./account-projects";
-import { clearEmptyProjectAction } from "./actions";
+import { clearEmptyProjectAction, reorderFoldersAction, reorderProjectsAction } from "./actions";
 import { IconTile, WaitingList } from "./components";
 import { Icon } from "./components/icons";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
@@ -26,6 +26,7 @@ import { QuickAdd, type QuickAddTarget } from "./components/quick-add";
 import { TaskRow, TaskSection } from "./components/task-row";
 import { FirstSteps } from "./features/first-steps";
 import { Landing } from "./features/landing";
+import { Sortable } from "./features/sortable";
 import { SubmitButton } from "./features/submit";
 import { QUIET_AFTER_DAYS } from "./p/[slug]/board";
 import { pageOpenGraph } from "./metadata-shared";
@@ -316,6 +317,23 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
         <ProjectGroups
           arranged={arranged}
           listClassName="today-list flex flex-col"
+          sortFolders={(items) => (
+            <Sortable
+              items={items}
+              container="div"
+              onReorder={reorderFoldersAction}
+              labels={{ handle: t("sortHandle"), moved: t("folderMoved") }}
+            />
+          )}
+          sortProjects={(folderId, items) => (
+            <Sortable
+              items={items}
+              container="ul"
+              className="today-list flex flex-col"
+              onReorder={reorderProjectsAction.bind(null, folderId)}
+              labels={{ handle: t("sortHandle"), moved: t("folderMoved") }}
+            />
+          )}
           labels={{
             pinned: t("sidebarPinned"),
             loose: t("sidebarLoose"),
@@ -326,22 +344,20 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
             const count = counts.map.get(project.id);
             const open = count ? count.todo + count.doing + count.blocked : 0;
             return (
-              <li key={project.id}>
-                <Link href={`/p/${project.slug}`} className="task-row" data-align="center">
-                  <span
-                    aria-hidden="true"
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ background: projectColor(project.id) }}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-[16px]">{project.name}</span>
-                  {open > 0 && (
-                    <span className="shrink-0 text-meta text-muted">
-                      {t("sidebarOpenCount", { n: open })}
-                    </span>
-                  )}
-                  <span aria-hidden="true" className="mr-0.5 size-1.5 shrink-0 rotate-45 border-r border-t border-faint" />
-                </Link>
-              </li>
+              <Link href={`/p/${project.slug}`} className="task-row" data-align="center">
+                <span
+                  aria-hidden="true"
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ background: projectColor(project.id) }}
+                />
+                <span className="min-w-0 flex-1 truncate text-[16px]">{project.name}</span>
+                {open > 0 && (
+                  <span className="shrink-0 text-meta text-muted">
+                    {t("sidebarOpenCount", { n: open })}
+                  </span>
+                )}
+                <span aria-hidden="true" className="mr-0.5 size-1.5 shrink-0 rotate-45 border-r border-t border-faint" />
+              </Link>
             );
           }}
         />

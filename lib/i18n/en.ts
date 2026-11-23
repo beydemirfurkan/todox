@@ -841,7 +841,9 @@ export const en = {
   folderMoveUp: "move {name} up",
   folderMoveDown: "move {name} down",
   folderMoved: "{name} moved to place {n}",
-  folderDragHint: "drag to reorder",
+  projectMoveUp: "move {name} up in its folder",
+  projectMoveDown: "move {name} down in its folder",
+  sortHandle: "reorder {name}: drag, or use the arrow keys",
   folderProjectCountOne: "1 project",
   folderProjectCount: "{n} projects",
 

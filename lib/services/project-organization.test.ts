@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   assertFolder: vi.fn(async () => undefined),
   assertFolders: vi.fn(async (..._args: unknown[]) => undefined),
   reorder: vi.fn(async (..._args: unknown[]) => 1),
+  listPlacements: vi.fn(async (): Promise<ProjectPlacement[]> => []),
+  reorderInFolder: vi.fn(async (..._args: unknown[]) => 1),
+  listRecent: vi.fn(async () => [] as { id: number; name: string }[]),
   setFolder: vi.fn(async () => 1),
   setPinnedAt: vi.fn(async () => 1),
   setArchivedAt: vi.fn(async (..._args: unknown[]) => 1),
@@ -27,8 +30,10 @@ vi.mock("./ownership", () => ({
   assertFolder: mocks.assertFolder,
   assertFolders: mocks.assertFolders,
 }));
+vi.mock("./project-activity", () => ({ listRecent: mocks.listRecent }));
 vi.mock("../repositories/project-placements", () => ({
-  listByUser: vi.fn(async () => []),
+  listByUser: mocks.listPlacements,
+  reorderInFolder: mocks.reorderInFolder,
   setFolder: mocks.setFolder,
   setPinnedAt: mocks.setPinnedAt,
   setArchivedAt: mocks.setArchivedAt,
@@ -58,6 +63,7 @@ const placed = (projectId: number, over: Partial<ProjectPlacement> = {}): Projec
   folder_id: null,
   pinned_at: null,
   archived_at: null,
+  position: null,
   ...over,
 });
 /** Newest activity first, the order `listRecent` hands over. */
@@ -231,5 +237,67 @@ describe("folder order", () => {
     mocks.assertFolder.mockRejectedValueOnce(new Error("folder #10 does not exist or is not yours"));
     await expect(org.moveFolder(USER, 10, "down")).rejects.toThrow("not yours");
     expect(mocks.reorder).not.toHaveBeenCalled();
+  });
+});
+
+describe("projects in a folder", () => {
+  it("puts hand-placed projects first, in their order, and the rest after by activity", () => {
+    const out = org.arrange({
+      projects,
+      folders: [folder(10, "work")],
+      placements: [
+        placed(1, { folder_id: 10 }),
+        placed(2, { folder_id: 10, position: 1 }),
+        placed(3, { folder_id: 10 }),
+        placed(4, { folder_id: 10, position: 0 }),
+      ],
+    });
+    expect(ids(out.folders[0].projects)).toEqual([4, 2, 1, 3]);
+  });
+
+  it("saves a drag's order once every id is placed in that folder", async () => {
+    mocks.listPlacements.mockResolvedValueOnce([placed(1, { folder_id: 10 }), placed(2, { folder_id: 10 })]);
+    await org.reorderProjectsInFolder(USER, 10, [2, 1]);
+    expect(mocks.assertFolder).toHaveBeenCalledWith(USER, 10);
+    expect(mocks.reorderInFolder).toHaveBeenCalledWith(USER, [2, 1]);
+  });
+
+  it.each([
+    ["a project from another folder", [2, 3]],
+    ["a repeated id", [1, 1]],
+    ["nothing", []],
+  ])("refuses %s", async (_case, order) => {
+    mocks.listPlacements.mockResolvedValueOnce([
+      placed(1, { folder_id: 10 }),
+      placed(2, { folder_id: 10 }),
+      placed(3, { folder_id: 11 }),
+    ]);
+    await expect(org.reorderProjectsInFolder(USER, 10, order)).rejects.toThrow("does not match");
+    expect(mocks.reorderInFolder).not.toHaveBeenCalled();
+  });
+
+  it("refuses a folder that is not theirs before reading anything", async () => {
+    mocks.assertFolder.mockRejectedValueOnce(new Error("folder #10 does not exist or is not yours"));
+    await expect(org.reorderProjectsInFolder(USER, 10, [1])).rejects.toThrow("not yours");
+    expect(mocks.listPlacements).not.toHaveBeenCalled();
+  });
+
+  it("moves one place from the order as shown, fixing the whole folder's order", async () => {
+    mocks.listRecent.mockResolvedValueOnce([1, 2, 3].map((id) => ({ id, name: `p${id}` })));
+    mocks.listFolders.mockResolvedValueOnce([folder(10, "work")]);
+    mocks.listPlacements.mockResolvedValueOnce([1, 2, 3].map((id) => placed(id, { folder_id: 10 })));
+    await org.moveProjectInFolder(USER, 3, "up");
+    expect(mocks.assertProjectAccess).toHaveBeenCalledWith(USER, 3);
+    expect(mocks.reorderInFolder).toHaveBeenCalledWith(USER, [1, 3, 2]);
+  });
+
+  it("does nothing for a project in no folder, or at an end", async () => {
+    for (const projectId of [2, 1]) {
+      mocks.listRecent.mockResolvedValueOnce([1, 2].map((id) => ({ id, name: `p${id}` })));
+      mocks.listFolders.mockResolvedValueOnce([folder(10, "work")]);
+      mocks.listPlacements.mockResolvedValueOnce([placed(1, { folder_id: 10 })]);
+      await org.moveProjectInFolder(USER, projectId, "up");
+    }
+    expect(mocks.reorderInFolder).not.toHaveBeenCalled();
   });
 });

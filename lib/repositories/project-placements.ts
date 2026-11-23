@@ -11,11 +11,28 @@ export const listByUser = (userId: number) =>
  * the other two columns as they were.
  */
 
+/** A move to another folder forgets the old place: it was a place among other neighbours. */
 export const setFolder = (userId: number, projectId: number, folderId: number | null) =>
   run(
     `INSERT INTO project_placements (user_id, project_id, folder_id) VALUES (?, ?, ?)
-     ON CONFLICT (user_id, project_id) DO UPDATE SET folder_id = EXCLUDED.folder_id`,
+     ON CONFLICT (user_id, project_id) DO UPDATE SET
+       folder_id = EXCLUDED.folder_id,
+       position = CASE WHEN project_placements.folder_id IS NOT DISTINCT FROM EXCLUDED.folder_id
+                       THEN project_placements.position END`,
     [userId, projectId, folderId],
+  );
+
+/**
+ * One person's order for projects in a folder: each id gets its index, in one
+ * statement. The service has already checked every id is placed in that
+ * folder by this person; the user_id here is the row's key, not a check.
+ */
+export const reorderInFolder = (userId: number, orderedProjectIds: readonly number[]) =>
+  run(
+    `UPDATE project_placements pl SET position = o.pos::int - 1
+       FROM unnest(?::int[]) WITH ORDINALITY AS o(id, pos)
+      WHERE pl.user_id = ? AND pl.project_id = o.id`,
+    [orderedProjectIds, userId],
   );
 
 export const setPinnedAt = (userId: number, projectId: number, at: string | null) =>

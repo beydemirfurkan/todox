@@ -649,27 +649,87 @@ body:has([data-wide-page]) .page-column {
 .project-group[open] > summary .project-group-caret {
   transform: rotate(45deg);
 }
-/* Reordering folders in the sidebar: a line where the folder will land. */
-.folder-drag {
+/* Reordering by hand: see Sortable. The grip is the only part that drags,
+   so the row's link still opens and the page still scrolls around it.
+   With a mouse the grip sits over the row's own left padding and shows on
+   hover, so a sortable row lines up with every other row. On a touch screen
+   it is always there, a thumb wide, and the lists inside a folder that have
+   none are indented to match. */
+.sortable-item {
   position: relative;
 }
-.folder-drag[data-lifted] {
-  opacity: 0.45;
+.sort-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  width: 12px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--faint);
+  cursor: grab;
+  opacity: 0;
+  touch-action: none;
 }
-.folder-drag[data-folder-drop]::before {
+ul > .sortable-item > .sort-handle {
+  height: 100%;
+}
+.sortable-item:hover > .sort-handle,
+.sort-handle:focus-visible,
+.sortable-item[data-lifted] > .sort-handle {
+  opacity: 1;
+}
+.sort-handle:hover {
+  color: var(--ink);
+}
+.sortable-item[data-lifted] {
+  opacity: 0.5;
+}
+.sortable-item[data-lifted] > .sort-handle {
+  cursor: grabbing;
+}
+.sortable-item[data-drop]::before {
   content: "";
   position: absolute;
   left: 12px;
-  right: 12px;
+  right: 8px;
   height: 2px;
   border-radius: 1px;
   background: var(--accent);
 }
-.folder-drag[data-folder-drop="before"]::before {
-  top: -4px;
+.sortable-item[data-drop="before"]::before {
+  top: -2px;
 }
-.folder-drag[data-folder-drop="after"]::before {
-  bottom: -4px;
+.sortable-item[data-drop="after"]::before {
+  bottom: -2px;
+}
+@media (hover: none) {
+  .sortable-item {
+    display: flex;
+    align-items: flex-start;
+  }
+  .sortable-body {
+    min-width: 0;
+    flex: 1;
+  }
+  .sort-handle,
+  ul > .sortable-item > .sort-handle {
+    position: static;
+    width: 40px;
+    height: auto;
+    min-height: 44px;
+    flex-shrink: 0;
+    opacity: 1;
+  }
+  .project-group > ul:not(.sortable) {
+    margin-left: 40px;
+  }
+  .sortable-item[data-drop]::before {
+    left: 40px;
+  }
 }
 .project-group-empty {
   padding: 2px 12px 6px 26px;

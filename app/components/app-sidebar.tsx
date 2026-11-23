@@ -5,8 +5,8 @@ import type { T } from "@/lib/i18n";
 import type { PublicUser } from "@/lib/types";
 
 import { accountProjects } from "../account-projects";
-import { reorderFoldersAction } from "../actions";
-import { FolderOrder } from "../features/folder-order";
+import { reorderFoldersAction, reorderProjectsAction } from "../actions";
+import { Sortable } from "../features/sortable";
 import { AccountMenu } from "../features/account-menu";
 import { Notifications } from "../features/notifications";
 import { SearchBox } from "../features/search-box";
@@ -98,11 +98,21 @@ async function SidebarProjects({ userId, t }: { userId: number; t: T }) {
       <ProjectGroups
         arranged={arranged}
         listClassName="flex flex-col gap-0.5"
-        orderFolders={(items) => (
-          <FolderOrder
+        sortFolders={(items) => (
+          <Sortable
             items={items}
-            reorderAction={reorderFoldersAction}
-            labels={{ moved: t("folderMoved"), hint: t("folderDragHint") }}
+            container="div"
+            onReorder={reorderFoldersAction}
+            labels={{ handle: t("sortHandle"), moved: t("folderMoved") }}
+          />
+        )}
+        sortProjects={(folderId, items) => (
+          <Sortable
+            items={items}
+            container="ul"
+            className="flex flex-col gap-0.5"
+            onReorder={reorderProjectsAction.bind(null, folderId)}
+            labels={{ handle: t("sortHandle"), moved: t("folderMoved") }}
           />
         )}
         labels={{
@@ -115,22 +125,20 @@ async function SidebarProjects({ userId, t }: { userId: number; t: T }) {
           const count = counts.map.get(project.id);
           const open = count ? count.todo + count.doing + count.blocked : 0;
           return (
-            <li key={project.id}>
-              <SidebarLink href={`/p/${project.slug}`} title={project.name}>
-                <span
-                  aria-hidden="true"
-                  className="size-2 shrink-0 rounded-full"
-                  style={{ background: projectColor(project.id) }}
-                />
-                <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                {open > 0 && (
-                  <span className="text-meta text-faint">
-                    <span className="sr-only">{open === 1 ? t("sidebarOpenCountOne") : t("sidebarOpenCount", { n: open })}</span>
-                    <span aria-hidden="true">{open}</span>
-                  </span>
-                )}
-              </SidebarLink>
-            </li>
+            <SidebarLink href={`/p/${project.slug}`} title={project.name}>
+              <span
+                aria-hidden="true"
+                className="size-2 shrink-0 rounded-full"
+                style={{ background: projectColor(project.id) }}
+              />
+              <span className="min-w-0 flex-1 truncate">{project.name}</span>
+              {open > 0 && (
+                <span className="text-meta text-faint">
+                  <span className="sr-only">{open === 1 ? t("sidebarOpenCountOne") : t("sidebarOpenCount", { n: open })}</span>
+                  <span aria-hidden="true">{open}</span>
+                </span>
+              )}
+            </SidebarLink>
           );
         }}
       />

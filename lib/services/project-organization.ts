@@ -1,5 +1,6 @@
 import * as folders from "../repositories/project-folders";
 import * as placements from "../repositories/project-placements";
+import { listRecent } from "./project-activity";
 import type { ProjectFolder, ProjectPlacement } from "../types";
 import { now } from "../util/time";
 import { BadRequest } from "./errors";
@@ -60,6 +61,10 @@ export function arrange<P extends { id: number }>(input: {
   }
 
   pinned.sort((first, second) => first.at.localeCompare(second.at));
+  // Placed by hand first, in that order; the rest keep activity order after
+  // them. The sort is stable, which is what keeps the second half true.
+  const positionOf = (project: P) => placementOf.get(project.id)?.position ?? Number.POSITIVE_INFINITY;
+  for (const group of groups) group.projects.sort((first, second) => positionOf(first) - positionOf(second));
   return { pinned: pinned.map((row) => row.project), folders: groups, loose, archived };
 }
 
@@ -172,6 +177,48 @@ export async function moveFolder(userId: number, folderId: number, step: FolderS
   if (from < 0 || to < 0 || to >= ids.length) return;
   [ids[from], ids[to]] = [ids[to], ids[from]];
   await folders.reorder(ids);
+}
+
+/**
+ * A new order for the projects shown in one folder, as a drag leaves it.
+ * Every id must be a project this person placed in that folder, once; a stale
+ * or forged list is refused rather than half-applied.
+ */
+export async function reorderProjectsInFolder(
+  userId: number,
+  folderId: number,
+  orderedProjectIds: readonly number[],
+): Promise<void> {
+  await assertFolder(userId, folderId);
+  const inFolder = new Set(
+    (await placements.listByUser(userId)).filter((row) => row.folder_id === folderId).map((row) => row.project_id),
+  );
+  const isValid =
+    orderedProjectIds.length > 0 &&
+    new Set(orderedProjectIds).size === orderedProjectIds.length &&
+    orderedProjectIds.every((id) => inFolder.has(id));
+  if (!isValid) throw new BadRequest("that order does not match the projects in this folder");
+  await placements.reorderInFolder(userId, orderedProjectIds);
+}
+
+/**
+ * One place up or down inside its folder, the no-script way. Works from the
+ * order the person actually sees -- placed ones, then activity -- so the
+ * first press on a never-ordered folder fixes the whole visible order.
+ */
+export async function moveProjectInFolder(userId: number, projectId: number, step: FolderStep): Promise<void> {
+  await assertProjectAccess(userId, projectId);
+  const [projectRows, arrangement] = await Promise.all([listRecent(userId), arrangementFor(userId)]);
+  const group = arrange({ projects: projectRows, ...arrangement }).folders.find((folder) =>
+    folder.projects.some((project) => project.id === projectId),
+  );
+  if (!group) return;
+  const ids = group.projects.map((project) => project.id);
+  const from = ids.indexOf(projectId);
+  const to = step === "up" ? from - 1 : from + 1;
+  if (to < 0 || to >= ids.length) return;
+  [ids[from], ids[to]] = [ids[to], ids[from]];
+  await placements.reorderInFolder(userId, ids);
 }
 
 export async function deleteFolder(userId: number, folderId: number): Promise<void> {
