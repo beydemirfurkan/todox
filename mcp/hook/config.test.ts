@@ -38,8 +38,21 @@ describe("where the hooks find the server", () => {
 
 describe("token, data directory and the off switch", () => {
   it("takes the token the plugin already prompts for", () => {
-    expect(hookConfig({ CLAUDE_PLUGIN_OPTION_TOKEN: "todox_a" }, undefined, vi.fn()).token).toBe("todox_a");
-    expect(hookConfig({}, undefined, vi.fn()).token).toBeUndefined();
+    const home = mkdtempSync(join(tmpdir(), "todox-home-empty-"));
+    expect(hookConfig({ CLAUDE_PLUGIN_OPTION_TOKEN: "todox_a", TODOX_HOME: home }, undefined, vi.fn()).token).toBe(
+      "todox_a",
+    );
+    expect(hookConfig({ TODOX_HOME: home }, undefined, vi.fn()).token).toBeUndefined();
+  });
+
+  it("falls back to what `todox-mcp login` saved, since the plugin's MCP entry signs in by browser", () => {
+    const home = mkdtempSync(join(tmpdir(), "todox-home-saved-"));
+    writeFileSync(join(home, "config.json"), JSON.stringify({ token: "todox_saved", url: "https://self.example" }));
+    const config = hookConfig({ TODOX_HOME: home }, undefined, vi.fn());
+    expect(config.token).toBe("todox_saved");
+    expect(config.url).toBe("https://self.example");
+    // A prompted token still wins; the file is not even read then.
+    expect(hookConfig({ TODOX_HOME: home, TODOX_TOKEN: "todox_env" }, undefined, vi.fn()).token).toBe("todox_env");
   });
 
   it("keeps state where Claude Code keeps plugin data", () => {

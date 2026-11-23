@@ -22,6 +22,7 @@ import type { MethodName } from "../lib/services/rpc-schemas";
 import { isAbsolutePath } from "../lib/util/paths";
 import { runInstallDoctor } from "./doctor";
 import { runHookCommand } from "./git-hook/cli";
+import { runLogin } from "./login";
 import { memoryFileFor } from "../scripts/install-mcp/clients/contract";
 import { hasMemoryBlock } from "../scripts/install-mcp/memory";
 import { createObserver } from "./observer";
@@ -239,6 +240,20 @@ if (process.argv[2] === "hook") {
     console.error("[todox] hook:", e instanceof Error ? e.message : e);
     process.exit(1);
   }
+} else if (process.argv[2] === "login") {
+  // How a token gets saved without anyone copying one: also before readConfig.
+  // `exitCode`, not `exit()`: right after a `fetch`, an explicit exit on
+  // Windows trips a libuv assertion and turns a successful login into a crash
+  // code. Nothing else is left running here, so the loop drains by itself.
+  runLogin(process.argv.slice(3), process.env).then(
+    (code) => {
+      process.exitCode = code;
+    },
+    (e) => {
+      console.error("[todox] login:", e instanceof Error ? e.message : e);
+      process.exitCode = 1;
+    },
+  );
 } else if (process.argv[2] === "doctor") {
   runInstallDoctor(process.argv[3] ?? process.cwd()).then(
     (code) => process.exit(code),

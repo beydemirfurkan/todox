@@ -2,6 +2,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSyn
 import { join } from "node:path";
 
 import { findProjectRoot, gitConfigValue, gitDir } from "../workspace";
+import { saveCredentials } from "../saved-config";
 import { configPath, todoxHome } from "./config";
 
 /**
@@ -139,8 +140,7 @@ function saveConfig(o: InstallOptions): string[] {
       ? [`kept the token already in ${path}`]
       : [`no token given: the hook will log "no token" until you re-run with --token todox_… or set TODOX_TOKEN`];
   const url = o.url ?? o.env.TODOX_URL;
-  writeFileSync(path, `${JSON.stringify({ token, ...(url ? { url } : {}) })}\n`, { mode: 0o600 });
-  chmodSync(path, 0o600);
+  saveCredentials(o.env, { token, url });
   return [`saved the token${url ? ` and ${url}` : ""} to ${path} (readable by you only)`];
 }
 
