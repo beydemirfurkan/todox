@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { readSavedConfig } from "../saved-config";
 import type { HookClient } from "./types";
 
 /**
@@ -50,9 +51,18 @@ export function hookConfig(
   warn: (message: string) => void,
   client: HookClient = "claude-code",
 ): HookConfig {
+  // The plugin's MCP entry now signs in through the browser, and the token it
+  // gets lives inside Claude Code where no hook can read it. So with nothing
+  // prompted or exported, the hooks use what `todox-mcp login` saved.
+  const prompted = tokenFrom(env);
+  const saved = prompted ? {} : readSavedConfig(env, warn);
   return {
-    token: tokenFrom(env),
-    url: env.TODOX_URL || (pluginRoot && urlFromMcpJson(pluginRoot, warn)) || HOSTED_URL,
+    token: prompted ?? saved.token,
+    url:
+      env.TODOX_URL ||
+      (pluginRoot && urlFromMcpJson(pluginRoot, warn)) ||
+      saved.url ||
+      HOSTED_URL,
     dataDir: dataDirFrom(env, client),
     disabled: env.TODOX_HOOKS === "off",
     stopMode: env.TODOX_STOP === "off" || env.TODOX_STOP === "strict" ? env.TODOX_STOP : "default",

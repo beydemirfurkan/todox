@@ -15,7 +15,6 @@ import {
   logoutAction,
   resendVerificationAction,
   revokeAllTokensAction,
-  revokeTokenAction,
   updateNameAction,
 } from "../auth-actions";
 import {
@@ -32,6 +31,8 @@ import { AuthForm } from "../features/auth-form";
 import { SubmitButton } from "../features/submit";
 import { RevealCurrent } from "../features/reveal-current";
 import { TokenForm } from "../features/token-form";
+import { AgentSetup, type AgentSetupLabels } from "../features/agent-setup";
+import { isGrant, LOGIN_COMMAND, TokenTable } from "./agent-tokens";
 import { CopyMarkdown } from "../features/copy-markdown";
 import { acceptProjectInviteAction, setLangAction, updatePublicProfileAction } from "../actions";
 import { PROFILE_BIO_MAX } from "@/lib/constants";
@@ -133,6 +134,19 @@ export default async function AccountPage({
     membershipsRepo.listByUser(user.id),
     membershipsRepo.sharedOwnedBy(user.id),
   ]);
+  const grants = tokens.filter(isGrant);
+  const personal = tokens.filter((token) => !isGrant(token));
+  const mcpUrl = `${publicUrl()}/api/mcp`;
+  const setupLabels: AgentSetupLabels = {
+    promptTitle: t("setupPromptTitle"),
+    manualTitle: t("setupManualTitle"),
+    scopeNote: t("setupScopeNote"),
+    agentLabel: t("setupAgentLabel"),
+    other: t("setupAgentOther"),
+    verify: t("setupVerify"),
+    copy: t("copySnippet"),
+    copied: t("shareCopied"),
+  };
   const asked = await searchParams;
   const requestedTab = asked.tab;
   const askedError = Array.isArray(asked.error) ? asked.error[0] : asked.error;
@@ -385,94 +399,73 @@ export default async function AccountPage({
       {activeTab === "tokens" && (
         <Panel
           delay={40}
-          title={t("apiTokens")}
-          right={<Counter n={tokens.length} label={t("apiTokens")} />}
+          title={t("connectTitle")}
+          right={<Counter n={grants.length} label={t("connectedAppsTitle")} />}
         >
-          <p className="mb-3 text-[14px] text-muted">{t("apiTokensIntro")}</p>
+          <p className="mb-3 text-[14px] text-muted">{t("connectIntro")}</p>
 
-          <TokenForm
-            url={`${publicUrl()}/api/mcp`}
-            promptTemplate={t("setupPromptTemplate")}
-            nameLabel={t("tokenName")}
-            submitLabel={t("createToken")}
-            pendingLabel={t("tokenCreating")}
-            onceLabel={t("tokenOnce")}
-            tooManyTemplate={t("tokenTooMany")}
-            setup={{
-              promptTitle: t("setupPromptTitle"),
-              promptWarning: t("setupPromptWarning"),
-              manualTitle: t("setupManualTitle"),
-              scopeNote: t("setupScopeNote"),
-              agentLabel: t("setupAgentLabel"),
-              other: t("setupAgentOther"),
-              verify: t("setupVerify"),
-              copy: t("copySnippet"),
-              copied: t("shareCopied"),
-            }}
+          {/* No token anywhere in this text: the client is refused once, finds
+              the OAuth metadata and opens a browser here for the approval. So
+              it is safe to show to anyone, any time, without a click first. */}
+          <AgentSetup
+            url={mcpUrl}
+            prompt={t("connectPromptTemplate").replaceAll("{url}", mcpUrl)}
+            labels={setupLabels}
           />
 
-          {tokens.length > 0 ? (
-            <div className="mt-5 border-t border-dashed border-rule pt-4">
-              <div className="account-token-table-wrap">
-                <table className="account-token-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">{t("tokenColumnName")}</th>
-                      <th scope="col">{t("tokenColumnActivity")}</th>
-                      <th scope="col">{t("tokenColumnCreated")}</th>
-                      <th scope="col" className="text-right">
-                        {t("tokenColumnActions")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tokens.map((tok) => (
-                      <tr key={tok.id}>
-                        <th scope="row" className="display font-bold">
-                          {tok.name}
-                        </th>
-                        <td>
-                          <Chip color={tok.last_used_at ? "var(--ok)" : undefined}>
-                            {tok.last_used_at
-                              ? `${t("lastUsed")} ${ago(tok.last_used_at, t)}`
-                              : t("neverUsed")}
-                          </Chip>
-                        </td>
-                        <td className="mono text-meta text-faint">
-                          {ago(tok.created_at, t)}
-                        </td>
-                        <td className="text-right">
-                          <form action={revokeTokenAction}>
-                            <input type="hidden" name="token_id" value={tok.id} />
-                            <SubmitButton
-                              className="link-more !text-[12px]"
-                              pendingLabel={t("working")}
-                            >
-                              {t("revoke")}
-                              <span className="sr-only"> — {tok.name}</span>
-                            </SubmitButton>
-                          </form>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <section aria-labelledby="connected-title" className="mt-5 border-t border-dashed border-rule pt-4">
+            <h3 id="connected-title" className="display font-bold">
+              {t("connectedAppsTitle")}
+            </h3>
+            <p className="mt-1 mb-3 text-small text-muted">{t("connectedAppsIntro")}</p>
+            {grants.length > 0 ? (
+              <TokenTable rows={grants} actionLabel={t("disconnect")} t={t} />
+            ) : (
+              <Empty>{t("noConnectedApps")}</Empty>
+            )}
+          </section>
 
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-                <p className="min-w-[15rem] flex-1 text-[13.5px] text-muted">
-                  {t("revokeAllNote")}
-                </p>
-                <form action={revokeAllTokensAction} className="shrink-0">
-                  <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
-                    {t("revokeAll")}
-                  </SubmitButton>
-                </form>
+          {/* The pasted token is the way in where no browser can open. Folded,
+              because it is the one thing on this page that mints a credential
+              worth stealing, and most people never need it. Open by default
+              while one exists, so a person who has them can see and end them. */}
+          <details
+            className="disclosure mt-5 border-t border-dashed border-rule pt-4"
+            open={personal.length > 0}
+          >
+            <summary className="display font-bold">{t("personalTokensTitle")}</summary>
+            <p className="mt-2 text-small text-muted">{t("personalTokensIntro")}</p>
+            <p className="mt-3 text-small text-muted">{t("loginCommandLabel")}</p>
+            <pre className="sticker-flat mono mt-1 overflow-x-auto whitespace-pre-wrap break-all p-3 text-meta">
+              {LOGIN_COMMAND}
+            </pre>
+
+            <TokenForm
+              url={mcpUrl}
+              promptTemplate={t("setupPromptTemplate")}
+              nameLabel={t("tokenName")}
+              submitLabel={t("createToken")}
+              pendingLabel={t("tokenCreating")}
+              onceLabel={t("tokenOnce")}
+              tooManyTemplate={t("tokenTooMany")}
+              setup={{ ...setupLabels, promptWarning: t("setupPromptWarning") }}
+            />
+
+            {personal.length > 0 && (
+              <div className="mt-5">
+                <TokenTable rows={personal} actionLabel={t("revoke")} t={t} />
               </div>
-            </div>
-          ) : (
-            <div className="mt-4">
-              <Empty>{t("noTokens")}</Empty>
+            )}
+          </details>
+
+          {tokens.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-dashed border-rule pt-4">
+              <p className="min-w-[15rem] flex-1 text-[13.5px] text-muted">{t("revokeAllNote")}</p>
+              <form action={revokeAllTokensAction} className="shrink-0">
+                <SubmitButton className="link-more !text-[13px]" pendingLabel={t("working")}>
+                  {t("revokeAll")}
+                </SubmitButton>
+              </form>
             </div>
           )}
 

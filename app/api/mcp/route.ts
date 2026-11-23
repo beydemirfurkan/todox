@@ -9,6 +9,8 @@ import { logError, logWarn, newRequestId } from "@/lib/server/log";
 import { normalise, type ClientInfo } from "@/lib/client-identity";
 import { clientDuringSetup, record } from "@/lib/server/client-info";
 import { metered, serverTiming } from "@/lib/db/client";
+import { publicUrl } from "@/lib/public-url";
+import { resourceMetadataUrl } from "@/lib/services/oauth-rules";
 import { agentForToken, type AgentIdentity } from "@/lib/services/auth";
 import { silentAccountNudge } from "@/lib/services/nudge";
 import { BadRequest, refusalReason } from "@/lib/services/errors";
@@ -124,12 +126,15 @@ async function nudgeFor(agent: AgentIdentity, body: unknown, client: ClientInfo 
 }
 
 /**
- * Deliberately no `WWW-Authenticate` with `resource_metadata`: that header is
- * what makes a client go looking for an OAuth authorisation server, and this
- * one is a pasted bearer token.
+ * The 401 names where to get a token (RFC 9728). That header is what sends an
+ * MCP client to the browser to have the person approve it, so connecting needs
+ * no pasted credential. It used to be withheld on purpose, when a pasted token
+ * was the only way in; a personal token still works and never sees this.
  */
 const unauthorised = (error: string) =>
-  json({ jsonrpc: "2.0", error: { code: -32001, message: error } }, 401);
+  json({ jsonrpc: "2.0", error: { code: -32001, message: error } }, 401, {
+    "www-authenticate": `Bearer resource_metadata="${resourceMetadataUrl(publicUrl())}"`,
+  });
 
 /**
  * The error boundary, and nothing else.

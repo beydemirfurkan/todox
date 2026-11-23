@@ -32,16 +32,65 @@ export async function create(input: {
   user_id: number;
   name: string;
   token: string;
+  /** Set for the CLI login, so the list can say where a token came from. */
+  client_id?: string;
 }): Promise<ApiToken> {
   const row = await one<ApiToken>(
-    `INSERT INTO api_tokens (user_id, name, token_hash, created_at)
-     VALUES (?, ?, ?, ?) RETURNING *`,
-    [input.user_id, input.name, hashToken(input.token), now()],
+    `INSERT INTO api_tokens (user_id, name, token_hash, created_at, client_id)
+     VALUES (?, ?, ?, ?, ?) RETURNING *`,
+    [input.user_id, input.name, hashToken(input.token), now(), input.client_id ?? null],
   );
   return row!;
 }
 
-/** Resolves a bearer token to its owner and records that it was used. */
+/** The access token of a new OAuth grant: one row for the grant's whole life. */
+export const createGrantStmt = (input: {
+  user_id: number;
+  name: string;
+  token: string;
+  client_id: string;
+  family_id: string;
+  created_at: string;
+  expires_at: string;
+}): Statement => ({
+  text: `INSERT INTO api_tokens (user_id, name, token_hash, created_at, client_id, family_id, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  params: [
+    input.user_id,
+    input.name,
+    hashToken(input.token),
+    input.created_at,
+    input.client_id,
+    input.family_id,
+    input.expires_at,
+  ],
+});
+
+/**
+ * A refresh swaps the grant's access token in place. Updating the one row,
+ * rather than adding one an hour, keeps `last_used_at` and the captured client
+ * attached to the connection a person sees in their list.
+ */
+export const rotateGrantStmt = (familyId: string, token: string, expiresAt: string): Statement => ({
+  text: "UPDATE api_tokens SET token_hash = ?, expires_at = ? WHERE family_id = ?",
+  params: [hashToken(token), expiresAt, familyId],
+});
+
+export const removeGrantStmt = (familyId: string): Statement => ({
+  text: "DELETE FROM api_tokens WHERE family_id = ?",
+  params: [familyId],
+});
+
+export const findForUser = (id: number, userId: number): Promise<ApiToken | undefined> =>
+  one<ApiToken>("SELECT * FROM api_tokens WHERE id = ? AND user_id = ?", [id, userId]);
+
+/** The live grant of a family, if a person has not revoked it. */
+export const findGrant = (familyId: string): Promise<ApiToken | undefined> =>
+  one<ApiToken>("SELECT * FROM api_tokens WHERE family_id = ?", [familyId]);
+
+export const findByToken = (token: string): Promise<ApiToken | undefined> =>
+  one<ApiToken>("SELECT * FROM api_tokens WHERE token_hash = ?", [hashToken(token)]);
+
 /**
  * The account behind an agent token, and how this call sits in that token's
  * history.
@@ -93,8 +142,8 @@ export async function userForToken(token: string): Promise<TokenIdentity | undef
             t.last_client_name, t.last_client_version, t.last_client_seen_at
        FROM api_tokens t
        JOIN users u ON u.id = t.user_id
-      WHERE t.token_hash = ?`,
-    [hashToken(token)],
+      WHERE t.token_hash = ? AND (t.expires_at IS NULL OR t.expires_at > ?)`,
+    [hashToken(token), now()],
   );
   if (!row) return undefined;
 

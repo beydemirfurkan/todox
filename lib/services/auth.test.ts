@@ -36,6 +36,7 @@ const apiTokensRepo = vi.hoisted(() => ({
   remove: vi.fn(),
   destroyAllFor: vi.fn(),
   userForToken: vi.fn(),
+  findForUser: vi.fn(),
 }));
 const authTokensRepo = vi.hoisted(() => ({
   invalidateAllStmt: vi.fn((_userId: number, purpose: string) => ({
@@ -485,9 +486,19 @@ describe("api tokens", () => {
   });
 
   it("scopes a revoke to the account, so an id from elsewhere is not enough", async () => {
+    apiTokensRepo.findForUser.mockResolvedValue({ id: 11, family_id: null });
     await auth.revokeApiToken(11, USER.id);
 
+    expect(apiTokensRepo.findForUser).toHaveBeenCalledWith(11, USER.id);
     expect(apiTokensRepo.remove).toHaveBeenCalledWith(11, USER.id);
+  });
+
+  it("does nothing for an id that is not this account's", async () => {
+    apiTokensRepo.findForUser.mockResolvedValue(undefined);
+    apiTokensRepo.remove.mockClear();
+    await auth.revokeApiToken(12, USER.id);
+
+    expect(apiTokensRepo.remove).not.toHaveBeenCalled();
   });
 });
 

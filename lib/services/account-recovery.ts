@@ -2,6 +2,7 @@ import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
 import * as authTokens from "../repositories/auth-tokens";
 import * as oauthAccounts from "../repositories/oauth-accounts";
+import * as refreshTokens from "../repositories/oauth-refresh-tokens";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
 import type { AuthTokenPurpose, PublicUser } from "../types";
@@ -95,6 +96,8 @@ export async function completePasswordReset(
     // full permissions is exactly what an intruder would keep. Killing sessions
     // while leaving those alive would have been security theatre.
     apiTokens.destroyAllForStmt(hit.user.id),
+    // An authorised client's refresh token would mint a fresh one, so those end too.
+    refreshTokens.revokeAllForUserStmt(hit.user.id, consumedAt),
     // And any Google or GitHub identity linked to it, for the same reason: an
     // intruder's own identity is a way back in that no password change ends.
     oauthAccounts.destroyAllForStmt(hit.user.id),

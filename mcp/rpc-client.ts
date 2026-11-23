@@ -1,4 +1,5 @@
 import { HOSTED_URL } from "./hook/config";
+import { readSavedConfig } from "./saved-config";
 
 /**
  * Thin transport to the todox server. The MCP process runs on the developer's
@@ -59,16 +60,19 @@ export function createClient(baseUrl: string, token: string, options: ClientOpti
 }
 
 export function readConfig() {
-  const token = process.env.TODOX_TOKEN;
+  // The environment first, then what `todox-mcp login` saved: the same order
+  // the hooks and the git hook use, so one login serves all three.
+  const saved = readSavedConfig(process.env, (message) => console.error(`[todox] ${message}`));
+  const token = process.env.TODOX_TOKEN || saved.token;
   // The same default as the hooks and the git hook. It was localhost, so a
   // todox.dev user who set only TODOX_TOKEN -- what the Codex steps say --
   // got a stdio server talking to nothing while the hooks beside it worked.
-  const url = process.env.TODOX_URL?.trim() || HOSTED_URL;
+  const url = process.env.TODOX_URL?.trim() || saved.url || HOSTED_URL;
   if (!token) {
     throw new Error(
-      "TODOX_TOKEN is not set. Create an agent token on the Account page and pass it " +
-        "to this process in the environment. Most people do not need this mode at " +
-        "all: the hosted server at /api/mcp needs no local process.",
+      "No todox token. Run `todox-mcp login` once on this machine to sign in through " +
+        "the browser, or pass TODOX_TOKEN in the environment. Most people do not need " +
+        "this mode at all: the hosted server at /api/mcp needs no local process.",
     );
   }
   return { token, url };

@@ -32,6 +32,9 @@ const sessionsRepo = vi.hoisted(() => ({
 const apiTokensRepo = vi.hoisted(() => ({
   destroyAllForStmt: vi.fn(() => ({ text: "drop agent tokens", params: [] })),
 }));
+const refreshRepo = vi.hoisted(() => ({
+  revokeAllForUserStmt: vi.fn(() => ({ text: "revoke refresh tokens", params: [] })),
+}));
 const invitationsRepo = vi.hoisted(() => ({ byToken: vi.fn() }));
 const db = vi.hoisted(() => ({ tx: vi.fn() }));
 
@@ -40,6 +43,7 @@ vi.mock("../repositories/users", () => usersRepo);
 vi.mock("../repositories/auth-tokens", () => authTokensRepo);
 vi.mock("../repositories/sessions", () => sessionsRepo);
 vi.mock("../repositories/api-tokens", () => apiTokensRepo);
+vi.mock("../repositories/oauth-refresh-tokens", () => refreshRepo);
 vi.mock("../repositories/project-invitations", () => invitationsRepo);
 vi.mock("../db/client", () => db);
 vi.mock("../server/log", () => ({ logInfo: vi.fn() }));
@@ -151,6 +155,7 @@ describe("an address that already has an account", () => {
       "clear password",
       "drop sessions",
       "drop agent tokens",
+      "revoke refresh tokens",
       "mark verified",
     ]);
   });

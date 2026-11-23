@@ -36,6 +36,15 @@ const PUBLIC = [
   // Signing in with Google or GitHub starts and ends here, before there is a
   // session to have. Both routes decide for themselves what a caller may do.
   "/api/auth/",
+  // An MCP client getting a token. Discovery, registration, the token and
+  // revocation endpoints are called by a program with no cookie, and the
+  // consent decision checks the session itself. Redirected to /login, every
+  // one of them would answer a client with HTML.
+  "/.well-known/oauth-",
+  "/api/oauth/",
+  // The consent page sends a signed-out visitor to /login itself, with the
+  // way back attached; the generic redirect below would drop the query.
+  "/oauth/authorize",
   // The container's own liveness check, which has no cookie and never will.
   // Redirected, it answers 307 to a runtime that only asked whether this
   // process can serve anything -- and a redirect is a perfectly healthy

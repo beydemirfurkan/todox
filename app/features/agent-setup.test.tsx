@@ -107,6 +107,28 @@ describe("agent snippets", () => {
     }
   });
 
+  it("carries no credential at all without a token, so the client signs in by browser", () => {
+    // The default path: a header with nothing in it, or a stray "Bearer",
+    // would stop the client from ever asking for OAuth.
+    for (const snippet of snippetsFor(URL, undefined, LABELS.other)) {
+      expect(snippet.body, snippet.id).not.toMatch(/Bearer|Authorization|headers/);
+      expect(snippet.body, snippet.id).toContain(URL);
+    }
+  });
+
+  it("tells the two CLI clients how to start the sign-in", () => {
+    const tokenless = snippetsFor(URL, undefined, LABELS.other);
+    expect(tokenless.find((s) => s.id === "claude")?.body).toContain("/mcp");
+    expect(tokenless.find((s) => s.id === "codex")?.body).toContain("codex mcp login todox");
+  });
+
+  it("produces JSON that parses without a token too", () => {
+    for (const snippet of snippetsFor(URL, undefined, LABELS.other)) {
+      if (snippet.id === "claude" || snippet.id === "codex") continue;
+      expect(() => JSON.parse(snippet.body), snippet.id).not.toThrow();
+    }
+  });
+
   it("produces JSON that parses, for every JSON client", () => {
     // A trailing comma or an unquoted key would be pasted straight into a
     // config file and rejected there instead of here.

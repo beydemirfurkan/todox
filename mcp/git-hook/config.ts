@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { HOSTED_URL } from "../hook/config";
+import { readSavedConfig, todoxHome } from "../saved-config";
+
+export { configPath, todoxHome } from "../saved-config";
 
 /**
  * Where a git hook finds the server and the token.
@@ -24,29 +25,12 @@ export interface GitHookConfig {
 
 type Env = Record<string, string | undefined>;
 
-export const todoxHome = (env: Env): string => env.TODOX_HOME || join(homedir(), ".todox");
-export const configPath = (env: Env): string => join(todoxHome(env), "config.json");
-
 export function gitHookConfig(env: Env, warn: (message: string) => void): GitHookConfig {
-  const saved = readSaved(configPath(env), warn);
+  const saved = readSavedConfig(env, warn);
   return {
     token: env.TODOX_TOKEN || saved.token,
     url: env.TODOX_URL || saved.url || HOSTED_URL,
     dataDir: join(todoxHome(env), "git-hook"),
     disabled: env.TODOX_OBSERVE === "off" || env.TODOX_HOOKS === "off",
   };
-}
-
-function readSaved(path: string, warn: (message: string) => void): { token?: string; url?: string } {
-  if (!existsSync(path)) return {};
-  try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as { token?: unknown; url?: unknown };
-    return {
-      token: typeof parsed.token === "string" ? parsed.token : undefined,
-      url: typeof parsed.url === "string" ? parsed.url : undefined,
-    };
-  } catch (e) {
-    warn(`${path} unreadable: ${(e as Error).message}`);
-    return {};
-  }
 }

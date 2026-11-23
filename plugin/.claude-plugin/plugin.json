@@ -20,9 +20,10 @@
   "userConfig": {
     "token": {
       "type": "string",
-      "title": "todox agent token",
-      "description": "From the Account page on todox.dev (or your own instance). Starts with todox_. Stored in your Claude Code settings, never in this plugin.",
-      "sensitive": true
+      "title": "todox agent token (optional)",
+      "description": "Leave empty: the todox tools sign in through your browser the first time (/mcp → todox → Authenticate), and the hooks use the token `npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz login` saves. Only for a machine with no browser: a personal token from the Account page, starting with todox_. Stored in your Claude Code settings, never in this plugin.",
+      "sensitive": true,
+      "required": false
     }
   }
 }

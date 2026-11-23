@@ -93,6 +93,18 @@ export const POLICIES = {
    * needs one; the ceiling only stops a loop.
    */
   oauthPerIp: { limit: 30, windowMs: 15 * MINUTE },
+  /**
+   * Dynamic client registrations, per address. Each one is a row nobody
+   * vouched for, so the ceiling is what keeps an unauthenticated endpoint from
+   * becoming a way to fill a table. A real client registers once per install.
+   */
+  clientRegisterPerIp: { limit: 20, windowMs: HOUR },
+  /**
+   * Token requests, per address. A code or refresh token is a 256-bit secret,
+   * so this is not guarding a guess; it caps what a misbehaving client loop
+   * can cost before it notices.
+   */
+  oauthTokenPerIp: { limit: 120, windowMs: 15 * MINUTE },
 } as const;
 
 export type PolicyName = keyof typeof POLICIES;

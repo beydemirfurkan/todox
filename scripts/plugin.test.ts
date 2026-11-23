@@ -44,21 +44,24 @@ describe("the plugin says what the server says", () => {
  * install prompts for, and the one hook says the two things the protocol asks.
  */
 describe("the plugin's hand-written files", () => {
-  it("points the MCP entry at the hosted endpoint with the prompted token", () => {
+  it("points the MCP entry at the hosted endpoint with no header, so it signs in by browser", () => {
+    // A header -- even an empty one -- would stop Claude Code from treating
+    // the 401 as a reason to run OAuth.
     const mcp = JSON.parse(readFileSync(join(PLUGIN_ROOT, ".mcp.json"), "utf8")) as {
-      mcpServers: Record<string, { type: string; url: string; headers: Record<string, string> }>;
+      mcpServers: Record<string, { type: string; url: string; headers?: Record<string, string> }>;
     };
     expect(mcp.mcpServers.todox.type).toBe("http");
     expect(mcp.mcpServers.todox.url).toBe("https://www.todox.dev/api/mcp");
-    expect(mcp.mcpServers.todox.headers.Authorization).toBe("Bearer ${user_config.token}");
+    expect(mcp.mcpServers.todox.headers).toBeUndefined();
   });
 
-  it("asks for the token as a sensitive value, and for nothing else", () => {
+  it("asks for a token only optionally, as a sensitive value, and for nothing else", () => {
     const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8")) as {
-      userConfig: Record<string, { sensitive?: boolean }>;
+      userConfig: Record<string, { sensitive?: boolean; required?: boolean }>;
     };
     expect(Object.keys(manifest.userConfig)).toEqual(["token"]);
     expect(manifest.userConfig.token.sensitive).toBe(true);
+    expect(manifest.userConfig.token.required).toBe(false);
   });
 
   it("runs every hook through run.sh, and starts sessions with the digest after compaction too", () => {

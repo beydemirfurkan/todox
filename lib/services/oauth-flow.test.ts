@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { decodePending, encodePending, inviteTokenFromNext, safeNext, stateMatches } from "./oauth-flow";
+import {
+  decodePending,
+  encodePending,
+  inviteTokenFromNext,
+  resumablePath,
+  safeNext,
+  stateMatches,
+} from "./oauth-flow";
 
 describe("safeNext", () => {
   it("allows an invitation and the account page, nothing else", () => {
@@ -11,6 +18,26 @@ describe("safeNext", () => {
     for (const bad of ["https://evil.example", "//evil.example", "/p/x", "/account?tab=a&x=1", null, ""]) {
       expect(safeNext(bad)).toBe("/");
     }
+  });
+});
+
+describe("resumablePath", () => {
+  it("returns to an agent's pending connection after sign-in", () => {
+    const pending = "/oauth/authorize?client_id=https%3A%2F%2Fclaude.ai%2Fmeta&response_type=code&state=a.b~c";
+    expect(resumablePath(pending)).toBe(pending);
+    expect(safeNext(pending)).toBe(pending);
+  });
+
+  it("refuses anything that could leave the consent page", () => {
+    for (const bad of [
+      "/oauth/authorize",
+      "/oauth/authorize?x=<script>",
+      "/oauth/authorizeX?a=1",
+      "//evil.example/oauth/authorize?a=1",
+      "/oauth/authorize?a=1#frag",
+      "/oauth/authorize?a=1 b",
+    ])
+      expect(resumablePath(bad), bad).toBeUndefined();
   });
 });
 

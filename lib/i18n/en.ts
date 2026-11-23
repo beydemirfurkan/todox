@@ -125,8 +125,8 @@ export const en = {
   firstStepsTitleNoName: "welcome",
   firstStepsBody: "Three steps. After that, this page fills itself.",
   firstStep1Title: "connect your agent",
-  firstStep1Body: "Create a key on the account page and paste the command it gives you into your terminal. The key is inside the command, so keep it to yourself.",
-  firstStep1Cta: "create a key",
+  firstStep1Body: "Add todox to your agent with the one line on the account page. The first time it connects, you approve it in the browser — there is no key to copy.",
+  firstStep1Cta: "connect an agent",
   firstStep2Title: "open your agent in a repository",
   firstStep2Body: "The project registers itself the first time your agent starts there. Nothing to set up by hand.",
   firstStep2Manual: "or create a project by hand",
@@ -303,7 +303,7 @@ export const en = {
   changePassword: "change password",
   changePasswordNote:
     "Signs you out everywhere. Agent tokens keep working — revoke them below if one of those is the problem.",
-  apiTokens: "agent tokens",
+  apiTokens: "agents",
   invites: "invites",
   viewInvites: "view invites",
   pendingInvites: "pending invites",
@@ -319,7 +319,7 @@ export const en = {
   inviteInvalidBody: "It may have expired, been revoked, or already been accepted.",
   habitTitle: "the habit your agent needs",
   habitIntro:
-    "A token makes the tools exist; these four lines are what make an agent use them. Paste them into your agent's user-level memory file: the one it reads in every project, not the one inside a repository. pnpm install:mcp offers to do it for you.",
+    "Connecting makes the tools exist; these four lines are what make an agent use them. Paste them into your agent's user-level memory file: the one it reads in every project, not the one inside a repository. pnpm install:mcp offers to do it for you.",
   habitWhere: "Where each agent reads it:",
   apiTokensIntro:
     "An agent signs in with one of these. Create one and you get setup text you can paste straight into whichever agent you use; it reaches your account and nothing else.",
@@ -449,7 +449,7 @@ export const en = {
   noteBodyPh: "the note itself",
   hookTitle: "hook up your agent",
   hookBody:
-    "Create an agent token and paste the setup text into your agent — Claude Code, Codex, Cursor, VS Code, anything that speaks MCP. After that it reads and writes this log by itself.",
+    "Add todox to your agent — Claude Code, Codex, Cursor, VS Code, anything that speaks MCP — and approve it in the browser the first time it connects. After that it reads and writes this log by itself.",
   hookCta: "go to Account →",
   inFlight: "in flight",
   queued: "queued",
@@ -810,6 +810,78 @@ export const en = {
   notFoundBody:
     "This page does not exist, or the project it pointed at has been renamed or deleted.",
   backHome: "back to your projects",
+
+  /* connecting an agent without a token */
+  connectTitle: "connect an agent",
+  connectIntro:
+    "Paste this to your agent, or run the line for your tool yourself. The first time it connects, a browser tab opens here and you approve it. Nothing in the text is a secret.",
+  connectPromptTemplate: [
+    "Add todox as an MCP server. It is a remote (HTTP) server, so there is",
+    "nothing to install, and no token: the first time you connect, todox",
+    "opens a browser tab where I approve you.",
+    "",
+    "  name : todox",
+    "  type : http (streamable-http)",
+    "  url  : {url}",
+    "",
+    "Add it at USER / GLOBAL scope, not for this project only — todox is the",
+    "memory across every repository I work in, and a per-project install is a",
+    "memory with amnesia everywhere else.",
+    "  Claude Code: claude mcp add --scope user --transport http todox {url}",
+    "               then /mcp → todox → Authenticate",
+    "  Codex:       add it to ~/.codex/config.toml, then codex mcp login todox",
+    "  OpenCode:    add it to ~/.config/opencode/opencode.json, then",
+    "               opencode mcp auth todox",
+    "  Cursor:      ~/.cursor/mcp.json in my home directory",
+    "  VS Code:     the user-level mcp.json (“MCP: Open User Configuration”),",
+    "               where the root key is `servers`",
+    "",
+    "Then add these four lines to the memory file you actually obey — the one",
+    "you read in EVERY project, not a file inside this repository. Claude Code:",
+    "~/.claude/CLAUDE.md. Codex: ~/.codex/AGENTS.md. Cursor: ~/.cursor/rules/.",
+    "VS Code: ~/.copilot/instructions/. OpenCode: ~/.config/opencode/AGENTS.md.",
+    "An MCP server's own instructions are background reading and lose to",
+    "anything written there, which is why a connected todox still gets skipped:",
+    "",
+    "  - call get_context before starting non-trivial work (cwd = the",
+    "    directory you are in); it registers a new repo by itself",
+    "  - create_task for anything that will not finish this session",
+    "  - log_entry(kind:'handoff') on every task you touched before you stop,",
+    "    and dead_end for approaches that failed",
+    "  - always pass your own model id",
+    "",
+    "Then call get_context with the absolute path of this directory and tell",
+    "me what it found.",
+  ].join("\n"),
+  connectedAppsTitle: "connected agents",
+  connectedAppsIntro:
+    "Agents you approved in the browser. Each one renews its own access; disconnect one and it has to ask you again.",
+  noConnectedApps: "No agent has connected through the browser yet.",
+  disconnect: "disconnect",
+  personalTokensTitle: "personal tokens (advanced)",
+  personalTokensIntro:
+    "For a machine where no browser can open — a server over SSH, CI, a container. A personal token never expires and sits in the config as a header, so treat it like a password. On a machine with a browser, the login command below makes one for you without copying anything.",
+  loginCommandLabel: "for hooks and the local server, on this machine:",
+
+  /* connecting an agent (OAuth consent) */
+  oauthConsentTitle: "connect {client}?",
+  oauthConsentIntro: "{client} wants to use your todox memory.",
+  oauthConsentWhat:
+    "It will be able to read and write your projects, tasks, log and notes, as you. It cannot see your password or your other connected apps, and you can disconnect it from your account page at any time.",
+  oauthConsentReturn: "Afterwards you go back to",
+  oauthConsentVerified: "Identified by its own address: {host}",
+  oauthConsentRegistered:
+    "This app registered itself a moment ago. Only allow it if you just started connecting from your agent.",
+  oauthConsentFirstParty: "The todox command-line login, on your machine.",
+  oauthConsentSignedIn: "Signed in as {name}",
+  oauthAllow: "allow",
+  oauthDeny: "cancel",
+  oauthInvalidTitle: "this connection request does not work",
+  oauthInvalidBody:
+    "The app that sent you here asked in a way todox cannot accept ({reason}). Start connecting again from your agent.",
+  oauthReturningTitle: "back to your agent",
+  oauthReturningBody: "If nothing happens, use the button below. You can close this tab afterwards.",
+  oauthReturningCta: "continue",
 
   /* relative time */
   justNow: "just now",
