@@ -812,6 +812,8 @@ export const en = {
   backHome: "back to your projects",
 
   /* arranging projects: folders, pins, archive */
+  manageFolders: "folders, pins and archive",
+  foldersLink: "folders",
   sidebarPinned: "pinned",
   sidebarLoose: "not in a folder",
   sidebarArchive: "archive",

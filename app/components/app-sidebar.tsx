@@ -50,9 +50,21 @@ export function AppSidebar({ user, t }: { user: PublicUser; t: T }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5">
-        <h2 className="px-3 pb-2 text-small font-medium text-faint">
-          {t("sidebarProjects")}
-        </h2>
+        {/* The way into folders, pins and the archive. Without it the
+            grouping only appeared once something was arranged, and nothing
+            on the screen said there was anything to arrange. */}
+        <div className="flex items-center gap-2 pr-1 pb-1 pl-3">
+          <h2 className="flex-1 text-small font-medium text-faint">{t("sidebarProjects")}</h2>
+          <Link
+            href="/account?tab=projects"
+            className="sidebar-heading-action text-meta"
+            aria-label={t("manageFolders")}
+            title={t("manageFolders")}
+          >
+            <Icon name="folder" size={14} />
+            {t("foldersLink")}
+          </Link>
+        </div>
         <Suspense fallback={null}>
           <SidebarProjects userId={user.id} t={t} />
         </Suspense>

@@ -311,9 +311,14 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
       {/* On a phone the sidebar is gone, and with it the project list -- so
           it lives at the bottom of Today there. */}
       <section aria-labelledby="projects-mobile" className="flex flex-col gap-2 md:hidden">
-        <h2 id="projects-mobile" tabIndex={-1} className="today-heading scroll-mt-[calc(5rem+var(--safe-top))]">
-          {t("projects")}
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="projects-mobile" tabIndex={-1} className="today-heading scroll-mt-[calc(5rem+var(--safe-top))]">
+            {t("projects")}
+          </h2>
+          <Link href="/account?tab=projects" className="link-more text-small" aria-label={t("manageFolders")}>
+            {t("foldersLink")}
+          </Link>
+        </div>
         <ProjectGroups
           arranged={arranged}
           listClassName="today-list flex flex-col"
