@@ -21,9 +21,11 @@ import {
   deleteEntryAction,
   linkFileAction,
   acceptRefAction,
+  requestForAgentAction,
   setStatusAction,
   unlinkRefAction,
   updateTaskAction,
+  withdrawAgentRequestAction,
 } from "../../../../actions";
 import {
   KIND_COLOR,
@@ -119,6 +121,9 @@ export default async function TaskPage({
     ...deletions.map((d) => ({ type: "deleted" as const, at: d.created_at, d })),
   ].sort((a, b) => a.at.localeCompare(b.at));
   const refs = refRows.map((r) => ({ ...r, state: refsRepo.freshness(r) }));
+  // A question stays open until some entry names it; only an open one offers
+  // the answer form.
+  const answered = new Set(entries.flatMap((e) => (e.answers_entry_id ? [e.answers_entry_id] : [])));
 
   const kindStrings = Object.fromEntries(
     ENTRY_KINDS.map((k) => [
@@ -147,6 +152,7 @@ export default async function TaskPage({
       item={item}
       isLast={isLast}
       canDelete={item.type === "entry" && canDelete(item.e)}
+      isOpenQuestion={item.type === "entry" && item.e.kind === "question" && !answered.has(item.e.id)}
       t={t}
     />
   );
@@ -186,6 +192,12 @@ export default async function TaskPage({
             </div>
           </fieldset>
         </form>
+        <AgentQueueControl
+          taskId={task.id}
+          status={task.status}
+          requestedAt={task.requested_at}
+          t={t}
+        />
       </header>
 
       <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
@@ -406,15 +418,81 @@ function newestHandoff(entries: readonly Entry[]): Entry | undefined {
 }
 
 /** One line of the log, or the trace a deleted one left. */
+/**
+ * Handing the task to the agent, or taking it back. Only a `todo` task can
+ * wait in the queue: one already started has been taken, and one finished or
+ * dropped has nothing left to ask for.
+ */
+function AgentQueueControl({
+  taskId,
+  status,
+  requestedAt,
+  t,
+}: {
+  taskId: number;
+  status: string;
+  requestedAt: string | null;
+  t: T;
+}): React.JSX.Element | null {
+  if (status !== "todo") return null;
+  if (!requestedAt)
+    return (
+      <form action={requestForAgentAction} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <input type="hidden" name="task_id" value={taskId} />
+        <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+          {t("queueForAgent")}
+        </SubmitButton>
+        <span className="text-small text-muted">{t("queueForAgentHint")}</span>
+      </form>
+    );
+  return (
+    <form action={withdrawAgentRequestAction} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <input type="hidden" name="task_id" value={taskId} />
+      <Chip color="var(--accent)">{t("queuedForAgent")}</Chip>
+      <span className="text-meta text-faint">{ago(requestedAt, t)}</span>
+      <SubmitButton className="link-more text-small" pendingLabel={t("working")}>
+        {t("withdrawFromQueue")}
+      </SubmitButton>
+    </form>
+  );
+}
+
+/**
+ * The agent asked; the person answers here. The answer is a note that names
+ * the question, which is what closes it in every later briefing -- the same
+ * `answers_entry_id` an agent would send. A disclosure, so the log stays a
+ * log until somebody means to reply.
+ */
+function AnswerForm({ taskId, questionId, t }: { taskId: number; questionId: number; t: T }): React.JSX.Element {
+  return (
+    <details className="mt-2">
+      <summary className="link-more text-small">{t("answerQuestion")}</summary>
+      <form action={addEntryAction} className="mt-2 flex flex-col gap-2">
+        <input type="hidden" name="task_id" value={taskId} />
+        <input type="hidden" name="kind" value="note" />
+        <input type="hidden" name="answers_entry_id" value={questionId} />
+        <Field label={t("answerLabel")}>
+          <textarea name="body" required rows={3} placeholder={t("answerPlaceholder")} />
+        </Field>
+        <SubmitButton className="btn self-start" pendingLabel={t("working")}>
+          {t("answerSubmit")}
+        </SubmitButton>
+      </form>
+    </details>
+  );
+}
+
 function TimelineRow({
   item,
   isLast,
   canDelete,
+  isOpenQuestion,
   t,
 }: {
   item: TimelineItem;
   isLast: boolean;
   canDelete: boolean;
+  isOpenQuestion: boolean;
   t: T;
 }) {
   const rail = (mark: React.ReactNode) => (
@@ -467,6 +545,10 @@ function TimelineRow({
           )}
         </div>
         <EntryBody body={e.body} more={t("showMore")} less={t("showLess")} />
+        {isOpenQuestion && <AnswerForm taskId={e.task_id} questionId={e.id} t={t} />}
+        {e.kind === "question" && !isOpenQuestion && (
+          <p className="mt-1 text-meta text-faint">{t("answered")}</p>
+        )}
       </article>
     </li>
   );

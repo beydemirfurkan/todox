@@ -122,6 +122,10 @@ export type Task = {
   created_at: string;
   updated_at: string;
   closed_at: string | null;
+  /** Set when a person handed this task to their agent from the panel. */
+  requested_at: string | null;
+  /** Who handed it over; null once that account is gone. */
+  requested_by: number | null;
 };
 
 export type Entry = {

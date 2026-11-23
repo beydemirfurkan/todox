@@ -334,6 +334,9 @@ export async function createTaskAction(fd: FormData) {
     title,
     body: str(fd, "body") || null,
     priority: priority ?? DEFAULT_PRIORITY,
+    // Handed straight to the agent: written in the same statement as the task,
+    // so there is no moment where it exists and is not yet asked for.
+    requested_by: fd.get("for_agent") === "1" ? user.id : null,
     actor: "human",
     user_id: user.id,
   });
@@ -349,6 +352,23 @@ export async function setStatusAction(fd: FormData) {
   const status = str(fd, "status");
   if (!isStatus(status)) return;
   await taskService.update(id, { status }, { actor: "human", user_id: user.id });
+  revalidatePath("/", "layout");
+}
+
+/** Puts a task at the front of what the agent is told to do next. */
+export async function requestForAgentAction(fd: FormData) {
+  const user = await writingUser();
+  const id = num(fd, "task_id");
+  await assertTask(user.id, id);
+  await taskService.requestForAgent(id, user.id);
+  revalidatePath("/", "layout");
+}
+
+export async function withdrawAgentRequestAction(fd: FormData) {
+  const user = await writingUser();
+  const id = num(fd, "task_id");
+  await assertTask(user.id, id);
+  await taskService.withdrawAgentRequest(id);
   revalidatePath("/", "layout");
 }
 
@@ -388,12 +408,17 @@ export async function addEntryAction(fd: FormData) {
   const body = str(fd, "body");
   const kind = str(fd, "kind");
   if (!body || !isEntryKind(kind)) return;
+  // An answer to an agent's question. Only the link is new: the service
+  // refuses an id that is not an open question on this same task, so a
+  // forged field can close nothing elsewhere.
+  const answers = num(fd, "answers_entry_id");
   await taskService.addEntry({
     task_id: taskId,
     kind,
     body,
     author: "human",
     user_id: user.id,
+    ...(answers > 0 ? { answers_entry_id: answers } : {}),
   });
   revalidatePath("/", "layout");
 }

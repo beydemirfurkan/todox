@@ -39,6 +39,16 @@ export async function create(
 }
 
 /**
+ * A person handing a task to their agent from the panel. The caller has
+ * already checked the task is theirs to touch (`assertTask`); this only
+ * records who asked and when, which is what the briefing leads with.
+ */
+export const requestForAgent = (taskId: number, userId: number): Promise<number> =>
+  tasks.request(taskId, userId);
+
+export const withdrawAgentRequest = (taskId: number): Promise<number> => tasks.withdrawRequest(taskId);
+
+/**
  * `closed_at` follows the status, and only a real transition moves it.
  *
  * It used to be derived inside the repository from `patch.status`, which meant

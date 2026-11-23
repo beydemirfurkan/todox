@@ -792,6 +792,20 @@ export const tr: Record<Key, string> = {
     "Böyle bir sayfa yok; ya da işaret ettiği projenin adı değişmiş veya silinmiş.",
   backHome: "projelerine dön",
 
+  queueForAgent: "agent'ıma ver",
+  queueForAgentHint: "Bu projede açılan ilk oturumda agent'ın işe bununla başlar.",
+  queuedForAgent: "agent'ının sırasında",
+  withdrawFromQueue: "geri al",
+  quickAddForAgent: "agent'ım yapsın",
+  todayQueueTitle: "agent'ının sırası",
+  todayQueueIntro: "Agent'ın, o projede açılan ilk oturumda işe bunlarla başlar; en eskisi önce.",
+  queuedBy: "{name} sıraya koydu",
+  answerQuestion: "yanıtla",
+  answerLabel: "yanıtın",
+  answerPlaceholder: "Yanıtın. Agent bir sonraki oturumda okur ve soru kapanır.",
+  answerSubmit: "yanıtı gönder",
+  answered: "yanıtlandı",
+
   connectTitle: "agent bağla",
   connectIntro:
     "Bunu agent'ına yapıştır ya da kullandığın aracın satırını kendin çalıştır. İlk bağlandığında burada bir tarayıcı sekmesi açılır ve sen onaylarsın. Metinde gizli hiçbir şey yok.",

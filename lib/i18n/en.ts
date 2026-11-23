@@ -811,6 +811,21 @@ export const en = {
     "This page does not exist, or the project it pointed at has been renamed or deleted.",
   backHome: "back to your projects",
 
+  /* handing work to the agent */
+  queueForAgent: "hand to my agent",
+  queueForAgentHint: "Your agent starts with it the next time a session opens in this project.",
+  queuedForAgent: "queued for your agent",
+  withdrawFromQueue: "take it back",
+  quickAddForAgent: "for my agent",
+  todayQueueTitle: "queued for your agent",
+  todayQueueIntro: "Your agent starts with these, oldest first, the next time a session opens in that project.",
+  queuedBy: "queued by {name}",
+  answerQuestion: "answer",
+  answerLabel: "your answer",
+  answerPlaceholder: "Your answer. The agent reads it next session, and the question closes.",
+  answerSubmit: "send the answer",
+  answered: "answered",
+
   /* connecting an agent without a token */
   connectTitle: "connect an agent",
   connectIntro:

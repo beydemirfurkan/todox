@@ -355,7 +355,7 @@ export async function briefing(userId: number, project: Project, focus?: string)
   const idleIds = idle.map((t) => t.id);
 
   const teammatesSince = new Date(Date.now() - TEAMMATE_DAYS * 86_400_000).toISOString();
-  const [globalContext, projectContext, logs, idleHandoffs, counts, files, observed, sameName, developer, teammates] =
+  const [globalContext, projectContext, logs, idleHandoffs, counts, files, observed, sameName, developer, teammates, queue] =
     await Promise.all([
       contexts.pageByProject(userId, null, notes, noteBytes, focus),
       contexts.pageByProject(userId, project.id, notes, noteBytes, focus),
@@ -388,6 +388,8 @@ export async function briefing(userId: number, project: Project, focus?: string)
     contexts.developerNotes(userId, BRIEFING_DEVELOPER_BYTES),
     // Tenth: what other people wrote here lately. Empty on a solo project.
     entries.recentByOthers(project.id, userId, teammatesSince, BRIEFING_TEAMMATES),
+    // Eleventh: what a person handed to the agent from the panel.
+    tasks.requestedByProject(project.id),
   ]);
 
   const bodies = budgetBodies(live, BRIEFING_TASK_BYTES);
@@ -515,6 +517,19 @@ export async function briefing(userId: number, project: Project, focus?: string)
     // means. Ranked: what you asked about is at the top and the rest is the
     // newest. Recent: nobody said what this session is about.
     context_ranked_by: focus ? "focus" : "recency",
+    /**
+     * Work a person handed to the agent from the panel, oldest request first.
+     * The one part of a briefing that is a request rather than a record: the
+     * developer queued it to be done. Absent when nothing is queued, so the
+     * key means something when it is there.
+     *
+     * `requested_by` appears only when somebody other than this developer
+     * asked. On a shared project a teammate can queue work, and their words
+     * must not reach an agent as its own developer's instruction -- that is
+     * the difference between a team queue and a way to steer someone else's
+     * agent. The tasks stay in `open_tasks` too; this is their order.
+     */
+    ...(queue.length > 0 ? { requested: queue.map((t) => requestedItem(t, userId)) } : {}),
     open_tasks: openTasks,
     /**
      * Open tasks untouched for `IDLE_DAYS` or more, carried as a line each
@@ -593,6 +608,24 @@ export async function briefing(userId: number, project: Project, focus?: string)
       summary: project.summary,
       knowsDeveloper: developer.rows.length > 0,
     }),
+  };
+}
+
+/** Enough of a request to act on; `get_task` has the rest. */
+const REQUEST_BODY_CHARS = 2_000;
+
+function requestedItem(t: tasks.RequestedTask, viewerId: number) {
+  const body = t.body?.trim() ?? "";
+  return {
+    id: t.id,
+    title: t.title,
+    priority: t.priority,
+    requested_at: t.requested_at,
+    body: body.length > REQUEST_BODY_CHARS ? `${body.slice(0, REQUEST_BODY_CHARS - 1)}…` : body || null,
+    // Null means the account that asked is gone: still not this developer.
+    ...(t.requested_by !== viewerId
+      ? { requested_by: t.requested_by_name ?? "a former member" }
+      : {}),
   };
 }
 

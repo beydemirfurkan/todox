@@ -40,6 +40,8 @@ const BLOCKED_SHOWN = 5;
 
 /** Cards in "Waiting on you". The rest are counted, and found on their projects. */
 const WAITING_SHOWN = 6;
+/** The agent's queue, across projects. Longer than this is a backlog, not a queue. */
+const QUEUE_SHOWN = 8;
 
 const DAY_MS = 86_400_000;
 
@@ -108,7 +110,7 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
   const renderedAt = new Date();
   const quietBefore = new Date(renderedAt.getTime() - QUIET_AFTER_DAYS * DAY_MS).toISOString();
   // Everything below needs the project ids, so it waits for them -- together.
-  const [doing, next, blocked, teamSizes, notesByProject, pending, questions, stalled] =
+  const [doing, next, blocked, teamSizes, notesByProject, pending, questions, stalled, queue] =
     await Promise.all([
       tasks.openAcross(allIds, "doing", DOING_SHOWN),
       tasks.openAcross(allIds, "todo", NEXT_SHOWN),
@@ -122,10 +124,15 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
       // can see, because a question in a quiet project waits just as long.
       entriesRepo.openQuestionsByProjects(allIds, OPEN_STATUSES, WAITING_SHOWN),
       tasks.stalledByProjects(allIds, quietBefore, WAITING_SHOWN),
+      // What was handed to the agent and not yet started.
+      tasks.requestedAcross(allIds, QUEUE_SHOWN),
     ]);
   // The agent's last word on each task in progress: one query for all of them.
   const handoffs = await entriesRepo.latestHandoffByTasks(doing.map((task) => task.id));
   const waiting = waitingItems({ questions, stalled, limit: WAITING_SHOWN, now: renderedAt });
+  // A queued task is listed once, in the queue, not again under "up next".
+  const queuedIds = new Set(queue.map((task) => task.id));
+  const upNext = next.filter((task) => !queuedIds.has(task.id));
   const slugOf = new Map(allProjects.map((p) => [p.id, p.slug]));
   const projectOf = new Map(allProjects.map((p) => [p.id, p]));
 
@@ -200,6 +207,27 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
         </section>
       )}
 
+      {/* Only while something is queued: an empty queue says nothing the
+          rest of the page does not. */}
+      {queue.length > 0 && (
+        <TaskSection
+          id="queue"
+          title={t("todayQueueTitle")}
+          hint={t("todayQueueIntro")}
+          shown={queue.length}
+          total={queue.length}
+          empty=""
+          t={t}
+        >
+          {queue.map((task) =>
+            rowFor(
+              { ...task, status: "todo" },
+              task.requested_by === user.id ? null : t("queuedBy", { name: task.requested_by_name ?? t("unknownPerson") }),
+            ),
+          )}
+        </TaskSection>
+      )}
+
       <TaskSection
         id="doing"
         title={t("todayDoing")}
@@ -220,12 +248,12 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
         id="next"
         title={t("todayNext")}
         hint={t("todayNextHint")}
-        shown={next.length}
-        total={totals.todo}
+        shown={upNext.length}
+        total={totals.todo - queue.length}
         empty={t("todayNextEmpty")}
         t={t}
       >
-        {next.map((task) => rowFor(task))}
+        {upNext.map((task) => rowFor(task))}
       </TaskSection>
 
       {blocked.length > 0 && (
