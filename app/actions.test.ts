@@ -88,7 +88,6 @@ vi.mock("@/lib/services/notifications", () => ({ markAllRead: vi.fn() }));
 vi.mock("@/lib/services/project-invitations", () => ({
   invite: vi.fn(),
   accept: vi.fn(),
-  acceptWithNewAccount: vi.fn(),
 }));
 vi.mock("@/lib/services/auth", () => ({ issueSession: vi.fn() }));
 
@@ -218,12 +217,11 @@ describe("every exported action", () => {
   for (const match of source.matchAll(pattern)) bodies.set(match[1]!, match[0]!);
 
   /**
-   * The two that legitimately run without an account, and why.
-   * `setLangAction` only sets a cookie; `acceptNewAccountInviteAction` is how
-   * somebody without an account yet redeems an invitation — its authority is
-   * the token in the link, which `acceptWithNewAccount` checks.
+   * The one that legitimately runs without an account: `setLangAction` only
+   * sets a cookie. An invitation is redeemed after signing in, by
+   * `acceptProjectInviteAction`, like every other write.
    */
-  const NO_ACCOUNT = new Set(["setLangAction", "acceptNewAccountInviteAction"]);
+  const NO_ACCOUNT = new Set(["setLangAction"]);
 
   it("finds the actions at all, so a rename cannot empty this suite", () => {
     expect(bodies.size).toBeGreaterThan(15);

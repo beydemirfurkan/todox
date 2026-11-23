@@ -60,8 +60,7 @@ export const removeUnlessLast = (userId: number, provider: OAuthProvider) =>
 /**
  * A new account and the identity that made it, in one statement.
  *
- * A CTE for the same reason as `tasks.create` and
- * `project-invitations.acceptWithNewUser`: the identity row needs the id of the
+ * A CTE for the same reason as `tasks.create`: the identity row needs the id of the
  * account inserted just before it, and `tx()` has no JavaScript between its
  * statements to carry that id across. Two statements would also leave, on a
  * failure between them, an account nobody can sign in to.

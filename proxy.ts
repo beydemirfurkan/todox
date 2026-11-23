@@ -66,7 +66,15 @@ const PUBLIC = [
  * landing page lives at "/" and the dashboard lives behind it at the same
  * address, which is why this distinction has to exist at all.
  */
-const PUBLIC_EXACT = ["/", "/about", "/contact", "/privacy"];
+const PUBLIC_EXACT = [
+  "/", "/about", "/contact", "/privacy",
+  "/icons/google.svg",
+  "/icons/github.svg",
+  "/integrations/claude-code.svg",
+  "/integrations/codex.svg",
+  "/integrations/cursor.svg",
+  "/integrations/visual-studio-code.svg",
+];
 
 /**
  * Pages where the response body depends on the viewer. A `Last-Modified`

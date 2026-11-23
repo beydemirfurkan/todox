@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OAuthProfile } from "./oauth-providers";
 
@@ -32,6 +32,7 @@ const sessionsRepo = vi.hoisted(() => ({
 const apiTokensRepo = vi.hoisted(() => ({
   destroyAllForStmt: vi.fn(() => ({ text: "drop agent tokens", params: [] })),
 }));
+const invitationsRepo = vi.hoisted(() => ({ byToken: vi.fn() }));
 const db = vi.hoisted(() => ({ tx: vi.fn() }));
 
 vi.mock("../repositories/oauth-accounts", () => oauthRepo);
@@ -39,6 +40,7 @@ vi.mock("../repositories/users", () => usersRepo);
 vi.mock("../repositories/auth-tokens", () => authTokensRepo);
 vi.mock("../repositories/sessions", () => sessionsRepo);
 vi.mock("../repositories/api-tokens", () => apiTokensRepo);
+vi.mock("../repositories/project-invitations", () => invitationsRepo);
 vi.mock("../db/client", () => db);
 vi.mock("../server/log", () => ({ logInfo: vi.fn() }));
 
@@ -69,6 +71,7 @@ beforeEach(() => {
   usersRepo.byUsername.mockReset().mockResolvedValue(undefined);
   db.tx.mockReset().mockResolvedValue(undefined);
   authTokensRepo.resolve.mockResolvedValue({ row: { id: 31 }, user: { id: 9 } });
+  invitationsRepo.byToken.mockResolvedValue(undefined);
 });
 
 describe("an identity that is already linked", () => {
@@ -210,6 +213,46 @@ describe("a new account", () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+
+  it("is refused when the provider did not verify the address", async () => {
+    // Nothing sends a verification mail for an account made this way, so an
+    // unverified address would stay unverified -- and invitations and resets
+    // trust it.
+    expect(await signIn({ isEmailVerified: false })).toEqual({ ok: false, code: "oauthEmailUnverified" });
+    expect(oauthRepo.createUserWithIdentity).not.toHaveBeenCalled();
+  });
+
+  describe("on a closed instance, through an invitation", () => {
+    const TOKEN = "t".repeat(32);
+    const throughInvite = () =>
+      resolveSignIn({ provider: "github", profile: PROFILE, currentUserId: null, inviteToken: TOKEN });
+
+    beforeEach(() => vi.stubEnv("TODOX_REGISTRATION", "closed"));
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("is made when the invitation went to this address", async () => {
+      invitationsRepo.byToken.mockResolvedValue({ email: "Ada@Example.com" });
+      oauthRepo.createUserWithIdentity.mockResolvedValue({ id: 11 });
+
+      expect(await throughInvite()).toEqual({ ok: true, userId: 11, how: "created" });
+      expect(invitationsRepo.byToken).toHaveBeenCalledWith(TOKEN, expect.any(String));
+    });
+
+    it("is refused when the invitation went to somebody else", async () => {
+      // One invitation must not open the instance for whichever account
+      // happens to follow the link.
+      invitationsRepo.byToken.mockResolvedValue({ email: "grace@example.com" });
+
+      expect(await throughInvite()).toEqual({ ok: false, code: "registrationClosed" });
+      expect(oauthRepo.createUserWithIdentity).not.toHaveBeenCalled();
+    });
+
+    it("is refused when the invitation is spent, revoked or expired", async () => {
+      invitationsRepo.byToken.mockResolvedValue(undefined);
+
+      expect(await throughInvite()).toEqual({ ok: false, code: "registrationClosed" });
+    });
   });
 
   it("is refused without an address", async () => {

@@ -11,7 +11,7 @@ import { hashPassword, verifyPassword } from "../util/password";
 import { SESSION_DAYS, newApiToken, newSessionToken, tokenPreview } from "../util/tokens";
 import { addDays } from "../util/time";
 import { sweep } from "./rate-limit";
-import { isRegistrationOpen } from "./registration";
+import { canRegister } from "./registration";
 
 /** `retryAfterSec` is only set by the rate limiter, and is minutes by the time
  *  it reaches the UI -- the field carries whatever the message needs. */
@@ -89,8 +89,10 @@ export async function register(input: {
   email: string;
   name: string;
   password: string;
+  /** Lets an invited address in when the instance is closed to everyone else. */
+  inviteToken?: string;
 }): Promise<Result<{ user: PublicUser }>> {
-  if (!isRegistrationOpen())
+  if (!(await canRegister(input.email, input.inviteToken)))
     return { ok: false, errors: [{ field: "form", code: "registrationClosed" }] };
   const errors = validateRegistration(input);
   if (errors.length) return { ok: false, errors };

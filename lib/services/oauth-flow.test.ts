@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decodePending, encodePending, safeNext, stateMatches } from "./oauth-flow";
+import { decodePending, encodePending, inviteTokenFromNext, safeNext, stateMatches } from "./oauth-flow";
 
 describe("safeNext", () => {
   it("allows an invitation and the account page, nothing else", () => {
@@ -10,6 +10,24 @@ describe("safeNext", () => {
     expect(safeNext("/account?tab=connections")).toBe("/account?tab=connections");
     for (const bad of ["https://evil.example", "//evil.example", "/p/x", "/account?tab=a&x=1", null, ""]) {
       expect(safeNext(bad)).toBe("/");
+    }
+  });
+});
+
+describe("inviteTokenFromNext", () => {
+  it("reads the token from an invitation link, and from nothing else", () => {
+    const token = "a".repeat(40);
+    expect(inviteTokenFromNext(`/invite?token=${token}`)).toBe(token);
+    for (const bad of [
+      "/invite?token=short",
+      `/invite?token=${token}&then=https://evil.example`,
+      `https://evil.example/invite?token=${token}`,
+      "/account",
+      "",
+      null,
+      undefined,
+    ]) {
+      expect(inviteTokenFromNext(bad)).toBeUndefined();
     }
   });
 });

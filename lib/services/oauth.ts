@@ -11,7 +11,7 @@ import { logInfo } from "../server/log";
 import { newSessionToken } from "../util/tokens";
 import { now } from "../util/time";
 import type { OAuthProfile } from "./oauth-providers";
-import { isRegistrationOpen } from "./registration";
+import { canRegister } from "./registration";
 
 /**
  * What a sign-in through Google or GitHub turns into.
@@ -75,6 +75,7 @@ export async function resolveSignIn(input: {
   profile: OAuthProfile;
   currentUserId: number | null;
   linkGrant?: string;
+  inviteToken?: string;
 }): Promise<SignInOutcome> {
   const { provider, profile, currentUserId } = input;
   const linked = await oauthAccounts.byIdentity(provider, profile.providerUserId);
@@ -91,9 +92,9 @@ export async function resolveSignIn(input: {
   }
 
   if (!profile.email) return { ok: false, code: "oauthNoEmail" };
+  if (!profile.isEmailVerified) return { ok: false, code: "oauthEmailUnverified" };
   const owner = await users.byEmail(profile.email);
   if (owner) {
-    if (!profile.isEmailVerified) return { ok: false, code: "oauthEmailUnverified" };
     return link({
       userId: owner.id,
       provider,
@@ -102,7 +103,8 @@ export async function resolveSignIn(input: {
       takeOver: owner.email_verified_at === null,
     });
   }
-  return create(provider, profile);
+  if (!(await canRegister(profile.email, input.inviteToken))) return { ok: false, code: "registrationClosed" };
+  return create(provider, { ...profile, email: profile.email });
 }
 
 async function link(input: {
@@ -147,10 +149,8 @@ async function link(input: {
 
 const CREATE_ATTEMPTS = 5;
 
-async function create(provider: OAuthProvider, profile: OAuthProfile): Promise<SignInOutcome> {
-  if (!isRegistrationOpen()) return { ok: false, code: "registrationClosed" };
-  const email = profile.email;
-  if (!email) return { ok: false, code: "oauthNoEmail" };
+async function create(provider: OAuthProvider, profile: OAuthProfile & { email: string }): Promise<SignInOutcome> {
+  const { email } = profile;
   const base = usernameBase(profile.usernameHint);
   for (let attempt = 0; attempt < CREATE_ATTEMPTS; attempt++) {
     const username = usernameCandidate(base, attempt);
@@ -159,7 +159,7 @@ async function create(provider: OAuthProvider, profile: OAuthProfile): Promise<S
       username,
       email,
       name: profile.name.trim() || username,
-      isEmailVerified: profile.isEmailVerified,
+      isEmailVerified: true,
       provider,
       providerUserId: profile.providerUserId,
     });
@@ -173,7 +173,7 @@ async function create(provider: OAuthProvider, profile: OAuthProfile): Promise<S
   return { ok: false, code: "oauthFailed" };
 }
 
-/** The shape `validateRegistration` accepts: 3-32 of `[a-z0-9_-]`. */
+/** A URL-safe account name. The remaining space is for a collision suffix. */
 export function usernameBase(hint: string): string {
   const cleaned = hint
     .replace(/ı/g, "i")
