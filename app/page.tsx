@@ -15,7 +15,12 @@ import * as memberships from "@/lib/repositories/project-memberships";
 import * as tasks from "@/lib/repositories/tasks";
 import { firstLine } from "@/lib/util/headline";
 import { accountProjects } from "./account-projects";
-import { clearEmptyProjectAction, reorderFoldersAction, reorderProjectsAction } from "./actions";
+import {
+  clearEmptyProjectAction,
+  moveProjectToFolderAction,
+  reorderFoldersAction,
+  reorderProjectsAction,
+} from "./actions";
 import { IconTile, WaitingList } from "./components";
 import { Icon } from "./components/icons";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
@@ -335,8 +340,13 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
               items={items}
               container="ul"
               className="today-list flex flex-col"
-              onReorder={reorderProjectsAction.bind(null, folderId)}
-              labels={{ handle: t("sortHandle"), moved: t("folderMoved") }}
+              onReorder={folderId === null ? undefined : reorderProjectsAction.bind(null, folderId)}
+              folderMove={{
+                current: folderId ?? "none",
+                moveTo: moveProjectToFolderAction,
+                movedLabel: t("projectMovedToFolder"),
+              }}
+              labels={{ handle: t(folderId === null ? "sortHandleMove" : "sortHandle"), moved: t("folderMoved") }}
             />
           )}
           labels={{
