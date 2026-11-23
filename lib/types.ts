@@ -310,4 +310,6 @@ export type ProjectPlacement = {
   folder_id: number | null;
   pinned_at: string | null;
   archived_at: string | null;
+  /** Its place inside its folder, once set by hand; null follows activity. */
+  position: number | null;
 };
