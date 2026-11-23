@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getT } from "@/lib/lang";
 import type { T } from "@/lib/i18n";
 import { isRegistrationOpen } from "@/lib/services/registration";
-import { inviteTokenFromNext } from "@/lib/services/oauth-flow";
+import { inviteTokenFromNext, resumablePath } from "@/lib/services/oauth-flow";
 import { currentUser } from "@/lib/session";
 import { loginAction } from "../auth-actions";
 import { authMessages, isAuthCode } from "../auth-messages";
@@ -42,16 +42,18 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const asked = await searchParams;
   const next = first(asked.next);
   const errorCode = first(asked.error);
-  const inviteNext = inviteTokenFromNext(next) ? next : "";
-  if (await currentUser()) redirect(inviteNext || "/");
+  // `resume` is where signing in goes back to: an invitation or an agent's
+  // connection waiting for approval. Only an invitation opens registration.
+  const resume = resumablePath(next) ?? "";
+  if (await currentUser()) redirect(resume || "/");
   const { t } = await getT();
   const providers = enabledProviders();
   const isPasswordOnly = providers.length === 0;
   const isLegacy = !isPasswordOnly && first(asked.legacy) === "1";
-  const nextQuery = inviteNext ? `?next=${encodeURIComponent(inviteNext)}` : "";
+  const nextQuery = resume ? `?next=${encodeURIComponent(resume)}` : "";
   const login = `/login${nextQuery}`;
   const legacy = `${login}${nextQuery ? "&" : "?"}legacy=1`;
-  const canRegister = isRegistrationOpen() || inviteNext !== "";
+  const canRegister = isRegistrationOpen() || inviteTokenFromNext(next) !== undefined;
 
   return (
     <AuthShell
@@ -79,9 +81,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         </p>
       )}
       {isPasswordOnly || isLegacy ? (
-        <PasswordSignIn next={inviteNext} t={t} />
+        <PasswordSignIn next={resume} t={t} />
       ) : (
-        <OAuthButtons providers={providers} next={inviteNext || undefined} t={t} />
+        <OAuthButtons providers={providers} next={resume || undefined} t={t} />
       )}
     </AuthShell>
   );

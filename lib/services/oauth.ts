@@ -5,6 +5,7 @@ import * as apiTokens from "../repositories/api-tokens";
 import * as authTokens from "../repositories/auth-tokens";
 import * as oauthAccounts from "../repositories/oauth-accounts";
 import type { OAuthProvider } from "../repositories/oauth-accounts";
+import * as refreshTokens from "../repositories/oauth-refresh-tokens";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
 import { logInfo } from "../server/log";
@@ -132,6 +133,7 @@ async function link(input: {
           users.clearPasswordStmt(userId),
           sessions.destroyAllForStmt(userId),
           apiTokens.destroyAllForStmt(userId),
+          refreshTokens.revokeAllForUserStmt(userId, now()),
           users.markEmailVerifiedStmt(userId),
         ]
       : []),

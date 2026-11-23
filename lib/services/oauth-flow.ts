@@ -17,13 +17,33 @@ export function inviteTokenFromNext(value: string | null | undefined): string | 
 }
 
 /**
+ * An agent's connection waiting on the consent page. The path is fixed, so
+ * the query cannot point anywhere else, and the page re-checks every
+ * parameter in it before doing anything.
+ */
+const AUTHORIZE_NEXT = /^\/oauth\/authorize\?[A-Za-z0-9\-._~%&=+]{1,4000}$/;
+
+export const isAuthorizeNext = (value: string | null | undefined): boolean =>
+  typeof value === "string" && AUTHORIZE_NEXT.test(value);
+
+/**
+ * A page a signed-out visitor was in the middle of, which signing in should
+ * return them to: an invitation, or an agent waiting for approval.
+ */
+export function resumablePath(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  return inviteTokenFromNext(value) || isAuthorizeNext(value) ? value : undefined;
+}
+
+/**
  * Where a sign-in may land afterwards. An open redirect on the sign-in path
  * is a phishing kit, so this is an allow-list, not a same-origin check:
- * an invitation being accepted, or the account page that started a link.
+ * an invitation being accepted, an agent's connection waiting for approval,
+ * or the account page that started a link.
  */
 export function safeNext(value: string | null | undefined): string {
   if (!value) return "/";
-  if (inviteTokenFromNext(value)) return value;
+  if (resumablePath(value)) return value;
   if (/^\/account(\?tab=[a-z]+)?$/.test(value)) return value;
   return "/";
 }

@@ -16,7 +16,7 @@ import {
 import * as auth from "@/lib/services/auth";
 import { beginOAuth } from "@/lib/oauth-begin";
 import { issueLinkGrant, unlink } from "@/lib/services/oauth";
-import { inviteTokenFromNext, isProvider } from "@/lib/services/oauth-flow";
+import { inviteTokenFromNext, isProvider, resumablePath } from "@/lib/services/oauth-flow";
 import { enabledProviders } from "@/lib/services/oauth-providers";
 import * as limit from "@/lib/services/rate-limit";
 import { clientIp as addressOf } from "@/lib/server/client-ip";
@@ -32,13 +32,14 @@ const str = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ??
 const raw = (fd: FormData, k: string) => (fd.get(k) as string | null) ?? "";
 
 /**
- * Where a password sign-in lands. An invitation being accepted goes back to
- * it. Otherwise, on an instance that offers a provider, a password account is
- * one still to migrate, so it lands where it can connect one.
+ * Where a password sign-in lands. An invitation being accepted, or an agent
+ * waiting for approval, goes back to it. Otherwise, on an instance that offers
+ * a provider, a password account is one still to migrate, so it lands where it
+ * can connect one.
  */
 const loginDestination = (fd: FormData) => {
   const value = str(fd, "next");
-  if (inviteTokenFromNext(value)) return value;
+  if (resumablePath(value)) return value;
   return enabledProviders().length ? "/account?tab=connections" : "/";
 };
 
@@ -120,7 +121,7 @@ export async function registerAction(
 
   await sendVerification(result.value.user, await getLang());
   await startSession(result.value.user.id);
-  redirect(inviteTokenFromNext(next) ? next : "/");
+  redirect(resumablePath(next) ?? "/");
 }
 
 /* ----------------------------------------------------------------- login */

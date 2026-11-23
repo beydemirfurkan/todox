@@ -2,6 +2,7 @@ import { tx } from "../db/client";
 import * as apiTokens from "../repositories/api-tokens";
 import * as authTokens from "../repositories/auth-tokens";
 import type { ClientUse } from "../repositories/api-tokens";
+import * as refreshTokens from "../repositories/oauth-refresh-tokens";
 import * as memberships from "../repositories/project-memberships";
 import * as sessions from "../repositories/sessions";
 import * as users from "../repositories/users";
@@ -9,7 +10,8 @@ import { logInfo } from "../server/log";
 import type { ApiToken, PublicUser, User } from "../types";
 import { hashPassword, verifyPassword } from "../util/password";
 import { SESSION_DAYS, newApiToken, newSessionToken, tokenPreview } from "../util/tokens";
-import { addDays } from "../util/time";
+import { addDays, now } from "../util/time";
+import { revokeFromAccount } from "./oauth-server";
 import { sweep } from "./rate-limit";
 import { canRegister } from "./registration";
 
@@ -332,15 +334,17 @@ export async function createApiToken(userId: number, name: string) {
 export const listApiTokens = (userId: number): Promise<ApiToken[]> =>
   apiTokens.listByUser(userId);
 
-export const revokeApiToken = (id: number, userId: number) =>
-  apiTokens.remove(id, userId);
+/** One row from the account page: a personal token, or an authorised client's whole grant. */
+export const revokeApiToken = (id: number, userId: number) => revokeFromAccount(id, userId);
 
 /**
- * Agent tokens carry the full permissions of the account and never expire, so
- * there has to be one action that ends all of them at once. The recovery flow
- * calls it; the account page offers it as a button.
+ * Agent tokens carry the full permissions of the account and personal ones
+ * never expire, so there has to be one action that ends all of them at once.
+ * The account page offers it as a button. An authorised client's refresh
+ * tokens end with it, or the client would simply mint itself a new one.
  */
-export const revokeAllApiTokens = (userId: number) => apiTokens.destroyAllFor(userId);
+export const revokeAllApiTokens = (userId: number) =>
+  tx([apiTokens.destroyAllForStmt(userId), refreshTokens.revokeAllForUserStmt(userId, now())]);
 
 /**
  * The account behind an agent token.

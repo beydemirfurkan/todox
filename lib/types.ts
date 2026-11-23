@@ -60,6 +60,12 @@ export type ApiToken = {
   token_hash: string;
   created_at: string;
   last_used_at: string | null;
+  /** Set when an authorised MCP client holds this token rather than a person. */
+  client_id: string | null;
+  /** The grant a refresh keeps alive; null for a personal token. */
+  family_id: string | null;
+  /** Null for a personal token, which lasts until it is revoked. */
+  expires_at: string | null;
 };
 
 export type Project = {

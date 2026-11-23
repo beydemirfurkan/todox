@@ -115,11 +115,20 @@ describe("authentication", () => {
     expect((await jsonRpcError(res)).message).toBe("missing bearer token");
   });
 
-  it("does not offer OAuth discovery on the way out", async () => {
-    // A `WWW-Authenticate` with `resource_metadata` is what sends a client
-    // looking for an authorisation server. This one is a pasted token.
+  it("points a client without a token at OAuth discovery", async () => {
+    // `resource_metadata` is what sends a client to the browser to be
+    // approved, instead of asking the person to paste a token.
     const res = await post({ token: null });
-    expect(res.headers.get("www-authenticate")).toBeNull();
+    expect(res.headers.get("www-authenticate")).toMatch(
+      /^Bearer resource_metadata="https?:\/\/[^"]+\/\.well-known\/oauth-protected-resource\/api\/mcp"$/,
+    );
+  });
+
+  it("points a client with a dead token at OAuth discovery too", async () => {
+    // An expired access token is how a client learns to refresh or re-approve.
+    mocks.agentForToken.mockResolvedValue(undefined);
+    const res = await post();
+    expect(res.headers.get("www-authenticate")).toContain("resource_metadata=");
   });
 
   it("refuses a token that resolves to nobody", async () => {
