@@ -119,6 +119,52 @@ CREATE TABLE IF NOT EXISTS project_memberships (
 CREATE INDEX IF NOT EXISTS idx_project_memberships_user
   ON project_memberships (user_id, project_id);
 
+-- How one person arranges the projects they can see: folders, pins, archive.
+--
+-- Per person, not per project. A shared project sits in the owner's "work"
+-- folder and in a collaborator's "clients" folder at once, and archiving it
+-- on one account must not hide it from the other. That is why this is not
+-- a column on projects -- and why projects.archived, which nothing ever set,
+-- is superseded here rather than reused.
+--
+-- Arranging is display only. An archived project still answers get_context
+-- and an agent working in it is not refused, it just stops crowding the list.
+CREATE TABLE IF NOT EXISTS project_folders (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  position    INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL,
+  -- the target of the placements' (folder_id, user_id) reference below
+  UNIQUE (id, user_id)
+);
+-- Two folders called "Work" and "work" in one sidebar is a mistake, not a choice.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_project_folders_name
+  ON project_folders (user_id, lower(name));
+
+-- A row only once somebody moved, pinned or archived a project: no row is
+-- the default place (no folder, not pinned, not archived), so a new project
+-- needs no write to appear. Timestamps rather than flags, because pins are
+-- listed in the order they were made and the archive says when.
+--
+-- The folder reference carries user_id too, so a placement can only ever
+-- point at a folder of the same person: the database refuses the row that a
+-- forged folder id would write, whatever the code in front of it checks.
+-- Deleting a folder empties it (only folder_id goes null) rather than
+-- deleting what was in it.
+CREATE TABLE IF NOT EXISTS project_placements (
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  project_id   INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  folder_id    INTEGER,
+  pinned_at    TEXT,
+  archived_at  TEXT,
+  PRIMARY KEY (user_id, project_id),
+  FOREIGN KEY (folder_id, user_id) REFERENCES project_folders (id, user_id)
+    ON DELETE SET NULL (folder_id)
+);
+CREATE INDEX IF NOT EXISTS idx_project_placements_folder
+  ON project_placements (folder_id) WHERE folder_id IS NOT NULL;
+
 -- Invitation links contain a random secret and only its hash reaches the
 -- database. Accepted and revoked rows remain as a small audit trail.
 CREATE TABLE IF NOT EXISTS project_invitations (
