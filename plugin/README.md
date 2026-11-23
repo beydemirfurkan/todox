@@ -10,8 +10,18 @@ claude plugin marketplace add beydemirfurkan/todox
 claude plugin install todox@todox
 ```
 
-It asks for your agent token once (Account page on todox.dev, or your own
-instance) and keeps it in your Claude Code settings, not in the plugin.
+There is no token to paste. The first time the todox tools connect, run
+`/mcp` → todox → Authenticate and approve it in the browser; Claude Code keeps
+and renews that access itself. The hooks run outside the agent and cannot use
+it, so sign this machine in once for them:
+
+```bash
+npx https://github.com/beydemirfurkan/todox/releases/latest/download/todox-mcp.tgz login
+```
+
+That saves a token to `~/.todox/config.json` (readable by you only), which the
+hooks, the stdio server and the git hook all read. The plugin still accepts a
+token in its settings, for a machine with no browser.
 
 **Your own server.** The plugin points at todox.dev. For your own instance:
 
@@ -20,8 +30,8 @@ instance) and keeps it in your Claude Code settings, not in the plugin.
   `https://your-instance/api/mcp`. A plugin update overwrites that file, so
   check it after one. `pnpm install:mcp claude-code --url https://your-instance`
   from a clone writes the MCP entry outside the plugin and survives updates.
-- **Codex:** set `TODOX_URL=https://your-instance` beside `TODOX_TOKEN`; the
-  stdio server and the hooks both read it.
+- **Codex:** set `TODOX_URL=https://your-instance`, or run the login above with
+  `--url https://your-instance`; the stdio server and the hooks both read it.
 
 **Codex** reads the same directory through its own manifest,
 `.codex-plugin/plugin.json`. The skill and `hooks/todox-hook.mjs` are shared;
@@ -29,7 +39,8 @@ what differs is the hooks file and the MCP entry:
 
 - **Install:** `codex plugin marketplace add beydemirfurkan/todox`, then
   `codex plugin add todox@todox`.
-- **Token:** `TODOX_TOKEN` in your environment; Codex plugins cannot prompt.
+- **Token:** the `login` above, or `TODOX_TOKEN` in your environment; Codex
+  plugins cannot prompt.
 - **MCP:** the stdio server from the release tarball (`codex-mcp.json`), so
   files are hashed and git is observed locally.
 - **Hooks:** `hooks/codex-hooks.json` -- SessionStart, PostToolUse
@@ -46,7 +57,7 @@ the digest was injected; in an unregistered one, the checkout's `repo_url`.
 
 What it adds:
 
-- **MCP server** — `https://www.todox.dev/api/mcp` with your token. Self-hosting?
+- **MCP server** — `https://www.todox.dev/api/mcp`, signed in through the browser. Self-hosting?
   Edit `.mcp.json`'s `url`, or use `pnpm install:mcp claude-code --url …` from a
   clone instead of this plugin.
 - **Skill `todox`** — the same text the server sends at `initialize`, loaded by
@@ -54,7 +65,7 @@ What it adds:
   when a session is ending. Generated from `mcp/tools.ts` by `pnpm plugin:sync`;
   `plugin.test.ts` fails when it drifts.
 - **SessionStart hook** — the project's briefing as a digest (under Claude
-  Code's 10,000-character limit for hook context), fetched with your token
+  Code's 10,000-character limit for hook context), fetched with the saved token
   before the MCP connection is even up, and fetched again after `/compact`, which
   is where a long session forgets what it read at the start. It never registers
   a project: in a directory todox does not know yet, or with no token, todox
