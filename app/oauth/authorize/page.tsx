@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getT } from "@/lib/lang";
@@ -6,6 +7,7 @@ import type { T } from "@/lib/i18n";
 import type { OAuthClient } from "@/lib/repositories/oauth-clients";
 import { checkAuthorization } from "@/lib/services/oauth-server";
 import type { AuthorizeQuery, AuthorizeRequest } from "@/lib/services/oauth-rules";
+import { siteBase } from "@/lib/server/site-base";
 import { currentUser } from "@/lib/session";
 import { AuthShell } from "../../features/auth-shell";
 
@@ -52,7 +54,7 @@ export default async function AuthorizePage({ searchParams }: PageProps<"/oauth/
   if (!user) redirect(`/login?next=${encodeURIComponent(selfPath(query))}`);
 
   const { t } = await getT();
-  const outcome = await checkAuthorization(query);
+  const outcome = await checkAuthorization(query, siteBase(await headers()));
   if (outcome.kind === "redirect") redirect(outcome.url);
   if (outcome.kind === "invalid")
     return (

@@ -3,6 +3,7 @@ import { publicUrl } from "@/lib/public-url";
 import { logWarn } from "@/lib/server/log";
 import { approve, checkAuthorization, deny } from "@/lib/services/oauth-server";
 import { siteOrigins, type AuthorizeQuery } from "@/lib/services/oauth-rules";
+import { siteBase } from "@/lib/server/site-base";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -77,13 +78,14 @@ export async function POST(req: Request): Promise<Response> {
     state: field(form, "state"),
     resource: field(form, "resource"),
   };
-  const outcome = await checkAuthorization(query);
+  const base = siteBase(req.headers);
+  const outcome = await checkAuthorization(query, base);
   if (outcome.kind === "invalid") return refuse(400, outcome.description);
   if (outcome.kind === "redirect") return handBack(outcome.url);
 
   const url =
     field(form, "decision") === "allow"
-      ? await approve(user.id, outcome.request)
-      : deny(outcome.request);
+      ? await approve(user.id, outcome.request, base)
+      : deny(outcome.request, base);
   return handBack(url);
 }
