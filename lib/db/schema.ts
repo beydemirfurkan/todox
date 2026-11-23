@@ -188,6 +188,22 @@ CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks (project_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_project_rank
   ON tasks (project_id, priority, updated_at DESC);
 
+-- Work a person handed to their agent from the web panel.
+--
+-- A task created in the panel used to reach an agent only as one more line in
+-- the next briefing, ranked like any other. \`requested_at\` marks it as asked
+-- for: the briefing leads with it, and an agent starts there unless the
+-- developer says otherwise. \`requested_by\` is who asked, because on a shared
+-- project the briefing must not present a teammate's request as the
+-- developer's own instruction. SET NULL: a request outlives the account that
+-- made it, it just stops saying whose it was.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS requested_at TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+-- The queue is read on every briefing and holds a handful of rows, so the
+-- index holds only those.
+CREATE INDEX IF NOT EXISTS idx_tasks_requested ON tasks (project_id, requested_at)
+  WHERE requested_at IS NOT NULL;
+
 -- The work log. This is the part no issue tracker has: an append-only record
 -- of what was decided, what was tried and failed, and what the last session
 -- left behind. A cold agent reads this instead of asking the human.
