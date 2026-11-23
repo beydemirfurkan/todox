@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   acceptedResources,
   authorizationServerMetadata,
+  baseForHost,
   checkAuthorizeQuery,
   isAcceptableRedirect,
   isMetadataClientId,
@@ -171,6 +172,23 @@ describe("the authorisation request", () => {
       ok: false,
       error: "unsupported_response_type",
     });
+  });
+});
+
+describe("which origin a request reached", () => {
+  it("answers with the host the client used, when it is one of ours", () => {
+    expect(baseForHost("https://todox.dev", "www.todox.dev")).toBe("https://www.todox.dev");
+    expect(baseForHost("https://todox.dev", "todox.dev")).toBe("https://todox.dev");
+    expect(baseForHost("https://www.todox.dev", "TODOX.DEV")).toBe("https://todox.dev");
+    // x-forwarded-host may carry a list; the first is the client's.
+    expect(baseForHost("https://todox.dev", "www.todox.dev, internal:3000")).toBe("https://www.todox.dev");
+  });
+
+  it("never lets a host header name somebody else's origin", () => {
+    expect(baseForHost("https://todox.dev", "evil.example")).toBe("https://todox.dev");
+    expect(baseForHost("https://todox.dev", "todox.dev.evil.example")).toBe("https://todox.dev");
+    expect(baseForHost("https://todox.dev", "10.0.0.5:3000")).toBe("https://todox.dev");
+    expect(baseForHost("https://todox.dev", null)).toBe("https://todox.dev");
   });
 });
 

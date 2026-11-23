@@ -124,6 +124,22 @@ describe("authentication", () => {
     );
   });
 
+  it("names the host the client used, so www and the bare domain both sign in", async () => {
+    // Claude Code refuses metadata whose resource origin differs from the
+    // URL it was given: configured as todox.dev, a www client failed.
+    vi.stubEnv("TODOX_PUBLIC_URL", "https://todox.dev");
+    try {
+      const www = await post({ token: null, headers: { "x-forwarded-host": "www.todox.dev" } });
+      expect(www.headers.get("www-authenticate")).toContain(
+        '"https://www.todox.dev/.well-known/oauth-protected-resource/api/mcp"',
+      );
+      const forged = await post({ token: null, headers: { "x-forwarded-host": "evil.example" } });
+      expect(forged.headers.get("www-authenticate")).toContain('"https://todox.dev/.well-known/');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("points a client with a dead token at OAuth discovery too", async () => {
     // An expired access token is how a client learns to refresh or re-approve.
     mocks.agentForToken.mockResolvedValue(undefined);

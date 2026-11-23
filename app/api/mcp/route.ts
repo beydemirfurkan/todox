@@ -9,7 +9,7 @@ import { logError, logWarn, newRequestId } from "@/lib/server/log";
 import { normalise, type ClientInfo } from "@/lib/client-identity";
 import { clientDuringSetup, record } from "@/lib/server/client-info";
 import { metered, serverTiming } from "@/lib/db/client";
-import { publicUrl } from "@/lib/public-url";
+import { siteBase } from "@/lib/server/site-base";
 import { resourceMetadataUrl } from "@/lib/services/oauth-rules";
 import { agentForToken, type AgentIdentity } from "@/lib/services/auth";
 import { silentAccountNudge } from "@/lib/services/nudge";
@@ -131,9 +131,9 @@ async function nudgeFor(agent: AgentIdentity, body: unknown, client: ClientInfo 
  * no pasted credential. It used to be withheld on purpose, when a pasted token
  * was the only way in; a personal token still works and never sees this.
  */
-const unauthorised = (error: string) =>
+const unauthorised = (error: string, base: string) =>
   json({ jsonrpc: "2.0", error: { code: -32001, message: error } }, 401, {
-    "www-authenticate": `Bearer resource_metadata="${resourceMetadataUrl(publicUrl())}"`,
+    "www-authenticate": `Bearer resource_metadata="${resourceMetadataUrl(base)}"`,
   });
 
 /**
@@ -170,7 +170,7 @@ async function answer(req: Request, requestId: string): Promise<Response> {
   const ip = clientIp(req.headers);
 
   const token = bearerToken(req.headers);
-  if (!token) return unauthorised("missing bearer token");
+  if (!token) return unauthorised("missing bearer token", siteBase(req.headers));
 
   // Same bucket as /api/rpc: one token surface, one brute-force budget. The
   // gate and the lookup go out together -- the lookup's answer is only used
@@ -187,7 +187,7 @@ async function answer(req: Request, requestId: string): Promise<Response> {
         { "retry-after": String(gate.retryAfterSec) },
       );
     await limit.penalise("badTokenPerIp", ip);
-    return unauthorised("invalid or revoked token");
+    return unauthorised("invalid or revoked token", siteBase(req.headers));
   }
   const { user } = agent;
 

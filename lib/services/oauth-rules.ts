@@ -32,6 +32,23 @@ export function acceptedResources(base: string): string[] {
   return siteOrigins(base).flatMap((origin) => [mcpResource(origin), origin, `${origin}/`]);
 }
 
+/**
+ * The origin this request reached, if it is one of this site's two; the
+ * configured one otherwise.
+ *
+ * The resource, the issuer and the metadata URL have to name the host the
+ * client is talking to: Claude Code refuses a protected resource whose origin
+ * differs from the server URL it was given, so an agent added as
+ * `www.todox.dev` failed against metadata that said `todox.dev`. The host
+ * header is the client's to write, so it is only ever chosen from the
+ * allow-list -- anything else gets the configured origin, never itself.
+ */
+export function baseForHost(configured: string, host: string | null | undefined): string {
+  if (!host) return configured;
+  const candidate = `${new URL(configured).protocol}//${host.split(",")[0].trim().toLowerCase()}`;
+  return siteOrigins(configured).includes(candidate) ? candidate : configured;
+}
+
 /** This site's origin in both host forms, with and without `www.`. */
 export function siteOrigins(base: string): string[] {
   const url = new URL(base);

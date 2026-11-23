@@ -12,6 +12,7 @@ import { logError, logInfo, logWarn } from "../server/log";
 import { newApiToken } from "../util/tokens";
 import { now } from "../util/time";
 import {
+  acceptedResources,
   ACCESS_TTL_MS,
   checkAuthorizeQuery,
   CIMD_TTL_MS,
@@ -19,7 +20,6 @@ import {
   FIRST_PARTY_CLIENT_ID,
   FIRST_PARTY_REDIRECT,
   isMetadataClientId,
-  mcpResource,
   parseClientMetadataDocument,
   parseRegistrationRequest,
   redirectMatches,
@@ -120,7 +120,8 @@ export type Authorization =
   | { kind: "redirect"; url: string }
   | { kind: "ok"; client: OAuthClient; request: AuthorizeRequest };
 
-export async function checkAuthorization(query: AuthorizeQuery): Promise<Authorization> {
+/** `base` is the origin the request arrived on (`siteBase`), so `iss` and the resource name it. */
+export async function checkAuthorization(query: AuthorizeQuery, base: string): Promise<Authorization> {
   const clientId = query.client_id ?? "";
   const redirectUri = query.redirect_uri ?? "";
   const client = await resolveClient(clientId);
@@ -128,7 +129,6 @@ export async function checkAuthorization(query: AuthorizeQuery): Promise<Authori
   if (!redirectMatches(client.redirect_uris, redirectUri))
     return { kind: "invalid", description: "redirect_uri is not registered for this client" };
 
-  const base = publicUrl();
   const outcome = checkAuthorizeQuery(query, { clientId, redirectUri, base });
   if (!outcome.ok)
     return {
@@ -152,7 +152,7 @@ function pruneInBackground(): void {
 }
 
 /** The person said yes: a code, bound to everything the token request must repeat. */
-export async function approve(userId: number, request: AuthorizeRequest): Promise<string> {
+export async function approve(userId: number, request: AuthorizeRequest, base: string): Promise<string> {
   const code = randomBytes(32).toString("base64url");
   const at = now();
   await codes.create({
@@ -167,15 +167,15 @@ export async function approve(userId: number, request: AuthorizeRequest): Promis
   });
   pruneInBackground();
   logInfo("oauth.approved", { userId });
-  return redirectWith(request.redirect_uri, { code, state: request.state, iss: publicUrl() });
+  return redirectWith(request.redirect_uri, { code, state: request.state, iss: base });
 }
 
-export const deny = (request: AuthorizeRequest): string =>
+export const deny = (request: AuthorizeRequest, base: string): string =>
   redirectWith(request.redirect_uri, {
     error: "access_denied",
     error_description: "the request was declined",
     state: request.state,
-    iss: publicUrl(),
+    iss: base,
   });
 
 /* ------------------------------------------------------------------ token */
@@ -273,7 +273,7 @@ export async function exchangeCode(input: CodeExchange): Promise<TokenResult> {
   if (!stored) return invalidGrant("the code is unknown, expired or already used");
   if (stored.client_id !== input.client_id) return invalidGrant("the code was issued to another client");
   if (stored.redirect_uri !== input.redirect_uri) return invalidGrant("redirect_uri does not match");
-  if (input.resource && input.resource !== stored.resource && input.resource !== mcpResource(publicUrl()))
+  if (input.resource && !acceptedResources(publicUrl()).includes(input.resource))
     return invalidGrant("resource does not match");
   if (!verifierMatches(input.code_verifier, stored.code_challenge))
     return invalidGrant("code_verifier does not match the challenge");

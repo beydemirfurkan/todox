@@ -48,6 +48,7 @@ import {
   revokeFromAccount,
 } from "./oauth-server";
 
+const SITE = "https://www.todox.dev";
 const VERIFIER = "v".repeat(64);
 const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
 const DCR = {
@@ -124,13 +125,13 @@ describe("checking an authorisation request", () => {
   };
 
   it("never redirects to a URI the client did not register", async () => {
-    expect(await checkAuthorization({ ...query, redirect_uri: "https://evil.example/cb" })).toMatchObject({
+    expect(await checkAuthorization({ ...query, redirect_uri: "https://evil.example/cb" }, SITE)).toMatchObject({
       kind: "invalid",
     });
   });
 
   it("sends a bad request back to a registered redirect, with iss", async () => {
-    const outcome = await checkAuthorization({ ...query, code_challenge_method: "plain", state: "s1" });
+    const outcome = await checkAuthorization({ ...query, code_challenge_method: "plain", state: "s1" }, SITE);
     expect(outcome.kind).toBe("redirect");
     const url = new URL((outcome as { url: string }).url);
     expect(url.searchParams.get("error")).toBe("invalid_request");
@@ -138,10 +139,18 @@ describe("checking an authorisation request", () => {
     expect(url.searchParams.get("iss")).toBe("https://www.todox.dev");
   });
 
-  it("approves into a code bound to the challenge", async () => {
-    const outcome = await checkAuthorization(query);
+  it("names the host the request arrived on, in iss and in the resource", async () => {
+    const outcome = await checkAuthorization(query, "https://todox.dev");
     if (outcome.kind !== "ok") throw new Error(`expected ok, got ${outcome.kind}`);
-    const url = new URL(await approve(7, outcome.request));
+    expect(outcome.request.resource).toBe("https://todox.dev/api/mcp");
+    const url = new URL(await approve(7, outcome.request, "https://todox.dev"));
+    expect(url.searchParams.get("iss")).toBe("https://todox.dev");
+  });
+
+  it("approves into a code bound to the challenge", async () => {
+    const outcome = await checkAuthorization(query, SITE);
+    if (outcome.kind !== "ok") throw new Error(`expected ok, got ${outcome.kind}`);
+    const url = new URL(await approve(7, outcome.request, SITE));
     expect(url.searchParams.get("code")).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(codes.create).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: 7, code_challenge: CHALLENGE, client_id: "mcp_abc" }),
