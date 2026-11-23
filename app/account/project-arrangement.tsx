@@ -8,6 +8,7 @@ import {
   createFolderAction,
   deleteFolderAction,
   moveFolderAction,
+  moveProjectAction,
   moveProjectInFolderAction,
   renameFolderAction,
 } from "../actions";
@@ -18,15 +19,19 @@ import { SubmitButton } from "../features/submit";
 const NAME_MAX = 60;
 
 /**
- * The account's "projects" tab: the folders themselves, and the archive.
+ * The account's "projects" tab: the folders themselves, every project with
+ * the folder it is in, and the archive.
  *
- * Moving a project happens from its own menu, where you already are when you
- * decide it belongs somewhere. This is for what has no project to stand on:
- * naming a folder, renaming one, deleting one, and finding what you archived.
+ * The list of projects is the way to sort many at once -- opening a hundred
+ * project menus one by one is not -- and the plain-form way to do what the
+ * sidebar does by dragging.
  */
 export async function ProjectArrangement({ userId, t }: { userId: number; t: T }) {
   const { arranged } = await accountProjects(userId);
   const countLabel = (n: number) => (n === 1 ? t("folderProjectCountOne") : t("folderProjectCount", { n }));
+
+  const folderOf = new Map(arranged.folders.flatMap((folder) => folder.projects.map((p) => [p.id, folder.id] as const)));
+  const placeable = [...arranged.pinned, ...arranged.folders.flatMap((folder) => folder.projects), ...arranged.loose];
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -122,6 +127,47 @@ export async function ProjectArrangement({ userId, t }: { userId: number; t: T }
         )}
         {arranged.folders.length > 0 && <p className="mt-3 text-meta text-faint">{t("deleteFolderHint")}</p>}
       </Panel>
+
+      {arranged.folders.length > 0 && placeable.length > 0 && (
+        <Panel delay={60} title={t("yourProjectsTitle")} className="lg:col-span-2">
+          <p className="mb-4 text-small text-muted">{t("yourProjectsIntro")}</p>
+          <ul className="flex flex-col gap-2">
+            {placeable.map((project) => (
+              <li key={project.id}>
+                {/* Keyed by where it is now: React resets a form after its
+                    action, and without a fresh mount the picker would fall
+                    back to the folder it showed before the move. */}
+                <form
+                  key={folderOf.get(project.id) ?? "none"}
+                  action={moveProjectAction}
+                  className="sticker-flat flex flex-wrap items-center gap-2 p-2.5"
+                >
+                  <input type="hidden" name="project_id" value={project.id} />
+                  <label htmlFor={`folder-of-${project.id}`} className="min-w-[10rem] flex-1 truncate text-body text-ink">
+                    {project.name}
+                  </label>
+                  {/* The width sits on a wrapper: the global select rule is
+                      unlayered and would win over a utility on the select. */}
+                  <div className="w-full min-w-0 sm:w-56">
+                    <select id={`folder-of-${project.id}`} name="folder_id" defaultValue={folderOf.get(project.id) ?? ""}>
+                      <option value="">{t("noFolder")}</option>
+                      {arranged.folders.map((folder) => (
+                        <option key={folder.id} value={folder.id}>
+                          {folder.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
+                    {t("moveSubmit")}
+                    <span className="sr-only"> — {project.name}</span>
+                  </SubmitButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <Panel delay={80} title={t("archivedTitle")}>
         {arranged.archived.length === 0 ? (

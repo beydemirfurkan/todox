@@ -744,6 +744,15 @@ ul > .sortable-item > .sort-handle {
     left: 40px;
   }
 }
+/* A folder a dragged project is over: lit, so the drop has a visible target. */
+[data-folder-target] > summary,
+[data-folder-target] > .project-group-head {
+  background: var(--raised);
+  color: var(--ink);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  border-radius: 10px;
+}
 .project-group-empty {
   padding: 2px 12px 6px 26px;
 }

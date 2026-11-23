@@ -5,7 +5,7 @@ import type { T } from "@/lib/i18n";
 import type { PublicUser } from "@/lib/types";
 
 import { accountProjects } from "../account-projects";
-import { reorderFoldersAction, reorderProjectsAction } from "../actions";
+import { moveProjectToFolderAction, reorderFoldersAction, reorderProjectsAction } from "../actions";
 import { Sortable } from "../features/sortable";
 import { AccountMenu } from "../features/account-menu";
 import { Notifications } from "../features/notifications";
@@ -123,8 +123,13 @@ async function SidebarProjects({ userId, t }: { userId: number; t: T }) {
             items={items}
             container="ul"
             className="flex flex-col gap-0.5"
-            onReorder={reorderProjectsAction.bind(null, folderId)}
-            labels={{ handle: t("sortHandle"), moved: t("folderMoved") }}
+            onReorder={folderId === null ? undefined : reorderProjectsAction.bind(null, folderId)}
+            folderMove={{
+              current: folderId ?? "none",
+              moveTo: moveProjectToFolderAction,
+              movedLabel: t("projectMovedToFolder"),
+            }}
+            labels={{ handle: t(folderId === null ? "sortHandleMove" : "sortHandle"), moved: t("folderMoved") }}
           />
         )}
         labels={{

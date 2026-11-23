@@ -13,6 +13,20 @@ interface Drag {
   pointerId: number;
 }
 
+/** Where a project sits now, and how to put it somewhere else. */
+export interface FolderMove {
+  /** The folder this list is, or "none" for projects in no folder. */
+  current: number | "none";
+  /** Into a folder, or out of any with null. */
+  moveTo: (projectId: number, folderId: number | null) => Promise<void>;
+  /** What is said once a move is sent; {name} and {folder}. */
+  movedLabel: string;
+}
+
+/** Anything a project can be dropped on carries this: a folder's id, or "none". */
+const DROP_FOLDER = "data-drop-folder";
+const TARGET_MARK = "data-folder-target";
+
 /**
  * A list a person can put in their own order: by mouse, by finger, by keyboard.
  *
@@ -34,12 +48,16 @@ interface Drag {
 export function Sortable({
   items,
   onReorder,
+  folderMove,
   labels,
   container,
   className,
 }: {
   items: SortableItem[];
-  onReorder: (orderedIds: number[]) => Promise<void>;
+  /** Absent for a list whose order is not the person's to set (activity order). */
+  onReorder?: (orderedIds: number[]) => Promise<void>;
+  /** Present where a row can be dropped on another folder to move there. */
+  folderMove?: FolderMove;
   labels: { handle: string; moved: string };
   /** `ul` when the rows are list items, `div` for anything else. */
   container: "ul" | "div";
@@ -49,6 +67,8 @@ export function Sortable({
   const [drag, setDrag] = useState<Drag | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [folderTarget, setFolderTarget] = useState<{ value: string; element: Element } | null>(null);
+  const [movedAway, setMovedAway] = useState<ReadonlySet<number>>(new Set());
   const [, startTransition] = useTransition();
   const rowRefs = useRef(new Map<number, HTMLElement>());
   const containerRef = useRef<HTMLElement | null>(null);
@@ -57,7 +77,19 @@ export function Sortable({
   // wins over the local order; the same set in a new order is ours.
   const byId = new Map(items.map((item) => [item.id, item]));
   const isSameSet = order.length === items.length && order.every((id) => byId.has(id));
-  const shown = isSameSet ? order : items.map((item) => item.id);
+  const shown = (isSameSet ? order : items.map((item) => item.id)).filter((id) => !movedAway.has(id));
+
+  // Once the server's list no longer has a row we sent away, it has arrived:
+  // forget it, or the row would stay hidden if it were ever moved back here.
+  // Adjusted during render when the list changes, not in an effect, so there
+  // is no extra pass with a stale list.
+  const itemKey = items.map((item) => item.id).join(",");
+  const [seenKey, setSeenKey] = useState(itemKey);
+  if (seenKey !== itemKey) {
+    setSeenKey(itemKey);
+    const pending = [...movedAway].filter((id) => byId.has(id));
+    if (pending.length !== movedAway.size) setMovedAway(new Set(pending));
+  }
 
   function commit(next: number[], movedId: number) {
     if (next.every((id, index) => id === shown[index])) return;
@@ -67,6 +99,7 @@ export function Sortable({
       labels.moved.replace("{name}", byId.get(movedId)?.name ?? "").replace("{n}", String(next.indexOf(movedId) + 1)),
     );
     startTransition(async () => {
+      if (!onReorder) return;
       try {
         await onReorder(next);
       } catch (error) {
@@ -94,22 +127,76 @@ export function Sortable({
     setDropAt(shown.indexOf(id));
   }
 
+  /**
+   * The folder under the pointer, if it is somewhere this row could move to.
+   * Read from the page, not from props: the folders are rendered elsewhere,
+   * and each carries `data-drop-folder`. Pointer capture changes where
+   * events go, not what `elementFromPoint` sees.
+   */
+  function folderUnder(clientX: number, clientY: number): Element | null {
+    if (!folderMove) return null;
+    const zone = document.elementFromPoint(clientX, clientY)?.closest(`[${DROP_FOLDER}]`) ?? null;
+    if (!zone || zone.getAttribute(DROP_FOLDER) === String(folderMove.current)) return null;
+    return zone;
+  }
+
+  function markTarget(zone: Element | null) {
+    if (folderTarget?.element === zone) return;
+    folderTarget?.element.removeAttribute(TARGET_MARK);
+    zone?.setAttribute(TARGET_MARK, "");
+    setFolderTarget(zone ? { value: zone.getAttribute(DROP_FOLDER) ?? "none", element: zone } : null);
+  }
+
   function onPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
     if (!drag || event.pointerId !== drag.pointerId) return;
     scrollNearEdge(event.clientY, containerRef.current);
-    const at = insertionIndex(event.clientY, drag.id);
+    const zone = folderUnder(event.clientX, event.clientY);
+    markTarget(zone);
+    const at = zone || !onReorder ? null : insertionIndex(event.clientY, drag.id);
     if (at !== dropAt) setDropAt(at);
   }
 
   function onPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
     if (!drag || event.pointerId !== drag.pointerId) return;
-    const others = shown.filter((id) => id !== drag.id);
-    const at = insertionIndex(event.clientY, drag.id);
+    const zone = folderUnder(event.clientX, event.clientY);
+    const movingId = drag.id;
     endDrag();
-    commit([...others.slice(0, at), drag.id, ...others.slice(at)], drag.id);
+    if (zone && folderMove) {
+      sendToFolder(movingId, zone);
+      return;
+    }
+    if (!onReorder) return;
+    const others = shown.filter((id) => id !== movingId);
+    const at = insertionIndex(event.clientY, movingId);
+    commit([...others.slice(0, at), movingId, ...others.slice(at)], movingId);
+  }
+
+  /** Gone from this list at once; back if the server says no. */
+  function sendToFolder(projectId: number, zone: Element) {
+    if (!folderMove) return;
+    const value = zone.getAttribute(DROP_FOLDER);
+    const folderId = value && value !== "none" ? Number(value) : null;
+    const folderName = zone.getAttribute("data-folder-name") ?? "";
+    setMovedAway((ids) => new Set(ids).add(projectId));
+    setAnnouncement(
+      folderMove.movedLabel.replace("{name}", byId.get(projectId)?.name ?? "").replace("{folder}", folderName),
+    );
+    startTransition(async () => {
+      try {
+        await folderMove.moveTo(projectId, folderId);
+      } catch (error) {
+        console.error("moving the project failed", error);
+        setMovedAway((ids) => {
+          const next = new Set(ids);
+          next.delete(projectId);
+          return next;
+        });
+      }
+    });
   }
 
   function endDrag() {
+    markTarget(null);
     setDrag(null);
     setDropAt(null);
   }
@@ -120,7 +207,7 @@ export function Sortable({
       return;
     }
     const step = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
-    if (!step) return;
+    if (!step || !onReorder) return;
     event.preventDefault();
     const from = shown.indexOf(id);
     const to = from + step;

@@ -393,6 +393,14 @@ export async function moveProjectInFolderAction(fd: FormData) {
   revalidatePath("/", "layout");
 }
 
+/** A project dropped on a folder in the sidebar, or on "not in a folder" (null). */
+export async function moveProjectToFolderAction(projectId: number, folderId: number | null) {
+  const user = await writingUser();
+  const target = folderId ? { folderId: Number(folderId) } : { none: true as const };
+  await organization.moveToFolder(user.id, Number(projectId), target);
+  revalidatePath("/", "layout");
+}
+
 /** A drag inside one folder. Bound to the folder id where it is rendered. */
 export async function reorderProjectsAction(folderId: number, orderedIds: number[]) {
   const user = await writingUser();
