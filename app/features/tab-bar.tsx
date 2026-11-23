@@ -13,7 +13,7 @@ export interface Tab {
   icon: IconName;
 }
 
-/** A project and its tasks belong to the Projects tab: that is where you came from. */
+/** Projects and their tasks are reached from Today on a phone. */
 function isActive(href: string, pathname: string): boolean {
   if (href === "/") return pathname === "/" || pathname.startsWith("/p/");
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -42,8 +42,8 @@ export function TabBar({ tabs, label }: { tabs: Tab[]; label: string }) {
             className="tab-bar-item"
             aria-current={active ? "page" : undefined}
           >
-            <Icon name={tab.icon} size={22} />
-            <span>{tab.label}</span>
+            <span className="tab-bar-icon"><Icon name={tab.icon} size={21} /></span>
+            <span className="tab-bar-label">{tab.label}</span>
             <LinkPending />
           </Link>
         );

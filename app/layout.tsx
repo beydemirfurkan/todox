@@ -98,7 +98,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   pinned. Everything else is a tab at the bottom. From `md` the
                   sidebar carries all of it and this bar is gone. */}
               <header className="app-bar relative z-20 flex w-full items-center gap-3 px-5 md:hidden">
-                <Link href="/" className="brand flex items-center gap-2.5">
+                <Link href="/" className="brand flex min-h-11 items-center gap-2.5">
                   <LogoMark size={26} />
                   <span className="display text-[20px] leading-none">todox</span>
                 </Link>
@@ -118,8 +118,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </div>
         ) : (
           <>
-            <header className="app-bar relative z-20 mx-auto flex w-full page-column flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
-              <Link href="/" className="brand flex items-center gap-2.5">
+            <header className="site-header relative z-20 mx-auto flex w-full page-column flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-2 sm:pt-6 sm:pb-3">
+              <Link href="/" className="brand flex min-h-11 items-center gap-2.5">
                 <LogoMark size={28} />
                 <span className="display text-[22px] leading-none">todox</span>
               </Link>

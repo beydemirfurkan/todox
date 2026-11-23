@@ -1,6 +1,7 @@
 import type { T } from "@/lib/i18n";
 
 import { createTaskAction } from "../actions";
+import { ClosePopoverAfterSubmit } from "../features/close-popover-after-submit";
 import { SubmitButton } from "../features/submit";
 
 /**
@@ -16,17 +17,16 @@ export type QuickAddTarget =
  * The same form on Today and on a project, so adding a task looks and works
  * the same wherever you are.
  */
-export function QuickAdd({ target, t }: { target: QuickAddTarget; t: T }) {
+export function QuickAdd({ target, t, popoverId }: { target: QuickAddTarget; t: T; popoverId?: string }) {
+  const fieldPrefix = popoverId ?? "quick-add";
   return (
     <form action={createTaskAction} className="quick-add">
-      <span aria-hidden="true" className="quick-add-plus">
-        +
-      </span>
-      <label className="sr-only" htmlFor="quick-add-title">
+      {!popoverId && <span aria-hidden="true" className="quick-add-plus">+</span>}
+      <label className="sr-only" htmlFor={`${fieldPrefix}-title`}>
         {t("todayAddLabel")}
       </label>
       <input
-        id="quick-add-title"
+        id={`${fieldPrefix}-title`}
         name="title"
         required
         autoComplete="off"
@@ -37,10 +37,10 @@ export function QuickAdd({ target, t }: { target: QuickAddTarget; t: T }) {
         <input type="hidden" name="slug" value={target.slug} />
       ) : (
         <>
-          <label className="sr-only" htmlFor="quick-add-project">
+          <label className="sr-only" htmlFor={`${fieldPrefix}-project`}>
             {t("todayAddProject")}
           </label>
-          <select id="quick-add-project" name="slug" className="quick-add-select">
+          <select id={`${fieldPrefix}-project`} name="slug" className="quick-add-select">
             {target.projects.map((project) => (
               <option key={project.slug} value={project.slug}>
                 {project.name}
@@ -54,6 +54,7 @@ export function QuickAdd({ target, t }: { target: QuickAddTarget; t: T }) {
         {t("todayImportant")}
       </label>
       <SubmitButton pendingLabel={t("working")}>{t("todayAddSubmit")}</SubmitButton>
+      {popoverId && <ClosePopoverAfterSubmit />}
     </form>
   );
 }
