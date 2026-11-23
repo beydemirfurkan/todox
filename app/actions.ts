@@ -35,11 +35,9 @@ import * as limit from "@/lib/services/rate-limit";
 import * as sharing from "@/lib/services/sharing";
 import { deleteEntry } from "@/lib/services/entry-deletion";
 import * as taskService from "@/lib/services/task-service";
-import { accept, acceptWithNewAccount, invite } from "@/lib/services/project-invitations";
+import { accept, invite } from "@/lib/services/project-invitations";
 import { getLang } from "@/lib/lang";
 import { normalisePath, scrubRemote } from "@/lib/util/paths";
-import * as auth from "@/lib/services/auth";
-import { setSessionCookie } from "@/lib/session";
 import { requireUser } from "@/lib/session";
 import type { AuthState } from "./auth-actions";
 
@@ -320,15 +318,6 @@ export async function acceptProjectInviteAction(fd: FormData) {
   if (!slug) redirect("/account?tab=invites&invite=failed");
   revalidatePath("/", "layout");
   redirect(`/p/${slug}`);
-}
-
-export async function acceptNewAccountInviteAction(fd: FormData) {
-  const token = str(fd, "token");
-  const result = token ? await acceptWithNewAccount(token, await getLang()) : null;
-  if (!result) redirect("/invite?state=failed");
-  await setSessionCookie(await auth.issueSession(result.user_id));
-  revalidatePath("/", "layout");
-  redirect(`/p/${result.access_slug}`);
 }
 
 /* ----------------------------------------------------------------- tasks */

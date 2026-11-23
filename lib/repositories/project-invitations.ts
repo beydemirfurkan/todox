@@ -121,55 +121,6 @@ export const acceptStmt = (id: number, userId: number, acceptedAt: string): Stat
   params: [acceptedAt, userId, id, acceptedAt],
 });
 
-/**
- * Creates the recipient and membership from one invitation in one statement.
- * The generated user id has to feed two later writes, which the HTTP driver's
- * fixed-list transaction API cannot express without CTEs.
- */
-export const acceptWithNewUser = (input: {
-  token: string;
-  username: string;
-  passwordHash: string;
-  accessSlug: string;
-  acceptedAt: string;
-}) =>
-  one<{ user_id: number; access_slug: string }>(
-    `WITH eligible AS (
-       SELECT i.* FROM project_invitations i
-        WHERE i.token_hash = ? AND i.accepted_at IS NULL AND i.revoked_at IS NULL
-          AND i.expires_at > ?
-          AND NOT EXISTS (SELECT 1 FROM users u WHERE lower(u.email) = lower(i.email))
-     ), created_user AS (
-       INSERT INTO users
-         (username, email, name, password_hash, created_at, email_verified_at)
-       SELECT ?, e.email, '', ?, ?, ? FROM eligible e
-       RETURNING id
-     ), claimed AS (
-       UPDATE project_invitations i
-          SET accepted_at = ?, accepted_by = u.id
-         FROM eligible e, created_user u
-        WHERE i.id = e.id AND i.accepted_at IS NULL AND i.revoked_at IS NULL
-       RETURNING i.project_id, i.invited_by, u.id AS user_id
-     ), member AS (
-       INSERT INTO project_memberships
-         (project_id, user_id, access_slug, invited_by, created_at)
-       SELECT c.project_id, c.user_id, ?, c.invited_by, ? FROM claimed c
-       RETURNING user_id, access_slug
-     )
-     SELECT user_id, access_slug FROM member`,
-    [
-      hashToken(input.token),
-      input.acceptedAt,
-      input.username,
-      input.passwordHash,
-      input.acceptedAt,
-      input.acceptedAt,
-      input.acceptedAt,
-      input.accessSlug,
-      input.acceptedAt,
-    ],
-  );
-
 export const revokeOwned = (ownerId: number, invitationId: number, revokedAt: string) =>
   run(
     `UPDATE project_invitations i SET revoked_at = ?

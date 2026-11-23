@@ -128,7 +128,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               </span>
               <div className="ml-auto flex items-center gap-2">
                 <LangSwitcher lang={lang} t={t} />
-                <HeaderAuthLink signIn={t("signIn")} signUp={t("signUp")} />
+                <HeaderAuthLink signIn={t("signIn")} />
               </div>
             </header>
             <main

@@ -37,7 +37,7 @@ async function issue(userId: number, purpose: AuthTokenPurpose, expiresAt: strin
  */
 export async function requestPasswordReset(email: string, lang: "tr" | "en") {
   const user = await users.byEmail(email.trim());
-  if (!user) return;
+  if (!user?.password_hash) return;
   // Not awaited: issuing the link and the SMTP round trip only happen when the
   // address has an account, so waiting for them made a registered address
   // measurably slower to answer -- the one thing the message text is careful
@@ -64,7 +64,7 @@ export async function completePasswordReset(
     return { ok: false, errors: [{ field: "password", code: "passwordShort" }] };
 
   const hit = await authTokens.resolve("reset", token);
-  if (!hit) return { ok: false, errors: [{ field: "form", code: "linkInvalid" }] };
+  if (!hit?.user.password_hash) return { ok: false, errors: [{ field: "form", code: "linkInvalid" }] };
 
   // All of it or none of it. These were five independent round trips, and every
   // partial outcome is a security bug rather than an inconvenience: the new

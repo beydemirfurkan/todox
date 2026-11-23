@@ -638,21 +638,6 @@ body:has([data-wide-page]) .page-column {
 .oauth-button:hover {
   background: var(--control);
 }
-.oauth-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 6px;
-  color: var(--faint);
-  font-size: 13px;
-}
-.oauth-divider::before,
-.oauth-divider::after {
-  content: "";
-  height: 1px;
-  flex: 1;
-  background: var(--line);
-}
 
 /* A row on a settings page: what it is on the left, its control on the
    right, wrapping under it on a phone. */

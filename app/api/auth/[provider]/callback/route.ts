@@ -6,7 +6,7 @@ import { publicUrl } from "@/lib/public-url";
 import { logError } from "@/lib/server/log";
 import * as auth from "@/lib/services/auth";
 import { resolveSignIn } from "@/lib/services/oauth";
-import { decodePending, stateMatches } from "@/lib/services/oauth-flow";
+import { decodePending, inviteTokenFromNext, stateMatches } from "@/lib/services/oauth-flow";
 import { OAuthExchangeError, profileFromCode } from "@/lib/services/oauth-providers";
 import { getLang } from "@/lib/lang";
 import * as users from "@/lib/repositories/users";
@@ -37,10 +37,13 @@ export async function GET(
   const query = new URL(request.url).searchParams;
   const sessionToken = store.get(SESSION_COOKIE)?.value;
   const current = sessionToken ? await auth.userForSession(sessionToken) : undefined;
-  const fail = (code: string) =>
-    NextResponse.redirect(
-      current ? `${publicUrl()}/account?tab=connections&error=${code}` : `${publicUrl()}/login?error=${code}`,
-    );
+  const inviteToken = inviteTokenFromNext(pending?.next);
+  const fail = (code: string) => {
+    const url = new URL(current ? "/account?tab=connections" : "/login", publicUrl());
+    url.searchParams.set("error", code);
+    if (!current && inviteToken && pending) url.searchParams.set("next", pending.next);
+    return NextResponse.redirect(url);
+  };
 
   if (!pending || pending.provider !== provider || !stateMatches(pending.state, query.get("state")))
     return fail("oauthFailed");
@@ -63,6 +66,7 @@ export async function GET(
     profile,
     currentUserId: current?.id ?? null,
     linkGrant: pending.linkGrant,
+    inviteToken,
   });
   if (!outcome.ok) return fail(outcome.code);
 

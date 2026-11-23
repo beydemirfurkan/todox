@@ -4,10 +4,8 @@ import Link from "next/link";
 import { getT } from "@/lib/lang";
 import * as invitations from "@/lib/repositories/project-invitations";
 import { currentUser } from "@/lib/session";
-import { acceptNewAccountInviteAction, acceptProjectInviteAction } from "../actions";
+import { acceptProjectInviteAction } from "../actions";
 import { AuthShell } from "../features/auth-shell";
-import { OAuthButtons } from "../features/oauth-buttons";
-import { enabledProviders } from "@/lib/services/oauth-providers";
 
 import { SubmitButton } from "../features/submit";
 
@@ -43,18 +41,10 @@ export default async function InvitePage({
         title={t("inviteTitle")}
         intro={t("inviteDescription", { project: invitation.project_name })}
       >
-        <OAuthButtons providers={enabledProviders()} next={next} t={t} />
-        <form action={acceptNewAccountInviteAction}>
-          <input type="hidden" name="token" value={token} />
-          <SubmitButton className="btn w-full" pendingLabel={t("working")}>
-            {t("acceptInvite")}
-          </SubmitButton>
-        </form>
-        <p className="mt-3 text-center text-[12.5px] text-muted">
-          <Link href={`/login?next=${encodeURIComponent(next)}`} className="link-more">
-            {t("haveAccount")}
-          </Link>
-        </p>
+        <p className="mb-4 text-small text-muted">{t("inviteSignInHint")}</p>
+        <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn w-full">
+          {t("signIn")}
+        </Link>
       </AuthShell>
     );
 
