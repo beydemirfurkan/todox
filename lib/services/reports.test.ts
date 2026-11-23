@@ -16,6 +16,8 @@ const task = (over: Partial<Task> = {}): Task => ({
   created_at: "2026-03-01T09:00:00.000Z",
   updated_at: "2026-03-01T09:00:00.000Z",
   closed_at: null,
+  requested_at: null,
+  requested_by: null,
   ...over,
 });
 

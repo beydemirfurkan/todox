@@ -147,3 +147,39 @@ describe("the briefing digest", () => {
     expect(text.indexOf("[profile]")).toBeLessThan(text.indexOf("A rule"));
   });
 });
+
+describe("the queue from the panel", () => {
+  const request = (id: number, extra: Record<string, unknown> = {}) => ({
+    id,
+    title: `Queued ${id}`,
+    priority: 2,
+    requested_at: AT,
+    body: "Do the thing.",
+    ...extra,
+  });
+
+  it("leads the digest and says it is a request, not a record", () => {
+    const { text } = renderDigest(briefingWith({ requested: [request(7)] }));
+    const lines = text.split("\n");
+    const heading = lines.findIndex((l) => l.startsWith("Queued for you in the todox panel"));
+    // Straight after the two header lines: before the developer, the rules and every task.
+    expect(heading).toBe(2);
+    expect(lines[heading + 1]).toBe("- #7 Queued 7: Do the thing.");
+  });
+
+  it("tells the agent to ask before taking a teammate's request", () => {
+    const { text } = renderDigest(briefingWith({ requested: [request(8, { requested_by: "Ayşe" })] }));
+    expect(text).toContain("#8 Queued 8 -- queued by Ayşe, a teammate: ask the developer before taking it");
+  });
+
+  it("survives a ceiling that drops everything else", () => {
+    const brief = crowded();
+    (brief as { requested?: unknown[] }).requested = [request(9)];
+    const { text } = renderDigest(brief, 1_200);
+    expect(text).toContain("- #9 Queued 9");
+  });
+
+  it("has no heading at all when nothing is queued", () => {
+    expect(renderDigest(briefingWith()).text).not.toContain("Queued for you");
+  });
+});

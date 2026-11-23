@@ -23,6 +23,8 @@ export type NewTask = {
   body?: string | null;
   status?: Status;
   priority?: number;
+  /** A person handing the new task straight to their agent. */
+  requested_by?: number | null;
 };
 
 export type TaskPatch = Partial<
@@ -57,7 +59,7 @@ const COLUMNS = ["title", "body", "status", "priority", "closed_at"] as const;
 export const listForBoard = (projectId: number) =>
   all<Task>(
     `SELECT id, project_id, title, NULL::text AS body, status, priority,
-            created_at, updated_at, closed_at
+            created_at, updated_at, closed_at, requested_at, requested_by
        FROM tasks WHERE project_id = ?
       ORDER BY (status IN ('done','dropped')), priority, updated_at DESC`,
     [projectId],
@@ -320,8 +322,9 @@ export async function create(
   const closedAt = isClosedStatus(status) ? ts : null;
   const row = await one<Task>(
     `WITH t AS (
-       INSERT INTO tasks (project_id, title, body, status, priority, created_at, updated_at, closed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       INSERT INTO tasks (project_id, title, body, status, priority, created_at, updated_at, closed_at,
+                          requested_at, requested_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *
      ), e AS (
        INSERT INTO task_events (task_id, from_status, to_status, at, actor, model, user_id)
@@ -337,6 +340,8 @@ export async function create(
       ts,
       ts,
       closedAt,
+      input.requested_by ? ts : null,
+      input.requested_by ?? null,
       ts,
       input.actor ?? "agent",
       input.model ?? null,
@@ -372,6 +377,65 @@ export async function update(id: number, patch: TaskPatch): Promise<Task | undef
   if (!stmt) return byId(id);
   return one<Task>(stmt.text, stmt.params);
 }
+
+/* ------------------------------------------------------ the agent's queue */
+
+/** How many requests a briefing carries; a queue longer than this is a backlog. */
+export const REQUESTED_LIMIT = 10;
+
+/** A task waiting for the agent, with the name of whoever asked. */
+export type RequestedTask = Pick<
+  Task,
+  "id" | "project_id" | "title" | "body" | "priority" | "updated_at" | "requested_at" | "requested_by"
+> & {
+  requested_at: string;
+  requested_by_name: string | null;
+};
+
+const REQUESTED_SELECT = `
+  SELECT t.id, t.project_id, t.title, t.body, t.priority, t.updated_at, t.requested_at, t.requested_by,
+         u.name AS requested_by_name
+    FROM tasks t
+    LEFT JOIN users u ON u.id = t.requested_by`;
+
+/**
+ * Requests still waiting: asked for, and not yet started. Taking one -- an
+ * agent setting it to `doing` -- is what takes it off the queue, so there is
+ * no second flag to clear and nothing to forget. Put back to `todo`
+ * unfinished, which is what a session that ends mid-task is told to do, it
+ * is still asked for and comes back; only finishing, dropping or taking it
+ * back in the panel ends the request.
+ */
+export const requestedByProject = (projectId: number, limit = REQUESTED_LIMIT) =>
+  all<RequestedTask>(
+    `${REQUESTED_SELECT}
+      WHERE t.project_id = ? AND t.requested_at IS NOT NULL AND t.status = ?
+      ORDER BY t.requested_at
+      LIMIT ?`,
+    [projectId, "todo", limit],
+  );
+
+/** The same, across every project a person can see, for Today. One query, not one per project. */
+export async function requestedAcross(projectIds: number[], limit: number): Promise<RequestedTask[]> {
+  if (!projectIds.length) return [];
+  return all<RequestedTask>(
+    `${REQUESTED_SELECT}
+      WHERE t.project_id IN (${projectIds.map(() => "?").join(",")})
+        AND t.requested_at IS NOT NULL AND t.status = ?
+      ORDER BY t.requested_at
+      LIMIT ?`,
+    [...projectIds, "todo", limit],
+  );
+}
+
+/** Hands an existing task to the agent. Touches it too: being asked for is activity. */
+export const request = (id: number, byUserId: number): Promise<number> => {
+  const at = now();
+  return run("UPDATE tasks SET requested_at = ?, requested_by = ?, updated_at = ? WHERE id = ?", [at, byUserId, at, id]);
+};
+
+export const withdrawRequest = (id: number): Promise<number> =>
+  run("UPDATE tasks SET requested_at = NULL, requested_by = NULL, updated_at = ? WHERE id = ?", [now(), id]);
 
 export const touchStmt = (id: number): Statement => ({
   text: "UPDATE tasks SET updated_at = ? WHERE id = ?",

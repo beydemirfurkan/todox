@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   pageByProject: vi.fn(),
   staleDoing: vi.fn(),
+  requestedByProject: vi.fn(async (..._args: unknown[]): Promise<unknown[]> => []),
   pageNotes: vi.fn(),
   developerNotes: vi.fn(async () => ({ rows: [], omitted: 0 })),
   pageByTasksPerKind: vi.fn(),
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../repositories/tasks", () => ({
   pageByProject: mocks.pageByProject,
   staleDoing: mocks.staleDoing,
+  requestedByProject: mocks.requestedByProject,
 }));
 vi.mock("../repositories/contexts", () => ({
   pageByProject: mocks.pageNotes,
@@ -1219,5 +1221,55 @@ describe("who wrote it", () => {
     expect(out.from_teammates).toEqual([
       expect.objectContaining({ id: 9, kind: "note", by: "Ayşe's agent" }),
     ]);
+  });
+});
+
+describe("work queued from the panel", () => {
+  const queued = (over: Record<string, unknown> = {}) => ({
+    id: 31,
+    project_id: PROJECT.id,
+    title: "Fix the export button",
+    body: "It downloads an empty file on Safari.",
+    priority: 2,
+    requested_at: "2026-11-23T10:00:00.000Z",
+    requested_by: USER,
+    requested_by_name: "Furkan",
+    ...over,
+  });
+
+  it("leaves the key out when nothing is queued, so its presence means something", async () => {
+    const out = await briefing(USER, PROJECT as never);
+    expect(out).not.toHaveProperty("requested");
+  });
+
+  it("carries the developer's own request with its body, and no name", async () => {
+    mocks.requestedByProject.mockResolvedValueOnce([queued()]);
+    const out = await briefing(USER, PROJECT as never);
+    expect(out.requested).toEqual([
+      {
+        id: 31,
+        title: "Fix the export button",
+        priority: 2,
+        requested_at: "2026-11-23T10:00:00.000Z",
+        body: "It downloads an empty file on Safari.",
+      },
+    ]);
+  });
+
+  it("names a teammate who queued work, so it never reads as the developer's own instruction", async () => {
+    mocks.requestedByProject.mockResolvedValueOnce([
+      queued({ requested_by: 99, requested_by_name: "Ayşe" }),
+      queued({ id: 32, requested_by: null, requested_by_name: null }),
+    ]);
+    const out = await briefing(USER, PROJECT as never);
+    expect(out.requested?.[0]).toMatchObject({ id: 31, requested_by: "Ayşe" });
+    // An account that has since been deleted is still not this developer.
+    expect(out.requested?.[1]).toMatchObject({ id: 32, requested_by: "a former member" });
+  });
+
+  it("cuts a long request rather than spending the briefing on it", async () => {
+    mocks.requestedByProject.mockResolvedValueOnce([queued({ body: "y".repeat(5000) })]);
+    const out = await briefing(USER, PROJECT as never);
+    expect(out.requested?.[0].body?.length).toBe(2000);
   });
 });

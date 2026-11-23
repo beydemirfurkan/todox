@@ -68,7 +68,7 @@ function footer(slug: string, dropped: Record<string, number>): string {
 
 /** The longest footer `fill` could ask for, so its room is set aside first. */
 function worstCaseDropped(): Record<string, number> {
-  const names = ["developer notes", "rules", "tasks", "questions", "dead ends", "decisions", "changed files", "observations", "idle tasks"];
+  const names = ["requests", "developer notes", "rules", "tasks", "questions", "dead ends", "decisions", "changed files", "observations", "idle tasks"];
   return Object.fromEntries(names.map((name) => [name, 9999]));
 }
 
@@ -101,6 +101,8 @@ function keptAny(lines: string[], section: Section): boolean {
 function sections(brief: Briefing): Section[] {
   const tasks = [...brief.open_tasks].sort((a, b) => doingFirst(a.status) - doingFirst(b.status));
   return [
+    // First: what survives the smallest ceiling should be what was asked for.
+    { name: "requests", heading: REQUESTS_HEADING, items: (brief.requested ?? []).map(requestLine) },
     { name: "developer notes", heading: "The developer (who they are, what they use, how they work):", items: brief.developer.map(developerLine) },
     { name: "rules", heading: "Rules (account-wide):", items: brief.global_context.map(noteLine) },
     { name: "rules", heading: "Rules (this project):", items: brief.project_context.map(noteLine) },
@@ -116,6 +118,26 @@ function sections(brief: Briefing): Section[] {
 }
 
 const doingFirst = (status: string) => (status === "doing" ? 0 : 1);
+
+/**
+ * Said as a request on purpose. Everything else in a digest is a record to
+ * weigh; these the developer queued from the panel for this agent to do, and
+ * the line says so -- including when it was somebody else who queued them.
+ */
+const REQUESTS_HEADING =
+  "Queued for you in the todox panel, oldest first. Tell the developer, then start the first with update_task(status:'doing') unless they ask for something else:";
+
+/** Long enough to act on the ask without a round trip; the id leads to the rest. */
+const REQUEST_LINE_CHARS = 600;
+
+function requestLine(item: NonNullable<Briefing["requested"]>[number]): string {
+  const who =
+    "requested_by" in item && item.requested_by
+      ? ` -- queued by ${item.requested_by}, a teammate: ask the developer before taking it`
+      : "";
+  const body = item.body ? `: ${item.body}` : "";
+  return clip(`- #${item.id} ${item.title}${who}${body}`, REQUEST_LINE_CHARS);
+}
 
 /** The one section that carries bodies: it is short, and it is the point. */
 const DEVELOPER_LINE_CHARS = 700;
