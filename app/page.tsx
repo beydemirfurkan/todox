@@ -21,6 +21,7 @@ import { Icon } from "./components/icons";
 import { OrganizationJsonLd } from "./components/organization-json-ld";
 import { PageSkeleton } from "./components/page-skeleton";
 import { projectColor } from "./components/project-color";
+import { ProjectGroups } from "./components/project-groups";
 import { QuickAdd, type QuickAddTarget } from "./components/quick-add";
 import { TaskRow, TaskSection } from "./components/task-row";
 import { FirstSteps } from "./features/first-steps";
@@ -84,7 +85,7 @@ export default async function Home() {
 }
 
 async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) {
-  const [{ projects: allProjects, counts }, connected] = await Promise.all([
+  const [{ projects: allProjects, counts, arranged }, connected] = await Promise.all([
     // Shared with the sidebar through `cache`, so this is not a second query.
     accountProjects(user.id),
     // Rides along rather than costing a round trip of its own.
@@ -134,6 +135,17 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
   const queuedIds = new Set(queue.map((task) => task.id));
   const upNext = next.filter((task) => !queuedIds.has(task.id));
   const slugOf = new Map(allProjects.map((p) => [p.id, p.slug]));
+  // The picker offers what the list shows: archived projects stay out of it,
+  // and folders group it.
+  const folderOf = new Map(arranged.folders.flatMap((folder) => folder.projects.map((p) => [p.id, folder.name] as const)));
+  const archivedIds = new Set(arranged.archived.map((p) => p.id));
+  const unarchived = allProjects.filter((p) => !archivedIds.has(p.id));
+  // Everything archived still leaves somewhere to add a task.
+  const addTargets = (unarchived.length ? unarchived : allProjects).map((p) => ({
+    slug: p.slug,
+    name: p.name,
+    folder: folderOf.get(p.id) ?? null,
+  }));
   const projectOf = new Map(allProjects.map((p) => [p.id, p]));
 
   /**
@@ -191,11 +203,11 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
             projects: projectsWithOpenWork,
           })}
         </p>
-        <TodayMobileActions target={{ projects: allProjects }} t={t} />
+        <TodayMobileActions target={{ projects: addTargets }} t={t} />
       </header>
 
       <div className="hidden md:block">
-        <QuickAdd target={{ projects: allProjects }} t={t} />
+        <QuickAdd target={{ projects: addTargets }} t={t} />
       </div>
 
       {waiting.items.length > 0 && (
@@ -275,8 +287,16 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
         <h2 id="projects-mobile" tabIndex={-1} className="today-heading scroll-mt-[calc(5rem+var(--safe-top))]">
           {t("projects")}
         </h2>
-        <ul className="today-list flex flex-col">
-          {allProjects.map((project) => {
+        <ProjectGroups
+          arranged={arranged}
+          listClassName="today-list flex flex-col"
+          labels={{
+            pinned: t("sidebarPinned"),
+            loose: t("sidebarLoose"),
+            archive: t("sidebarArchive"),
+            empty: t("folderEmpty"),
+          }}
+          renderRow={(project) => {
             const count = counts.map.get(project.id);
             const open = count ? count.todo + count.doing + count.blocked : 0;
             return (
@@ -297,8 +317,8 @@ async function Today({ user, t, lang }: { user: PublicUser; t: T; lang: Lang }) 
                 </Link>
               </li>
             );
-          })}
-        </ul>
+          }}
+        />
       </section>
 
       {emptyProjects.length > 0 && (

@@ -1,0 +1,102 @@
+import Link from "next/link";
+
+import type { T } from "@/lib/i18n";
+
+import { accountProjects } from "../account-projects";
+import {
+  archiveProjectAction,
+  createFolderAction,
+  deleteFolderAction,
+  renameFolderAction,
+} from "../actions";
+import { Empty, Panel } from "../components";
+import { SubmitButton } from "../features/submit";
+
+/** Matches `FOLDER_NAME_MAX`, so the browser stops a name the server would refuse. */
+const NAME_MAX = 60;
+
+/**
+ * The account's "projects" tab: the folders themselves, and the archive.
+ *
+ * Moving a project happens from its own menu, where you already are when you
+ * decide it belongs somewhere. This is for what has no project to stand on:
+ * naming a folder, renaming one, deleting one, and finding what you archived.
+ */
+export async function ProjectArrangement({ userId, t }: { userId: number; t: T }) {
+  const { arranged } = await accountProjects(userId);
+  const countLabel = (n: number) => (n === 1 ? t("folderProjectCountOne") : t("folderProjectCount", { n }));
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <Panel delay={40} title={t("foldersTitle")}>
+        <p className="mb-4 text-small text-muted">{t("foldersIntro")}</p>
+        <form action={createFolderAction} className="mb-5 flex flex-wrap items-end gap-2">
+          <label className="flex min-w-[12rem] flex-1 flex-col gap-1.5 text-small text-muted">
+            {t("newFolderLabel")}
+            <input name="name" required maxLength={NAME_MAX} autoComplete="off" />
+          </label>
+          <SubmitButton className="btn" pendingLabel={t("working")}>
+            {t("createFolder")}
+          </SubmitButton>
+        </form>
+
+        {arranged.folders.length === 0 ? (
+          <Empty>{t("foldersEmpty")}</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {arranged.folders.map((folder) => (
+              <li key={folder.id} className="sticker-flat flex flex-col gap-2 p-3">
+                <form action={renameFolderAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="folder_id" value={folder.id} />
+                  <label className="flex min-w-[12rem] flex-1 flex-col gap-1.5 text-small text-muted">
+                    {t("folderNameLabel")}
+                    <input name="name" required maxLength={NAME_MAX} defaultValue={folder.name} autoComplete="off" />
+                  </label>
+                  <SubmitButton className="btn btn-quiet" pendingLabel={t("saving")}>
+                    {t("save")}
+                    <span className="sr-only"> — {folder.name}</span>
+                  </SubmitButton>
+                </form>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="mono text-meta text-faint">{countLabel(folder.projects.length)}</span>
+                  <form action={deleteFolderAction} className="ml-auto">
+                    <input type="hidden" name="folder_id" value={folder.id} />
+                    <SubmitButton className="link-more text-small" pendingLabel={t("working")}>
+                      {t("deleteFolder")}
+                      <span className="sr-only"> — {folder.name}</span>
+                    </SubmitButton>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {arranged.folders.length > 0 && <p className="mt-3 text-meta text-faint">{t("deleteFolderHint")}</p>}
+      </Panel>
+
+      <Panel delay={80} title={t("archivedTitle")}>
+        {arranged.archived.length === 0 ? (
+          <Empty>{t("archivedEmpty")}</Empty>
+        ) : (
+          <ul className="space-y-2">
+            {arranged.archived.map((project) => (
+              <li key={project.id} className="sticker-flat flex flex-wrap items-center gap-3 p-3">
+                <Link href={`/p/${project.slug}`} className="min-w-[10rem] flex-1 truncate text-body text-ink">
+                  {project.name}
+                </Link>
+                <form action={archiveProjectAction}>
+                  <input type="hidden" name="project_id" value={project.id} />
+                  <input type="hidden" name="archived" value="0" />
+                  <SubmitButton className="btn btn-quiet" pendingLabel={t("working")}>
+                    {t("unarchiveProject")}
+                    <span className="sr-only"> — {project.name}</span>
+                  </SubmitButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  );
+}

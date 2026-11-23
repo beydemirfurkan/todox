@@ -293,3 +293,21 @@ export type BriefingObservation = Omit<
   | "promoted_at"
   | "promoted_as"
 >;
+
+/** One person's folder in their own project list. */
+export type ProjectFolder = {
+  id: number;
+  user_id: number;
+  name: string;
+  position: number;
+  created_at: string;
+};
+
+/** Where one person keeps one project; no row means the default place. */
+export type ProjectPlacement = {
+  user_id: number;
+  project_id: number;
+  folder_id: number | null;
+  pinned_at: string | null;
+  archived_at: string | null;
+};

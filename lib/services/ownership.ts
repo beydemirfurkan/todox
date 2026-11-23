@@ -126,6 +126,10 @@ export const ownsObservation = (userId: number, id: number) =>
     [userId, id, userId],
   );
 
+/** A folder is one person's way of arranging their sidebar; nobody else's. */
+export const ownsFolder = (userId: number, id: number) =>
+  owns("SELECT 1 AS n FROM project_folders WHERE id = ? AND user_id = ?", [id, userId]);
+
 export async function assertTask(userId: number, id: number) {
   if (!(await ownsTask(userId, id))) throw new NotYours("task", id);
 }
@@ -157,6 +161,9 @@ export async function assertContext(userId: number, id: number) {
 }
 export async function assertCanModifyContext(userId: number, id: number) {
   if (!(await canModifyContext(userId, id))) throw new NotYours("context", id);
+}
+export async function assertFolder(userId: number, id: number) {
+  if (!(await ownsFolder(userId, id))) throw new NotYours("folder", id);
 }
 export async function assertObservation(userId: number, id: number) {
   if (!(await ownsObservation(userId, id))) throw new NotYours("observation", id);
