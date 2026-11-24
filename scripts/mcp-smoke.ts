@@ -400,12 +400,10 @@ async function runSuite(mode: Mode, token: string) {
     throw new Error(`session_status hint should name #${taskId} and ask for a handoff: ${owed.hint}`);
   console.log("owed:", owed.yours.length, "| hint:", owed.hint.slice(0, 60) + "…");
 
-  await text("log_entry", {
-    task_id: taskId,
-    kind: "handoff",
-    body: "SMOKE: done; nothing left to continue.",
-    model: MODEL,
-  });
+  const echoed = "SMOKE: done; nothing left to continue.";
+  const receipt = await text("log_entry", { task_id: taskId, kind: "handoff", body: echoed, model: MODEL });
+  if (receipt.includes(echoed) || receipt.length > 200)
+    throw new Error(`log_entry answered with more than a receipt: ${receipt}`);
   const afterHandoff = JSON.parse(await text("session_status", { cwd: SCRATCH }));
   const cleared = afterHandoff.yours.find((t: { id: number }) => t.id === taskId);
   if (!cleared || cleared.handoff_missing !== false)
@@ -416,6 +414,12 @@ async function runSuite(mode: Mode, token: string) {
   // may stay; what must go is this task's id from it.
   if (afterHandoff.hint.includes(`#${taskId}`))
     throw new Error(`the hint should stop naming #${taskId} once its handoff is written: ${afterHandoff.hint}`);
+  // Parking a task is how a written-up session ends, not more work on it.
+  await text("update_task", { task_id: taskId, status: "blocked", model: MODEL });
+  await text("update_task", { task_id: taskId, status: "done", model: MODEL });
+  const parked = JSON.parse(await text("session_status", { cwd: SCRATCH }));
+  if (parked.yours.find((t: { id: number }) => t.id === taskId)?.handoff_missing !== false)
+    throw new Error("moving a task after its handoff asked for the handoff again");
   console.log("cleared: handoff_missing =", cleared.handoff_missing);
 
   console.log("\n--- linked files ---");

@@ -74,6 +74,8 @@ export type TaskActivity = {
   latest_at: string;
   latest_to_status: Status;
   last_by_user_at: string | null;
+  /** When this user last started work on it; parking or closing is not work. */
+  last_doing_by_user_at: string | null;
 };
 
 export async function activityByTasks(
@@ -85,11 +87,13 @@ export async function activityByTasks(
     `SELECT task_id,
             max(at) AS latest_at,
             (array_agg(to_status ORDER BY id DESC))[1] AS latest_to_status,
-            max(at) FILTER (WHERE user_id = ?) AS last_by_user_at
+            max(at) FILTER (WHERE user_id = ?) AS last_by_user_at,
+            max(at) FILTER (WHERE user_id = ? AND to_status = 'doing')
+              AS last_doing_by_user_at
        FROM task_events
       WHERE task_id IN (${taskIds.map(() => "?").join(",")})
       GROUP BY task_id`,
-    [userId, ...taskIds],
+    [userId, userId, ...taskIds],
   );
   return new Map(rows.map((r) => [r.task_id, r]));
 }

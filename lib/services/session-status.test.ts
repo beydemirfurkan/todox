@@ -45,8 +45,26 @@ const task = (id: number, status: string, updatedHoursAgo: number) => ({
 });
 
 const events = (
-  rows: [number, { latest_at: string; latest_to_status: string; last_by_user_at: string | null }][],
-) => new Map(rows.map(([id, r]) => [id, { task_id: id, ...r }]));
+  rows: [
+    number,
+    {
+      latest_at: string;
+      latest_to_status: string;
+      last_by_user_at: string | null;
+      last_doing_by_user_at?: string | null;
+    },
+  ][],
+) =>
+  new Map(
+    rows.map(([id, r]) => [
+      id,
+      {
+        task_id: id,
+        last_doing_by_user_at: r.latest_to_status === "doing" ? r.last_by_user_at : null,
+        ...r,
+      },
+    ]),
+  );
 
 const entries = (
   rows: [
@@ -138,6 +156,57 @@ describe("what is yours", () => {
     );
     const { yours } = await sessionStatus(ME, PROJECT);
     expect(yours[0]).toMatchObject({ status: "done", handoff_missing: false });
+  });
+
+  it.each(["todo", "blocked", "done"])("owes nothing when the task was set %s after its handoff", async (status) => {
+    // The end of a well-kept session: start, write it up, park it. Reading the
+    // last step as work asked for the same handoff a second time.
+    mocks.touchedByUserSince.mockResolvedValue([task(1, status, 1)]);
+    mocks.eventActivity.mockResolvedValue(
+      events([
+        [1, { latest_at: ago(1), latest_to_status: status, last_by_user_at: ago(1), last_doing_by_user_at: ago(5) }],
+      ]),
+    );
+    mocks.entryActivity.mockResolvedValue(
+      entries([
+        [1, { last_at: ago(2), last_handoff_at: ago(2), last_by_user_at: ago(2), last_non_handoff_by_user_at: ago(3) }],
+      ]),
+    );
+    const { yours, hint } = await sessionStatus(ME, PROJECT);
+    expect(yours[0]!.handoff_missing).toBe(false);
+    expect(hint).not.toMatch(/handoff/);
+  });
+
+  it("owes a handoff when the task was started again after the last one", async () => {
+    mocks.touchedByUserSince.mockResolvedValue([task(1, "blocked", 1)]);
+    mocks.eventActivity.mockResolvedValue(
+      events([
+        [1, { latest_at: ago(1), latest_to_status: "blocked", last_by_user_at: ago(1), last_doing_by_user_at: ago(2) }],
+      ]),
+    );
+    mocks.entryActivity.mockResolvedValue(
+      entries([
+        [1, { last_at: ago(3), last_handoff_at: ago(3), last_by_user_at: ago(3), last_non_handoff_by_user_at: null }],
+      ]),
+    );
+    expect((await sessionStatus(ME, PROJECT)).yours[0]!.handoff_missing).toBe(true);
+  });
+
+  it.each([
+    ["nobody wrote it up", null, true],
+    ["the last write-up is from before the window", ago(40), true],
+    ["it was written up inside the window", ago(2), false],
+  ])("on a task only ever moved, when %s", async (_when, last_handoff_at, owed) => {
+    mocks.touchedByUserSince.mockResolvedValue([task(1, "blocked", 1)]);
+    mocks.eventActivity.mockResolvedValue(
+      events([[1, { latest_at: ago(1), latest_to_status: "blocked", last_by_user_at: ago(1) }]]),
+    );
+    mocks.entryActivity.mockResolvedValue(
+      entries([
+        [1, { last_at: ago(2), last_handoff_at, last_by_user_at: last_handoff_at, last_non_handoff_by_user_at: null }],
+      ]),
+    );
+    expect((await sessionStatus(ME, PROJECT)).yours[0]!.handoff_missing).toBe(owed);
   });
 
   it("owes a handoff again when this user did more after the last one", async () => {

@@ -339,6 +339,60 @@ describe("the payload the agent receives", () => {
     }
   });
 
+  /**
+   * The answer to a write is the part of todox nobody reads and everybody pays
+   * for. A ceiling rather than a list of fields, so that a field added later
+   * has to fit too.
+   */
+  it.each([
+    ["log_entry", { task_id: 7, kind: "handoff", body: "x" }],
+    ["update_task", { task_id: 7, status: "done" }],
+    ["add_context", { kind: "gotcha", title: "t", body: "x" }],
+    ["update_context", { context_id: 7, body: "x" }],
+    ["create_task", { cwd: "/repo", title: "t" }],
+  ])("answers %s in under 200 characters however long the record is", async (name, args) => {
+    const long = "A long body. ".repeat(1_000);
+    const row = {
+      id: 4185,
+      task_id: 7,
+      project_id: 16,
+      kind: "handoff",
+      status: "done",
+      title: long.slice(0, 500),
+      body: long,
+      author: "agent",
+      model: "claude-opus-5",
+      created_at: "2026-11-24T13:10:17.008Z",
+      updated_at: "2026-11-24T13:10:17.008Z",
+    };
+    const answer =
+      name === "create_task"
+        ? { task: row, project: { slug: "todox", name: "todox", root_path: "/repo" }, project_created: false }
+        : row;
+    for (const workspace of [localWs, remoteWs]) {
+      const result = await harness(workspace, answer).tools.get(name)!.handler(args);
+      const { text } = (result as { content: { text: string }[] }).content[0];
+      expect(text.length).toBeLessThanOrEqual(200);
+      expect(text).toContain("4185");
+    }
+  });
+
+  it("keeps what a write has to say besides the record", async () => {
+    const answer = { id: 4185, task_id: 7, kind: "note", body: "long", hint: "open with a headline" };
+    const result = await harness(remoteWs, answer)
+      .tools.get("log_entry")!
+      .handler({ task_id: 7, kind: "note", body: "long" });
+    expect(payloadOf(result)).toEqual({ id: 4185, task_id: 7, kind: "note", hint: "open with a headline" });
+  });
+
+  it("says a note went account-wide", async () => {
+    const answer = { id: 9, kind: "gotcha", project_id: null, title: "t", body: "b" };
+    const result = await harness(remoteWs, answer)
+      .tools.get("add_context")!
+      .handler({ kind: "gotcha", title: "t", body: "b" });
+    expect(payloadOf(result)).toEqual({ id: 9, kind: "gotcha", project_id: null });
+  });
+
   it("leaves an unexpected create-task response untouched", async () => {
     const answer = { error: "upstream shape changed" };
     const { tools } = harness(remoteWs, answer);
@@ -689,6 +743,15 @@ describe("instructions", () => {
    * bytes on 2026-09-15) so a sentence can still be added, and a paragraph
    * cannot be.
    */
+  it("asks for a handoff only where session_status says one is missing", () => {
+    // Told to write one on every task it touched, an agent wrote the same
+    // handoff again on a task session_status had already cleared.
+    for (const local of [true, false]) {
+      expect(instructions({ local })).toMatch(/log_entry\(kind:'handoff'\) on each with handoff_missing/);
+      expect(instructions({ local })).not.toMatch(/handoff'\) on every task/);
+    }
+  });
+
   it("stays under a byte ceiling on both transports", () => {
     expect(Buffer.byteLength(instructions({ local: false }))).toBeLessThanOrEqual(5120);
     expect(Buffer.byteLength(instructions({ local: true }))).toBeLessThanOrEqual(4608);

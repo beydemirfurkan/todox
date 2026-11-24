@@ -128,7 +128,7 @@ const BASE = [
   "   'doing' and not finished goes back to 'todo' or 'blocked' -- a task left",
   "   'doing' by a session that ended is the log going stale.",
   "2. log_entry(kind:'dead_end') for each failed approach not yet logged.",
-  "3. log_entry(kind:'handoff') on every task you touched -- state, next step,",
+  "3. log_entry(kind:'handoff') on each with handoff_missing -- state, next step,",
   "   what to watch -- enough for a fresh session to continue without asking.",
   "Not finished until all three are done.",
   "",
@@ -238,8 +238,9 @@ export function skillDocument(): string {
  */
 export const SERVER_INFO = { name: "todox", version: "0.1.8" } as const;
 
+/** One line: a reader that is a model pays for indentation and gets nothing. */
 const ok = (data: unknown) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+  content: [{ type: "text" as const, text: JSON.stringify(data) }],
 });
 const plain = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const fail = (msg: string) => ({
@@ -377,18 +378,37 @@ function digestText(result: unknown): string | null {
   return typeof result.warning === "string" ? `Warning: ${result.warning}\n${result.digest}` : result.digest;
 }
 
+/** What a write has to say besides the record; each is there only when it has something to. */
+const NOTICES = ["hint", "warning", "next", "related_dead_ends"] as const;
+
+/**
+ * A write's answer: the fields the caller could not know, and any notice.
+ *
+ * The whole row used to come back, so the agent paid for its own words twice
+ * -- 1,000 characters answered to a log_entry that sent 846, a fifth of
+ * everything todox put in front of an agent (82 sessions, 2026-11-24). Anything
+ * that is not a record is handed over as it came.
+ */
+function receipt(...fields: string[]): (result: unknown) => unknown {
+  return (result) => {
+    if (!isRecord(result) || typeof result.id !== "number") return result;
+    const kept = [...fields, ...NOTICES].filter((field) => result[field] !== undefined);
+    return Object.fromEntries(kept.map((field) => [field, result[field]]));
+  };
+}
+
 /** Keep the receipt useful without echoing the body the caller just sent. */
 function compactTaskCreation(result: unknown): unknown {
   if (!isRecord(result) || !isRecord(result.task) || !isRecord(result.project)) return result;
 
-  const { body, ...task } = result.task;
-  const id = task.id;
+  const { id, status, body } = result.task;
   const slug = result.project.slug;
   if (typeof id !== "number" || typeof slug !== "string") return result;
 
   return {
     ...result,
-    task: { ...task, body_characters: typeof body === "string" ? body.length : 0 },
+    task: { id, status, body_characters: typeof body === "string" ? body.length : 0 },
+    project: { slug },
     task_path: `/p/${slug}/t/${id}`,
   };
 }
@@ -464,8 +484,8 @@ function registerPrompts(server: McpServer) {
               "   the entry that saves the most time later.",
               "3. log_entry(kind:'decision') for what is worth keeping and why the",
               "   alternatives lost; kind:'question' for anything only I can answer.",
-              "4. log_entry(kind:'handoff'), for someone who was not here: done, next,",
-              "   what to watch out for.",
+              "4. log_entry(kind:'handoff') where `handoff_missing` is true or you have",
+              "   worked since: for someone who was not here -- done, next, what to watch.",
               "",
               "Skip anything a diff would already show. Pass your own model id. A write",
               "refused twice with the same message: stop and tell me what was refused.",
@@ -838,7 +858,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "What this session still owes",
       description:
-        "Call before finishing. `yours`: the tasks you changed or wrote on in this project within `hours` (default 12), any status, each with whether a handoff was written since the last thing you did there. `stale`: tasks 'doing' for 7+ days with nothing logged, by anyone. Ids, titles, dates and one boolean -- small on purpose. Empty lists mean nothing is owed. `hint` says what to do about each list.",
+        "Call before finishing. `yours`: the tasks you changed or wrote on in this project within `hours` (default 12), any status, each with whether a handoff was written since you last worked on it. `stale`: tasks 'doing' for 7+ days with nothing logged, by anyone. Ids, titles, dates and one boolean -- small on purpose. Empty lists mean nothing is owed. `hint` says what to do about each list.",
       annotations: READ_ONLY,
     },
     { referenceRequirement: "project-or-cwd", localInternal: ["repo_url"] },
@@ -904,19 +924,29 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     },
   );
 
-  tool("update_task", "updateTask", {
-    title: "Update task",
-    description:
-      "Change title, body, status or priority. 'doing' starts the clock, 'done' stops it; that is where report durations come from.",
-  });
+  tool(
+    "update_task",
+    "updateTask",
+    {
+      title: "Update task",
+      description:
+        "Change title, body, status or priority. 'doing' starts the clock, 'done' stops it; that is where report durations come from.",
+    },
+    { transform: receipt("id", "status") },
+  );
 
   /* ----------------------------------------------------------- the log */
 
-  tool("log_entry", "logEntry", {
-    title: "Append to a task's log",
-    description:
-      "Append one entry: 'decision', 'dead_end', 'question', 'note' or 'handoff'. First line is the headline the briefing shows; keep the body to a screen. Settling an earlier question? Pass its id as `answers_entry_id` -- nothing else closes one.",
-  });
+  tool(
+    "log_entry",
+    "logEntry",
+    {
+      title: "Append to a task's log",
+      description:
+        "Append one entry: 'decision', 'dead_end', 'question', 'note' or 'handoff'. First line is the headline the briefing shows; keep the body to a screen. Settling an earlier question? Pass its id as `answers_entry_id` -- nothing else closes one.",
+    },
+    { transform: receipt("id", "task_id", "kind") },
+  );
 
   tool("delete_entry", "deleteEntry", {
     title: "Remove a log entry",
@@ -990,17 +1020,28 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     annotations: READ_ONLY,
   });
 
-  tool("add_context", "addContext", {
-    title: "Record durable knowledge",
-    description:
-      "Knowledge that outlives a task: decision, convention, gotcha, preference. Omit `project` and `cwd` to make it account-wide.",
-  });
+  tool(
+    "add_context",
+    "addContext",
+    {
+      title: "Record durable knowledge",
+      description:
+        "Knowledge that outlives a task: decision, convention, gotcha, preference. Omit `project` and `cwd` to make it account-wide.",
+    },
+    // `project_id` because null is the one thing worth noticing: account-wide.
+    { transform: receipt("id", "kind", "project_id") },
+  );
 
-  tool("update_context", "updateContext", {
-    title: "Correct a context note",
-    description:
-      "Rewrite a note that is wrong or out of date; `body` replaces the whole thing. Correct rather than add a second note that disagrees.",
-  });
+  tool(
+    "update_context",
+    "updateContext",
+    {
+      title: "Correct a context note",
+      description:
+        "Rewrite a note that is wrong or out of date; `body` replaces the whole thing. Correct rather than add a second note that disagrees.",
+    },
+    { transform: receipt("id", "kind", "project_id") },
+  );
 
   tool("delete_context", "deleteContext", {
     title: "Remove a context note",

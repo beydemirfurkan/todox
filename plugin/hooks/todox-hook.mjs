@@ -595,8 +595,8 @@ function staleLines(tasks, checked) {
 var STALE_HEADING = "Checked on this machine just now: these linked files changed or went missing after their note was written. Read the change before trusting the note (get_file_context with the path), then accept_file_change if the note still holds.";
 
 // mcp/hook/session-start.ts
-var REMINDER = "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on every task it names.";
-var PREAMBLE = "todox fetched this project's briefing for you (digest; get_context with a focus has the bodies). Before finishing: session_status with cwd, then a handoff on every task it names.";
+var REMINDER = "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on each task with handoff_missing.";
+var PREAMBLE = "todox fetched this project's briefing for you (digest; get_context with a focus has the bodies). Before finishing: session_status with cwd, then a handoff on each task with handoff_missing.";
 var DIGEST_CHARS = 9200;
 var INJECT_CEILING = 9900;
 async function sessionStart(ctx) {

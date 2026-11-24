@@ -43,7 +43,7 @@ export type SessionStatus = {
     title: string;
     status: Status;
     last_activity_at: string;
-    /** No handoff since the last thing this user did here that was not one. */
+    /** No handoff since this user last worked here: started it, or wrote on it. */
     handoff_missing: boolean;
   }[];
   /** 'doing' with nothing logged for STALE_DOING_DAYS or more -- by anyone. */
@@ -83,9 +83,13 @@ export async function sessionStatus(
   const yours = touched.map((t) => {
     const ev = events.get(t.id);
     const en = entries.get(t.id);
-    // The moment a handoff is owed from: the last thing this user did on the
-    // task that was not itself a handoff. Either table may hold it.
-    const owedFrom = latest(ev?.last_by_user_at, en?.last_non_handoff_by_user_at);
+    // The moment a handoff is owed from: the last work this user did on the
+    // task. Parking or closing it is not work -- it is how a session that has
+    // just written its handoff ends, and counting it asked for the same handoff
+    // again, 0.2 seconds after it was written. A task only ever
+    // moved is owed one unless somebody wrote it up inside the window.
+    const worked = latest(ev?.last_doing_by_user_at, en?.last_non_handoff_by_user_at);
+    const owedFrom = worked ?? (ev?.last_by_user_at ? since : null);
     return {
       id: t.id,
       title: t.title,
