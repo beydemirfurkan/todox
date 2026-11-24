@@ -33,6 +33,7 @@ import { silentAccountNudge } from "./nudge";
 import { highlightedTerms, search } from "./search";
 import { sessionStatus } from "./session-status";
 import { deleteEntry } from "./entry-deletion";
+import { taskResume, type TaskResume } from "./task-resume";
 import * as taskService from "./task-service";
 import { headlineHint, quickCloseHint } from "./write-hints";
 import { logError } from "../server/log";
@@ -377,7 +378,8 @@ export const methods = {
     // Only on the call that closed it: a later title edit on a task that was
     // closed quickly long ago is not news.
     const hint = p.status === "done" && task ? quickCloseHint(task) : undefined;
-    return hint ? { ...task, hint } : task;
+    const resume = p.status === "doing" ? await resumeOf(userId, task_id) : null;
+    return { ...task, ...(hint ? { hint } : {}), ...(resume ? { resume } : {}) };
   },
 
   logEntry: async (
@@ -793,6 +795,19 @@ async function relatedDeadEnds(
   } catch (e) {
     logError("createTask.relatedDeadEnds", e);
     return {};
+  }
+}
+
+/**
+ * Never fails the update, for the reason `relatedDeadEnds` gives: the status
+ * is already moved, and a read that errors here costs the log, not the work.
+ */
+async function resumeOf(userId: number, taskId: number): Promise<TaskResume | null> {
+  try {
+    return await taskResume(userId, taskId);
+  } catch (e) {
+    logError("updateTask.resume", e);
+    return null;
   }
 }
 

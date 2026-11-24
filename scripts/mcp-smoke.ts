@@ -820,6 +820,16 @@ async function runSuite(mode: Mode, token: string) {
   // Advice rides on the write rather than refusing it, and has to survive both
   // transports to be any use: half of production handoffs opened with a line
   // the briefing cuts off.
+  console.log("\n--- starting a task hands over its log ---");
+  const started = JSON.parse(await text("update_task", { task_id: openA, status: "doing", model: MODEL }));
+  const resumed = JSON.stringify(started.resume ?? null);
+  if (!resumed.includes("SMOKE-A-ONLY")) throw new Error(`starting a task lost its dead end: ${resumed}`);
+  if (resumed.includes("SMOKE-QUESTION")) throw new Error("an answered question came back as open");
+  if (resumed.length > 1_500) throw new Error(`resume is ${resumed.length} characters`);
+  const moved = JSON.parse(await text("update_task", { task_id: openA, status: "todo", model: MODEL }));
+  if (moved.resume) throw new Error("a task that was not started came back with its log");
+  console.log(`resume: ${resumed.length} characters`);
+
   console.log("\n--- a write with a headline the briefing would cut says so ---");
   const longHead = JSON.parse(
     await text("log_entry", {
