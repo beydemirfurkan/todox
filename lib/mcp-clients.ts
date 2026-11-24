@@ -99,7 +99,8 @@ export const MEMORY_SNIPPET = `todox MCP is installed here — persistent memory
   directory). It registers a new repo by itself.
 - \`create_task\` for anything that will not finish this session.
 - Before stopping, \`session_status\` lists what you touched; leave a
-  \`log_entry(kind:'handoff')\` on each, and \`dead_end\` for approaches that failed.
+  \`log_entry(kind:'handoff')\` on each unfinished one, and \`dead_end\` for
+  approaches that failed.
 - Always pass your own model id.`;
 
 /**

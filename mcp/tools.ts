@@ -858,7 +858,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "What this session still owes",
       description:
-        "Call before finishing. `yours`: the tasks you changed or wrote on in this project within `hours` (default 12), any status, each with whether a handoff was written since you last worked on it. `stale`: tasks 'doing' for 7+ days with nothing logged, by anyone. Ids, titles, dates and one boolean -- small on purpose. Empty lists mean nothing is owed. `hint` says what to do about each list.",
+        "Call before finishing. `yours`: the tasks you changed or wrote on in this project within `hours` (default 12), any status, each with whether it is unfinished and lacks a handoff since you last worked on it. `stale`: tasks 'doing' for 7+ days with nothing logged, by anyone. Ids, titles, dates and one boolean -- small on purpose. Empty lists mean nothing is owed. `hint` says what to do about each list.",
       annotations: READ_ONLY,
     },
     { referenceRequirement: "project-or-cwd", localInternal: ["repo_url"] },

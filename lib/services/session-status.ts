@@ -1,7 +1,7 @@
 import * as entriesRepo from "../repositories/entries";
 import * as eventsRepo from "../repositories/events";
 import * as tasksRepo from "../repositories/tasks";
-import type { Status } from "../constants";
+import { isClosedStatus, type Status } from "../constants";
 import type { Project } from "../types";
 import { lacksHandoffSince, STALE_DOING_DAYS } from "./briefing";
 
@@ -43,7 +43,10 @@ export type SessionStatus = {
     title: string;
     status: Status;
     last_activity_at: string;
-    /** No handoff since this user last worked here: started it, or wrote on it. */
+    /**
+     * Unfinished, and no handoff since this user last worked here: started it,
+     * or wrote on it. Closed work has nobody to hand over to.
+     */
     handoff_missing: boolean;
   }[];
   /** 'doing' with nothing logged for STALE_DOING_DAYS or more -- by anyone. */
@@ -96,7 +99,9 @@ export async function sessionStatus(
       status: t.status,
       last_activity_at: latest(ev?.last_by_user_at, en?.last_by_user_at) ?? t.updated_at,
       handoff_missing:
-        owedFrom !== null && lacksHandoffSince(en?.last_handoff_at ?? null, owedFrom),
+        !isClosedStatus(t.status) &&
+        owedFrom !== null &&
+        lacksHandoffSince(en?.last_handoff_at ?? null, owedFrom),
     };
   });
 
@@ -142,8 +147,8 @@ function hint(yours: SessionStatus["yours"], stale: SessionStatus["stale"]): str
   const owed = yours.filter((t) => t.handoff_missing);
   if (owed.length)
     lines.push(
-      `No handoff since you last touched: ${ids(owed)}. log_entry(kind:'handoff') on ` +
-        `each -- state, next step, what to watch.`,
+      `Unfinished with no handoff since you worked on it: ${ids(owed)}. ` +
+        `log_entry(kind:'handoff') on each -- state, next step, what to watch.`,
     );
   // Nothing touched is exactly when the why goes missing: a session that
   // fixed something without a task left no line at all (dogfood 2026-11-22,
