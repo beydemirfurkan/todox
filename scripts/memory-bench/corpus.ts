@@ -42,6 +42,12 @@ export type Task = {
  */
 export type Question = {
   asked: string;
+  /**
+   * `asked`, translated word for word, for the questions a note answers. Written
+   * from the question and not from the note that answers it: borrowing the
+   * note's own words would measure the translator.
+   */
+  inTurkish?: string;
   term: string;
   /** Title of the note or task that answers it. Resolved to an id after seeding. */
   answer: string;
@@ -347,93 +353,118 @@ export const TASKS: Task[] = [
   },
 ];
 
+/**
+ * The question the way the `focus` description asks for it: in both languages
+ * the log is written in. Full-text matching cannot cross a language, and every
+ * question a focus missed here was an English one a Turkish note answers.
+ */
+export function inBothLanguages(question: Question): string {
+  if (!question.inTurkish) throw new Error(`no translation for: ${question.asked}`);
+  return `${question.asked} / ${question.inTurkish}`;
+}
+
 export const QUESTIONS: Question[] = [
   {
     asked: "why did we choose scrypt instead of bcrypt for passwords?",
+    inTurkish: "şifreler için neden bcrypt yerine scrypt seçtik?",
     term: "scrypt",
     answer: "Şifreler scrypt ile, bcrypt değil",
     answerType: "context",
   },
   {
     asked: "how should I test that a query checks ownership?",
+    inTurkish: "bir sorgunun sahipliği kontrol ettiğini nasıl test etmeliyim?",
     term: "ownership",
     answer: "Ownership is asserted in one place",
     answerType: "context",
   },
   {
     asked: "can I put a question mark inside a SQL string?",
+    inTurkish: "bir SQL metninin içine soru işareti koyabilir miyim?",
     term: "string literal",
     answer: "No question mark inside a SQL string literal",
     answerType: "context",
   },
   {
     asked: "what happens if the migration has not run yet when new code deploys?",
+    inTurkish: "yeni kod yayınlandığında migration henüz çalışmadıysa ne olur?",
     term: "ON CONFLICT",
     answer: "A deploy and a migration are separate steps",
     answerType: "context",
   },
   {
     asked: "why is text getting cut off on mobile without a scrollbar?",
+    inTurkish: "mobilde metin neden kaydırma çubuğu olmadan kesiliyor?",
     term: "overflow-x: clip",
     answer: "overflow-x: clip layout hatalarını metni keserek gizliyor",
     answerType: "context",
   },
   {
     asked: "which language should the site default to for a crawler?",
+    inTurkish: "site bir tarayıcı bot için varsayılan olarak hangi dilde olmalı?",
     term: "Accept-Language",
     answer: "English is the default language, Turkish is not a translation",
     answerType: "context",
   },
   {
     asked: "can one repository module read another table?",
+    inTurkish: "bir repository modülü başka bir tabloyu okuyabilir mi?",
     term: "Repositories never call each other",
     answer: "Repositories never call each other",
     answerType: "context",
   },
   {
     asked: "how do I build an update statement safely?",
+    inTurkish: "bir update ifadesini güvenli şekilde nasıl kurarım?",
     term: "setClause",
     answer: "Never build a SET clause by hand",
     answerType: "context",
   },
   {
     asked: "what identifies a project across two machines?",
+    inTurkish: "iki makine arasında bir projeyi ne tanımlar?",
     term: "repo_url",
     answer: "Bir proje bir depodur, bir yol değil",
     answerType: "context",
   },
   {
     asked: "why did the MCP server not get called in a new repo?",
+    inTurkish: "yeni bir depoda MCP sunucusu neden çağrılmadı?",
     term: "local scope",
     answer: "MCP clients default to per-project installs, and fail silently",
     answerType: "context",
   },
   {
     asked: "an installer reported success but the tool never showed up, why?",
+    inTurkish: "kurulum başarılı dedi ama araç hiç görünmedi, neden?",
     term: "verify()",
     answer: "Kendi yazdığını geri okuyan kurulum hiçbir şey kanıtlamaz",
     answerType: "context",
   },
   {
     asked: "how are durations in the report calculated?",
+    inTurkish: "rapordaki süreler nasıl hesaplanıyor?",
     term: "task_events",
     answer: "Reports are replayed from task_events, never guessed from updated_at",
     answerType: "context",
   },
   {
     asked: "a tool returns an empty object but reports no error, what was that?",
+    inTurkish: "bir araç boş nesne döndürüyor ama hata bildirmiyor, bu neydi?",
     term: "pending promise",
     answer: "Bir aracın {} döndürmesi bağlı görünmesini engellemiyor",
     answerType: "context",
   },
   {
     asked: "is colour alone enough to show a status?",
+    inTurkish: "bir durumu göstermek için renk tek başına yeterli mi?",
     term: "Renkler tek başına",
     answer: "Renkler tek başına anlam taşımaz",
     answerType: "context",
   },
   {
     asked: "what should go in a commit message body?",
+    inTurkish: "commit mesajının gövdesine ne yazılmalı?",
     term: "Conventional Commits",
     answer: "Commit messages answer why, not what",
     answerType: "context",
@@ -488,6 +519,7 @@ export const QUESTIONS: Question[] = [
   // by it. Remove that arm and these are the questions that stop working.
   {
     asked: "how do I build an update statement without splicing column names?",
+    inTurkish: "kolon adlarını eklemeden bir update ifadesini nasıl kurarım?",
     term: "Clause",
     answer: "Never build a SET clause by hand",
     answerType: "context",

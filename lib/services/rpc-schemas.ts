@@ -299,7 +299,7 @@ export const SHAPES = {
       .max(MAX.line)
       .optional()
       .describe(
-        "What this session is about, in a sentence. The note and log budgets are spent on what matches it instead of what is newest; it can only move a record up, never drop one.",
+        "What this session is about, in a sentence, written in English AND in the developer's other language if they have one ('add a profile name column / profil adı kolonu ekle'): it is matched word by word and the log may be in either. Keep identifiers as they are. The note and log budgets are spent on what matches it instead of what is newest; it can only move a record up, never drop one.",
       ),
     repo_root: repoRoot,
     repo_url: repoIdentity,
