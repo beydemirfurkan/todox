@@ -761,6 +761,15 @@ describe("instructions", () => {
     }
   });
 
+  it("asks for the focus in both languages, everywhere it asks for one", () => {
+    // Matching is by word, so a focus in one language cannot reach a note in
+    // the other: 11 of 16 bench questions found, against 14 asked both ways.
+    const { config } = harness(remoteWs).tools.get("get_context")!;
+    expect(instructions({ local: false })).toMatch(/in English and the\s+developer's own language/);
+    expect(config.description).toMatch(/both the developer's language and English/);
+    expect(JSON.stringify(z.toJSONSchema(config.inputSchema as unknown as z.ZodType))).toMatch(/in English AND in the developer's other language/);
+  });
+
   it("stays under a byte ceiling on both transports", () => {
     expect(Buffer.byteLength(instructions({ local: false }))).toBeLessThanOrEqual(5120);
     expect(Buffer.byteLength(instructions({ local: true }))).toBeLessThanOrEqual(4608);

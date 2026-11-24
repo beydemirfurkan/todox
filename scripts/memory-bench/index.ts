@@ -43,7 +43,7 @@ import { invoke } from "../../lib/services/rpc";
 import { search } from "../../lib/services/search";
 import * as taskService from "../../lib/services/task-service";
 import { hashPassword } from "../../lib/util/password";
-import { filler, logFiller, NOTES, QUESTIONS, TASKS, UNANSWERABLE, type Question } from "./corpus";
+import { filler, inBothLanguages, logFiller, NOTES, QUESTIONS, TASKS, UNANSWERABLE, type Question } from "./corpus";
 import { approxTokens, bytes, kb, reachableWithin, recallAt, score, type Hit } from "./measure";
 
 const USERNAME = "memory-bench";
@@ -321,7 +321,7 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
   const asked = QUESTIONS.filter((q) => q.answerType === "context");
 
   console.log("\nFOCUS  —  did the briefing carry the body that answers the question?\n");
-  console.log(row("notes in the project", "  recency   with focus"));
+  console.log(row("notes in the project", "  recency   one language  both languages"));
 
   const carriedBody = (brief: Awaited<ReturnType<typeof briefing>>, title: string) =>
     [...brief.global_context, ...brief.project_context].some(
@@ -346,17 +346,23 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
     const byRecency = await briefing(userId, project);
     const recency = asked.filter((q) => carriedBody(byRecency, q.answer)).length;
 
-    const focused = await Promise.all(
-      asked.map(async (q) => ({
-        q,
-        hit: carriedBody(await briefing(userId, project, q.asked), q.answer),
-      })),
-    );
-    missed = focused.filter((f) => !f.hit).map((f) => f.q.asked);
+    const missedWith = async (focusOf: (q: Question) => string): Promise<string[]> => {
+      const focused = await Promise.all(
+        asked.map(async (q) => ({
+          q,
+          hit: carriedBody(await briefing(userId, project, focusOf(q)), q.answer),
+        })),
+      );
+      return focused.filter((f) => !f.hit).map((f) => f.q.asked);
+    };
+    const missedInOne = await missedWith((q) => q.asked);
+    missed = await missedWith(inBothLanguages);
 
     const pct = (n: number) =>
       `${String(n).padStart(2)}/${asked.length} (${String(Math.round((n / asked.length) * 100)).padStart(3)}%)`;
-    console.log(row(`${target}`, `${pct(recency)} ${pct(asked.length - missed.length)}`));
+    console.log(
+      row(`${target}`, `${pct(recency)} ${pct(asked.length - missedInOne.length)}   ${pct(asked.length - missed.length)}`),
+    );
   }
 
   if (missed.length) {
@@ -383,7 +389,7 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
   // typical cost.
   const measure = async (rows: number, budgetBytes: number) => {
     const pages = await Promise.all(
-      asked.map((q) => contextsRepo.pageByProject(userId, project.id, rows, budgetBytes, q.asked)),
+      asked.map((q) => contextsRepo.pageByProject(userId, project.id, rows, budgetBytes, inBothLanguages(q))),
     );
     const found = pages.filter((page, i) =>
       page.rows.some((n) => n.title === asked[i].answer && n.body !== null),
@@ -394,7 +400,7 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
 
   // The row ceiling on its own, so this curve means what it did before the
   // byte ceiling existed.
-  for (const rows of [60, 40, 25, 15, 8])
+  for (const rows of [60, 25, 8, 5, 3])
     console.log(row(`  ${rows}`, await measure(rows, Number.MAX_SAFE_INTEGER)));
 
   // The byte ceiling, at the row ceiling a focused briefing uses. The rows
@@ -402,7 +408,7 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
   // constant in `briefing.ts` was picked off this curve.
   console.log("\n  what the byte ceiling costs, at 25 bodies and with a focus:\n");
   console.log(row("  bytes allowed", "recall     note bytes"));
-  for (const budgetBytes of [32_768, 24_576, 16_384, 12_288, 8_192])
+  for (const budgetBytes of [8_192, 4_096, 2_048, 1_200])
     console.log(row(`  ${kb(budgetBytes)}`, await measure(25, budgetBytes)));
 
   for (const id of added) await contextsRepo.remove(id);
