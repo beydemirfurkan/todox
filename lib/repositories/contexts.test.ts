@@ -44,6 +44,11 @@ describe("the parameters it takes", () => {
     expect(count(FOCUSED)).toBe(count(PROJECT) + 2);
   });
 
+  it("spends the bodies on matches before anything that merely ranks", () => {
+    expect(FOCUSED).toContain("ORDER BY matched DESC, relevance DESC, updated_at DESC, id DESC");
+    expect(PROJECT).toContain("ORDER BY c.updated_at DESC, c.id DESC");
+  });
+
   it("says which notes the focus reached, by the stripped match and only with one", () => {
     expect(FOCUSED).toMatch(/@@ q\.en OR .*@@ q\.tr\) AS matched/);
     expect(FOCUSED).not.toMatch(/_all\) AS matched/);
@@ -119,9 +124,15 @@ describe("ownership", () => {
   });
 
   it("changes the ORDER BY and never the WHERE when a focus is sent", () => {
-    const where = (sql: string) => sql.slice(sql.indexOf("WHERE c."), sql.indexOf("spent AS ("));
-    expect(where(PROJECT).length).toBeGreaterThan(0);
+    // To the end of the CTE that reads the table, which a focus puts one further
+    // up. The table is read once in either form, so no read goes without it.
+    const where = (sql: string) => {
+      const from = sql.indexOf("WHERE c.");
+      return sql.slice(from, sql.indexOf("\n     )", from));
+    };
+    expect(where(PROJECT)).toMatch(/pm\.user_id IS NOT NULL\)$/);
     expect(where(FOCUSED)).toBe(where(PROJECT));
+    for (const sql of [ACCOUNT, PROJECT, FOCUSED]) expect(sql.match(/\bcontexts c\b/g)).toHaveLength(1);
     expect(FOCUSED).toContain("ts_rank");
     expect(PROJECT).not.toContain("ts_rank");
   });

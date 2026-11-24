@@ -64,10 +64,28 @@ describe("renderOpening", () => {
     expect(text).toContain("Not shown: 3 notes");
   });
 
-  it("keeps a seat for an account-wide rule", () => {
-    const { text } = renderOpening(brief({ project_context: notes(1, 9), global_context: [note(50)] }), []);
-    expect(text).toContain("body of 50");
-    expect(text).not.toContain("body of 5\n");
+  it("ranks both scopes together: an account-wide rule earns its place or does not get one", () => {
+    const opened = (relevance: number) =>
+      renderOpening(
+        brief({ project_context: notes(1, 5, { relevance: 0.2 }), global_context: [note(50, { relevance })] }),
+        [],
+      ).text;
+    expect(opened(0.3)).toContain("body of 50");
+    expect(opened(0.3)).not.toContain("body of 5\n");
+    expect(opened(0.15)).not.toContain("body of 50");
+  });
+
+  it("leaves out a note that matches only in passing, title included", () => {
+    const { text, notes: shown } = renderOpening(
+      brief({
+        project_context: [note(1, { relevance: 0.4 }), note(2, { relevance: 0.2 }), note(3, { relevance: 0.19 })],
+      }),
+      [],
+    );
+    expect(shown).toBe(2);
+    expect(text).toContain("body of 2");
+    expect(text).not.toContain("Note 3");
+    expect(text).toContain("Not shown: 1 notes");
   });
 
   it("names a note too long to send instead of cutting it, and still sends the one after it", () => {
