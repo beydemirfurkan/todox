@@ -34,7 +34,7 @@ export const DIGEST_DEFAULT_CHARS = 9_500;
 /** No single line may eat the budget; the record's id still leads to the rest. */
 const LINE_CHARS = 240;
 
-interface Section {
+export interface Section {
   name: string;
   heading: string;
   items: string[];
@@ -73,7 +73,7 @@ function worstCaseDropped(): Record<string, number> {
 }
 
 /** Greedy, in section order: an item goes in whole or is counted as left out. */
-function fill(all: Section[], room: number): { lines: string[]; dropped: Record<string, number> } {
+export function fill(all: Section[], room: number): { lines: string[]; dropped: Record<string, number> } {
   const lines: string[] = [];
   const dropped: Record<string, number> = {};
   let left = room;
@@ -124,13 +124,13 @@ const doingFirst = (status: string) => (status === "doing" ? 0 : 1);
  * weigh; these the developer queued from the panel for this agent to do, and
  * the line says so -- including when it was somebody else who queued them.
  */
-const REQUESTS_HEADING =
+export const REQUESTS_HEADING =
   "Queued for you in the todox panel, oldest first. Tell the developer, then start the first with update_task(status:'doing') unless they ask for something else:";
 
 /** Long enough to act on the ask without a round trip; the id leads to the rest. */
 const REQUEST_LINE_CHARS = 600;
 
-function requestLine(item: NonNullable<Briefing["requested"]>[number]): string {
+export function requestLine(item: NonNullable<Briefing["requested"]>[number]): string {
   const who =
     "requested_by" in item && item.requested_by
       ? ` -- queued by ${item.requested_by}, a teammate: ask the developer before taking it`
@@ -142,7 +142,7 @@ function requestLine(item: NonNullable<Briefing["requested"]>[number]): string {
 /** The one section that carries bodies: it is short, and it is the point. */
 const DEVELOPER_LINE_CHARS = 700;
 
-function developerLine(note: { id: number; kind: string; title: string; body: string | null }): string {
+export function developerLine(note: { id: number; kind: string; title: string; body: string | null }): string {
   const body = note.body ? `: ${note.body.replace(/\s+/g, " ").trim()}` : ` (note ${note.id})`;
   return clip(`- [${note.kind}] ${note.title}${body}`, DEVELOPER_LINE_CHARS);
 }
@@ -151,7 +151,7 @@ function noteLine(note: { id: number; kind: string; title: string }): string {
   return clip(`- [${note.kind}] ${note.title} (note ${note.id})`, LINE_CHARS);
 }
 
-function taskLines(task: Briefing["open_tasks"][number]): string {
+export function taskLines(task: Briefing["open_tasks"][number]): string {
   const line = clip(`- #${task.id} [${task.status}] ${task.title}`, LINE_CHARS);
   const handoff = task.last_handoff;
   if (!handoff) return `${line}\n  no handoff yet`;
@@ -176,9 +176,9 @@ function idleLine(task: Briefing["idle_tasks"][number]): string {
   return clip(`- #${task.id} [${task.status}] ${task.title} (${task.idle_days}d idle)`, LINE_CHARS);
 }
 
-const day = (iso: string | Date) => new Date(iso).toISOString().slice(0, 10);
+export const day = (iso: string | Date) => new Date(iso).toISOString().slice(0, 10);
 
-function clip(text: string, max: number): string {
+export function clip(text: string, max: number): string {
   const flat = text.replace(/\s+/g, " ");
   return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
 }

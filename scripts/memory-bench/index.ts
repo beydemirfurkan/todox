@@ -39,6 +39,7 @@ import * as usersRepo from "../../lib/repositories/users";
 import { briefing } from "../../lib/services/briefing";
 import { fitToCeiling } from "../../lib/services/briefing-ceiling";
 import { renderDigest } from "../../lib/services/briefing-digest";
+import { renderOpening } from "../../lib/services/briefing-opening";
 import { invoke } from "../../lib/services/rpc";
 import { search } from "../../lib/services/search";
 import * as taskService from "../../lib/services/task-service";
@@ -355,6 +356,17 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
       );
       return focused.filter((f) => !f.hit).map((f) => f.q.asked);
     };
+    // The gate the opening has to pass: no question the full briefing answers
+    // may go unanswered because the session was shown less.
+    const openings = await Promise.all(
+      asked.map(async (q) => {
+        const { text, chars } = renderOpening(await briefing(userId, project, inBothLanguages(q)), []);
+        const answer = NOTES.find((n) => n.title === q.answer)!;
+        return { hit: text.includes(answer.body), chars };
+      }),
+    );
+    const openingHits = openings.filter((o) => o.hit).length;
+    const openingChars = openings.map((o) => o.chars).sort((a, b) => a - b)[Math.floor(openings.length / 2)];
     const missedInOne = await missedWith((q) => q.asked);
     missed = await missedWith(inBothLanguages);
 
@@ -363,6 +375,7 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
     console.log(
       row(`${target}`, `${pct(recency)} ${pct(asked.length - missedInOne.length)}   ${pct(asked.length - missed.length)}`),
     );
+    console.log(row("    as the opening", `${pct(openingHits)} in ${openingChars} characters (median)`));
   }
 
   if (missed.length) {

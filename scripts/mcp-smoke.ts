@@ -274,7 +274,9 @@ async function runSuite(mode: Mode, token: string) {
   console.log("create_task requires project or cwd:", requiresOne);
 
   const text = async (name: string, args: Record<string, unknown> = {}) => {
-    const r = await client.callTool({ name, arguments: args });
+    // Everything below reads the whole briefing; the opening has its own block.
+    const asked = name === "get_context" ? { shape: "full", ...args } : args;
+    const r = await client.callTool({ name, arguments: asked });
     const raw = (r.content as { text: string }[])[0].text;
     return name === "get_context" ? readBriefing(raw) : raw;
   };
@@ -1132,6 +1134,30 @@ async function runSuite(mode: Mode, token: string) {
   if (noteIn(afterRemoval))
     throw new Error("a deleted note is still in the briefing");
   console.log("entry and note both removed, and gone from what the next session reads");
+
+  console.log("\n--- the opening: what matches the focus, and nothing else ---");
+  const opener = async (args: Record<string, unknown>) => {
+    const r = await client.callTool({ name: "get_context", arguments: { cwd: SCRATCH, ...args } });
+    return (r.content as { text: string }[])[0].text;
+  };
+  const matching = JSON.parse(
+    await text("add_context", {
+      cwd: SCRATCH,
+      kind: "gotcha",
+      title: "SMOKE-OPENING zephyr migrations",
+      body: "SMOKE-OPENING-BODY: zephyr migrations lock the quokka table.",
+    }),
+  );
+  const opening = await opener({ focus: "run the zephyr migration" });
+  if (!opening.includes("SMOKE-OPENING-BODY")) throw new Error(`the opening lost the note its focus names: ${opening}`);
+  if (opening.startsWith("{")) throw new Error("the opening came back as JSON");
+  if (!/Not shown: \d+ notes/.test(opening)) throw new Error("the opening does not say what it left out");
+  const unmatched = await opener({ focus: "xylophone" });
+  if (!unmatched.startsWith("{")) throw new Error(`a focus that matches nothing should get everything: ${unmatched.slice(0, 200)}`);
+  if (!(await opener({})).startsWith("{")) throw new Error("no focus should get everything");
+  if (unmatched.includes('"matched"')) throw new Error("the full briefing carries the opening's flag");
+  await text("delete_context", { context_id: matching.id });
+  console.log(`opening: ${opening.length} characters`);
 
   // The digest is what a SessionStart hook injects, under a hard ceiling, so
   // the ceiling is the assertion: a digest one character over it is spilled

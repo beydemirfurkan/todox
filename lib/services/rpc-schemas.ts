@@ -310,10 +310,10 @@ export const SHAPES = {
      * can actually read. See `briefing-digest.ts`.
      */
     shape: z
-      .enum(["full", "digest"])
+      .enum(["full", "digest", "opening"])
       .optional()
       .describe(
-        "'digest' returns the briefing as an indexed text under max_chars (default 9500): rules, live tasks with their last handoff, open questions, dead ends and decisions by headline only. Default 'full'.",
+        "'digest' returns the briefing as an indexed text under max_chars (default 9500): rules, live tasks with their last handoff, open questions, dead ends and decisions by headline only. 'opening' is what the tool sends by default: what matches `focus`, as text under 8,000 characters, or the full briefing when nothing does. 'full' is everything, as JSON.",
       ),
     max_chars: z
       .number()

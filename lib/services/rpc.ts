@@ -10,6 +10,7 @@ import * as toolUsage from "../repositories/tool-usage";
 import { briefing } from "./briefing";
 import { fitToCeiling, type Fitted } from "./briefing-ceiling";
 import { renderDigest, type Briefing } from "./briefing-digest";
+import { hasMatchedNotes, renderOpening } from "./briefing-opening";
 import { developerBrief, renderDeveloper } from "./developer";
 import { fileContext } from "./file-context";
 import { BadRequest } from "./errors";
@@ -247,7 +248,7 @@ export const methods = {
       focus?: string;
       repo_root?: string;
       repo_url?: string;
-      shape?: "full" | "digest";
+      shape?: BriefingShape;
       max_chars?: number;
     },
   ) => {
@@ -268,12 +269,12 @@ export const methods = {
       return {
         project_created: created,
         ...(warning ? { warning } : {}),
-        ...shapeBriefing(brief, p),
+        ...(await shapeBriefing(brief, { userId, projectId: project.id, ...p })),
       };
     }
     const project = await mustResolve(userId, which, hints);
     pruneEmptyProjects(userId, project.id);
-    return shapeBriefing(await briefing(userId, project, p.focus), p);
+    return shapeBriefing(await briefing(userId, project, p.focus), { userId, projectId: project.id, ...p });
   },
 
   listTasks: async ({ userId }, p: { project?: string; cwd?: string; status?: string }) => {
@@ -739,13 +740,36 @@ const EMPTY_PROJECT_DAYS = 7;
  * The full shape is fitted here and not inside `briefing()`, so the digest is
  * cut from everything that is open rather than from what a larger ceiling left.
  */
-function shapeBriefing(
+async function shapeBriefing(
   brief: Briefing,
-  p: { shape?: "full" | "digest"; max_chars?: number },
-): Fitted<Briefing> | { digest: string; chars: number; dropped: Record<string, number> } {
-  if (p.shape !== "digest") return fitToCeiling(brief);
-  const { text, chars, dropped } = renderDigest(brief, p.max_chars);
-  return { digest: text, chars, dropped };
+  p: { userId: number; projectId: number; shape?: BriefingShape; max_chars?: number; focus?: string },
+): Promise<ShapedBriefing> {
+  if (p.shape === "digest") {
+    const { text, chars, dropped } = renderDigest(brief, p.max_chars);
+    return { digest: text, chars, dropped };
+  }
+  // Nothing to choose by is not a reason to show nothing: without a focus, or
+  // with one that reached no note, the caller gets what it always got.
+  if (p.shape !== "opening" || !p.focus || !hasMatchedNotes(brief)) return fitToCeiling(withoutMatched(brief));
+
+  const { related_dead_ends = [] } = await relatedDeadEnds(p.userId, p.projectId, p.focus);
+  const { text, chars } = renderOpening(brief, related_dead_ends);
+  // The files are not for the reader: a process beside the code hashes them, so
+  // a note goes on being checked in a session that was not shown its task.
+  return { opening: text, chars, files: brief.open_tasks.flatMap((t) => t.files), stale_refs: brief.stale_refs };
+}
+
+type BriefingShape = "full" | "digest" | "opening";
+
+type ShapedBriefing =
+  | Fitted<Briefing>
+  | { digest: string; chars: number; dropped: Record<string, number> }
+  | { opening: string; chars: number; files: object[]; stale_refs: string[] };
+
+/** The flag chose what to show; in a payload that shows everything it is only bytes. */
+function withoutMatched(brief: Briefing): Briefing {
+  const bare = <N extends { matched?: boolean }>({ matched: _chosen, ...note }: N) => note;
+  return { ...brief, global_context: brief.global_context.map(bare), project_context: brief.project_context.map(bare) };
 }
 
 /**
