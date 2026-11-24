@@ -766,9 +766,9 @@ type ShapedBriefing =
   | { digest: string; chars: number; dropped: Record<string, number> }
   | { opening: string; chars: number; files: object[]; stale_refs: string[] };
 
-/** The flag chose what to show; in a payload that shows everything it is only bytes. */
+/** What chose the opening; in a payload that shows everything it is only bytes. */
 function withoutMatched(brief: Briefing): Briefing {
-  const bare = <N extends { matched?: boolean }>({ matched: _chosen, ...note }: N) => note;
+  const bare = <N extends { matched?: boolean; relevance?: number }>({ matched: _m, relevance: _r, ...note }: N) => note;
   return { ...brief, global_context: brief.global_context.map(bare), project_context: brief.project_context.map(bare) };
 }
 

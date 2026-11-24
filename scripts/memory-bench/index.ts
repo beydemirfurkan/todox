@@ -360,11 +360,14 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
     // may go unanswered because the session was shown less.
     const openings = await Promise.all(
       asked.map(async (q) => {
-        const { text, chars } = renderOpening(await briefing(userId, project, inBothLanguages(q)), []);
+        const { text, chars, notes: shown } = renderOpening(await briefing(userId, project, inBothLanguages(q)), []);
         const answer = NOTES.find((n) => n.title === q.answer)!;
-        return { hit: text.includes(answer.body), chars };
+        return { hit: text.includes(answer.body), chars, shown };
       }),
     );
+    // Recall says the answer came and nothing about what came with it, and a
+    // note that does not answer is paid for on every later turn.
+    const shownEach = openings.reduce((n, o) => n + o.shown, 0) / openings.length;
     const openingHits = openings.filter((o) => o.hit).length;
     const openingChars = openings.map((o) => o.chars).sort((a, b) => a - b)[Math.floor(openings.length / 2)];
     const missedInOne = await missedWith((q) => q.asked);
@@ -375,7 +378,7 @@ async function reportFocus(userId: number, project: Awaited<ReturnType<typeof se
     console.log(
       row(`${target}`, `${pct(recency)} ${pct(asked.length - missedInOne.length)}   ${pct(asked.length - missed.length)}`),
     );
-    console.log(row("    as the opening", `${pct(openingHits)} in ${openingChars} characters (median)`));
+    console.log(row("    as the opening", `${pct(openingHits)} in ${openingChars} characters (median), ${shownEach.toFixed(2)} notes each`));
   }
 
   if (missed.length) {

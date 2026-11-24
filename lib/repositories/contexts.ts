@@ -57,6 +57,8 @@ export type BriefingNote = {
    * ranks. This is the stripped match `search` decides by.
    */
   matched?: boolean;
+  /** How well it matched, comparable across scopes; present beside `matched`. */
+  relevance?: number;
 };
 
 /** `null` means the account-wide scope, which is a real scope here, not "no
@@ -184,17 +186,30 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
   // selective, so that idea is now worth retrying; it is not done here because
   // the numbers above were taken before it and re-taking them is the work.
   const relevance = focused ? `WITH q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),` : `WITH`;
-  const order = focused
-    ? `${rank(doc)} DESC, c.updated_at DESC, c.id DESC`
-    : `c.updated_at DESC, c.id DESC`;
-
-  return `${relevance} ranked AS (
+  // Matched first, and not only ranked first. The rank is taken over everything
+  // the caller typed, so a note sharing nothing but a stopword outranks a real
+  // match often enough to spend the bytes it needed: 14 of 16 bench questions
+  // at ninety notes, 16 with the matches ahead.
+  const scored = focused
+    ? `scored AS (
        SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at,
-              ${focused ? `${matches(doc)} AS matched,` : ``}
-              row_number() OVER (ORDER BY ${order}) AS rn
-         FROM ${focused ? `q CROSS JOIN contexts c` : `contexts c`}
+              ${matches(doc)} AS matched, ${rank(doc)} AS relevance
+         FROM q CROSS JOIN contexts c
          ${joins}
         WHERE ${where}
+     ),`
+    : ``;
+  const ranked = focused
+    ? `SELECT *, row_number() OVER (ORDER BY matched DESC, relevance DESC, updated_at DESC, id DESC) AS rn
+         FROM scored`
+    : `SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at,
+              row_number() OVER (ORDER BY c.updated_at DESC, c.id DESC) AS rn
+         FROM contexts c
+         ${joins}
+        WHERE ${where}`;
+
+  return `${relevance} ${scored} ranked AS (
+       ${ranked}
      ),
      spent AS (
        SELECT *,
@@ -204,7 +219,7 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
               ) AS spent_before
          FROM ranked
      )
-     SELECT id, kind, title, created_at, updated_at, ${focused ? `matched,` : ``}
+     SELECT id, kind, title, created_at, updated_at, ${focused ? `matched, relevance,` : ``}
             CASE WHEN rn <= ? AND coalesce(spent_before, 0) < ? THEN body END AS body
        FROM spent ORDER BY rn`;
 }

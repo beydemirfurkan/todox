@@ -112,7 +112,7 @@ describe("getContext's two shapes", () => {
   it.each([
     ["the focus reached nothing", { matched: false }, { shape: "opening", focus: "xylophone" }],
     ["there was no focus", {}, { shape: "opening" }],
-    ["everything was asked for", { matched: true }, { shape: "full", focus: "lock the table" }],
+    ["everything was asked for", { matched: true, relevance: 0.3 }, { shape: "full", focus: "lock the table" }],
     ["an older client named no shape", { matched: true }, { focus: "lock the table" }],
   ])("gives everything when %s, without the opening's flag", async (_when, over, params) => {
     withNote(over);
@@ -120,6 +120,7 @@ describe("getContext's two shapes", () => {
     expect(full).not.toHaveProperty("opening");
     expect(full.open_tasks).not.toEqual([]);
     expect((full.project_context as object[])[0]).not.toHaveProperty("matched");
+    expect((full.project_context as object[])[0]).not.toHaveProperty("relevance");
   });
 
   it("keeps a session's linked files to be hashed though it is not shown them", async () => {

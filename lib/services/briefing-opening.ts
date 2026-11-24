@@ -30,8 +30,17 @@ const MATCHED_NOTE_BYTES = 5_120;
 /** Matching notes with no room, named by title: the one case a title is worth its line. */
 const MATCHED_TITLES = 5;
 
-/** An account-wide rule keeps a seat when the project could fill them all. */
-const PROJECT_SEATS = MATCHED_NOTES - 1;
+/**
+ * A note is shown if it matches at least this well beside the best one.
+ *
+ * One shared word is a match, and in a project about accounts nearly every note
+ * says "account": five seats were always filled, the last of them by whatever
+ * was left. On the bench, half takes 4.56 notes a question to 3.13 with no answer
+ * lost, and 0.7 loses one. Real notes gain less, 4.98 to 4.22 over 41 focuses on
+ * 21 notes: they share more words. Weighing terms by how rare they are was tried
+ * as well, and lost answers at every cut.
+ */
+const WEAKEST_SHARE = 0.5;
 
 const IN_PROGRESS = 5;
 const QUESTIONS = 3;
@@ -49,6 +58,8 @@ export interface RelatedDeadEnd {
 export interface Opening {
   text: string;
   chars: number;
+  /** Notes carried whole. */
+  notes: number;
 }
 
 /** Whether the focus reached anything, in either scope. */
@@ -57,33 +68,36 @@ export function hasMatchedNotes(brief: Briefing): boolean {
 }
 
 export function renderOpening(brief: Briefing, deadEnds: RelatedDeadEnd[], maxChars = OPENING_MAX_CHARS): Opening {
-  const notes = matchedNotes(brief);
+  const strong = strongMatches(brief);
+  const notes = inBudget(strong);
   const doing = brief.open_tasks.filter((t) => t.status === "doing").slice(0, IN_PROGRESS);
   const next = brief.open_tasks.filter((t) => !doing.includes(t)).slice(0, UP_NEXT);
   const head = header(brief);
   const foot = footer(brief, notes.length, doing.length + next.length);
-  const alsoMatch = [...brief.project_context, ...brief.global_context]
-    .filter((n) => n.matched && !notes.includes(n))
-    .slice(0, MATCHED_TITLES);
+  const alsoMatch = strong.filter((n) => !notes.includes(n)).slice(0, MATCHED_TITLES);
   const { lines } = fill(sections(brief, { notes, alsoMatch, doing, next, deadEnds }), maxChars - head.length - foot.length - 2);
   const text = [head, ...lines, foot].join("\n");
-  return { text, chars: text.length };
+  return { text, chars: text.length, notes: notes.length };
 }
 
-/** Whole notes, best match first, while the budget lasts; one too long to fit is skipped, not cut. */
-function matchedNotes(brief: Briefing): Note[] {
-  const project = brief.project_context.filter((n) => n.matched && n.body !== null);
-  const account = brief.global_context.filter((n) => n.matched && n.body !== null);
-  const ranked = [
-    ...project.slice(0, PROJECT_SEATS),
-    ...account.slice(0, MATCHED_NOTES - PROJECT_SEATS),
-    ...project.slice(PROJECT_SEATS),
-    ...account.slice(MATCHED_NOTES - PROJECT_SEATS),
-  ];
+const relevanceOf = (note: Note): number => note.relevance ?? 0;
+
+/** Both scopes together, best first, without the ones that match only in passing. */
+function strongMatches(brief: Briefing): Note[] {
+  const matched = [...brief.project_context, ...brief.global_context]
+    .filter((n) => n.matched)
+    .sort((a, b) => relevanceOf(b) - relevanceOf(a));
+  const weakest = WEAKEST_SHARE * (matched[0] ? relevanceOf(matched[0]) : 0);
+  return matched.filter((n) => relevanceOf(n) >= weakest);
+}
+
+/** Whole notes while the budget lasts; one too long to fit is skipped, not cut. */
+function inBudget(ranked: Note[]): Note[] {
   const kept: Note[] = [];
   let room = MATCHED_NOTE_BYTES;
   for (const note of ranked) {
-    const cost = Buffer.byteLength(note.body ?? "");
+    if (note.body === null) continue;
+    const cost = Buffer.byteLength(note.body);
     if (kept.length === MATCHED_NOTES || cost > room) continue;
     kept.push(note);
     room -= cost;
