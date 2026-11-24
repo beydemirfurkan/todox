@@ -57,11 +57,13 @@ export interface TaskLine {
   updated_at: string;
   last_handoff: HandoffHead | null;
   /**
-   * Kept when everything else goes. This is what a process on the machine with
-   * the code hashes to learn that a note went stale, and a task nobody hashes
-   * goes stale in silence.
+   * Kept when the log goes. This is what a process on the machine with the code
+   * hashes to learn that a note went stale, and a task nobody hashes goes stale
+   * in silence.
    */
   files: object[];
+  /** Linked files this line had no room for; `get_task` carries and hashes them. */
+  files_omitted?: number;
   entry_count: number;
 }
 
@@ -73,11 +75,13 @@ export interface Fittable {
   open_tasks: LiveTask[];
   idle_tasks: object[];
   open_tasks_omitted: number;
+  stale_refs: string[];
   log_bodies_omitted: number;
   task_bodies_omitted: number;
 }
 
-export type Fitted<B extends Fittable> = B & { condensed_tasks: TaskLine[] };
+/** `stale_refs_omitted` is absent unless warnings were cut, so it means something. */
+export type Fitted<B extends Fittable> = B & { condensed_tasks: TaskLine[]; stale_refs_omitted?: number };
 
 /** Makes one cut; false when this step has nothing left to cut. */
 type Cut = (brief: Fitted<Fittable>) => boolean;
@@ -88,16 +92,22 @@ type Cut = (brief: Fitted<Fittable>) => boolean;
  *
  * The order is the argument:
  *  1. Live tasks become lines, the least worth reading first -- see `byWorth`.
- *  2. Lines are dropped, idle before condensed, into `open_tasks_omitted`. A
- *     dropped task is one `list_tasks` away.
- *  3. Note bodies go, least relevant first, into `context_omitted`. After the
+ *  2. Idle lines are dropped into `open_tasks_omitted`. A dropped task is one
+ *     `list_tasks` away.
+ *  3. Condensed lines lose their file lists into `files_omitted`, the longest
+ *     first so that the fewest tasks lose theirs: one task may link five
+ *     hundred paths, and must not push every other task out of the payload.
+ *  4. Condensed lines are dropped, also into `open_tasks_omitted`.
+ *  5. Note bodies go, least relevant first, into `context_omitted`. After the
  *     backlog because notes are the rules a session must not break, and a
  *     backlog line is only a pointer to other work.
- *  4. The task most worth reading becomes a line too.
+ *  6. The task most worth reading becomes a line too, and then loses its files.
+ *  7. Stale-file warnings go, into `stale_refs_omitted`.
  *
- * `requested` is never cut: it is the one part that is an ask, not a record.
- * Never a truncation either, for the reason every budget in `briefing.ts`
- * gives: half a record reads as the whole of a shorter one.
+ * What no step touches is capped where it is read: `requested` above all, the
+ * one part that is an ask and not a record. Never a truncation either, for the
+ * reason every budget in `briefing.ts` gives: half a record reads as the whole
+ * of a shorter one.
  */
 export function fitToCeiling<B extends Fittable>(brief: B, maxChars = BRIEFING_MAX_CHARS): Fitted<B> {
   const fitted: Fitted<B> = {
@@ -106,16 +116,20 @@ export function fitToCeiling<B extends Fittable>(brief: B, maxChars = BRIEFING_M
     project_context: brief.project_context.map((n) => ({ ...n })),
     open_tasks: [...brief.open_tasks],
     idle_tasks: [...brief.idle_tasks],
+    stale_refs: [...brief.stale_refs],
     condensed_tasks: [],
   };
   const leastWorthFirst = byWorth(brief).reverse();
   const cuts: Cut[] = [
     condense(leastWorthFirst.slice(0, -1)),
     dropLastLine("idle_tasks"),
+    dropLongestFileList,
     dropLastLine("condensed_tasks"),
     dropLastNoteBody("project_context"),
     dropLastNoteBody("global_context"),
     condense(leastWorthFirst.slice(-1)),
+    dropLongestFileList,
+    dropHalfTheStaleRefs,
   ];
   for (const cut of cuts) while (charsOf(fitted) > maxChars && cut(fitted));
   return fitted;
@@ -165,6 +179,25 @@ function dropLastLine(tier: "idle_tasks" | "condensed_tasks"): Cut {
     brief.open_tasks_omitted += 1;
     return true;
   };
+}
+
+function dropLongestFileList(brief: Fitted<Fittable>): boolean {
+  const longest = brief.condensed_tasks.reduce<TaskLine | null>(
+    (best, line) => (line.files.length > (best?.files.length ?? 0) ? line : best),
+    null,
+  );
+  if (!longest) return false;
+  longest.files_omitted = longest.files.length;
+  longest.files = [];
+  return true;
+}
+
+/** By halves: there can be hundreds, and each cut measures the payload again. */
+function dropHalfTheStaleRefs(brief: Fitted<Fittable>): boolean {
+  if (brief.stale_refs.length === 0) return false;
+  const dropped = brief.stale_refs.splice(Math.floor(brief.stale_refs.length / 2));
+  brief.stale_refs_omitted = (brief.stale_refs_omitted ?? 0) + dropped.length;
+  return true;
 }
 
 function dropLastNoteBody(scope: "project_context" | "global_context"): Cut {

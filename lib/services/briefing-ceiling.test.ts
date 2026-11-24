@@ -42,6 +42,7 @@ const brief = (over: Partial<Fittable> = {}): Fittable => ({
   open_tasks: [],
   idle_tasks: [],
   open_tasks_omitted: 0,
+  stale_refs: [],
   log_bodies_omitted: 0,
   task_bodies_omitted: 0,
   ...over,
@@ -156,6 +157,33 @@ describe("fitToCeiling", () => {
     const keptCount = kept.filter(Boolean).length;
     expect(kept.slice(0, keptCount).every(Boolean)).toBe(true);
     expect(fitted.context_omitted).toBe(10 - keptCount);
+  });
+
+  it("fits a task linked to hundreds of files without dropping the other tasks", () => {
+    // `link_files` takes five hundred paths, and a line kept every one of them:
+    // the last cut could leave a payload as large as the refusal it prevents.
+    const many = Array.from({ length: 500 }, (_, i) => ({ id: i, path: `/repo/${"p".repeat(200)}/${i}.ts` }));
+    const one = [{ id: 900, path: "/repo/one.ts" }];
+    const open_tasks = liveTasks(10, (id) => ({ files: id === 5 ? many : one }));
+    const fitted = fitToCeiling(brief({ open_tasks }));
+
+    expect(chars(fitted)).toBeLessThanOrEqual(BRIEFING_MAX_CHARS);
+    expect(fitted.open_tasks_omitted).toBe(0);
+    const lines = new Map(fitted.condensed_tasks.map((t) => [t.id, t]));
+    expect(lines.get(5)).toMatchObject({ files: [], files_omitted: 500 });
+    // Only the list that did not fit is gone: the others can still be hashed.
+    expect(lines.get(6)).toMatchObject({ files: one });
+    expect(lines.get(6)).not.toHaveProperty("files_omitted");
+  });
+
+  it("fits when the task most worth reading is the one with the files", () => {
+    const files = Array.from({ length: 500 }, (_, i) => ({ id: i, path: `/repo/${"p".repeat(4_000)}/${i}.ts` }));
+    const stale_refs = files.map((f) => `task #1 "task 1" -> ${f.path} (changed)`);
+    const fitted = fitToCeiling(brief({ open_tasks: [liveTask(1, { status: "doing", files })], stale_refs }));
+
+    expect(chars(fitted)).toBeLessThanOrEqual(BRIEFING_MAX_CHARS);
+    expect(fitted.condensed_tasks[0]).toMatchObject({ id: 1, files: [], files_omitted: 500 });
+    expect(fitted.stale_refs.length + (fitted.stale_refs_omitted ?? 0)).toBe(500);
   });
 
   it("never cuts what somebody queued", () => {
