@@ -259,6 +259,37 @@ describe("the payload the agent receives", () => {
     });
   });
 
+  it("asks for the opening unless the agent named a shape", async () => {
+    const { tools, calls } = harness(remoteWs);
+    await tools.get("get_context")!.handler({ cwd: "/repo", focus: "x" });
+    await tools.get("get_context")!.handler({ cwd: "/repo", shape: "full" });
+    expect(calls.map((c) => c.params.shape)).toEqual(["opening", "full"]);
+  });
+
+  it("hands an opening over as text, with what only this side knows under it", async () => {
+    const answer = {
+      opening: "todox: repo, what matches your focus.",
+      chars: 40,
+      files: [],
+      warning: "Registered beside a namesake.",
+      stale_refs: Array.from({ length: 7 }, (_, i) => `/repo/${i}.ts (changed)`),
+    };
+    const { tools } = harness({ ...remoteWs, clientInfo: async () => ({ name: "claude-code", version: "1" }) } as Workspace, answer);
+    const result = await tools.get("get_context")!.handler({ cwd: "/repo", focus: "x" });
+    const { text } = (result as { content: { text: string }[] }).content[0];
+    expect(text).toMatch(/^Warning: Registered beside a namesake\.\ntodox: repo/);
+    expect(text).toContain("- /repo/4.ts (changed)\n- +2 more");
+    // Setup advice is why some accounts ever call a tool; a text answer keeps it.
+    expect(text).toContain("CLAUDE.md");
+  });
+
+  it("hashes the files of tasks an opening does not show", async () => {
+    const answer = { opening: "o", chars: 1, files: [{ id: 7, path: "/repo/a.ts", hash: null }], stale_refs: [] };
+    const { tools, calls } = harness(localWs, answer);
+    await tools.get("get_context")!.handler({ cwd: "/repo", focus: "x" });
+    expect(calls.filter((c) => c.method === "reportRefs")).toHaveLength(1);
+  });
+
   it("hands a digest over as the text itself, keeping a registration warning", async () => {
     const { tools } = harness(remoteWs, {
       project_created: true,

@@ -333,7 +333,7 @@ the line to add instead.
 
 | tool | what it does |
 | --- | --- |
-| `get_context` | **Call first.** Rules, decisions, dead ends, open tasks and stale-file warnings for a project. Pass `focus`, in English and your own language, to spend the budget on what matters for this session. Kept under about 40,000 characters; `shape: "digest"` returns a shorter plain-text version. |
+| `get_context` | **Call first.** What matches `focus` in a project: rules whole, related dead ends, work in progress. Pass `focus`, in English and your own language, to spend the budget on what matters for this session. Under 8,000 characters; `shape: "full"` returns everything (under about 40,000) and `shape: "digest"` an index of it. |
 | `get_developer` | Who the developer is: profile, standing rules, projects and the last 30 days. No project needed. |
 | `create_task` | Capture work that will outlive this session. Warns about related dead ends. |
 | `update_task` | Status, title, body, priority. `doing` and `done` are where durations come from. `doing` answers with the task's last handoff, dead ends and open questions. |

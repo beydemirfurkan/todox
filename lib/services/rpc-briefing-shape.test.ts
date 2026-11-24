@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * The full briefing is fitted under a ceiling and the digest is not: a digest
  * rendered from a fitted briefing would lose the tasks the larger ceiling
  * condensed, and the records under them, without counting them as left out.
+ * The opening is what the agent's tool asks for, and is only given when there
+ * is something to choose by.
  */
 const db = vi.hoisted(() => ({ one: vi.fn(), all: vi.fn(), run: vi.fn(), tx: vi.fn() }));
-const mocks = vi.hoisted(() => ({ briefing: vi.fn() }));
+const mocks = vi.hoisted(() => ({ briefing: vi.fn(), search: vi.fn() }));
 
 vi.mock("../db/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../db/client")>()),
@@ -15,6 +17,10 @@ vi.mock("../db/client", async (importOriginal) => ({
 vi.mock("./briefing", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./briefing")>()),
   briefing: mocks.briefing,
+}));
+vi.mock("./search", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./search")>()),
+  search: mocks.search,
 }));
 vi.mock("./project-resolver", () => ({
   mustResolve: vi.fn(async () => ({ id: 42, slug: "repo", name: "repo", user_id: 9 })),
@@ -68,6 +74,7 @@ const getContext = (params: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
   mocks.briefing.mockResolvedValue(CROWDED);
+  mocks.search.mockResolvedValue([]);
   db.all.mockResolvedValue([]);
   db.run.mockResolvedValue(0);
 });
@@ -79,6 +86,52 @@ describe("getContext's two shapes", () => {
     const sent = JSON.stringify(full).replaceAll(/"\w+":\[\],?/g, "");
     expect(sent.length).toBeLessThanOrEqual(BRIEFING_MAX_CHARS);
     expect(full.condensed_tasks).not.toEqual([]);
+  });
+
+  const note = (over: object) => ({
+    id: 5,
+    kind: "gotcha",
+    title: "Lock the table",
+    body: "because it deadlocks",
+    created_at: "2026-11-24T00:00:00Z",
+    updated_at: "2026-11-24T00:00:00Z",
+    ...over,
+  });
+  const withNote = (over: object) =>
+    mocks.briefing.mockResolvedValue({ ...CROWDED, project_context: [note(over)] });
+
+  it("gives the opening to a session whose focus reached a note", async () => {
+    withNote({ matched: true });
+    const { opening, files, stale_refs } = await getContext({ shape: "opening", focus: "lock the table" });
+    expect(opening).toContain("because it deadlocks");
+    expect(String(opening).length).toBeLessThanOrEqual(8_000);
+    expect(files).toEqual([]);
+    expect(stale_refs).toEqual([]);
+  });
+
+  it.each([
+    ["the focus reached nothing", { matched: false }, { shape: "opening", focus: "xylophone" }],
+    ["there was no focus", {}, { shape: "opening" }],
+    ["everything was asked for", { matched: true }, { shape: "full", focus: "lock the table" }],
+    ["an older client named no shape", { matched: true }, { focus: "lock the table" }],
+  ])("gives everything when %s, without the opening's flag", async (_when, over, params) => {
+    withNote(over);
+    const full = await getContext(params);
+    expect(full).not.toHaveProperty("opening");
+    expect(full.open_tasks).not.toEqual([]);
+    expect((full.project_context as object[])[0]).not.toHaveProperty("matched");
+  });
+
+  it("keeps a session's linked files to be hashed though it is not shown them", async () => {
+    const files = [{ id: 7, path: "/repo/a.ts", hash: null }];
+    mocks.briefing.mockResolvedValue({
+      ...CROWDED,
+      open_tasks: [{ ...task(1), files }],
+      project_context: [note({ matched: true })],
+    });
+    const answer = await getContext({ shape: "opening", focus: "lock" });
+    expect(answer.files).toEqual(files);
+    expect(answer.opening).not.toContain("/repo/a.ts");
   });
 
   it("renders the digest from everything open, not from what the ceiling left", async () => {

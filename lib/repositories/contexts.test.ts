@@ -44,6 +44,12 @@ describe("the parameters it takes", () => {
     expect(count(FOCUSED)).toBe(count(PROJECT) + 2);
   });
 
+  it("says which notes the focus reached, by the stripped match and only with one", () => {
+    expect(FOCUSED).toMatch(/@@ q\.en OR .*@@ q\.tr\) AS matched/);
+    expect(FOCUSED).not.toMatch(/_all\) AS matched/);
+    expect(PROJECT).not.toContain("matched");
+  });
+
   it("binds the row ceiling and the byte budget rather than writing them in", () => {
     expect(PROJECT).toContain("rn <= ?");
     expect(PROJECT).toContain("coalesce(spent_before, 0) < ?");

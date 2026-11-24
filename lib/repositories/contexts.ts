@@ -1,6 +1,6 @@
 import { DEVELOPER_KINDS, type ContextKind } from "../constants";
 import { all, one, run, setClause, type Statement } from "../db/client";
-import { document, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
+import { document, matches, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
 import type { Context } from "../types";
 import { now } from "../util/time";
 
@@ -50,6 +50,13 @@ export type BriefingNote = {
    */
   created_at: string;
   updated_at: string;
+  /**
+   * Whether the focus reached this note, present only when one was sent. Not
+   * the rank being above zero: that is taken over everything the caller typed,
+   * and a stopword of one language is a word of the other, so nearly every note
+   * ranks. This is the stripped match `search` decides by.
+   */
+  matched?: boolean;
 };
 
 /** `null` means the account-wide scope, which is a real scope here, not "no
@@ -183,6 +190,7 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
 
   return `${relevance} ranked AS (
        SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at,
+              ${focused ? `${matches(doc)} AS matched,` : ``}
               row_number() OVER (ORDER BY ${order}) AS rn
          FROM ${focused ? `q CROSS JOIN contexts c` : `contexts c`}
          ${joins}
@@ -196,7 +204,7 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
               ) AS spent_before
          FROM ranked
      )
-     SELECT id, kind, title, created_at, updated_at,
+     SELECT id, kind, title, created_at, updated_at, ${focused ? `matched,` : ``}
             CASE WHEN rn <= ? AND coalesce(spent_before, 0) < ? THEN body END AS body
        FROM spent ORDER BY rn`;
 }
