@@ -8,7 +8,7 @@
 # developer a blocked turn. Every failure inside the script exits 0 as well.
 if ! command -v node >/dev/null 2>&1; then
   if [ "$1" = "session-start" ]; then
-    echo "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on every task it names."
+    echo "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on each task with handoff_missing."
   fi
   exit 0
 fi

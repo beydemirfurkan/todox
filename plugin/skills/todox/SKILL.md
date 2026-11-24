@@ -66,7 +66,7 @@ this session and what each still lacks; work through it, in this order:
    'doing' and not finished goes back to 'todo' or 'blocked' -- a task left
    'doing' by a session that ended is the log going stale.
 2. log_entry(kind:'dead_end') for each failed approach not yet logged.
-3. log_entry(kind:'handoff') on every task you touched -- state, next step,
+3. log_entry(kind:'handoff') on each with handoff_missing -- state, next step,
    what to watch -- enough for a fresh session to continue without asking.
 Not finished until all three are done.
 

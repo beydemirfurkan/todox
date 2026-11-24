@@ -743,6 +743,15 @@ describe("instructions", () => {
    * bytes on 2026-09-15) so a sentence can still be added, and a paragraph
    * cannot be.
    */
+  it("asks for a handoff only where session_status says one is missing", () => {
+    // Told to write one on every task it touched, an agent wrote the same
+    // handoff again on a task session_status had already cleared.
+    for (const local of [true, false]) {
+      expect(instructions({ local })).toMatch(/log_entry\(kind:'handoff'\) on each with handoff_missing/);
+      expect(instructions({ local })).not.toMatch(/handoff'\) on every task/);
+    }
+  });
+
   it("stays under a byte ceiling on both transports", () => {
     expect(Buffer.byteLength(instructions({ local: false }))).toBeLessThanOrEqual(5120);
     expect(Buffer.byteLength(instructions({ local: true }))).toBeLessThanOrEqual(4608);

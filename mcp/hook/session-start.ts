@@ -9,11 +9,11 @@ import type { HookContext, HookOutput } from "./types";
  * that is the agent's call, made with get_context).
  */
 export const REMINDER =
-  "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on every task it names.";
+  "todox is connected. Before non-trivial work: get_context with cwd (it registers a new repo by itself). Before finishing: session_status with cwd, then update_task, dead_ends and a handoff on each task with handoff_missing.";
 
 /** Said above an injected briefing, so the agent knows nobody has to fetch it. */
 export const PREAMBLE =
-  "todox fetched this project's briefing for you (digest; get_context with a focus has the bodies). Before finishing: session_status with cwd, then a handoff on every task it names.";
+  "todox fetched this project's briefing for you (digest; get_context with a focus has the bodies). Before finishing: session_status with cwd, then a handoff on each task with handoff_missing.";
 
 /**
  * The digest's ceiling. Claude Code injects at most 10,000 characters of a
