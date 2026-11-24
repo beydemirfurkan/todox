@@ -335,7 +335,7 @@ the line to add instead.
 | `get_context` | **Call first.** Rules, decisions, dead ends, open tasks and stale-file warnings for a project. Pass `focus` to spend the budget on what matters for this session. Kept under about 40,000 characters; `shape: "digest"` returns a shorter plain-text version. |
 | `get_developer` | Who the developer is: profile, standing rules, projects and the last 30 days. No project needed. |
 | `create_task` | Capture work that will outlive this session. Warns about related dead ends. |
-| `update_task` | Status, title, body, priority. `doing` and `done` are where durations come from. |
+| `update_task` | Status, title, body, priority. `doing` and `done` are where durations come from. `doing` answers with the task's last handoff, dead ends and open questions. |
 | `log_entry` | Add a decision, dead end, question, handoff or note. `answers_entry_id` closes a question. |
 | `delete_entry` | Remove an entry that was wrong when written. |
 | `activity_report` | What got done in a period, with durations and models. `format: "markdown"` for a status update. |

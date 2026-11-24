@@ -385,6 +385,15 @@ describe("the payload the agent receives", () => {
     expect(payloadOf(result)).toEqual({ id: 4185, task_id: 7, kind: "note", hint: "open with a headline" });
   });
 
+  it("hands over a started task's log, and nothing else of the row", async () => {
+    const resume = { log: [{ id: 1, kind: "handoff", date: "2026-11-24", body: "where it was left" }] };
+    const answer = { id: 7, status: "doing", title: "t", body: "long", resume };
+    const result = await harness(remoteWs, answer)
+      .tools.get("update_task")!
+      .handler({ task_id: 7, status: "doing" });
+    expect(payloadOf(result)).toEqual({ id: 7, status: "doing", resume });
+  });
+
   it("says a note went account-wide", async () => {
     const answer = { id: 9, kind: "gotcha", project_id: null, title: "t", body: "b" };
     const result = await harness(remoteWs, answer)

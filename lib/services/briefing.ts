@@ -327,7 +327,7 @@ export function authorLabel(row: {
  * work (dogfood 2026-11-22). The reader's own lines go without: on a solo
  * project that is every line, and the bytes would buy nothing.
  */
-function attributed(row: BriefingEntryRow, viewerId: number): BriefingEntry {
+export function attributed(row: BriefingEntryRow, viewerId: number): BriefingEntry {
   const { user_id, author, model, author_name, ...entry } = row;
   if (user_id == null || user_id === viewerId) return entry;
   return { ...entry, by: authorLabel({ author, model, author_name }) };
