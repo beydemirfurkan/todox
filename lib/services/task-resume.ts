@@ -25,8 +25,13 @@ export const RESUME_MAX_CHARS = 1_500;
 const KINDS = ["handoff", "dead_end", "question", "decision"] as const;
 const PER_KIND = { handoff: 1, dead_end: 3, question: 2, decision: 2 } as const;
 
-/** Read, not sent: enough that no record short enough to fit arrives without its body. */
-const READ_BYTES = 4 * RESUME_MAX_CHARS;
+/**
+ * No budget on the read: it is eight rows at most, and the ceiling is applied
+ * when they are fitted. The query pays for whichever body crosses its budget
+ * and nulls the ones after it, so one long handoff would otherwise take the
+ * bodies of the short dead ends that do fit.
+ */
+const READ_BYTES = Number.MAX_SAFE_INTEGER;
 
 /** Whole (`body`) or its first line (`head`), never part of a body and never both. */
 export type ResumeRecord = { id: number; kind: string; date: string; by?: string } & (

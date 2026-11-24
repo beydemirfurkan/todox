@@ -57,7 +57,26 @@ describe("taskResume", () => {
     expect((await taskResume(ME, 7))!.log[0]).toMatchObject({ by: "Mert's agent (claude-opus-5)" });
   });
 
-  it("sends a head for a body the query's own budget did not read", async () => {
+  it("keeps a short dead end whole under a handoff too long to send", async () => {
+    // The query's rule, not a fixture: the row that crosses the budget is paid
+    // for and every body after it is null. Any budget the handoff could cross
+    // would cost the dead end its body.
+    const rows = [entry(1, "handoff", "x".repeat(90_000)), entry(2, "dead_end", "tried it, locks the table")];
+    mocks.page.mockImplementation(async (_ids, _kinds, _perKind, budget: number) => {
+      let spent = 0;
+      const read = rows.map((r) => {
+        const body = spent < budget ? r.body : null;
+        spent += r.body!.length;
+        return { ...r, body };
+      });
+      return { rows: new Map([[7, read]]), bodiesOmitted: 0 };
+    });
+    const { log } = (await taskResume(ME, 7))!;
+    expect(log[0]).toMatchObject({ id: 1, head: "head 1" });
+    expect(log[1]).toMatchObject({ id: 2, body: "tried it, locks the table" });
+  });
+
+  it("sends a head for a body that did not come back", async () => {
     answering(entry(1, "handoff", null));
     expect(await taskResume(ME, 7)).toEqual({
       log: [{ id: 1, kind: "handoff", date: "2026-11-24", head: "head 1" }],
