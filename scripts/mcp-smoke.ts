@@ -386,21 +386,27 @@ async function runSuite(mode: Mode, token: string) {
   console.log("status:", full.status, "| entries:", full.entries.length);
 
   console.log("\n--- what this session still owes ---");
-  // The task was moved twice and written on once, and none of it was a
-  // handoff: it is this session's and a handoff is owed on it. `cwd` alone
-  // has to be enough, because this is the call made at the moment the
-  // habit gets dropped.
+  // Closed: this session's, and nobody is going to resume it.
+  const finished = JSON.parse(await text("session_status", { cwd: SCRATCH }));
+  const finishedTask = finished.yours.find((t: { id: number }) => t.id === taskId);
+  if (finishedTask?.status !== "done" || finishedTask.handoff_missing !== false)
+    throw new Error(`a closed task should owe no handoff, got ${JSON.stringify(finished.yours)}`);
+
+  // Parked instead: it was started and written on, and none of it was a
+  // handoff, so one is owed. `cwd` alone has to be enough, because this is
+  // the call made at the moment the habit gets dropped.
+  await text("update_task", { task_id: taskId, status: "blocked", model: MODEL });
   const owed = JSON.parse(await text("session_status", { cwd: SCRATCH }));
   const owedTask = owed.yours.find((t: { id: number }) => t.id === taskId);
-  if (!owedTask || owedTask.status !== "done" || owedTask.handoff_missing !== true)
+  if (!owedTask || owedTask.status !== "blocked" || owedTask.handoff_missing !== true)
     throw new Error(
-      `session_status should list #${taskId} as done and owed a handoff, got ${JSON.stringify(owed.yours)}`,
+      `session_status should list #${taskId} as blocked and owed a handoff, got ${JSON.stringify(owed.yours)}`,
     );
   if (!owed.hint.includes(`#${taskId}`) || !/handoff/.test(owed.hint))
     throw new Error(`session_status hint should name #${taskId} and ask for a handoff: ${owed.hint}`);
   console.log("owed:", owed.yours.length, "| hint:", owed.hint.slice(0, 60) + "…");
 
-  const echoed = "SMOKE: done; nothing left to continue.";
+  const echoed = "SMOKE: parked; the next step is to close it.";
   const receipt = await text("log_entry", { task_id: taskId, kind: "handoff", body: echoed, model: MODEL });
   if (receipt.includes(echoed) || receipt.length > 200)
     throw new Error(`log_entry answered with more than a receipt: ${receipt}`);
@@ -415,11 +421,11 @@ async function runSuite(mode: Mode, token: string) {
   if (afterHandoff.hint.includes(`#${taskId}`))
     throw new Error(`the hint should stop naming #${taskId} once its handoff is written: ${afterHandoff.hint}`);
   // Parking a task is how a written-up session ends, not more work on it.
-  await text("update_task", { task_id: taskId, status: "blocked", model: MODEL });
-  await text("update_task", { task_id: taskId, status: "done", model: MODEL });
+  await text("update_task", { task_id: taskId, status: "todo", model: MODEL });
   const parked = JSON.parse(await text("session_status", { cwd: SCRATCH }));
   if (parked.yours.find((t: { id: number }) => t.id === taskId)?.handoff_missing !== false)
     throw new Error("moving a task after its handoff asked for the handoff again");
+  await text("update_task", { task_id: taskId, status: "done", model: MODEL });
   console.log("cleared: handoff_missing =", cleared.handoff_missing);
 
   console.log("\n--- linked files ---");

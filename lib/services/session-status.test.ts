@@ -177,6 +177,20 @@ describe("what is yours", () => {
     expect(hint).not.toMatch(/handoff/);
   });
 
+  it.each(["done", "dropped"])("owes nothing on a task that ended %s, with or without a handoff", async (status) => {
+    // Nobody resumes it. Of 234 tasks handed over in a session, 81 were closed
+    // in that same session (2026-11-24): words written for no reader.
+    mocks.touchedByUserSince.mockResolvedValue([task(1, status, 1)]);
+    mocks.eventActivity.mockResolvedValue(
+      events([
+        [1, { latest_at: ago(1), latest_to_status: status, last_by_user_at: ago(1), last_doing_by_user_at: ago(2) }],
+      ]),
+    );
+    const { yours, hint } = await sessionStatus(ME, PROJECT);
+    expect(yours[0]!.handoff_missing).toBe(false);
+    expect(hint).not.toMatch(/handoff/);
+  });
+
   it("owes a handoff when the task was started again after the last one", async () => {
     mocks.touchedByUserSince.mockResolvedValue([task(1, "blocked", 1)]);
     mocks.eventActivity.mockResolvedValue(
@@ -314,7 +328,7 @@ describe("the hint", () => {
     );
     const { hint } = await sessionStatus(ME, PROJECT);
     expect(hint).toMatch(/Still 'doing' from this session: #1\./);
-    expect(hint).toMatch(/No handoff since you last touched: #1\./);
+    expect(hint).toMatch(/Unfinished with no handoff since you worked on it: #1\./);
     expect(hint).not.toMatch(/#2/);
     expect(hint).toMatch(/7\+ days with nothing logged: #9\./);
   });
