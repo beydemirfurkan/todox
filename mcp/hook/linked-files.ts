@@ -27,8 +27,8 @@ interface LinkedTask {
 
 /** The linked files of each open task, as the full briefing hands them out. */
 export function linkedTasks(brief: unknown): LinkedTask[] {
-  const open = (brief as { open_tasks?: unknown } | null)?.open_tasks;
-  if (!Array.isArray(open)) return [];
+  const tiers = brief as { open_tasks?: unknown; condensed_tasks?: unknown } | null;
+  const open = [tiers?.open_tasks, tiers?.condensed_tasks].flatMap((tier) => (Array.isArray(tier) ? tier : []));
   return open.flatMap((t: { id?: unknown; title?: unknown; files?: unknown }) => {
     if (typeof t?.id !== "number" || !Array.isArray(t.files)) return [];
     const refs = t.files

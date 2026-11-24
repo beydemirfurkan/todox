@@ -445,6 +445,14 @@ describe("reporting what a linked file hashes to", () => {
   const reports = (calls: { method: string }[]) =>
     calls.filter((c) => c.method === "reportRefs").length;
 
+  it("hashes the files of a task the ceiling condensed to a line", async () => {
+    // A task nobody hashes goes stale in silence, whichever list it came in.
+    const { open_tasks, ...rest } = briefing("a".repeat(64));
+    const { tools, calls } = harness(localWs, { ...rest, open_tasks: [], condensed_tasks: open_tasks });
+    await tools.get("get_context")!.handler({ cwd: "/repo/src" });
+    expect(reports(calls)).toBe(1);
+  });
+
   it("reports a file the first time it sees it, then stays quiet", async () => {
     const { tools, calls } = harness(localWs, briefing("a".repeat(64)));
     const get = () => tools.get("get_context")!.handler({ cwd: "/repo/src" });
