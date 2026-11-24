@@ -37,6 +37,7 @@ import * as observationsRepo from "../../lib/repositories/observations";
 import * as projectsRepo from "../../lib/repositories/projects";
 import * as usersRepo from "../../lib/repositories/users";
 import { briefing } from "../../lib/services/briefing";
+import { fitToCeiling } from "../../lib/services/briefing-ceiling";
 import { renderDigest } from "../../lib/services/briefing-digest";
 import { invoke } from "../../lib/services/rpc";
 import { search } from "../../lib/services/search";
@@ -461,7 +462,10 @@ async function reportLogGrowth(
       0,
     );
     console.log(
-      row(`${brief.open_tasks.length}`, `${kb(log).padStart(9)} ${kb(bytes(brief)).padStart(11)}`),
+      row(
+        `${brief.open_tasks.length}`,
+        `${kb(log).padStart(9)} ${kb(bytes(brief)).padStart(11)} ${kb(bytes(fitToCeiling(brief))).padStart(11)} sent`,
+      ),
     );
   }
 

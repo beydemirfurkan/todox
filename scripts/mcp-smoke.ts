@@ -189,6 +189,7 @@ const BRIEFING_LISTS = [
   "project_context",
   "open_tasks",
   "idle_tasks",
+  "condensed_tasks",
   "observations",
   "stale_refs",
   "notes",
@@ -206,6 +207,9 @@ function readBriefing(raw: string): string {
   if (!raw.startsWith("{")) return raw;
   if (raw.includes("\n")) throw new Error("get_context answered with indented JSON");
   if (raw.includes(":[]")) throw new Error(`get_context sent an empty list: ${raw.slice(0, 200)}`);
+  // The ceiling and the client fields appended after it; Claude Code refuses
+  // a result somewhere above 47,000 characters and the agent reads none of it.
+  if (raw.length > 45_000) throw new Error(`get_context answered with ${raw.length} characters`);
   const brief = JSON.parse(raw) as Record<string, unknown>;
   for (const key of BRIEFING_LISTS) brief[key] ??= [];
   for (const task of brief.open_tasks as Record<string, unknown>[])

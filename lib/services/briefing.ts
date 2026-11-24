@@ -113,8 +113,9 @@ const PER_KIND = { handoff: 1, decision: 3, dead_end: 3, question: 3 } as const;
  * at 48 open tasks 77.9 KB of the log section is heads and metadata, and no
  * budget here touches that. It is bounded only by BRIEFING_TASKS times
  * PER_KIND times HEAD_CHARS. Task bodies were the other unbounded axis until
- * `BRIEFING_TASK_BYTES` below; the heads remain, real and smaller than what
- * the budgets fixed.
+ * `BRIEFING_TASK_BYTES` below; the heads remain, and on a project with 28 live
+ * tasks they took the payload past what Claude Code accepts. They are bounded
+ * on the whole payload instead: `BRIEFING_MAX_CHARS` in `briefing-ceiling.ts`.
  */
 /**
  * HALVED, all three budgets at once, 2026-09-12, on the developer's word

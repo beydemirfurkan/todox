@@ -43,6 +43,12 @@ describe("linkedTasks", () => {
     ]);
   });
 
+  it("collects from the tasks the ceiling condensed to a line as well", () => {
+    const condensed = { condensed_tasks: BRIEF.open_tasks };
+    expect(linkedTasks({ open_tasks: [], ...condensed })).toEqual(linkedTasks(BRIEF));
+    expect(linkedTasks(condensed)).toEqual(linkedTasks(BRIEF));
+  });
+
   it("reads nothing out of an answer that is not a briefing", () => {
     expect(linkedTasks(null)).toEqual([]);
     expect(linkedTasks({ open_tasks: "no" })).toEqual([]);

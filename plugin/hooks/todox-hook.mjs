@@ -558,8 +558,8 @@ async function sessionEnd(ctx) {
 var REPORT_BUDGET_MS = 3e3;
 var NAMED = 8;
 function linkedTasks(brief) {
-  const open = brief?.open_tasks;
-  if (!Array.isArray(open)) return [];
+  const tiers = brief;
+  const open = [tiers?.open_tasks, tiers?.condensed_tasks].flatMap((tier) => Array.isArray(tier) ? tier : []);
   return open.flatMap((t) => {
     if (typeof t?.id !== "number" || !Array.isArray(t.files)) return [];
     const refs = t.files.filter((f) => typeof f?.id === "number" && typeof f?.path === "string").map((f) => ({

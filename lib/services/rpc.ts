@@ -8,6 +8,7 @@ import * as refsRepo from "../repositories/refs";
 import * as tasksRepo from "../repositories/tasks";
 import * as toolUsage from "../repositories/tool-usage";
 import { briefing } from "./briefing";
+import { fitToCeiling, type Fitted } from "./briefing-ceiling";
 import { renderDigest, type Briefing } from "./briefing-digest";
 import { developerBrief, renderDeveloper } from "./developer";
 import { fileContext } from "./file-context";
@@ -732,12 +733,15 @@ const EMPTY_PROJECT_DAYS = 7;
  * The full briefing, or its digest when the caller asked for one. The digest
  * replaces the payload rather than riding beside it: a caller that asked for
  * text under a ceiling is a caller the JSON is too big for.
+ *
+ * The full shape is fitted here and not inside `briefing()`, so the digest is
+ * cut from everything that is open rather than from what a larger ceiling left.
  */
 function shapeBriefing(
   brief: Briefing,
   p: { shape?: "full" | "digest"; max_chars?: number },
-): Briefing | { digest: string; chars: number; dropped: Record<string, number> } {
-  if (p.shape !== "digest") return brief;
+): Fitted<Briefing> | { digest: string; chars: number; dropped: Record<string, number> } {
+  if (p.shape !== "digest") return fitToCeiling(brief);
   const { text, chars, dropped } = renderDigest(brief, p.max_chars);
   return { digest: text, chars, dropped };
 }
