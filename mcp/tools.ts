@@ -609,6 +609,13 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
        * plain paths here and a local process attaches the hashes.
        */
       overrides?: z.ZodRawShape;
+      /**
+       * Sent unless the agent named them, and dropped for a server that refuses
+       * them. The stdio package updates itself from the latest release while a
+       * self-hosted server waits for somebody, and a default nobody asked for
+       * must not be what stops a call from being answered.
+       */
+      defaults?: Record<string, unknown>;
       /** Last chance to add what only this side knows, before the call goes out. */
       prepare?: (params: Record<string, unknown>) => Record<string, unknown>;
       /** Runs on the result, and may call back to the server. */
@@ -697,7 +704,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       if (opts.prepare) params = opts.prepare(params);
 
       try {
-        const result = await invoke(method, params);
+        const result = await invokeWithDefaults(method, params, opts.defaults);
         const settled = opts.after ? await opts.after(result, invoke) : result;
         const shaped = opts.transform ? await opts.transform(settled, args) : settled;
         return typeof shaped === "string" ? plain(shaped) : ok(shaped);
@@ -705,6 +712,21 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
         return fail((e as Error).message);
       }
     });
+  }
+
+  async function invokeWithDefaults(
+    method: MethodName,
+    params: Record<string, unknown>,
+    defaults: Record<string, unknown> = {},
+  ): Promise<unknown> {
+    try {
+      return await invoke(method, { ...defaults, ...params });
+    } catch (e) {
+      const ours = Object.keys(defaults).filter((key) => params[key] === undefined);
+      const { message } = e as Error;
+      if (!message.startsWith("invalid params") || !ours.some((key) => message.includes(key))) throw e;
+      return invoke(method, params);
+    }
   }
 
   /**
@@ -839,7 +861,7 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
       // becomes this project's identity for good. So locally it is not asked.
       localInternal: ["repo_url"],
       after: checkLinkedFiles,
-      prepare: (p) => ({ shape: "opening", ...p }),
+      defaults: { shape: "opening" },
       transform: async (result, _args) => {
         const digest = digestText(result);
         if (digest) return digest;
