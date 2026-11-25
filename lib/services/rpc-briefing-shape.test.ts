@@ -93,6 +93,7 @@ describe("getContext's two shapes", () => {
     kind: "gotcha",
     title: "Lock the table",
     body: "because it deadlocks",
+    is_close: true,
     created_at: "2026-11-24T00:00:00Z",
     updated_at: "2026-11-24T00:00:00Z",
     ...over,
@@ -112,7 +113,7 @@ describe("getContext's two shapes", () => {
   it.each([
     ["the focus reached nothing", { matched: false }, { shape: "opening", focus: "xylophone" }],
     ["there was no focus", {}, { shape: "opening" }],
-    ["everything was asked for", { matched: true, relevance: 0.3 }, { shape: "full", focus: "lock the table" }],
+    ["everything was asked for", { matched: true, relevance: 0.3, is_close: true }, { shape: "full", focus: "lock the table" }],
     ["an older client named no shape", { matched: true }, { focus: "lock the table" }],
   ])("gives everything when %s, without the opening's flag", async (_when, over, params) => {
     withNote(over);
@@ -121,6 +122,7 @@ describe("getContext's two shapes", () => {
     expect(full.open_tasks).not.toEqual([]);
     expect((full.project_context as object[])[0]).not.toHaveProperty("matched");
     expect((full.project_context as object[])[0]).not.toHaveProperty("relevance");
+    expect((full.project_context as object[])[0]).not.toHaveProperty("is_close");
   });
 
   it("marks a pinned note in the full briefing, and only a pinned one", async () => {

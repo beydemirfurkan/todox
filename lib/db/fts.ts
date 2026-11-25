@@ -185,17 +185,57 @@ export const TSQUERY_FROM = `FROM (
                ON tur.ord = eng.ord
          ) cleaned`;
 
+/** A document's two vectors, as the SQL that names or computes them. */
+export type Vectors = Record<FtsConfig, string>;
+
+const vectorsOf = (doc: string): Vectors => ({ english: vector("english", doc), turkish: vector("turkish", doc) });
+
+/**
+ * A document's vectors computed once per row, as `alias.english` and
+ * `alias.turkish`, for a query that asks several things of each row. Only where
+ * no index could have answered: an expression index is on the expression, and
+ * this hides it. `OFFSET 0` keeps the planner from inlining it back.
+ */
+export const vectorsOnce = (doc: string, alias: string): string =>
+  `CROSS JOIN LATERAL (SELECT ${CONFIGS.map((c) => `${vector(c, doc)} AS ${c}`).join(", ")} OFFSET 0) ${alias}`;
+
+export const vectorColumns = (alias: string): Vectors => ({ english: `${alias}.english`, turkish: `${alias}.turkish` });
+
 /** Does this document match either way of asking? Needs `q` in scope. */
-export const matches = (doc: string): string =>
-  `(${vector("english", doc)} @@ q.en OR ${vector("turkish", doc)} @@ q.tr)`;
+export const matches = (doc: string | Vectors): string => {
+  const on = typeof doc === "string" ? vectorsOf(doc) : doc;
+  return `(${on.english} @@ q.en OR ${on.turkish} @@ q.tr)`;
+};
 
 /**
  * How well it matches, taking the better of the two configurations. Needs `q`
  * in scope. Zero for a document that matches neither, which is what lets a
  * ranked ordering fall back to whatever it was sorted by before.
  */
-export const rank = (doc: string): string =>
-  `greatest(ts_rank(${vector("english", doc)}, q.en_all), ts_rank(${vector("turkish", doc)}, q.tr_all))`;
+export const rank = (doc: string | Vectors): string => {
+  const on = typeof doc === "string" ? vectorsOf(doc) : doc;
+  return `greatest(ts_rank(${on.english}, q.en_all), ts_rank(${on.turkish}, q.tr_all))`;
+};
+
+/**
+ * Whether a document matches closely rather than in passing: the query names a
+ * word of its title, or shares `terms` different words with it -- all of them,
+ * when the query has fewer. Needs `q` in scope, like `matches`.
+ *
+ * `rank` cannot say this. Terms are joined with OR, so one common word repeated
+ * through a long document outranks three different ones in a short one.
+ */
+export const matchesClosely = (title: string, doc: Vectors, terms: number): string =>
+  `(${matches(title)} OR ${CONFIGS.map((config) => sharesTerms(`q.${config}_terms`, doc[config], terms)).join(" OR ")})`;
+
+const sharesTerms = (asked: string, on: string, terms: number): string =>
+  `(SELECT count(*) FROM unnest(tsvector_to_array(${on})) AS term WHERE term = ANY(${asked}))` +
+  ` >= greatest(1, least(${terms}, cardinality(${asked})))`;
+
+/** What `matchesClosely` needs of `q` beside `TSQUERY`: the query's own words. */
+export const TSQUERY_TERMS = CONFIGS.map(
+  (config) => `tsvector_to_array(${vector(config, "cleaned.text")}) AS ${config}_terms`,
+).join(", ");
 
 /** `idx_tasks_fts_english` and its five siblings, named the same way twice. */
 export const indexName = (table: SearchedTable, config: FtsConfig): string =>

@@ -13,6 +13,7 @@ const note = (id: number, over: object = {}) => ({
   title: `Note ${id}`,
   body: `body of ${id}`,
   matched: true,
+  is_close: true,
   created_at: "2026-11-20T00:00:00Z",
   updated_at: "2026-11-24T00:00:00Z",
   ...over,
@@ -72,20 +73,30 @@ describe("renderOpening", () => {
       ).text;
     expect(opened(0.3)).toContain("body of 50");
     expect(opened(0.3)).not.toContain("body of 5\n");
-    expect(opened(0.15)).not.toContain("body of 50");
+    expect(opened(0.1)).not.toContain("body of 50");
   });
 
-  it("leaves out a note that matches only in passing, title included", () => {
+  it("names a note that matches only in passing instead of sending it", () => {
     const { text, notes: shown } = renderOpening(
       brief({
-        project_context: [note(1, { relevance: 0.4 }), note(2, { relevance: 0.2 }), note(3, { relevance: 0.19 })],
+        project_context: [
+          note(1, { relevance: 0.4 }),
+          note(2, { relevance: 0.24 }),
+          note(3, { relevance: 0.23 }),
+          note(4, { relevance: 0.5, is_close: false }),
+          note(5, { relevance: 0.02 }),
+          note(6, { relevance: 0.01 }),
+        ],
       }),
       [],
     );
     expect(shown).toBe(2);
     expect(text).toContain("body of 2");
-    expect(text).not.toContain("Note 3");
-    expect(text).toContain("Not shown: 1 notes");
+    // Named, the best three of them: a title costs a line and a body a page.
+    for (const body of [3, 4, 5, 6]) expect(text).not.toContain(`body of ${body}`);
+    for (const named of [4, 3, 5]) expect(text).toContain(`Note ${named} (note ${named})`);
+    expect(text).not.toContain("Note 6");
+    expect(text).toContain("Not shown: 4 notes");
   });
 
   it("shows a pinned note whatever the focus, first, whole and once", () => {
@@ -107,7 +118,7 @@ describe("renderOpening", () => {
     expect(text.indexOf("write in Turkish")).toBeLessThan(text.indexOf("#31 Ship it"));
     // A pinned match still sets the bar for the others.
     expect(matched).toBe(1);
-    expect(text).not.toContain("Note 2");
+    expect(text).not.toContain("body of 2");
     expect(text).toContain("Not shown: 1 notes");
   });
 

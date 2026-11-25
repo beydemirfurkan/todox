@@ -1,6 +1,16 @@
 import { DEVELOPER_KINDS, type ContextKind } from "../constants";
 import { all, one, run, setClause, type Statement } from "../db/client";
-import { document, matches, rank, TSQUERY, TSQUERY_FROM } from "../db/fts";
+import {
+  document,
+  matches,
+  matchesClosely,
+  rank,
+  TSQUERY,
+  TSQUERY_FROM,
+  TSQUERY_TERMS,
+  vectorColumns,
+  vectorsOnce,
+} from "../db/fts";
 import type { Context } from "../types";
 import { now } from "../util/time";
 
@@ -57,6 +67,8 @@ export type BriefingNote = {
    * ranks. This is the stripped match `search` decides by.
    */
   matched?: boolean;
+  /** Matched by its title or by several different words, not by one in passing. */
+  is_close?: boolean;
   /** Shown to every session, whatever its focus. */
   is_pinned?: boolean;
   /** How well it matched, comparable across scopes; present beside `matched`. */
@@ -178,6 +190,7 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
       : `c.project_id = ? AND (p.user_id = ? OR pm.user_id IS NOT NULL)`;
 
   const doc = document("contexts", "c");
+  const onDoc = vectorColumns("v");
 
   // `ts_rank` straight in the window's ORDER BY, which does mean two tsvectors
   // per note in the project on the call every session opens with. Measured:
@@ -190,7 +203,7 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
   // the pre-filter filtered nothing. `db/fts.ts` has since made the match
   // selective, so that idea is now worth retrying; it is not done here because
   // the numbers above were taken before it and re-taking them is the work.
-  const relevance = focused ? `WITH q AS (SELECT ${TSQUERY} ${TSQUERY_FROM}),` : `WITH`;
+  const relevance = focused ? `WITH q AS MATERIALIZED (SELECT ${TSQUERY}, ${TSQUERY_TERMS} ${TSQUERY_FROM}),` : `WITH`;
   // Matched first, and not only ranked first. The rank is taken over everything
   // the caller typed, so a note sharing nothing but a stopword outranks a real
   // match often enough to spend the bytes it needed: 14 of 16 bench questions
@@ -198,15 +211,17 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
   const scored = focused
     ? `scored AS (
        SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at, c.is_pinned,
-              ${matches(doc)} AS matched, ${rank(doc)} AS relevance
+              ${matches(onDoc)} AS matched, ${rank(onDoc)} AS relevance,
+              CASE WHEN ${matches(onDoc)} THEN ${matchesClosely("c.title", onDoc, CLOSE_TERMS)} ELSE false END AS is_close
          FROM q CROSS JOIN contexts c
          ${joins}
+         ${vectorsOnce(doc, "v")}
         WHERE ${where}
      ),`
     : ``;
   const ranked = focused
     ? `SELECT *, row_number() OVER (
-              ORDER BY is_pinned DESC, matched DESC, relevance DESC, updated_at DESC, id DESC
+              ORDER BY is_pinned DESC, is_close DESC, matched DESC, relevance DESC, updated_at DESC, id DESC
             ) AS rn
          FROM scored`
     : `SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at, c.is_pinned,
@@ -226,10 +241,13 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
               ) AS spent_before
          FROM ranked
      )
-     SELECT id, kind, title, created_at, updated_at, is_pinned, ${focused ? `matched, relevance,` : ``}
+     SELECT id, kind, title, created_at, updated_at, is_pinned, ${focused ? `matched, relevance, is_close,` : ``}
             CASE WHEN rn <= ? AND coalesce(spent_before, 0) < ? THEN body END AS body
        FROM spent ORDER BY rn`;
 }
+
+/** Different words a note shares with a focus before it is more than a passing match. */
+const CLOSE_TERMS = 3;
 
 const DEVELOPER_KIND_LIST = DEVELOPER_KINDS.map((k) => `'${k}'`).join(", ");
 

@@ -42,20 +42,21 @@ export const OPENING_MAX_CHARS = 8_000;
 const MATCHED_NOTES = 5;
 const MATCHED_NOTE_BYTES = 5_120;
 
-/** Matching notes with no room, named by title: the one case a title is worth its line. */
-const MATCHED_TITLES = 5;
+/** Matching notes not sent whole, named by title: the one case a title is worth its line. */
+const MATCHED_TITLES = 3;
 
 /**
- * A note is shown if it matches at least this well beside the best one.
+ * A close match is sent whole if it ranks at least this well beside the best.
  *
  * One shared word is a match, and in a project about accounts nearly every note
- * says "account": five seats were always filled, the last of them by whatever
- * was left. On the bench, half takes 4.56 notes a question to 3.13 with no answer
- * lost, and 0.7 loses one. Real notes gain less, 4.98 to 4.22 over 41 focuses on
- * 21 notes: they share more words. Weighing terms by how rare they are was tried
- * as well, and lost answers at every cut.
+ * says "account". A share of the best rank alone sent 4.1 notes whole to a real
+ * focus none of them was about; asking that a match be close as well
+ * (`matchesClosely`) sends 2.5. On two projects the rule was not chosen on, 2.1
+ * became 0.2 and 2.6 became 0.8. No bench answer is lost, and a relevant note
+ * is whole or named for 24 of 29 labelled focuses where it was for 23, because
+ * what is not sent is named. One person wrote the labels (2026-11-25).
  */
-const WEAKEST_SHARE = 0.5;
+const WEAKEST_SHARE = 0.6;
 
 const IN_PROGRESS = 5;
 const QUESTIONS = 3;
@@ -84,13 +85,15 @@ export function hasMatchedNotes(brief: Briefing): boolean {
 
 export function renderOpening(brief: Briefing, deadEnds: RelatedDeadEnd[], maxChars = OPENING_MAX_CHARS): Opening {
   const pinned = pinnedNotes(brief);
-  const strong = strongMatches(brief).filter((n) => !pinned.includes(n));
+  const matched = matchedNotes(brief);
+  const strong = strongestOf(matched).filter((n) => !pinned.includes(n));
   const notes = inBudget(strong, MATCHED_NOTE_BYTES - bytesOf(pinned));
   const doing = brief.open_tasks.filter((t) => t.status === "doing").slice(0, IN_PROGRESS);
   const next = brief.open_tasks.filter((t) => !doing.includes(t)).slice(0, UP_NEXT);
   const head = header(brief);
   const foot = footer(brief, pinned.length + notes.length, doing.length + next.length);
-  const alsoMatch = strong.filter((n) => !notes.includes(n)).slice(0, MATCHED_TITLES);
+  const unsent = (from: Note[]) => from.filter((n) => !notes.includes(n) && !pinned.includes(n));
+  const alsoMatch = [...new Set([...unsent(strong), ...unsent(matched)])].slice(0, MATCHED_TITLES);
   const { lines } = fill(sections(brief, { pinned, notes, alsoMatch, doing, next, deadEnds }), maxChars - head.length - foot.length - 2);
   const text = [head, ...lines, foot].join("\n");
   return { text, chars: text.length, notes: notes.length };
@@ -98,13 +101,18 @@ export function renderOpening(brief: Briefing, deadEnds: RelatedDeadEnd[], maxCh
 
 const relevanceOf = (note: Note): number => note.relevance ?? 0;
 
-/** Both scopes together, best first, without the ones that match only in passing. */
-function strongMatches(brief: Briefing): Note[] {
-  const matched = [...brief.project_context, ...brief.global_context]
+/** Both scopes together, best first. */
+function matchedNotes(brief: Briefing): Note[] {
+  return [...brief.project_context, ...brief.global_context]
     .filter((n) => n.matched)
     .sort((a, b) => relevanceOf(b) - relevanceOf(a));
-  const weakest = WEAKEST_SHARE * (matched[0] ? relevanceOf(matched[0]) : 0);
-  return matched.filter((n) => relevanceOf(n) >= weakest);
+}
+
+/** Without the ones that match only in passing. */
+function strongestOf(matched: Note[]): Note[] {
+  const close = matched.filter((n) => n.is_close);
+  const weakest = WEAKEST_SHARE * (close[0] ? relevanceOf(close[0]) : 0);
+  return close.filter((n) => relevanceOf(n) >= weakest);
 }
 
 const bytesOf = (notes: Note[]): number => notes.reduce((n, note) => n + Buffer.byteLength(note.body ?? ""), 0);

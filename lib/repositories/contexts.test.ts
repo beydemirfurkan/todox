@@ -50,8 +50,15 @@ describe("the parameters it takes", () => {
   });
 
   it("pays for the pinned ones first, with a focus and without", () => {
-    expect(FOCUSED).toContain("ORDER BY is_pinned DESC, matched DESC");
+    expect(FOCUSED).toContain("ORDER BY is_pinned DESC, is_close DESC, matched DESC");
     for (const sql of [ACCOUNT, PROJECT]) expect(sql).toContain("ORDER BY c.is_pinned DESC, c.updated_at DESC");
+  });
+
+  it("calls a match close by its title or by three different words, and never by stopwords", () => {
+    expect(FOCUSED).toContain("to_tsvector('english', c.title) @@ q.en");
+    expect(FOCUSED).toContain("least(3, cardinality(q.turkish_terms))");
+    expect(FOCUSED).toContain("tsvector_to_array(to_tsvector('turkish', cleaned.text)) AS turkish_terms");
+    expect(PROJECT).not.toContain("is_close");
   });
 
   it("says which notes the focus reached, by the stripped match and only with one", () => {
