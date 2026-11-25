@@ -29,6 +29,8 @@ describe("update refinements cover every field they gate", () => {
     expect(() => parseParams("updateContext", { context_id: 1, kind: "gotcha" })).not.toThrow();
     expect(() => parseParams("updateContext", { context_id: 1, title: "x" })).not.toThrow();
     expect(() => parseParams("updateContext", { context_id: 1, body: "x" })).not.toThrow();
+    expect(() => parseParams("updateContext", { context_id: 1, is_pinned: false })).not.toThrow();
+    expect(() => parseParams("updateContext", { context_id: 1, is_pinned: "yes" })).toThrow();
   });
 
   it("still refuses a patch of nothing", () => {

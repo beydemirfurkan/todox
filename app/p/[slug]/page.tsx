@@ -20,6 +20,7 @@ import { repoLabel, repoLink } from "@/lib/util/paths";
 import {
   addContextAction,
   deleteContextAction,
+  setContextPinnedAction,
   updateContextAction,
 } from "../../actions";
 import { kindOptions } from "../../kinds";
@@ -296,7 +297,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
         </>
       )}
 
-      {tab === "notes" && <ProjectNotes slug={slug} notes={projectContext} t={t} />}
+      {tab === "notes" && <ProjectNotes slug={slug} notes={projectContext} t={t} isOwner={isOwner} />}
     </div>
   );
 }
@@ -482,10 +483,12 @@ function ProjectNotes({
   slug,
   notes,
   t,
+  isOwner,
 }: {
   slug: string;
   notes: Awaited<ReturnType<typeof contexts.listByProject>>;
   t: T;
+  isOwner: boolean;
 }) {
   return (
     <section aria-labelledby="notes-title" className="relative">
@@ -519,7 +522,11 @@ function ProjectNotes({
           <NoteGroups
             notes={notes}
             t={t}
-            actions={{ remove: deleteContextAction, update: updateContextAction }}
+            actions={{
+              remove: deleteContextAction,
+              update: updateContextAction,
+              pin: isOwner ? setContextPinnedAction : undefined,
+            }}
           />
         )}
       </div>

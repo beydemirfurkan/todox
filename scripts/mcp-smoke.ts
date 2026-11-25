@@ -1156,6 +1156,28 @@ async function runSuite(mode: Mode, token: string) {
   if (!unmatched.startsWith("{")) throw new Error(`a focus that matches nothing should get everything: ${unmatched.slice(0, 200)}`);
   if (!(await opener({})).startsWith("{")) throw new Error("no focus should get everything");
   if (unmatched.includes('"matched"')) throw new Error("the full briefing carries the opening's flag");
+
+  const pinnedRule = JSON.parse(
+    await text("add_context", {
+      cwd: SCRATCH,
+      kind: "convention",
+      title: "SMOKE-PINNED",
+      body: "SMOKE-PINNED-BODY: walrus.",
+    }),
+  );
+  if ((await opener({ focus: "run the zephyr migration" })).includes("SMOKE-PINNED-BODY"))
+    throw new Error("an unpinned note that shares nothing with the focus was shown");
+  await text("update_context", { context_id: pinnedRule.id, is_pinned: true });
+  if (!(await opener({ focus: "run the zephyr migration" })).includes("SMOKE-PINNED-BODY"))
+    throw new Error("a pinned note was not shown to a session it shares no words with");
+  const digested = await opener({ shape: "digest" });
+  if (!digested.includes("SMOKE-PINNED-BODY")) throw new Error("the digest does not carry the pinned note");
+  const lengthened = await client.callTool({
+    name: "update_context",
+    arguments: { context_id: pinnedRule.id, body: "x".repeat(501) },
+  });
+  if (!lengthened.isError) throw new Error("a pinned note was lengthened past its limit");
+  await text("delete_context", { context_id: pinnedRule.id });
   await text("delete_context", { context_id: matching.id });
   console.log(`opening: ${opening.length} characters`);
 

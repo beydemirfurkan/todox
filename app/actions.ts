@@ -21,6 +21,8 @@ import * as users from "@/lib/repositories/users";
 import type { TaskPatch } from "@/lib/repositories/tasks";
 import * as invitations from "@/lib/repositories/project-invitations";
 import * as collaboration from "@/lib/services/collaboration";
+import { updateContext } from "@/lib/services/context-service";
+import { BadRequest } from "@/lib/services/errors";
 import * as notificationService from "@/lib/services/notifications";
 import * as refs from "@/lib/repositories/refs";
 import {
@@ -565,8 +567,23 @@ export async function updateContextAction(fd: FormData) {
   const kind = str(fd, "kind");
   if (!title || !body) return;
   const patch = isContextKind(kind) ? { title, body, kind } : { title, body };
-  if (isDeveloperKind(patch.kind) && (await contexts.byId(id))?.project_id != null) return;
-  await contexts.update(id, patch);
+  await updateContext(user.id, id, patch);
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Shows a note to every session, or stops. A refusal is not an error page: the
+ * list behind the button was out of date, and reading it again says why.
+ */
+export async function setContextPinnedAction(fd: FormData) {
+  const user = await writingUser();
+  const id = num(fd, "context_id");
+  await assertCanModifyContext(user.id, id);
+  try {
+    await updateContext(user.id, id, { is_pinned: str(fd, "pinned") === "1" });
+  } catch (error) {
+    if (!(error instanceof BadRequest)) throw error;
+  }
   revalidatePath("/", "layout");
 }
 

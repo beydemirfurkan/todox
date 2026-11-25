@@ -1,3 +1,4 @@
+import { isDeveloperKind, PINNED_BODY_MAX, PINNED_PER_SCOPE } from "@/lib/constants";
 import type { T } from "@/lib/i18n";
 import { ago } from "@/lib/i18n";
 import type { Context } from "@/lib/types";
@@ -6,11 +7,13 @@ import { CONTEXT_KIND_COLOR, contextKindLabel } from "../kinds";
 import { groupNotes } from "../note-groups";
 import { Chip } from "./chip";
 
-/** What a row can do. `publish` is offered only on account-wide notes. */
+/** What a row can do. `publish` is offered only on account-wide notes, and
+ *  `pin` only to whoever may decide what every session in the scope is shown. */
 export interface NoteActions {
   remove: (formData: FormData) => Promise<void>;
   update: (formData: FormData) => Promise<void>;
   publish?: (formData: FormData) => Promise<void>;
+  pin?: (formData: FormData) => Promise<void>;
 }
 
 /**
@@ -37,12 +40,13 @@ export function NoteGroups({
   t: T;
   actions: NoteActions;
 }) {
+  const pinsLeft = PINNED_PER_SCOPE - notes.filter((n) => n.is_pinned).length;
   return (
     <div className="space-y-3">
       {groupNotes(notes).map((group) => (
         <ul key={group.kind} className="space-y-1.5">
           {group.shown.map((c) => (
-            <NoteRow key={c.id} note={c} t={t} actions={actions} />
+            <NoteRow key={c.id} note={c} t={t} actions={actions} pinsLeft={pinsLeft} />
           ))}
           {group.rest.length > 0 && (
             <li>
@@ -50,7 +54,7 @@ export function NoteGroups({
                 <summary className="link-more">{t("notesMore", { n: group.rest.length })}</summary>
                 <ul className="mt-1.5 space-y-1.5">
                   {group.rest.map((c) => (
-                    <NoteRow key={c.id} note={c} t={t} actions={actions} />
+                    <NoteRow key={c.id} note={c} t={t} actions={actions} pinsLeft={pinsLeft} />
                   ))}
                 </ul>
               </details>
@@ -62,7 +66,17 @@ export function NoteGroups({
   );
 }
 
-function NoteRow({ note, t, actions }: { note: Context; t: T; actions: NoteActions }) {
+function NoteRow({
+  note,
+  t,
+  actions,
+  pinsLeft,
+}: {
+  note: Context;
+  t: T;
+  actions: NoteActions;
+  pinsLeft: number;
+}) {
   const publishable = actions.publish && note.project_id === null;
   return (
     <li>
@@ -76,6 +90,7 @@ function NoteRow({ note, t, actions }: { note: Context; t: T; actions: NoteActio
           <span className="line-clamp-2 min-w-0 flex-1 basis-48 text-[14px] font-semibold break-words text-ink">
             {note.title}
           </span>
+          {note.is_pinned && <span className="mono shrink-0 text-meta text-accentInk">{t("pinned")}</span>}
           {publishable && note.is_public && (
             <span className="mono shrink-0 text-meta text-accentInk">{t("onProfile")}</span>
           )}
@@ -97,6 +112,7 @@ function NoteRow({ note, t, actions }: { note: Context; t: T; actions: NoteActio
                 </SubmitButton>
               </form>
             )}
+            {actions.pin && <PinControl note={note} t={t} pin={actions.pin} pinsLeft={pinsLeft} />}
             <form action={actions.remove}>
               <input type="hidden" name="context_id" value={note.id} />
               <SubmitButton className="link-more text-meta" pendingLabel={t("working")}>
@@ -108,6 +124,40 @@ function NoteRow({ note, t, actions }: { note: Context; t: T; actions: NoteActio
         </div>
       </details>
     </li>
+  );
+}
+
+/** The button, or in a line why there is none. */
+function PinControl({
+  note,
+  t,
+  pin,
+  pinsLeft,
+}: {
+  note: Context;
+  t: T;
+  pin: (formData: FormData) => Promise<void>;
+  pinsLeft: number;
+}) {
+  // Every session is shown these already.
+  if (isDeveloperKind(note.kind)) return null;
+  const refusal = note.is_pinned
+    ? null
+    : note.body.replaceAll("\r\n", "\n").length > PINNED_BODY_MAX
+      ? t("pinTooLong", { n: PINNED_BODY_MAX })
+      : pinsLeft <= 0
+        ? t("pinFull", { n: PINNED_PER_SCOPE })
+        : null;
+  if (refusal) return <span className="text-meta text-faint">{refusal}</span>;
+  return (
+    <form action={pin}>
+      <input type="hidden" name="context_id" value={note.id} />
+      <input type="hidden" name="pinned" value={note.is_pinned ? "0" : "1"} />
+      <SubmitButton className="link-more text-meta" pendingLabel={t("working")}>
+        {note.is_pinned ? t("unpinNote") : t("pinNote")}
+        <span className="sr-only"> — {note.title}</span>
+      </SubmitButton>
+    </form>
   );
 }
 
@@ -139,7 +189,13 @@ export function NoteEditor({
         </label>
         <label className="flex flex-col gap-1 text-meta text-faint">
           {t("noteBodyPh")}
-          <textarea name="body" defaultValue={note.body} required rows={5} />
+          <textarea
+            name="body"
+            defaultValue={note.body}
+            required
+            rows={5}
+            maxLength={note.is_pinned ? PINNED_BODY_MAX : undefined}
+          />
         </label>
         <div>
           <SubmitButton pendingLabel={t("saving")}>{t("save")}</SubmitButton>

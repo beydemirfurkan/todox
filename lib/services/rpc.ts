@@ -14,7 +14,7 @@ import { hasMatchedNotes, renderOpening } from "./briefing-opening";
 import { developerBrief, renderDeveloper } from "./developer";
 import { fileContext } from "./file-context";
 import { BadRequest } from "./errors";
-import { addContext } from "./context-service";
+import { addContext, developerKindInProject, updateContext } from "./context-service";
 import {
   assertCanModifyContext,
   assertContext,
@@ -73,13 +73,6 @@ type Handler = (ctx: RpcContext, params: Record<string, never>) => Promise<unkno
  * account-wide, where every project's briefing carries it. The refusal says
  * what to send instead rather than quietly dropping the project.
  */
-const developerKindInProject = (kind: string) =>
-  new BadRequest(
-    `a ${kind} note describes the developer, not a project: omit project and cwd ` +
-      "to write it account-wide, or use convention/preference for a project rule",
-    "developer_kind_in_project",
-  );
-
 const pickRef = (p: { project?: string; cwd?: string }) => {
   const ref = p.project ?? p.cwd;
   if (!ref) throw new BadRequest("pass either `project` or `cwd`", "no_ref");
@@ -548,16 +541,10 @@ export const methods = {
 
   updateContext: async (
     { userId },
-    p: { context_id: number; kind?: ContextKind; title?: string; body?: string },
+    p: { context_id: number; kind?: ContextKind; title?: string; body?: string; is_pinned?: boolean },
   ) => {
     const { context_id: id, ...patch } = p;
-    // `contexts.update` takes no user id -- this is the only thing standing
-    // between a context id off the wire and somebody else's note.
-    await assertCanModifyContext(userId, id);
-    if (isDeveloperKind(patch.kind) && (await contextsRepo.byId(id))?.project_id != null)
-      throw developerKindInProject(patch.kind);
-    await contextsRepo.update(id, patch);
-    return contextsRepo.byId(id);
+    return updateContext(userId, id, patch);
   },
 
   deleteContext: async ({ userId }, p: { context_id: number }) => {
@@ -768,7 +755,12 @@ type ShapedBriefing =
 
 /** What chose the opening; in a payload that shows everything it is only bytes. */
 function withoutMatched(brief: Briefing): Briefing {
-  const bare = <N extends { matched?: boolean; relevance?: number }>({ matched: _m, relevance: _r, ...note }: N) => note;
+  const bare = <N extends { matched?: boolean; relevance?: number; is_pinned?: boolean }>({
+    matched: _m,
+    relevance: _r,
+    is_pinned,
+    ...note
+  }: N) => ({ ...note, ...(is_pinned ? { is_pinned } : {}) });
   return { ...brief, global_context: brief.global_context.map(bare), project_context: brief.project_context.map(bare) };
 }
 

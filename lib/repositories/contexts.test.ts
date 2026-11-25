@@ -45,8 +45,13 @@ describe("the parameters it takes", () => {
   });
 
   it("spends the bodies on matches before anything that merely ranks", () => {
-    expect(FOCUSED).toContain("ORDER BY matched DESC, relevance DESC, updated_at DESC, id DESC");
-    expect(PROJECT).toContain("ORDER BY c.updated_at DESC, c.id DESC");
+    expect(FOCUSED).toContain("matched DESC, relevance DESC, updated_at DESC, id DESC");
+    expect(PROJECT).toContain("c.updated_at DESC, c.id DESC");
+  });
+
+  it("pays for the pinned ones first, with a focus and without", () => {
+    expect(FOCUSED).toContain("ORDER BY is_pinned DESC, matched DESC");
+    for (const sql of [ACCOUNT, PROJECT]) expect(sql).toContain("ORDER BY c.is_pinned DESC, c.updated_at DESC");
   });
 
   it("says which notes the focus reached, by the stripped match and only with one", () => {

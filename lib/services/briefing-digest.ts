@@ -1,3 +1,4 @@
+import { PINNED_PER_SCOPE } from "../constants";
 import type { briefing } from "./briefing";
 
 /**
@@ -100,12 +101,15 @@ function keptAny(lines: string[], section: Section): boolean {
 /** ORDERED: this is what survives a small ceiling first. */
 function sections(brief: Briefing): Section[] {
   const tasks = [...brief.open_tasks].sort((a, b) => doingFirst(a.status) - doingFirst(b.status));
+  const pinned = pinnedNotes(brief);
+  const unpinned = (notes: Note[]) => notes.filter((n) => !pinned.includes(n));
   return [
-    // First: what survives the smallest ceiling should be what was asked for.
+    // First, what binds any work; then what was asked for.
+    { name: "rules", heading: PINNED_HEADING, items: pinned.map(pinnedNote) },
     { name: "requests", heading: REQUESTS_HEADING, items: (brief.requested ?? []).map(requestLine) },
     { name: "developer notes", heading: "The developer (who they are, what they use, how they work):", items: brief.developer.map(developerLine) },
-    { name: "rules", heading: "Rules (account-wide):", items: brief.global_context.map(noteLine) },
-    { name: "rules", heading: "Rules (this project):", items: brief.project_context.map(noteLine) },
+    { name: "rules", heading: "Rules (account-wide):", items: unpinned(brief.global_context).map(noteLine) },
+    { name: "rules", heading: "Rules (this project):", items: unpinned(brief.project_context).map(noteLine) },
     { name: "tasks", heading: "Live tasks:", items: tasks.map(taskLines) },
     { name: "questions", heading: "Open questions:", items: entryLines(brief, "open_questions") },
     { name: "dead ends", heading: "Dead ends (tried, failed):", items: entryLines(brief, "dead_ends") },
@@ -116,6 +120,27 @@ function sections(brief: Briefing): Section[] {
     { name: "hint", heading: "Next:", items: brief.hint ? [clip(brief.hint, 1200)] : [] },
   ];
 }
+
+type Note = Briefing["project_context"][number];
+
+/** Said of the notes somebody chose to have every session see. */
+export const PINNED_HEADING = "Standing rules, shown to every session:";
+
+/** The rule is the body; the title only names it. */
+const PINNED_TITLE_CHARS = 120;
+
+/**
+ * Pinned notes, the project's before the account's. Counted again here though
+ * the write refuses a fourth: a merge moves one project's pins beside another's,
+ * and what is over the line then is an ordinary note until one is unpinned.
+ */
+export function pinnedNotes(brief: Pick<Briefing, "project_context" | "global_context">): Note[] {
+  const ofScope = (notes: Note[]) => notes.filter((n) => n.is_pinned && n.body !== null).slice(0, PINNED_PER_SCOPE);
+  return [...ofScope(brief.project_context), ...ofScope(brief.global_context)];
+}
+
+export const pinnedNote = (note: Note): string =>
+  `- [${note.kind}] ${clip(note.title, PINNED_TITLE_CHARS)} (note ${note.id})\n${note.body}`;
 
 const doingFirst = (status: string) => (status === "doing" ? 0 : 1);
 
