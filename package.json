@@ -35,7 +35,7 @@
     "bench:memory": "tsx scripts/memory-bench/index.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "next": "16.4.6",
     "nodemailer": "^10.1.4",
     "pg": "^8.23.0",
