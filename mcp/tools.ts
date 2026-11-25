@@ -236,7 +236,7 @@ export function skillDocument(): string {
  * `server.json` there. Three files, one release, one test that fails when
  * somebody bumps only two of them.
  */
-export const SERVER_INFO = { name: "todox", version: "0.1.8" } as const;
+export const SERVER_INFO = { name: "todox", version: "0.1.9" } as const;
 
 /** One line: a reader that is a model pays for indentation and gets nothing. */
 const ok = (data: unknown) => ({
