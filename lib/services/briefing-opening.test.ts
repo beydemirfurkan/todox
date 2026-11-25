@@ -88,6 +88,47 @@ describe("renderOpening", () => {
     expect(text).toContain("Not shown: 1 notes");
   });
 
+  it("shows a pinned note whatever the focus, first, whole and once", () => {
+    const { text, notes: matched } = renderOpening(
+      brief({
+        project_context: [
+          note(7, { is_pinned: true, matched: false, body: "never force push" }),
+          note(8, { is_pinned: true, matched: true, relevance: 0.4, body: "pinned and matching" }),
+          note(1, { relevance: 0.3 }),
+          note(2, { relevance: 0.1 }),
+        ],
+        global_context: [note(9, { is_pinned: true, matched: false, body: "write in Turkish" })],
+        requested: [{ id: 31, title: "Ship it", body: "today" }],
+      }),
+      [],
+    );
+    for (const body of ["never force push", "pinned and matching", "write in Turkish"])
+      expect(text.split(body)).toHaveLength(2);
+    expect(text.indexOf("write in Turkish")).toBeLessThan(text.indexOf("#31 Ship it"));
+    // A pinned match still sets the bar for the others.
+    expect(matched).toBe(1);
+    expect(text).not.toContain("Note 2");
+    expect(text).toContain("Not shown: 1 notes");
+  });
+
+  it("treats a fourth pin, which only a merge can make, as an ordinary note", () => {
+    const { text } = renderOpening(
+      brief({ project_context: [...notes(1, 4, { is_pinned: true, matched: false }), note(50)] }),
+      [],
+    );
+    expect(text).toContain("body of 3");
+    expect(text).not.toContain("body of 4");
+  });
+
+  it("pays for pins out of the matching notes' budget, not on top of it", () => {
+    const pins = notes(1, 3, { is_pinned: true, matched: false, body: "ş".repeat(500) });
+    const { notes: matched } = renderOpening(
+      brief({ project_context: [...pins, ...notes(10, 5, { body: "m".repeat(1_000) })] }),
+      [],
+    );
+    expect(matched).toBe(2);
+  });
+
   it("names a note too long to send instead of cutting it, and still sends the one after it", () => {
     const { text } = renderOpening(
       brief({ project_context: [note(1, { body: "x".repeat(6_000) }), note(2)] }),
@@ -139,8 +180,14 @@ describe("renderOpening", () => {
       brief({
         requested: Array.from({ length: 10 }, (_, i) => ({ id: 500 + i, title: long, body: long })),
         developer: Array.from({ length: 5 }, (_, i) => ({ id: i, kind: "profile", title: long, body: long })),
-        project_context: notes(1, 60, { title: long, body: "b".repeat(1_000) }),
-        global_context: notes(100, 60, { title: long, body: "b".repeat(1_000) }),
+        project_context: [
+          ...notes(900, 3, { title: long, body: "p".repeat(500), is_pinned: true }),
+          ...notes(1, 60, { title: long, body: "b".repeat(1_000) }),
+        ],
+        global_context: [
+          ...notes(950, 3, { title: long, body: "p".repeat(500), is_pinned: true }),
+          ...notes(100, 60, { title: long, body: "b".repeat(1_000) }),
+        ],
         open_tasks: Array.from({ length: 50 }, (_, i) =>
           task(200 + i, i % 2 ? "doing" : "todo", { title: long, open_questions: [{ id: i, head: long }] }),
         ),
@@ -148,6 +195,7 @@ describe("renderOpening", () => {
       Array.from({ length: 3 }, (_, i) => ({ entry_id: i, task_id: i, snippet: long })),
     );
     expect(chars).toBe(text.length);
+    for (const id of [900, 901, 902, 950, 951, 952]) expect(text).toContain(`(note ${id})`);
     expect(chars).toBeLessThanOrEqual(OPENING_MAX_CHARS);
     expect(text.split("\n").at(-1)).toMatch(/^Not shown: \d+ notes, \d+ open tasks\..*shape:'full'/);
   });

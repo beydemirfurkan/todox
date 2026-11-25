@@ -13,6 +13,7 @@ import {
   addContextAction,
   deleteContextAction,
   setContextPublicAction,
+  setContextPinnedAction,
   updateContextAction,
 } from "../actions";
 import {
@@ -48,6 +49,7 @@ const NOTE_ACTIONS = {
   remove: deleteContextAction,
   update: updateContextAction,
   publish: setContextPublicAction,
+  pin: setContextPinnedAction,
 };
 
 /**

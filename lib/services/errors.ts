@@ -39,6 +39,8 @@ export type RefusalReason =
   | "no_evidence"
   /** A developer note (profile, stack, workflow) aimed at a project. */
   | "developer_kind_in_project"
+  /** A note that cannot be pinned: its kind, its length, or three already are. */
+  | "not_pinnable"
   | "other";
 
 /**

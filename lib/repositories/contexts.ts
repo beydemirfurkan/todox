@@ -57,6 +57,8 @@ export type BriefingNote = {
    * ranks. This is the stripped match `search` decides by.
    */
   matched?: boolean;
+  /** Shown to every session, whatever its focus. */
+  is_pinned?: boolean;
   /** How well it matched, comparable across scopes; present beside `matched`. */
   relevance?: number;
 };
@@ -117,6 +119,9 @@ export const listByProject = (userId: number, projectId: number | null) =>
  * That fallback is the property worth keeping: `ts_rank` is 0 for a document
  * the query does not touch, so a focus that matches nothing produces the
  * identical order. Passing one can move a note up; it can never lose one.
+ *
+ * Pinned notes come before either: they are shown to every session, so their
+ * bodies are the first the budget pays for.
  */
 export async function pageByProject(
   userId: number,
@@ -192,7 +197,7 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
   // at ninety notes, 16 with the matches ahead.
   const scored = focused
     ? `scored AS (
-       SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at,
+       SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at, c.is_pinned,
               ${matches(doc)} AS matched, ${rank(doc)} AS relevance
          FROM q CROSS JOIN contexts c
          ${joins}
@@ -200,10 +205,12 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
      ),`
     : ``;
   const ranked = focused
-    ? `SELECT *, row_number() OVER (ORDER BY matched DESC, relevance DESC, updated_at DESC, id DESC) AS rn
+    ? `SELECT *, row_number() OVER (
+              ORDER BY is_pinned DESC, matched DESC, relevance DESC, updated_at DESC, id DESC
+            ) AS rn
          FROM scored`
-    : `SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at,
-              row_number() OVER (ORDER BY c.updated_at DESC, c.id DESC) AS rn
+    : `SELECT c.id, c.kind, c.title, c.body, c.created_at, c.updated_at, c.is_pinned,
+              row_number() OVER (ORDER BY c.is_pinned DESC, c.updated_at DESC, c.id DESC) AS rn
          FROM contexts c
          ${joins}
         WHERE ${where}`;
@@ -219,7 +226,7 @@ export function pageByProjectSql(scope: "account" | "project", focused: boolean)
               ) AS spent_before
          FROM ranked
      )
-     SELECT id, kind, title, created_at, updated_at, ${focused ? `matched, relevance,` : ``}
+     SELECT id, kind, title, created_at, updated_at, is_pinned, ${focused ? `matched, relevance,` : ``}
             CASE WHEN rn <= ? AND coalesce(spent_before, 0) < ? THEN body END AS body
        FROM spent ORDER BY rn`;
 }
@@ -346,19 +353,37 @@ export async function create(input: NewContext): Promise<Context> {
 export const setPublic = (id: number, isPublic: boolean) =>
   run("UPDATE contexts SET is_public = ? WHERE id = ? AND project_id IS NULL", [isPublic, id]);
 
-const COLUMNS = ["kind", "title", "body"] as const;
+const WORDS = ["kind", "title", "body"] as const;
+const COLUMNS = [...WORDS, "is_pinned"] as const;
 
-export async function update(
-  id: number,
-  patch: Partial<Pick<Context, "kind" | "title" | "body">>,
-) {
+export type ContextPatch = Partial<Pick<Context, (typeof COLUMNS)[number]>>;
+
+/**
+ * `updated_at` moves only when the words do. It is how a reader judges whether
+ * a note is still true, and pinning an old one does not make it newer.
+ */
+export async function update(id: number, patch: ContextPatch): Promise<void> {
   const set = setClause(patch, COLUMNS);
   if (!set.sql) return;
-  await run(`UPDATE contexts SET ${set.sql}, updated_at = ? WHERE id = ?`, [
+  const reworded = WORDS.some((column) => patch[column] !== undefined);
+  await run(`UPDATE contexts SET ${set.sql}${reworded ? ", updated_at = ?" : ""} WHERE id = ?`, [
     ...set.values,
-    now(),
+    ...(reworded ? [now()] : []),
     id,
   ]);
+}
+
+/** Pinned notes beside this one: in its project, or account-wide for its owner. */
+export async function countPinnedBeside(note: Pick<Context, "id" | "user_id" | "project_id">): Promise<number> {
+  const [scope, owner] =
+    note.project_id === null
+      ? ["project_id IS NULL AND user_id = ?", note.user_id]
+      : ["project_id = ?", note.project_id];
+  const row = await one<{ n: number }>(
+    `SELECT count(*)::int AS n FROM contexts WHERE ${scope} AND is_pinned AND id <> ?`,
+    [owner, note.id],
+  );
+  return row?.n ?? 0;
 }
 
 export const remove = (id: number) => run("DELETE FROM contexts WHERE id = ?", [id]);

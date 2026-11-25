@@ -1066,9 +1066,9 @@ export function registerTools(server: McpServer, invoke: Invoker, ws: Workspace)
     {
       title: "Correct a context note",
       description:
-        "Rewrite a note that is wrong or out of date; `body` replaces the whole thing. Correct rather than add a second note that disagrees.",
+        "Rewrite a note that is wrong or out of date; `body` replaces the whole thing. Correct rather than add a second note that disagrees. `is_pinned` makes it a rule every session is shown.",
     },
-    { transform: receipt("id", "kind", "project_id") },
+    { transform: receipt("id", "kind", "project_id", "is_pinned") },
   );
 
   tool("delete_context", "deleteContext", {

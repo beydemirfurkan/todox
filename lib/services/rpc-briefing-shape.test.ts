@@ -123,6 +123,18 @@ describe("getContext's two shapes", () => {
     expect((full.project_context as object[])[0]).not.toHaveProperty("relevance");
   });
 
+  it("marks a pinned note in the full briefing, and only a pinned one", async () => {
+    withNote({ is_pinned: true });
+    expect(((await getContext()).project_context as object[])[0]).toHaveProperty("is_pinned", true);
+    withNote({ is_pinned: false });
+    expect(((await getContext()).project_context as object[])[0]).not.toHaveProperty("is_pinned");
+  });
+
+  it("carries a pinned note whole in the digest too", async () => {
+    withNote({ is_pinned: true });
+    expect((await getContext({ shape: "digest" })).digest).toContain("because it deadlocks");
+  });
+
   it("keeps a session's linked files to be hashed though it is not shown them", async () => {
     const files = [{ id: 7, path: "/repo/a.ts", hash: null }];
     mocks.briefing.mockResolvedValue({

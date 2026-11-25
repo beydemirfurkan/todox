@@ -32,6 +32,14 @@ export type ContextKind = (typeof CONTEXT_KINDS)[number];
 export const DEVELOPER_KINDS = ["profile", "stack", "workflow"] as const;
 export type DeveloperKind = (typeof DEVELOPER_KINDS)[number];
 
+/**
+ * Notes shown to every session, whatever its focus: so many per project, and as
+ * many account-wide. Few and short, because they are paid for by sessions they
+ * have nothing to do with -- the cost the opening exists to stop.
+ */
+export const PINNED_PER_SCOPE = 3;
+export const PINNED_BODY_MAX = 500;
+
 /** The kinds a project note can be. */
 export const PROJECT_CONTEXT_KINDS = ["decision", "convention", "gotcha", "preference"] as const;
 

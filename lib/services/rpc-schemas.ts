@@ -5,6 +5,8 @@ import {
   ENTRY_KINDS,
   MAX_PRIORITY,
   MIN_PRIORITY,
+  PINNED_BODY_MAX,
+  PINNED_PER_SCOPE,
   STATUSES,
 } from "../constants";
 import { BadRequest } from "./errors";
@@ -589,6 +591,12 @@ export const SHAPES = {
       .max(MAX.text)
       .optional()
       .describe("Replaces the body outright. Send the whole note, not a diff."),
+    is_pinned: z
+      .boolean()
+      .optional()
+      .describe(
+        `true shows this note whole at the start of every session, whatever its focus; false stops that. Only when the developer asks for it. At most ${PINNED_PER_SCOPE} per project (and ${PINNED_PER_SCOPE} account-wide), body ${PINNED_BODY_MAX} characters or less; in a project, only its owner pins, unpins or edits a pinned note.`,
+      ),
     model,
   },
 
@@ -792,8 +800,8 @@ const OBJECTS: Record<string, z.ZodType> = {
     .object(SHAPES.updateContext)
     .strict()
     .refine(
-      (p) => p.kind !== undefined || p.title !== undefined || p.body !== undefined,
-      { message: "pass at least one of kind, title or body" },
+      (p) => p.kind !== undefined || p.title !== undefined || p.body !== undefined || p.is_pinned !== undefined,
+      { message: "pass at least one of kind, title, body or is_pinned" },
     ),
 
   /**

@@ -333,7 +333,7 @@ the line to add instead.
 
 | tool | what it does |
 | --- | --- |
-| `get_context` | **Call first.** What matches `focus` in a project: rules whole, related dead ends, work in progress. Pass `focus`, in English and your own language, to spend the budget on what matters for this session. Under 8,000 characters; `shape: "full"` returns everything (under about 40,000) and `shape: "digest"` an index of it. |
+| `get_context` | **Call first.** What matches `focus` in a project: rules whole, related dead ends, work in progress. Pinned notes always. Pass `focus`, in English and your own language, to spend the budget on what matters for this session. Under 8,000 characters; `shape: "full"` returns everything (under about 40,000) and `shape: "digest"` an index of it. |
 | `get_developer` | Who the developer is: profile, standing rules, projects and the last 30 days. No project needed. |
 | `create_task` | Capture work that will outlive this session. Warns about related dead ends. |
 | `update_task` | Status, title, body, priority. `doing` and `done` are where durations come from. `doing` answers with the task's last handoff, dead ends and open questions. |
@@ -347,7 +347,7 @@ the line to add instead.
 | `get_context_note` | One note in full. |
 | `get_file_context` | Tasks, dead ends and notes attached to one file. |
 | `session_status` | **Call before finishing.** What you touched and which tasks still need a handoff. |
-| `update_context` · `delete_context` | Fix or remove a note. |
+| `update_context` · `delete_context` | Fix, pin or remove a note. A pinned note is shown to every session. |
 | `search` | Search every project, in English or Turkish. `kinds` narrows to dead ends or decisions. |
 | `get_task` | One task with its log and files. |
 | `list_tasks` · `list_projects` | The plain lists. |

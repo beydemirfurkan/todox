@@ -1,5 +1,17 @@
 import type { Briefing } from "./briefing-digest";
-import { clip, day, developerLine, fill, REQUESTS_HEADING, requestLine, taskLines, type Section } from "./briefing-digest";
+import {
+  clip,
+  day,
+  developerLine,
+  fill,
+  PINNED_HEADING,
+  pinnedNote,
+  pinnedNotes,
+  REQUESTS_HEADING,
+  requestLine,
+  taskLines,
+  type Section,
+} from "./briefing-digest";
 
 /**
  * What a session needs before it has done anything: what it was asked for, what
@@ -11,6 +23,9 @@ import { clip, day, developerLine, fill, REQUESTS_HEADING, requestLine, taskLine
  * is not read, so this is not one: a matching note comes whole, the rest is a
  * count and a way to ask. A task's own log arrives when it is started
  * (`task-resume.ts`), which is why it can be left out here.
+ *
+ * The exception is a pinned note, which is shown whatever the focus: sharing
+ * words with today's work is the wrong test for a rule that binds all of it.
  *
  * Only for a session that sent a `focus` something matched. Without one there
  * is nothing to choose by, and the caller gets the full briefing instead.
@@ -68,14 +83,15 @@ export function hasMatchedNotes(brief: Briefing): boolean {
 }
 
 export function renderOpening(brief: Briefing, deadEnds: RelatedDeadEnd[], maxChars = OPENING_MAX_CHARS): Opening {
-  const strong = strongMatches(brief);
-  const notes = inBudget(strong);
+  const pinned = pinnedNotes(brief);
+  const strong = strongMatches(brief).filter((n) => !pinned.includes(n));
+  const notes = inBudget(strong, MATCHED_NOTE_BYTES - bytesOf(pinned));
   const doing = brief.open_tasks.filter((t) => t.status === "doing").slice(0, IN_PROGRESS);
   const next = brief.open_tasks.filter((t) => !doing.includes(t)).slice(0, UP_NEXT);
   const head = header(brief);
-  const foot = footer(brief, notes.length, doing.length + next.length);
+  const foot = footer(brief, pinned.length + notes.length, doing.length + next.length);
   const alsoMatch = strong.filter((n) => !notes.includes(n)).slice(0, MATCHED_TITLES);
-  const { lines } = fill(sections(brief, { notes, alsoMatch, doing, next, deadEnds }), maxChars - head.length - foot.length - 2);
+  const { lines } = fill(sections(brief, { pinned, notes, alsoMatch, doing, next, deadEnds }), maxChars - head.length - foot.length - 2);
   const text = [head, ...lines, foot].join("\n");
   return { text, chars: text.length, notes: notes.length };
 }
@@ -91,10 +107,12 @@ function strongMatches(brief: Briefing): Note[] {
   return matched.filter((n) => relevanceOf(n) >= weakest);
 }
 
+const bytesOf = (notes: Note[]): number => notes.reduce((n, note) => n + Buffer.byteLength(note.body ?? ""), 0);
+
 /** Whole notes while the budget lasts; one too long to fit is skipped, not cut. */
-function inBudget(ranked: Note[]): Note[] {
+function inBudget(ranked: Note[], budgetBytes: number): Note[] {
   const kept: Note[] = [];
-  let room = MATCHED_NOTE_BYTES;
+  let room = budgetBytes;
   for (const note of ranked) {
     if (note.body === null) continue;
     const cost = Buffer.byteLength(note.body);
@@ -106,6 +124,7 @@ function inBudget(ranked: Note[]): Note[] {
 }
 
 interface Chosen {
+  pinned: Note[];
   notes: Note[];
   alsoMatch: Note[];
   doing: Briefing["open_tasks"];
@@ -114,7 +133,7 @@ interface Chosen {
 }
 
 /** ORDERED: what comes first is what survives when there is not room for all of it. */
-function sections(brief: Briefing, { notes, alsoMatch, doing, next, deadEnds }: Chosen): Section[] {
+function sections(brief: Briefing, { pinned, notes, alsoMatch, doing, next, deadEnds }: Chosen): Section[] {
   const questions = brief.open_tasks
     .flatMap((t) => t.open_questions.map((q) => clip(`- #${t.id} (entry ${q.id}): ${q.head}`, 240)))
     .slice(0, QUESTIONS);
@@ -122,6 +141,7 @@ function sections(brief: Briefing, { notes, alsoMatch, doing, next, deadEnds }: 
     .filter((o) => o.handoff_missing.length)
     .map((o) => `- ${day(o.observed_at)}: no handoff on ${o.handoff_missing.map((id) => `#${id}`).join(", ")} (observation ${o.id})`);
   return [
+    { name: "notes", heading: PINNED_HEADING, items: pinned.map(pinnedNote) },
     { name: "requests", heading: REQUESTS_HEADING, items: (brief.requested ?? []).map(requestLine) },
     { name: "developer notes", heading: "The developer:", items: brief.developer.map(developerLine) },
     { name: "notes", heading: "Notes matching your focus, whole:", items: notes.map(noteInFull) },

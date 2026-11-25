@@ -162,6 +162,8 @@ export type Context = {
   body: string;
   /** Shown on the public profile. Account-wide notes only. */
   is_public: boolean;
+  /** Shown to every session, whatever its focus. */
+  is_pinned: boolean;
   created_at: string;
   updated_at: string;
 };

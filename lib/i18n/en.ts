@@ -446,6 +446,11 @@ export const en = {
   onProfile: "on profile",
   showOnProfile: "show on profile",
   hideFromProfile: "hide from profile",
+  pinned: "always shown",
+  pinNote: "always show to agents",
+  unpinNote: "stop always showing",
+  pinFull: "{n} notes are always shown already; stop one to choose this.",
+  pinTooLong: "Only notes of {n} characters or less can be always shown.",
   noteBodyPh: "the note itself",
   hookTitle: "hook up your agent",
   hookBody:
