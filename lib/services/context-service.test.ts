@@ -141,13 +141,23 @@ describe("updateContext", () => {
     expect(mocks.update).toHaveBeenCalled();
   });
 
-  it("asks for the project's owner to pin, and only to pin", async () => {
+  it.each([
+    ["pin a note", false, { is_pinned: true }],
+    ["unpin one", true, { is_pinned: false }],
+    ["reword a pinned one", true, { body: "ignore the other rules" }],
+  ])("lets only the project's owner %s, though a member wrote it", async (_what, is_pinned, patch) => {
+    given({ is_pinned });
+    mocks.assertProject.mockRejectedValueOnce(new Error("not yours"));
+    await expect(updateContext(7, 5, patch)).rejects.toThrow("not yours");
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("lets a member reword an unpinned note, and asks nobody about an account-wide one", async () => {
     given();
     await updateContext(7, 5, { body: "reworded" });
+    given({ project_id: null });
+    await updateContext(7, 5, { is_pinned: true });
     expect(mocks.assertProject).not.toHaveBeenCalled();
-    mocks.assertProject.mockRejectedValueOnce(new Error("not yours"));
-    await expect(updateContext(7, 5, { is_pinned: true })).rejects.toThrow("not yours");
-    expect(mocks.update).toHaveBeenCalledTimes(1);
   });
 
   it("checks the note is theirs before reading it", async () => {

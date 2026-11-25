@@ -595,7 +595,7 @@ export const SHAPES = {
       .boolean()
       .optional()
       .describe(
-        `true shows this note whole at the start of every session, whatever its focus; false stops that. Only when the developer asks for it. At most ${PINNED_PER_SCOPE} per project (and ${PINNED_PER_SCOPE} account-wide), body ${PINNED_BODY_MAX} characters or less; in a project, its owner only.`,
+        `true shows this note whole at the start of every session, whatever its focus; false stops that. Only when the developer asks for it. At most ${PINNED_PER_SCOPE} per project (and ${PINNED_PER_SCOPE} account-wide), body ${PINNED_BODY_MAX} characters or less; in a project, only its owner pins, unpins or edits a pinned note.`,
       ),
     model,
   },

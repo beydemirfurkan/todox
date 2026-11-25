@@ -43,6 +43,8 @@ describe("pinning a note", () => {
     const html = render([note(1, { is_pinned: true })], false);
     expect(html).toContain(t("pinned"));
     expect(html).not.toContain(t("unpinNote"));
+    expect(html).not.toContain(t("editNote"));
+    expect(render([note(1)], false)).toContain(t("editNote"));
   });
 
   it("can be undone when three are, and says so on the fourth", () => {

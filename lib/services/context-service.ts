@@ -58,8 +58,12 @@ export async function updateContext(
   if (!note) return undefined;
   const edited = { ...note, ...patch };
   if (isDeveloperKind(edited.kind) && note.project_id !== null) throw developerKindInProject(edited.kind);
+  // Pinned before or after: pinning, unpinning and rewording all decide what
+  // everybody's sessions are told, so in a project they are its owner's. The
+  // note's author keeps the right to delete it.
+  if ((note.is_pinned || edited.is_pinned) && note.project_id !== null) await assertProject(userId, note.project_id);
   if (edited.is_pinned) assertPinnable(edited);
-  if (edited.is_pinned && !note.is_pinned) await assertMayPin(userId, note);
+  if (edited.is_pinned && !note.is_pinned) await assertRoomToPin(note);
   await contexts.update(id, patch);
   return contexts.byId(id);
 }
@@ -84,9 +88,7 @@ function assertPinnable(note: Pick<Context, "kind" | "body">): void {
     );
 }
 
-/** The owner's call in a project, not any member's: it reaches everybody's sessions. */
-async function assertMayPin(userId: number, note: Context): Promise<void> {
-  if (note.project_id !== null) await assertProject(userId, note.project_id);
+async function assertRoomToPin(note: Context): Promise<void> {
   if ((await contexts.countPinnedBeside(note)) >= PINNED_PER_SCOPE)
     throw new BadRequest(
       `${PINNED_PER_SCOPE} notes are already pinned ${note.project_id === null ? "account-wide" : "in this project"}: ` +

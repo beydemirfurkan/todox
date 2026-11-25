@@ -101,7 +101,8 @@ function NoteRow({
             {note.body}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-            <NoteEditor note={note} t={t} update={actions.update} />
+            {/* What every session is shown is edited by whoever may pin it. */}
+            {(!note.is_pinned || actions.pin) && <NoteEditor note={note} t={t} update={actions.update} />}
             {publishable && actions.publish && (
               <form action={actions.publish}>
                 <input type="hidden" name="context_id" value={note.id} />
