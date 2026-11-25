@@ -362,6 +362,12 @@ CREATE INDEX IF NOT EXISTS idx_contexts_user ON contexts (user_id);
 -- reaches the profile, whatever this says.
 ALTER TABLE contexts ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
 
+-- A rule every session is shown, whatever it says it is about. The opening
+-- carries only notes that share words with the focus, which is the wrong test
+-- for a rule that binds all work. Capped at write time, per project and for
+-- the account-wide notes.
+ALTER TABLE contexts ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN NOT NULL DEFAULT false;
+
 -- The public profile at /u/<username>. Off until the owner turns it on, and
 -- read only through explicit column lists, never SELECT star, so email and the
 -- password hash cannot reach it by accident.
