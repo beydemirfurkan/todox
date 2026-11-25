@@ -37,7 +37,7 @@ function harness(ws: Workspace, answer: unknown = { ok: true }) {
 
   registerTools(server, async (method, params) => {
     calls.push({ method, params });
-    return answer;
+    return typeof answer === "function" ? answer(params) : answer;
   }, ws);
 
   return { tools, prompts, calls };
@@ -264,6 +264,38 @@ describe("the payload the agent receives", () => {
     await tools.get("get_context")!.handler({ cwd: "/repo", focus: "x" });
     await tools.get("get_context")!.handler({ cwd: "/repo", shape: "full" });
     expect(calls.map((c) => c.params.shape)).toEqual(["opening", "full"]);
+  });
+
+  describe("a server older than the opening", () => {
+    const refusing = (message: string) => (params: Record<string, unknown>) => {
+      if (params.shape === "opening") throw new Error(message);
+      return { project: { slug: "repo" }, open_tasks: [] };
+    };
+    const briefed = async (message: string, args: object = {}) => {
+      const { tools, calls } = harness(remoteWs, refusing(message));
+      const result = await tools.get("get_context")!.handler({ cwd: "/repo", focus: "x", ...args });
+      return { calls, result: result as { isError?: boolean; content: { text: string }[] } };
+    };
+
+    it.each([
+      ['invalid params for getContext — shape: Invalid option: expected one of "full"|"digest"'],
+      ['invalid params for getContext — Unrecognized key: "shape"'],
+    ])("is asked again without it: %s", async (message) => {
+      const { calls, result } = await briefed(message);
+      expect(calls.map((c) => c.params.shape)).toEqual(["opening", undefined]);
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('"slug":"repo"');
+    });
+
+    it.each([
+      ["what the agent asked for is not dropped", "invalid params for getContext — shape: no", { shape: "opening" }],
+      ["another parameter was refused", "invalid params for getContext — focus: Too long", {}],
+      ["the failure is not a refusal", "the shape of things", {}],
+    ])("is not asked twice when %s", async (_when, message, args) => {
+      const { calls, result } = await briefed(message, args);
+      expect(calls).toHaveLength(1);
+      expect(result.isError).toBe(true);
+    });
   });
 
   it("hands an opening over as text, with what only this side knows under it", async () => {
