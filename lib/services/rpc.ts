@@ -755,9 +755,10 @@ type ShapedBriefing =
 
 /** What chose the opening; in a payload that shows everything it is only bytes. */
 function withoutMatched(brief: Briefing): Briefing {
-  const bare = <N extends { matched?: boolean; relevance?: number; is_pinned?: boolean }>({
+  const bare = <N extends { matched?: boolean; relevance?: number; is_close?: boolean; is_pinned?: boolean }>({
     matched: _m,
     relevance: _r,
+    is_close: _c,
     is_pinned,
     ...note
   }: N) => ({ ...note, ...(is_pinned ? { is_pinned } : {}) });
